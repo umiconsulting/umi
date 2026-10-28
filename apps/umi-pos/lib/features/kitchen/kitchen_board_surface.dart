@@ -344,8 +344,8 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
         if (!state.stations.any((known) => known.id == station.id)) station,
     ];
     if (_stationFilter != null &&
-        _stationFilter != _screenStationId &&
-        !stations.any((station) => station.id == _stationFilter)) {
+        known.isNotEmpty &&
+        !known.any((station) => station.id == _stationFilter)) {
       _stationFilter = null;
     }
     final chipStations = [...known];

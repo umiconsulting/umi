@@ -69,4 +69,47 @@ describe('POS cash movement concurrency', () => {
       },
     });
   });
+
+  it('names a cash-policy refusal instead of returning a generic server failure', async () => {
+    const client = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              status: 'open',
+              registerId: '00000000-0000-4000-8000-000000000008',
+              currency: 'MXN',
+              businessDate: '2026-10-24',
+              version: 14,
+              sequence: '20',
+              holdingDeviceId: deviceId,
+              responsibleOperatorId: operatorId,
+            },
+          ],
+        })
+        // No active policy row is the repository's documented default-deny.
+        .mockResolvedValueOnce({ rows: [] }),
+    };
+    const repository = new PosCashRepository({} as never);
+
+    await expect(
+      repository.movement(
+        client as never,
+        merchantId,
+        {
+          operatorSessionId: movement.operatorSessionId,
+          operatorId,
+          deviceId,
+          credentialVersion: 1,
+          permissions: ['cash.movement.paid_out'],
+        },
+        movement,
+      ),
+    ).rejects.toMatchObject({
+      name: 'CashRefusal',
+      code: 'CASH_POLICY_DENIED',
+      status: 409,
+    });
+  });
 });

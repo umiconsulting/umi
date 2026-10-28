@@ -117,6 +117,7 @@ final class _CheckoutRepository implements CheckoutRepository {
   int? repricedGrandTotalMinorUnits;
   bool responseLost = false;
   bool idempotencyConflictSent = false;
+  String? commitFailureCode;
   bool requireCashShift = false;
   String cashHoldState = 'free';
   final commands = <CheckoutCommand>[];
@@ -307,6 +308,14 @@ final class _CheckoutRepository implements CheckoutRepository {
         code: 'CASH_SHIFT_REQUIRED',
         recoverable: false,
         details: {'holdState': cashHoldState},
+      );
+    }
+    final refusedCommit = commitFailureCode;
+    if (refusedCommit != null && command.totalsFingerprint != null) {
+      throw AppException(
+        category: AppErrorCategory.conflict,
+        code: refusedCommit,
+        recoverable: false,
       );
     }
     if (loseCommitResponseOnce && !responseLost) {
@@ -1590,6 +1599,44 @@ void main() {
     expect(repository.captures, hasLength(1));
     expect(repository.settlements, isEmpty);
   });
+
+  test(
+    'a confirmed external payment whose sale does not close is never presented as a generic checkout error',
+    () async {
+      final repository = _CheckoutRepository()
+        ..commitFailureCode = 'CHECKOUT_CART_CHANGED';
+      final controller = _controller(repository);
+      await controller.preview(
+        merchantId: '00000000-0000-4000-8000-000000000001',
+        locationId: '00000000-0000-4000-8000-000000000002',
+        operatorSessionId: '00000000-0000-4000-8000-000000000003',
+        cartId: '00000000-0000-4000-8000-000000000004',
+        cartVersion: 3,
+        paymentMethod: 'external_terminal',
+        tenderDrafts: const [
+          {
+            'id': '00000000-0000-4000-8000-000000000302',
+            'type': 'manual_terminal',
+            'amount': {'minorUnits': 11600, 'currency': 'MXN'},
+            'amountReceived': null,
+            'status': 'confirmed_success',
+            'correlationId': 'terminal-test',
+          },
+        ],
+      );
+
+      await controller.confirm();
+
+      expect(controller.state.phase, CheckoutPhase.failure);
+      expect(
+        controller.state.errorCode,
+        'EXTERNAL_PAYMENT_NOT_COMMITTED',
+      );
+      expect(controller.state.failureDetails?['causeCode'], 'CHECKOUT_CART_CHANGED');
+      expect(repository.captures, hasLength(1));
+      expect(repository.settlements, hasLength(1));
+    },
+  );
 
   test(
     'a failure the protocol does not describe reaches the failure surface',

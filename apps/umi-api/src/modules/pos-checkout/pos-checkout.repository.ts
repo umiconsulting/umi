@@ -24,12 +24,25 @@ import { deviceRegisterHoldDetails, resolveDeviceRegisterHold } from './cash-shi
 export interface CheckoutLine {
   id: string;
   productId: string;
+  productName: string;
+  saleAction: 'merchandise' | 'gift_card';
   variantId: string | null;
+  variantName: string | null;
+  variantAttributes: Record<string, string>;
   quantity: number;
   /** §8H step 4. The course this cart line is served in; 1 when never set. */
   courseNumber: number;
   note: string | null;
-  modifiers: Array<{ modifierId: string; quantity: number }>;
+  basePrice: number;
+  variantDelta: number;
+  taxRateBasisPoints: number;
+  modifiers: Array<{
+    modifierId: string;
+    groupId: string;
+    name: string;
+    quantity: number;
+    priceDelta: number;
+  }>;
 }
 
 export interface CheckoutCart {
@@ -41,6 +54,7 @@ export interface CheckoutCart {
   version: number;
   businessDate: string;
   merchantName: string;
+  currency: string;
   /** The café's logo URL, as `merchant.logo_url` holds it. Null when none is uploaded. */
   merchantLogoUrl: string | null;
   locationName: string;
@@ -706,7 +720,7 @@ export class PosCheckoutRepository {
       `SELECT c.id::text,c.merchant_id::text AS "merchantId",c.location_id::text AS "locationId",
               c.operator_session_id::text AS "operatorSessionId",
               c.original_operator_user_id::text AS "originalOperatorUserId",c.version,
-              c.business_date::text AS "businessDate",b.name AS "merchantName",
+              c.business_date::text AS "businessDate",b.name AS "merchantName",b.currency,
               b.logo_url AS "merchantLogoUrl",
               br.name AS "locationName",b.timezone,$6::text AS "operatorName",
               c.customer_id::text AS "customerId",
@@ -724,16 +738,25 @@ export class PosCheckoutRepository {
     );
     if (!cart.rows[0]) return null;
     const lines = await client.query<CheckoutLine>(
-      `SELECT l.id::text,l.product_id::text AS "productId",
-              l.variant_id::text AS "variantId",l.quantity,l.course_number AS "courseNumber",
-              l.note,
-              COALESCE(jsonb_agg(jsonb_build_object('modifierId',m.modifier_id::text,
-                'quantity',m.quantity) ORDER BY m.modifier_id)
+      `SELECT l.id::text,l.product_id::text AS "productId",l.product_name AS "productName",
+              p.sale_action AS "saleAction",
+              l.variant_id::text AS "variantId",l.variant_name AS "variantName",
+              l.variant_attributes AS "variantAttributes",
+              l.quantity,l.course_number AS "courseNumber",l.note,
+              l.base_price::int AS "basePrice",l.variant_delta::int AS "variantDelta",
+              l.tax_rate_basis_points AS "taxRateBasisPoints",
+              COALESCE(jsonb_agg(jsonb_build_object(
+                'modifierId',m.modifier_id::text,
+                'groupId',m.group_id::text,
+                'name',m.name,
+                'quantity',m.quantity,
+                'priceDelta',m.price_delta::int) ORDER BY m.name,m.modifier_id)
                 FILTER(WHERE m.id IS NOT NULL),'[]') AS modifiers
        FROM merchant.pos_cart_line l
+       JOIN merchant.product p ON p.id=l.product_id AND p.merchant_id=l.merchant_id
        LEFT JOIN merchant.pos_cart_line_modifier m ON m.line_id=l.id
        WHERE l.merchant_id=$1::uuid AND l.cart_id=$2::uuid
-       GROUP BY l.id ORDER BY l.created_at,l.id`,
+       GROUP BY l.id,p.sale_action ORDER BY l.created_at,l.id`,
       [merchantId, cartId],
     );
     return lines.rows.length ? { ...cart.rows[0], lines: lines.rows } : null;
@@ -1865,6 +1888,38 @@ export class PosCheckoutRepository {
        SET status='committed',lifecycle_state='committed',updated_at=now()
        WHERE id=$1::uuid AND version=$2`,
       [cart.id, cart.version],
+    );
+    // A paid table visit ends with the sale. The cart remains committed as the
+    // commercial record, while the floor must become dirty and free for the next
+    // party. Joining the visit prevents a delayed commit from clearing a newer
+    // party that has already reused the physical table.
+    await client.query(
+      `WITH sold AS (
+         SELECT c.table_id,c.table_visit_id,t.group_id
+           FROM merchant.pos_cart c
+           JOIN merchant.table_state t
+             ON t.merchant_id=c.merchant_id
+            AND t.location_id=c.location_id
+            AND t.table_id=c.table_id
+            AND t.visit_id=c.table_visit_id
+          WHERE c.merchant_id=$1::uuid
+            AND c.location_id=$2::uuid
+            AND c.id=$3::uuid
+       ), released AS (
+         UPDATE merchant.table_state t
+            SET state='dirty',seated_at=NULL,party_size=NULL,group_id=NULL,updated_at=now()
+           FROM sold
+          WHERE t.merchant_id=$1::uuid
+            AND t.location_id=$2::uuid
+            AND t.seated_at IS NOT NULL
+            AND (
+              (t.table_id=sold.table_id AND t.visit_id=sold.table_visit_id)
+              OR (sold.group_id IS NOT NULL AND t.group_id=sold.group_id)
+            )
+          RETURNING t.table_id
+       )
+       SELECT count(*)::int AS released FROM released`,
+      [cart.merchantId, cart.locationId, cart.id],
     );
     return {
       sale: {

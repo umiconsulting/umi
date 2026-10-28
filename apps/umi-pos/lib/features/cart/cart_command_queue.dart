@@ -131,12 +131,14 @@ final class CartCommandQueue {
   bool _replayScheduled = false;
   bool _reconciling = false;
   bool _disposed = false;
+  int _selectionGeneration = 0;
 
   bool get hasPending => _commands.isNotEmpty;
   int get pendingCount => _commands.length;
   bool get awaitsSynchronization => _journalBacked && _commands.isNotEmpty;
 
   void clearLocal() {
+    _selectionGeneration += 1;
     _commands.clear();
     _cartAliases.clear();
     _lineAliases.clear();
@@ -157,6 +159,7 @@ final class CartCommandQueue {
   }
 
   void initialize(Cart cart) {
+    _selectionGeneration += 1;
     _serverCart = cart;
     if (_initialized) return;
     _initialized = true;
@@ -557,7 +560,7 @@ final class CartCommandQueue {
     idempotencyKey: command.idempotencyKey,
   );
 
-  Future<Cart> _readServerCart(CartCommandScope scope) {
+  Future<Cart> _readServerCart(CartCommandScope scope, {String? cartId}) {
     final selected = _serverCart;
     if (selected == null) {
       throw const AppException(
@@ -566,7 +569,7 @@ final class CartCommandQueue {
         recoverable: true,
       );
     }
-    final cart = _cartAliases[selected.id] ?? selected.id;
+    final cart = cartId ?? _cartAliases[selected.id] ?? selected.id;
     final query = CartQuery(
       locationId: scope.locationId,
       operatorSessionId: scope.operatorSessionId,
@@ -669,7 +672,7 @@ final class CartCommandQueue {
     final recovery = _recovery;
     final scope = _scope();
     final hub = _hub;
-    if (scope == null || _replayScheduled) return;
+    if (scope == null || _replayScheduled || _reconciling) return;
     if (hub != null) {
       _replayScheduled = true;
       unawaited(
@@ -747,7 +750,6 @@ final class CartCommandQueue {
         _reconciling) {
       return;
     }
-    _reconciling = true;
     unawaited(_settleAfterReplay());
   }
 
@@ -820,50 +822,64 @@ final class CartCommandQueue {
   }
 
   Future<void> _settleAfterReplay() async {
+    if (_disposed || _reconciling) return;
+    _reconciling = true;
+    final generation = _selectionGeneration;
     final settling = _commands.map((command) => command.commandId).toSet();
-    // Recovery can drain journal work left by a previous process before the
-    // operator has selected an account. That work is still durable and belongs
-    // in Cuentas, but adopting it here would repaint an old order over the clean
-    // till that explicit login just created.
-    final hasLocalProjection = _commands.isNotEmpty || _serverCart != null;
+    final selectedId = _serverCart?.id;
+    var refreshed = false;
     try {
       final snapshot = await _journal.load();
-      if (_commands.length != settling.length ||
-          _commands.any((command) => !settling.contains(command.commandId))) {
-        return;
-      }
-      final stillPending = snapshot.entries.any(
-        (entry) =>
-            offlineOrderCommandTypes.contains(entry.command.commandType) &&
-            entry.status != JournalStatus.accepted &&
-            entry.status != JournalStatus.duplicate &&
-            entry.status != JournalStatus.archived,
-      );
-      if (stillPending) return;
+      if (_disposed || generation != _selectionGeneration) return;
+      final terminalIds = snapshot.entries
+          .where(
+            (entry) => switch (entry.status) {
+              JournalStatus.accepted ||
+              JournalStatus.duplicate ||
+              JournalStatus.resolved ||
+              JournalStatus.archived => true,
+              _ => false,
+            },
+          )
+          .map((entry) => entry.command.commandId)
+          .toSet();
+      final confirmed = settling.intersection(terminalIds);
+      if (settling.isNotEmpty && confirmed.isEmpty) return;
       final scope = _scope();
-      if (scope == null) return;
-      // The journal is the authority for "is anything still unsynced". Once it
-      // says nothing is, the in-memory list has done its job and must stop
-      // being counted — otherwise the header keeps saying "2 sin sincronizar"
-      // over a queue the server has already accepted, which is exactly the
-      // second-guessing this work exists to remove.
-      _commands.clear();
-      _cartAliases.clear();
-      _lineAliases.clear();
-      _journalBacked = false;
-      _onSettled?.call();
-      if (!hasLocalProjection) return;
-      try {
-        final cart = await _readServerCart(scope);
+      if (scope == null || selectedId == null) return;
+      final target =
+          snapshot.mappings[selectedId] ??
+          _cartAliases[selectedId] ??
+          selectedId;
+
+      // Keep new taps durable until the API snapshot supplies the current version.
+      _journalBacked = true;
+      final cart = await _readServerCart(scope, cartId: target);
+      if (_disposed || generation != _selectionGeneration) return;
+      if (_repository is OpenAccountCartRepository && cart.id != target) return;
+
+      _commands.removeWhere((command) => confirmed.contains(command.commandId));
+      _journaledCommands.removeAll(confirmed);
+      _cartAliases.addAll(snapshot.mappings);
+      final current = _serverCart;
+      if (current == null ||
+          current.id != cart.id ||
+          current.version <= cart.version) {
         _serverCart = cart;
-        _onCart(cart);
-      } catch (_) {
-        // The local cart stays on screen; the next read replaces it.
       }
+      _journalBacked = _commands.isNotEmpty;
+      _emitPrediction();
+      if (_commands.isEmpty) _onSettled?.call();
+      refreshed = true;
     } catch (_) {
-      // Keep the local commands until the server read succeeds.
+      // Preserve the projection and journal. A later sync retries the read.
     } finally {
       _reconciling = false;
+      if (!_disposed &&
+          _commands.isNotEmpty &&
+          (refreshed || generation != _selectionGeneration)) {
+        unawaited(_start());
+      }
     }
   }
 

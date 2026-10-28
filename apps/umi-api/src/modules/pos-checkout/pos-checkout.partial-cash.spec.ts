@@ -104,6 +104,7 @@ describe('cierre con abonos de efectivo', () => {
         version: 1,
         businessDate: '2026-10-13',
         merchantName: 'Umi',
+        currency: 'MXN',
         merchantLogoUrl: null,
         locationName: 'Local',
         operatorName: 'Cajero',

@@ -662,15 +662,28 @@ export class PosCashRepository {
       });
     }
     const policy = await this.policy(client, merchantId, dto.locationId, current.currency);
-    if (!policy.allowedMovementTypes.includes(dto.type)) throw new Error('CASH_POLICY_DENIED');
+    if (!policy.allowedMovementTypes.includes(dto.type)) {
+      throw new CashRefusal('CASH_POLICY_DENIED', 409, {
+        movementType: dto.type,
+        allowedMovementTypes: policy.allowedMovementTypes.join(','),
+      });
+    }
     if (
       dto.amount.minorUnits >= policy.movementApprovalThreshold.minorUnits &&
       dto.approvalId === null
     ) {
-      throw new Error('APPROVAL_REQUIRED');
+      throw new CashRefusal('APPROVAL_REQUIRED', 409, {
+        movementType: dto.type,
+        amountMinorUnits: dto.amount.minorUnits,
+        approvalThresholdMinorUnits: policy.movementApprovalThreshold.minorUnits,
+      });
     }
     if (dto.approvalId) {
-      if (!dto.actionFingerprint) throw new Error('APPROVAL_FINGERPRINT_REQUIRED');
+      if (!dto.actionFingerprint) {
+        throw new CashRefusal('APPROVAL_FINGERPRINT_REQUIRED', 409, {
+          movementType: dto.type,
+        });
+      }
       const expectedFingerprint = createHash('sha256')
         .update(
           [
@@ -687,7 +700,9 @@ export class PosCashRepository {
         )
         .digest('hex');
       if (dto.actionFingerprint !== expectedFingerprint) {
-        throw new Error('APPROVAL_FINGERPRINT_MISMATCH');
+        throw new CashRefusal('APPROVAL_FINGERPRINT_MISMATCH', 409, {
+          movementType: dto.type,
+        });
       }
       await this.consumeApproval(client, dto.approvalId, {
         merchantId,
@@ -700,7 +715,11 @@ export class PosCashRepository {
     if (dto.type === 'paid_out' || dto.type === 'safe_drop') {
       const expected = await this.expectedCash(client, dto.shiftId);
       if (dto.amount.minorUnits > expected.expectedDrawerCash.minorUnits) {
-        throw new Error('INSUFFICIENT_EXPECTED_CASH');
+        throw new CashRefusal('INSUFFICIENT_EXPECTED_CASH', 409, {
+          movementType: dto.type,
+          requestedMinorUnits: dto.amount.minorUnits,
+          expectedDrawerCashMinorUnits: expected.expectedDrawerCash.minorUnits,
+        });
       }
     }
     const sequence = Number(current.sequence) + 1;

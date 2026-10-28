@@ -316,9 +316,9 @@ final class CheckoutController extends ChangeNotifier {
         );
         return;
       }
-      final cached = _confirmationCache['${cart.id}:${cart.version}'];
+      final cached = _confirmationCache[_confirmationCacheKey(cart)];
       final confirmation = cached ?? _localConfirmation(cart);
-      _confirmationCache['${cart.id}:${cart.version}'] = confirmation;
+      _confirmationCache[_confirmationCacheKey(cart)] = confirmation;
       _set(
         CheckoutState(
           phase: CheckoutPhase.confirmationRequired,
@@ -934,7 +934,7 @@ final class CheckoutController extends ChangeNotifier {
     if (_shouldCommitLocally()) {
       if (fingerprint == null && _cart != null) {
         final confirmation = _localConfirmation(_cart!);
-        _confirmationCache['${_cart!.id}:${_cart!.version}'] = confirmation;
+        _confirmationCache[_confirmationCacheKey(_cart!)] = confirmation;
         _event('totals_confirmed_offline');
         _set(
           CheckoutState(
@@ -1020,7 +1020,7 @@ final class CheckoutController extends ChangeNotifier {
         ),
       );
       if (phase == CheckoutPhase.confirmationRequired && _cart != null) {
-        _confirmationCache['${_cart!.id}:${_cart!.version}'] = result;
+        _confirmationCache[_confirmationCacheKey(_cart!)] = result;
       }
       if (phase == CheckoutPhase.completed) {
         _event('payment_completed');
@@ -1069,7 +1069,7 @@ final class CheckoutController extends ChangeNotifier {
         _connectivity?.networkDown();
         if (fingerprint == null && _cart != null) {
           final confirmation = _localConfirmation(_cart!);
-          _confirmationCache['${_cart!.id}:${_cart!.version}'] = confirmation;
+          _confirmationCache[_confirmationCacheKey(_cart!)] = confirmation;
           _set(
             CheckoutState(
               phase: CheckoutPhase.confirmationRequired,
@@ -1087,6 +1087,21 @@ final class CheckoutController extends ChangeNotifier {
     } catch (error) {
       _unexpected(error);
     }
+  }
+
+  // Optimistic edits can change lines and totals before the API assigns a version.
+  String _confirmationCacheKey(Cart cart) {
+    final fingerprint = sha256.convert(
+      utf8.encode(
+        jsonEncode({
+          'cartId': cart.id,
+          'cartVersion': cart.version,
+          'items': cart.items,
+          'totals': cart.totals,
+        }),
+      ),
+    );
+    return fingerprint.toString();
   }
 
   CheckoutResult _localConfirmation(Cart cart) {
@@ -1136,10 +1151,10 @@ final class CheckoutController extends ChangeNotifier {
       _offlineCheckout != null &&
       _cart != null &&
       _authority != null &&
+      _isSimpleCashTender &&
       (error.category == AppErrorCategory.transport ||
           error.category == AppErrorCategory.timeout ||
-          error.category == AppErrorCategory.server ||
-          error.category == AppErrorCategory.unknown);
+          error.category == AppErrorCategory.server);
 
   /// The offline evidence is strong enough to skip the round trip.
   ///
@@ -1399,12 +1414,20 @@ final class CheckoutController extends ChangeNotifier {
       );
     }
     _event('checkout_failed', {'code': error.code});
+    final externalPaymentConfirmed = _tenderDrafts.any(
+      (tender) =>
+          tender['type'] != 'cash' && tender['status'] == 'confirmed_success',
+    );
     _set(
       CheckoutState(
         phase: CheckoutPhase.failure,
         result: _state.result,
-        errorCode: error.code,
-        failureDetails: error.details,
+        errorCode: externalPaymentConfirmed
+            ? 'EXTERNAL_PAYMENT_NOT_COMMITTED'
+            : error.code,
+        failureDetails: externalPaymentConfirmed
+            ? {...?error.details, 'causeCode': error.code}
+            : error.details,
       ),
     );
   }

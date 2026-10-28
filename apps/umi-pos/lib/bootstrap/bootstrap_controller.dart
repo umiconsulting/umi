@@ -43,8 +43,7 @@ final class BootstrapController extends ChangeNotifier {
   bool _provenCompatibility = false;
 
   static const _compatibilityKey = 'bootstrap.compatibility_proof.v1';
-  static const _compatibilityPreferenceKey =
-      'bootstrap.compatibility_proof.v1';
+  static const _compatibilityPreferenceKey = 'bootstrap.compatibility_proof.v1';
   static const _lastFailureKey = 'bootstrap.last_failure';
   static const _proofValidity = Duration(days: 7);
 
@@ -138,6 +137,7 @@ final class BootstrapController extends ChangeNotifier {
           BootstrapState(
             BootstrapPhase.configurationInvalid,
             diagnosticCategory: configFailure.category.name,
+            diagnosticCode: configFailure.code,
           ),
         );
         return;
@@ -165,6 +165,7 @@ final class BootstrapController extends ChangeNotifier {
             const BootstrapState(
               BootstrapPhase.recoverableFailure,
               diagnosticCategory: 'apiUnavailable',
+              diagnosticCode: 'API_UNAVAILABLE',
             ),
           );
           return;
@@ -177,6 +178,7 @@ final class BootstrapController extends ChangeNotifier {
           BootstrapState(
             BootstrapPhase.unrecoverableFailure,
             diagnosticCategory: releaseCompatibility.name,
+            diagnosticCode: releaseCompatibility.name,
           ),
         );
         return;
@@ -190,6 +192,7 @@ final class BootstrapController extends ChangeNotifier {
           BootstrapState(
             BootstrapPhase.storageUnavailable,
             diagnosticCategory: storage.category,
+            diagnosticCode: 'SECURE_STORAGE_UNAVAILABLE',
           ),
         );
         return;
@@ -203,6 +206,7 @@ final class BootstrapController extends ChangeNotifier {
               : BootstrapPhase.unrecoverableFailure,
           correlationId: error.correlationId,
           diagnosticCategory: error.category.name,
+          diagnosticCode: error.code,
         ),
       );
     } catch (_) {
@@ -210,6 +214,7 @@ final class BootstrapController extends ChangeNotifier {
         const BootstrapState(
           BootstrapPhase.unrecoverableFailure,
           diagnosticCategory: 'unknown',
+          diagnosticCode: 'UNKNOWN_BOOTSTRAP_FAILURE',
         ),
       );
     } finally {
@@ -231,7 +236,8 @@ final class BootstrapController extends ChangeNotifier {
 
   void _setState(BootstrapState next) {
     _state = next;
-    final failed = next.phase == BootstrapPhase.recoverableFailure ||
+    final failed =
+        next.phase == BootstrapPhase.recoverableFailure ||
         next.phase == BootstrapPhase.unrecoverableFailure ||
         next.phase == BootstrapPhase.configurationInvalid ||
         next.phase == BootstrapPhase.storageUnavailable;
@@ -239,7 +245,8 @@ final class BootstrapController extends ChangeNotifier {
       unawaited(
         _preferences.writeString(
           _lastFailureKey,
-          '${next.phase.name}|${next.diagnosticCategory ?? 'unknown'}',
+          '${next.phase.name}|${next.diagnosticCategory ?? 'unknown'}|'
+          '${next.diagnosticCode ?? 'unknown'}',
         ),
       );
     }
@@ -250,6 +257,7 @@ final class BootstrapController extends ChangeNotifier {
       debugPrint(
         'umi_pos.bootstrap phase=${next.phase.name} '
         'category=${next.diagnosticCategory ?? '-'} '
+        'code=${next.diagnosticCode ?? '-'} '
         'correlation=${next.correlationId ?? '-'} '
         'clientContract=${_config.release.contractVersion} '
         'clientVersion=${_config.release.version} '

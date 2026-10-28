@@ -217,6 +217,7 @@
   "appliedAmountLabel": "Applied amount",
   "remainingBalanceLabel": "Remaining balance",
   "offlineAdvancedTenderBlockedMessage": "Reconnect to use manual terminal, mixed payment, tips, or discounts. The sale is preserved.",
+  "externalPaymentNotCommittedMessage": "The external payment was confirmed, but the sale did not close. Do not charge again: retry closing the account or ask for help.",
   "recoveryQueryTitle": "Check saved result",
   "recoveryQueryDescription": "Ask UMI whether this exact operation was already accepted.",
   "recoveryPolicyTitle": "Refresh offline policy",

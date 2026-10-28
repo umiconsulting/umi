@@ -1,0 +1,4 @@
+interface:
+  display_name: "Soporte ONCA"
+  short_description: "Opera y repara la flota ONCA en producción"
+  default_prompt: "Use $onca-production-support para verificar la flota ONCA, diagnosticar el incidente con evidencia y entregar una corrección verificada."

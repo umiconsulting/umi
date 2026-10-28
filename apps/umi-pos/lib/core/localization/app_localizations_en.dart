@@ -679,6 +679,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Reconnect to use manual terminal, mixed payment, tips, or discounts. The sale is preserved.';
 
   @override
+  String get externalPaymentNotCommittedMessage =>
+      'The external payment was confirmed, but the sale did not close. Do not charge again: retry closing the account or ask for help.';
+
+  @override
   String get recoveryQueryTitle => 'Check saved result';
 
   @override

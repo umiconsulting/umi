@@ -10,7 +10,6 @@ import { createHash, randomUUID } from 'node:crypto';
 import type {
   Cart,
   CartItem,
-  CartLineInput,
   CheckoutCancellationRequest,
   CheckoutCommand,
   CheckoutPartialPaymentQuery,
@@ -33,7 +32,7 @@ import type { AuthUser } from '../auth/auth.types';
 import { IntegrityService } from '../integrity/integrity.service';
 import { inventoryConflictCode } from '../pos-inventory/inventory-errors';
 import { canonicalStoredValueFingerprint } from '../pos-customer-value/customer-value-domain';
-import { PosCartRepository, type PricedSelection } from '../pos-cart/pos-cart.repository';
+import { PosCartRepository } from '../pos-cart/pos-cart.repository';
 import { getRequestContext } from '../../shared/database/request-context';
 import { CashRefusal } from '../pos-cash/cash-refusal';
 import {
@@ -211,12 +210,7 @@ export class PosCheckoutService {
             cartId,
           );
           const frozenVersion = rows[0]?.cartVersion;
-          const repriced = await this.reprice(
-            context.client,
-            cart,
-            dto.idempotencyKey,
-            frozenVersion,
-          );
+          const repriced = await this.reprice(cart, frozenVersion);
           if (!repriced)
             return {
               ok: false,
@@ -579,12 +573,7 @@ export class PosCheckoutService {
             dto.locationId,
             dto.cartId,
           );
-          const repriced = await this.reprice(
-            context.client,
-            cart,
-            dto.idempotencyKey,
-            partialRows[0]?.cartVersion,
-          );
+          const repriced = await this.reprice(cart, partialRows[0]?.cartVersion);
           if (!repriced) {
             return {
               ok: false,
@@ -1449,68 +1438,47 @@ export class PosCheckoutService {
   }
 
   private async reprice(
-    client: Parameters<Parameters<IntegrityService['execute']>[1]>[0]['client'],
     cart: CheckoutCart,
-    idempotencyKey: string,
     fingerprintVersion = cart.version,
   ): Promise<{
     public: TotalsConfirmation;
     lineSnapshot: CartItem[];
   } | null> {
-    const fresh: Array<{ line: CheckoutCart['lines'][number]; priced: PricedSelection }> = [];
-    for (const line of cart.lines) {
-      const input: CartLineInput = {
-        cartId: cart.id,
-        locationId: cart.locationId,
-        operatorSessionId: cart.operatorSessionId,
-        productId: line.productId,
-        variantId: line.variantId,
-        modifierSelections: line.modifiers,
-        quantity: line.quantity,
-        courseNumber: line.courseNumber,
-        note: line.note,
-        expectedVersion: cart.version,
-        idempotencyKey,
-      };
-      const priced = await this.carts.price(client, cart.merchantId, cart.locationId, input);
-      if (!priced) return null;
-      fresh.push({ line, priced });
-    }
-    const currency = fresh[0].priced.currency;
+    const currency = cart.currency;
     let subtotal = 0;
     let taxTotal = 0;
     const taxGroups = new Map<number, { taxable: number; tax: number }>();
-    const items: CartItem[] = fresh.map(({ line, priced }) => {
-      const modifierTotal = priced.modifiers.reduce(
+    const items: CartItem[] = cart.lines.map((line) => {
+      const modifierTotal = line.modifiers.reduce(
         (sum, modifier) => safeMoney(sum + safeMoney(modifier.priceDelta * modifier.quantity)),
         0,
       );
-      const unit = safeMoney(priced.basePrice + priced.variantDelta + modifierTotal);
+      const unit = safeMoney(line.basePrice + line.variantDelta + modifierTotal);
       const lineTotal = safeMoney(unit * line.quantity);
       const tax = Math.round(
-        (lineTotal * priced.taxRateBasisPoints) / (10000 + priced.taxRateBasisPoints),
+        (lineTotal * line.taxRateBasisPoints) / (10000 + line.taxRateBasisPoints),
       );
       subtotal = safeMoney(subtotal + lineTotal);
       taxTotal = safeMoney(taxTotal + tax);
-      const group = taxGroups.get(priced.taxRateBasisPoints) ?? { taxable: 0, tax: 0 };
+      const group = taxGroups.get(line.taxRateBasisPoints) ?? { taxable: 0, tax: 0 };
       group.taxable = safeMoney(group.taxable + lineTotal);
       group.tax = safeMoney(group.tax + tax);
-      taxGroups.set(priced.taxRateBasisPoints, group);
+      taxGroups.set(line.taxRateBasisPoints, group);
       return {
         id: line.id,
-        productId: priced.productId,
-        productName: priced.productName,
-        saleAction: priced.saleAction,
+        productId: line.productId,
+        productName: line.productName,
+        saleAction: line.saleAction,
         quantity: line.quantity,
         courseNumber: line.courseNumber,
-        variant: priced.variantId
+        variant: line.variantId
           ? {
-              variantId: priced.variantId,
-              name: priced.variantName!,
-              attributes: priced.variantAttributes,
+              variantId: line.variantId,
+              name: line.variantName!,
+              attributes: line.variantAttributes,
             }
           : null,
-        modifiers: priced.modifiers.map((modifier) => ({
+        modifiers: line.modifiers.map((modifier) => ({
           modifierId: modifier.modifierId,
           groupId: modifier.groupId,
           name: modifier.name,
@@ -1527,7 +1495,7 @@ export class PosCheckoutService {
           lineSubtotal: { minorUnits: lineTotal, currency },
           tax: { minorUnits: tax, currency },
           lineTotal: { minorUnits: lineTotal, currency },
-          taxRateBasisPoints: priced.taxRateBasisPoints,
+          taxRateBasisPoints: line.taxRateBasisPoints,
         },
       };
     });

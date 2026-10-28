@@ -46,19 +46,19 @@ La revisión `8a8ec541`:
 
 ## Despliegue
 
-| Elemento | Valor |
-| --- | --- |
-| Revisión | `8a8ec541` |
-| Imagen API | `ghcr.io/umiconsulting/umi-api:onca-8a8ec541` |
-| Imagen SHA-256 | `sha256:b171d9ac1e451a39469a27080642362e0127ab93f9191fe439693e0c4efa218c` |
-| Identidad publicada | `1.0.0-onca.8a8ec541`; commit completo `8a8ec541d6d5c4ed8225512fa0ee7b872f0823f4` |
-| Salud | `/health/ready` respondió `200` |
-| Contrato | `2.44.0` |
-| Esquema esperado | `build-v3-79` |
-| POS instalado en iMin | 330 |
-| Barra | 330 |
-| Mesero | 330 |
-| POS instalado en tablet de prueba | 329 |
+| Elemento                          | Valor                                                                             |
+| --------------------------------- | --------------------------------------------------------------------------------- |
+| Revisión                          | `8a8ec541`                                                                        |
+| Imagen API                        | `ghcr.io/umiconsulting/umi-api:onca-8a8ec541`                                     |
+| Imagen SHA-256                    | `sha256:b171d9ac1e451a39469a27080642362e0127ab93f9191fe439693e0c4efa218c`         |
+| Identidad publicada               | `1.0.0-onca.8a8ec541`; commit completo `8a8ec541d6d5c4ed8225512fa0ee7b872f0823f4` |
+| Salud                             | `/health/ready` respondió `200`                                                   |
+| Contrato                          | `2.44.0`                                                                          |
+| Esquema esperado                  | `build-v3-79`                                                                     |
+| POS instalado en iMin             | 330                                                                               |
+| Barra                             | 330                                                                               |
+| Mesero                            | 330                                                                               |
+| POS instalado en tablet de prueba | 329                                                                               |
 
 La imagen anterior
 `ghcr.io/umiconsulting/umi-api:onca-6d54a4e3` permanece en el VPS. El respaldo
@@ -72,11 +72,11 @@ mostró **MXN 3,657.00 esperados**, secuencia 20.
 
 Se registró una salida controlada:
 
-| Prueba | Resultado |
-| --- | --- |
-| Salida de MXN 1.00 | HTTP 201; comando `62f4a629-c10a-441d-96de-407cc5c9f605`; secuencia 21 |
+| Prueba                         | Resultado                                                              |
+| ------------------------------ | ---------------------------------------------------------------------- |
+| Salida de MXN 1.00             | HTTP 201; comando `62f4a629-c10a-441d-96de-407cc5c9f605`; secuencia 21 |
 | Entrada de reversa de MXN 1.00 | HTTP 201; comando `49678a7f-9c85-43cd-9ecc-a9e419f23eaa`; secuencia 22 |
-| Efectivo esperado final | MXN 3,657.00, igual al estado anterior |
+| Efectivo esperado final        | MXN 3,657.00, igual al estado anterior                                 |
 
 [Salida registrada](./evidence/2026-10-24-onca-production-003/03-paid-out-1.png) y
 [saldo restaurado](./evidence/2026-10-24-onca-production-003/04-cash-restored.png).
@@ -85,14 +85,14 @@ El libro conserva ambas entradas con los motivos `prueba` y
 
 ## Pruebas de código
 
-| Comprobación | Resultado |
-| --- | --- |
-| Prueba API de versión atrasada | Conflicto `409` con `shiftVersion` 20 y `expectedShiftVersion` 14 |
-| Prueba POS de recarga de caja | Actualiza al estado del servidor y conserva el conflicto visible |
-| `flutter analyze` | Sin hallazgos |
-| Suite completa del POS | 1,151 pruebas aprobadas |
-| Suite API (`pnpm --filter @umi/api test`) | 2,093 pruebas aprobadas; 29 omitidas |
-| TypeScript API | Sin errores |
+| Comprobación                              | Resultado                                                         |
+| ----------------------------------------- | ----------------------------------------------------------------- |
+| Prueba API de versión atrasada            | Conflicto `409` con `shiftVersion` 20 y `expectedShiftVersion` 14 |
+| Prueba POS de recarga de caja             | Actualiza al estado del servidor y conserva el conflicto visible  |
+| `flutter analyze`                         | Sin hallazgos                                                     |
+| Suite completa del POS                    | 1,151 pruebas aprobadas                                           |
+| Suite API (`pnpm --filter @umi/api test`) | 2,093 pruebas aprobadas; 29 omitidas                              |
+| TypeScript API                            | Sin errores                                                       |
 
 ## Rollback
 
