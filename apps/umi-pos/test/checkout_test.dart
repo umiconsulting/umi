@@ -6,6 +6,7 @@ import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/bootstrap/composition_root.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
+import 'package:umi_pos/core/localization/app_localizations_es.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/security/credential_vault.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
@@ -85,11 +86,13 @@ final class _CheckoutRepository implements CheckoutRepository {
   _CheckoutRepository({
     this.unknown = false,
     this.loseCommitResponseOnce = false,
+    this.idempotencyConflictOnce = false,
     this.recoverySnapshot,
     this.paymentStatusValue = 'unknown',
   });
   final bool unknown;
   final bool loseCommitResponseOnce;
+  final bool idempotencyConflictOnce;
   final CheckoutRecoverySnapshot? recoverySnapshot;
   final String paymentStatusValue;
 
@@ -113,6 +116,7 @@ final class _CheckoutRepository implements CheckoutRepository {
   /// confirmation screen instead of the one-tap charge.
   int? repricedGrandTotalMinorUnits;
   bool responseLost = false;
+  bool idempotencyConflictSent = false;
   bool requireCashShift = false;
   String cashHoldState = 'free';
   final commands = <CheckoutCommand>[];
@@ -310,6 +314,14 @@ final class _CheckoutRepository implements CheckoutRepository {
       throw const AppException(
         category: AppErrorCategory.transport,
         code: 'TRANSPORT_FAILURE',
+        recoverable: true,
+      );
+    }
+    if (idempotencyConflictOnce && !idempotencyConflictSent) {
+      idempotencyConflictSent = true;
+      throw const AppException(
+        category: AppErrorCategory.conflict,
+        code: 'IDEMPOTENCY_CONFLICT',
         recoverable: true,
       );
     }
@@ -533,7 +545,8 @@ final class _PartialCheckoutRepository
 }
 
 final class _CartRepository implements CartRepository {
-  final cart = Cart(
+  bool failRead = false;
+  Cart cart = Cart(
     id: '00000000-0000-4000-8000-000000000004',
     merchantId: '00000000-0000-4000-8000-000000000001',
     locationId: '00000000-0000-4000-8000-000000000002',
@@ -553,7 +566,17 @@ final class _CartRepository implements CartRepository {
   Future<Cart> create(String merchantId, CreateCartRequest request) async =>
       cart;
   @override
-  Future<Cart> read(String merchantId, CartQuery query) async => cart;
+  Future<Cart> read(String merchantId, CartQuery query) async {
+    if (failRead) {
+      throw const AppException(
+        category: AppErrorCategory.transport,
+        code: 'NETWORK_UNAVAILABLE',
+        recoverable: true,
+      );
+    }
+    return cart;
+  }
+
   @override
   Future<Cart> add(String merchantId, CartLineInput input) async => cart;
   @override
@@ -641,7 +664,9 @@ Future<_TenderSheet> _openTenderSheet(
   WidgetTester tester,
   _CheckoutRepository repository, {
   required CheckoutPolicy policy,
+  _CartRepository? cartRepository,
   Future<String?> Function()? onOpenCashShift,
+  Future<String?> Function()? onEnsureCashShift,
 }) async {
   tester.view.devicePixelRatio = 1;
   // Tall enough that the whole tender surface lays out at once, so every
@@ -650,7 +675,7 @@ Future<_TenderSheet> _openTenderSheet(
   addTearDown(tester.view.reset);
   repository.policyValue = policy;
   final cart = CartController(
-    repository: _CartRepository(),
+    repository: cartRepository ?? _CartRepository(),
     telemetry: const SafeTelemetry(
       enabled: false,
       context: TelemetryContext(
@@ -694,6 +719,7 @@ Future<_TenderSheet> _openTenderSheet(
               entry: root.entry,
               sales: root.sales,
               onOpenCashShift: onOpenCashShift,
+              onEnsureCashShift: onEnsureCashShift,
             ),
             child: const Text('open'),
           ),
@@ -1033,6 +1059,23 @@ Future<_ValueSheet> _openValueSheet(
 }
 
 void main() {
+  test('known checkout refusals keep their actionable message', () {
+    final l = AppLocalizationsEs();
+    expect(
+      checkoutFailureMessage(l, 'OPTIMISTIC_VERSION_CONFLICT'),
+      l.checkoutCartChangedBody,
+    );
+    expect(
+      checkoutFailureMessage(l, 'PAYMENT_OUTCOME_UNKNOWN'),
+      l.paymentUnknownBody,
+    );
+    expect(
+      checkoutFailureMessage(l, 'policy_expired'),
+      l.checkoutCartNotReadyBody,
+    );
+    expect(checkoutFailureMessage(l, 'UNRECOGNIZED'), l.checkoutFailed);
+  });
+
   test('requires server repricing then explicit confirmation', () async {
     final repository = _CheckoutRepository();
     final controller = _controller(repository);
@@ -1209,6 +1252,30 @@ void main() {
         repository.commands[1].idempotencyKey,
         repository.commands[2].idempotencyKey,
       );
+    },
+  );
+
+  test(
+    'an idempotency refusal is recovered and retried automatically with a new identity',
+    () async {
+      final repository = _CheckoutRepository(idempotencyConflictOnce: true);
+      final controller = _controller(repository);
+      await controller.preview(
+        merchantId: '00000000-0000-4000-8000-000000000001',
+        locationId: '00000000-0000-4000-8000-000000000002',
+        operatorSessionId: '00000000-0000-4000-8000-000000000003',
+        cartId: '00000000-0000-4000-8000-000000000004',
+        cartVersion: 3,
+        paymentMethod: 'cash',
+      );
+      await controller.confirm();
+      expect(controller.state.phase, CheckoutPhase.completed);
+      final commits = repository.commands
+          .where((command) => command.totalsFingerprint != null)
+          .toList();
+      expect(commits, hasLength(2));
+      expect(commits.first.idempotencyKey, isNot(commits.last.idempotencyKey));
+      expect(commits.first.commandId, isNot(commits.last.commandId));
     },
   );
 
@@ -1963,6 +2030,71 @@ void main() {
     checkout.dispose();
   });
 
+  testWidgets('online checkout reads the current cart version before charge', (
+    tester,
+  ) async {
+    final repository = _CheckoutRepository();
+    final carts = _CartRepository();
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+      cartRepository: carts,
+    );
+    carts.cart = Cart.fromJson({...carts.cart.toJson(), 'version': 4});
+
+    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.pumpAndSettle();
+
+    expect(repository.commands, isNotEmpty);
+    expect(repository.commands.last.expectedCartVersion, 4);
+    await sheet.dispose();
+  });
+
+  testWidgets('online checkout stops before payment when cart read fails', (
+    tester,
+  ) async {
+    final repository = _CheckoutRepository();
+    final carts = _CartRepository();
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+      cartRepository: carts,
+    );
+    carts.failRead = true;
+
+    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.pumpAndSettle();
+
+    expect(repository.commands, isEmpty);
+    expect(find.text('Account update pending'), findsOneWidget);
+    await sheet.dispose();
+  });
+
+  testWidgets('terminal payment waits for a current cart', (tester) async {
+    final repository = _CheckoutRepository();
+    final carts = _CartRepository();
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+      cartRepository: carts,
+    );
+    await tester.tap(find.text('Manual terminal'));
+    await tester.pumpAndSettle();
+    carts.failRead = true;
+
+    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.pumpAndSettle();
+
+    expect(repository.captures, isEmpty);
+    expect(repository.settlements, isEmpty);
+    expect(repository.commands, isEmpty);
+    expect(find.text('Account update pending'), findsOneWidget);
+    await sheet.dispose();
+  });
+
   testWidgets('a tender corrected after the preview re-keys the pair before the charge', (
     tester,
   ) async {
@@ -2032,6 +2164,35 @@ void main() {
       await sheet.dispose();
     },
   );
+
+  testWidgets('checkout resolves a missing shift before the first charge', (
+    tester,
+  ) async {
+    final repository = _CheckoutRepository()
+      ..requireCashShift = true
+      ..policyValue = CheckoutPolicy.fromJson(_policy);
+    var ensures = 0;
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+      onEnsureCashShift: () async {
+        ensures++;
+        return '00000000-0000-4000-8000-000000000009';
+      },
+    );
+
+    await tester.tap(find.widgetWithText(PosButton, 'Checkout · MXN 116.00'));
+    await tester.pumpAndSettle();
+
+    expect(ensures, 1);
+    expect(sheet.checkout.state.phase, CheckoutPhase.completed);
+    expect(
+      repository.commands.last.cashShiftId,
+      '00000000-0000-4000-8000-000000000009',
+    );
+    await sheet.dispose();
+  });
 
   testWidgets('a tip is collected: the tender covers the amount due it creates', (
     tester,
@@ -2186,6 +2347,10 @@ void main() {
     expect(find.text('Change due'), findsOneWidget);
     expect(find.text('Receipt destination'), findsNothing);
     expect(find.text('MXN 116.00'), findsWidgets);
+    // Changing the received cash must not add another confirmation. The
+    // operator has already reviewed the visible total and tender.
+    await tester.tap(find.text('MXN 500.00'));
+    await tester.pumpAndSettle();
     // One-tap checkout: the charge button reviews the total server-side and, when
     // it matches what the cashier saw, commits in the same action. It is the last
     // PosButton (after the harness's own "open" button).
@@ -2826,6 +2991,39 @@ void main() {
     await sheet.dispose();
   });
 
+  testWidgets('a single terminal amount above the bill cannot be charged', (
+    tester,
+  ) async {
+    final repository = _CheckoutRepository();
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+    );
+    await tester.tap(find.text('Manual terminal'));
+    await tester.pumpAndSettle();
+    final terminalField = find.byWidgetPredicate(
+      (widget) =>
+          widget is PosField &&
+          widget.decoration?.labelText == 'Amount applied',
+    );
+    await tester.enterText(terminalField, '225.00');
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Payment amount does not match the total'),
+      findsOneWidget,
+    );
+    expect(find.text('Over by MXN 109.00'), findsOneWidget);
+    expect(
+      tester.widget<PosButton>(find.byType(PosButton).last).onPressed,
+      isNull,
+    );
+    expect(repository.captures, isEmpty);
+    expect(repository.commands, isEmpty);
+    await sheet.dispose();
+  });
+
   testWidgets('bank transfer is absent until the location enables it', (
     tester,
   ) async {
@@ -3148,6 +3346,7 @@ void main() {
       final value = sheet.value;
       final checkout = sheet.checkout;
       final charge = find.widgetWithText(PosButton, 'Checkout · MXN 116.00');
+      expect(find.text('Confirm and pay'), findsNothing);
       await tester.ensureVisible(charge);
       await tester.tap(charge);
       await tester.pump();
@@ -3156,6 +3355,9 @@ void main() {
       // parked, only the repricing command may exist: a commit here is the defect.
       expect(value.requests, hasLength(1));
       expect(repository.commands, hasLength(1));
+      expect(find.text('Checkout · MXN 116.00'), findsOneWidget);
+      expect(find.text('Confirm and pay'), findsNothing);
+      expect(tester.widget<PosButton>(charge).onPressed, isNull);
       value.answer();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
@@ -3224,7 +3426,7 @@ void main() {
       final canvas = Offset.zero & tester.view.physicalSize;
       for (final finder in [
         find.text('Cash'),
-        find.widgetWithText(PosButton, 'Confirm and pay'),
+        find.widgetWithText(PosButton, 'Checkout · MXN 999.00'),
       ]) {
         final rect = tester.getRect(finder.first);
         expect(

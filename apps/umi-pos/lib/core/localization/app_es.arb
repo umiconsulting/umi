@@ -149,6 +149,10 @@
   "saleCompletedTitle": "Venta completada",
   "finishSaleAction": "Finalizar e iniciar otra comanda",
   "checkoutFailed": "No fue posible completar el cobro de forma segura.",
+  "checkoutCartNotReadyTitle": "Cuenta pendiente de actualizar",
+  "checkoutCartNotReadyBody": "No pude confirmar el estado actual de la cuenta. Revisa la conexión y el Centro de recuperación antes de cobrar. Si la terminal ya confirmó un pago, no lo repitas.",
+  "checkoutCartChangedTitle": "Revisa el cobro",
+  "checkoutCartChangedBody": "La cuenta o el importe aplicado cambió. Revisa que coincidan antes de continuar. Si la terminal ya confirmó un pago, no lo repitas.",
   "provisionalSalePendingTitle": "Venta pendiente de sincronización",
   "provisionalSalePendingBody": "La venta se guardó de forma segura en este dispositivo y está pendiente de sincronización. Los datos oficiales del recibo se asignarán cuando el servidor la acepte.",
   "returnToCatalogAction": "Volver al catálogo",
@@ -821,6 +825,7 @@
   "splitTenderCancelAction": "Un solo método",
   "splitTenderPickSecond": "Elige el segundo método de pago.",
   "singleMethodOnlyNote": "Esta sucursal cobra con un solo método por venta.",
+  "tenderMismatchTitle": "El importe no coincide con el total",
   "tenderShortBy": "Falta {amount}",
   "@tenderShortBy": {
     "description": "How much of a split payment the selected methods still do not cover.",

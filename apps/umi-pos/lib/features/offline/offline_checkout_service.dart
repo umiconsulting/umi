@@ -10,7 +10,7 @@ final class OfflineCheckoutRequest {
   const OfflineCheckoutRequest({
     required this.commandId,
     required this.idempotencyKey,
-    required this.provisionalSaleId,
+    required this.localCommitId,
     required this.authority,
     required this.checkoutCommand,
     required this.cart,
@@ -23,12 +23,10 @@ final class OfflineCheckoutRequest {
     required this.taxSnapshotAt,
     required this.amountReceivedMinorUnits,
     required this.businessDate,
-    required this.locationName,
-    required this.operatorName,
   });
   final String commandId;
   final String idempotencyKey;
-  final String provisionalSaleId;
+  final String localCommitId;
   final OfflineAuthorityContext authority;
   final CheckoutCommand checkoutCommand;
   final Cart cart;
@@ -41,8 +39,16 @@ final class OfflineCheckoutRequest {
   final DateTime taxSnapshotAt;
   final int amountReceivedMinorUnits;
   final String businessDate;
-  final String locationName;
-  final String operatorName;
+}
+
+/// A cash sale saved on this device and waiting for the server.
+///
+/// This is a journal identity, not a receipt. Nothing may turn it into paper
+/// or an on-screen receipt; the API issues the only receipt this product shows.
+final class OfflineCashCommit {
+  const OfflineCashCommit({required this.localCommitId});
+
+  final String localCommitId;
 }
 
 final class OfflineCheckoutService {
@@ -57,7 +63,7 @@ final class OfflineCheckoutService {
   final OfflinePolicyCache _policyCache;
   final OfflineCheckoutEligibilityEngine _eligibility;
 
-  Future<ProvisionalReceipt> checkout(
+  Future<OfflineCashCommit> checkout(
     OfflineCheckoutRequest request, {
     required OfflineCheckoutFacts facts,
     required DateTime now,
@@ -117,26 +123,13 @@ final class OfflineCheckoutService {
       idempotencyKey: request.idempotencyKey,
       payload: payload.toJson(),
       commandType: 'pos.checkout.cash',
-      provisionalId: request.provisionalSaleId,
+      provisionalId: request.localCommitId,
       deduplicationKey: payload.checkoutIdentity,
       maxPendingCashCount: policy.limits.maxOfflineSaleCount,
       maxPendingCashMinorUnits: policy.limits.maxAccumulatedMinorUnits,
       cashAmountMinorUnits: due,
     );
-    final persistedPayload = OfflineCheckoutCommand.fromJson(persisted.payload);
-    final persistedSnapshot = OfflineCheckoutSnapshot.fromJson(
-      persistedPayload.snapshot,
-    );
-    return ProvisionalReceipt(
-      provisionalSaleId: persisted.provisionalId!,
-      status: 'pending_sync',
-      locationName: request.locationName,
-      operatorName: request.operatorName,
-      snapshot: persistedSnapshot.toJson(),
-      createdAt: persisted.createdAt,
-      lastSynchronizationAt: null,
-      officialReceipt: null,
-    );
+    return OfflineCashCommit(localCommitId: persisted.provisionalId!);
   }
 
   String _checkoutIdentity(OfflineCheckoutRequest request) {

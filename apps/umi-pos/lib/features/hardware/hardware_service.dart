@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/errors/app_error.dart';
-import '../../shared/receipt_time.dart';
+import '../offline/offline_checkout_service.dart';
 import 'hardware_fingerprint.dart';
 import 'hardware_recovery_store.dart';
 import 'hardware_repository.dart';
@@ -1222,105 +1222,16 @@ final class HardwareService {
     );
   }
 
-  Future<List<Object>> afterOfflineCheckoutCompleted(
+  Future<List<Object>> afterOfflineCashSale(
     HardwareScope scope,
-    ProvisionalReceipt receipt, {
+    OfflineCashCommit commit, {
     bool retryKnownSafe = false,
   }) async {
     final runtime = await _runtimeForOffline(scope);
     if (runtime == null) return const [];
     final policy = runtime.policy ?? const <String, Object?>{};
     final devices = runtime.devices.map(HardwareDevice.fromJson).toList();
-    final snapshot = OfflineCheckoutSnapshot.fromJson(receipt.snapshot);
-    final cart = Cart.fromJson(snapshot.cartSnapshot);
-    final totals = TotalsConfirmation.fromJson(snapshot.totals);
-    int money(Object? raw) {
-      if (raw is! Map) return 0;
-      return (raw['minorUnits'] as num?)?.toInt() ?? 0;
-    }
-
-    final totalFacts = totals.totals;
-    final discountFacts = totalFacts['discounts'] as Map<String, Object?>;
-    final printPayload = <String, Object?>{
-      'receiptId': receipt.provisionalSaleId,
-      'merchantName': 'Umi',
-      'locationName': receipt.locationName,
-      'registerName': null,
-      'receiptNumber': 'PROV-${receipt.provisionalSaleId.substring(0, 8)}',
-      'businessDate': snapshot.businessDate,
-      // WHEN THE PAPER WAS HANDED OVER, in this till's own clock. Nothing is answering, so the
-      // till is the only witness there is; the value travels back to the API when the journal
-      // replays, which is why it carries an offset rather than a bare wall clock.
-      'issuedAt': receiptLocalInstant(DateTime.now()),
-      'currency': snapshot.currency,
-      'items': cart.items.take(500).map((raw) {
-        final line = CartItem.fromJson(raw);
-        final price = line.price;
-        return <String, Object?>{
-          'name': line.productName,
-          'quantity': line.quantity,
-          'totalMinorUnits': money(price['lineTotal']),
-          'modifiers': line.modifiers
-              .map((modifier) => modifier['name']! as String)
-              .toList(),
-        };
-      }).toList(),
-      'subtotalMinorUnits': money(totalFacts['subtotal']),
-      'discountMinorUnits': money(discountFacts['total']),
-      'taxMinorUnits': money(totalFacts['tax']),
-      'tipMinorUnits': 0,
-      'totalMinorUnits': snapshot.amountDueMinorUnits,
-      'tenders': [
-        {
-          'type': 'cash',
-          'amountMinorUnits': snapshot.amountReceivedMinorUnits,
-          'maskedReference': null,
-        },
-      ],
-      'changeMinorUnits': snapshot.changeDueMinorUnits,
-      'loyaltySummary': null,
-      'customerValueSummary': null,
-      'exceptionMarker': 'provisional',
-      'qrValue': null,
-      'footer': 'OFFLINE PROVISIONAL RECEIPT',
-    };
     final actions = <Future<Object> Function()>[];
-    final printers = devices
-        .where(
-          (device) =>
-              device.enabled &&
-              device.type == 'printer' &&
-              device.capabilities.contains('printer.receipt'),
-        )
-        .toList();
-    final printer =
-        printers.where((device) => device.primary == true).firstOrNull ??
-        printers.firstOrNull;
-    if (printer != null &&
-        scope.permissions.contains('hardware.printer.print') &&
-        (policy['autoPrintReceipt'] as bool? ?? true)) {
-      final copies = (policy['receiptCopiesDefault'] as int? ?? 1).clamp(1, 3);
-      for (var copy = 1; copy <= copies; copy += 1) {
-        final payload = {
-          ...printPayload,
-          'footer': copy == 1
-              ? 'OFFLINE PROVISIONAL RECEIPT'
-              : 'OFFLINE PROVISIONAL RECEIPT · COPY',
-        };
-        actions.add(
-          () => _dispatchOffline(
-            scope: scope,
-            device: printer,
-            commandType: 'print_receipt',
-            capability: 'printer.receipt',
-            sourceId: receipt.provisionalSaleId,
-            safePayload: payload,
-            identity: 'offline-print-$copy',
-            retryKnownSafe: retryKnownSafe,
-          ),
-        );
-      }
-    }
     final drawer = _drawerFor(scope, devices, requireOpenCapability: true);
     if (drawer != null &&
         scope.permissions.contains('hardware.drawer.open') &&
@@ -1331,7 +1242,7 @@ final class HardwareService {
           device: drawer,
           commandType: 'open_drawer',
           capability: 'drawer.open',
-          sourceId: receipt.provisionalSaleId,
+          sourceId: commit.localCommitId,
           safePayload: const {'reason': 'cash_sale'},
           identity: 'offline-drawer',
           retryKnownSafe: retryKnownSafe,
@@ -1339,14 +1250,6 @@ final class HardwareService {
       );
     }
     return afterCommittedFinancialAction(actions);
-  }
-
-  Future<List<Object>> retryOfflineCheckoutHardware(
-    HardwareScope scope,
-    ProvisionalReceipt receipt,
-  ) async {
-    await _runtimeForOffline(scope);
-    return afterOfflineCheckoutCompleted(scope, receipt, retryKnownSafe: true);
   }
 
   Future<RuntimeCommandResult> _dispatchOffline({
@@ -1434,128 +1337,6 @@ final class HardwareService {
       ),
     );
     return safeResult;
-  }
-
-  Future<void> verifyOfflinePrint({
-    required HardwareScope scope,
-    required String commandId,
-  }) async {
-    if (!scope.permissions.contains('hardware.printer.print')) {
-      throw StateError('HARDWARE_PERMISSION_DENIED');
-    }
-    final prior = await _offlineRecoveryCommand(scope, commandId);
-    final type = prior.safeMetadata['commandType'];
-    if (prior.state != HardwareDispatchState.unknown ||
-        (type != 'print_receipt' && type != 'controlled_reprint')) {
-      throw StateError('HARDWARE_VERIFY_PRINT_NOT_ALLOWED');
-    }
-    await _recovery.save(
-      PendingHardwareDispatch(
-        merchantId: prior.merchantId,
-        locationId: prior.locationId,
-        commandId: prior.commandId,
-        payloadFingerprint: prior.payloadFingerprint,
-        state: HardwareDispatchState.succeeded,
-        safeMetadata: {...prior.safeMetadata, 'operatorVerified': true},
-      ),
-    );
-  }
-
-  Future<RuntimeCommandResult> controlledOfflineReprint({
-    required HardwareScope scope,
-    required String commandId,
-  }) async {
-    if (!scope.permissions.contains('hardware.printer.reprint')) {
-      throw StateError('HARDWARE_PERMISSION_DENIED');
-    }
-    final prior = await _offlineRecoveryCommand(scope, commandId);
-    final type = prior.safeMetadata['commandType'];
-    if (prior.state != HardwareDispatchState.unknown ||
-        (type != 'print_receipt' && type != 'controlled_reprint')) {
-      throw StateError('HARDWARE_CONTROLLED_REPRINT_NOT_ALLOWED');
-    }
-    final payload = Map<String, Object?>.from(
-      prior.safeMetadata['safePayload']! as Map,
-    );
-    payload['footer'] = '${payload['footer'] ?? 'OFFLINE RECEIPT'} · COPY';
-    return _dispatchOfflineRecovery(
-      scope: scope,
-      prior: prior,
-      commandType: 'controlled_reprint',
-      capability: 'printer.receipt',
-      safePayload: payload,
-      identity: 'offline-controlled-reprint-${_identifiers.next()}',
-    );
-  }
-
-  Future<RuntimeCommandResult> repeatOfflineDrawerOpen({
-    required HardwareScope scope,
-    required String commandId,
-  }) async {
-    if (!scope.permissions.contains('hardware.drawer.open')) {
-      throw StateError('HARDWARE_PERMISSION_DENIED');
-    }
-    final prior = await _offlineRecoveryCommand(scope, commandId);
-    if (prior.state != HardwareDispatchState.unknown ||
-        prior.safeMetadata['commandType'] != 'open_drawer') {
-      throw StateError('HARDWARE_DRAWER_REPEAT_NOT_ALLOWED');
-    }
-    final payload = Map<String, Object?>.from(
-      prior.safeMetadata['safePayload']! as Map,
-    );
-    payload['recoveryOf'] = commandId;
-    return _dispatchOfflineRecovery(
-      scope: scope,
-      prior: prior,
-      commandType: 'open_drawer',
-      capability: 'drawer.open',
-      safePayload: payload,
-      identity: 'offline-drawer-repeat-${_identifiers.next()}',
-    );
-  }
-
-  Future<PendingHardwareDispatch> _offlineRecoveryCommand(
-    HardwareScope scope,
-    String commandId,
-  ) async {
-    final prior = await _recovery.load(commandId);
-    if (prior == null ||
-        prior.merchantId != scope.merchantId ||
-        prior.locationId != scope.locationId) {
-      throw StateError('HARDWARE_RECOVERY_COMMAND_NOT_FOUND');
-    }
-    return prior;
-  }
-
-  Future<RuntimeCommandResult> _dispatchOfflineRecovery({
-    required HardwareScope scope,
-    required PendingHardwareDispatch prior,
-    required String commandType,
-    required String capability,
-    required Map<String, Object?> safePayload,
-    required String identity,
-  }) async {
-    final runtime = await _runtimeForOffline(scope);
-    if (runtime == null) throw StateError('HARDWARE_CONFIGURATION_STALE');
-    final hardwareId = prior.safeMetadata['hardwareId'] as String?;
-    final sourceId = prior.safeMetadata['sourceId'] as String?;
-    final device = runtime.devices
-        .map(HardwareDevice.fromJson)
-        .where((value) => value.id == hardwareId && value.enabled)
-        .firstOrNull;
-    if (device == null || sourceId == null) {
-      throw StateError('HARDWARE_RECOVERY_DEVICE_UNAVAILABLE');
-    }
-    return _dispatchOffline(
-      scope: scope,
-      device: device,
-      commandType: commandType,
-      capability: capability,
-      sourceId: sourceId,
-      safePayload: safePayload,
-      identity: identity,
-      retryKnownSafe: false,
-    );
   }
 
   Future<List<Object>> afterRefundCompleted(

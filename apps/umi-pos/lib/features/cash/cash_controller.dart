@@ -352,6 +352,36 @@ final class CashController extends ChangeNotifier {
     return activeShiftId;
   }
 
+  /// Make the open drawer usable before the checkout surface opens.
+  ///
+  /// A replaced terminal can receive a new device identity while the server
+  /// still holds the open shift for the old identity. That state is safe to
+  /// adopt: the server marks it adoptable only when the previous terminal is
+  /// gone. Waiting for the operator to visit Cash Center first made the next
+  /// Cobrar fall back to an online partial payment and repaint the same button.
+  Future<String?> ensureCheckoutShift({required bool canAdopt}) async {
+    if (!_hasContext) return null;
+    if (_state.snapshot == null) await load();
+    if (activeShiftId != null) return activeShiftId;
+    final snapshot = _state.snapshot;
+    if (canAdopt &&
+        snapshot?.adoptableShift != null &&
+        (snapshot?.allowedActions.contains('adopt_shift') ?? false)) {
+      await adoptShift();
+    }
+    final current = _state.snapshot?.currentShift;
+    if (canAdopt &&
+        activeShiftId == null &&
+        current != null &&
+        current['status'] == 'open' &&
+        current['operatorSessionId'] != _operatorSessionId) {
+      // Adoption can move the drawer hold without rewriting the operator session.
+      // The server authorizes this transition; do not return a stale shift id.
+      await resumeShiftById(current['id']! as String);
+    }
+    return activeShiftId;
+  }
+
   /// Bring this till's paused shift back, once the operator has said who they
   /// are.
   ///
@@ -484,7 +514,9 @@ final class CashController extends ChangeNotifier {
         ? int.tryParse(rawVersion)
         : null;
     if (version == null) {
-      debugPrint('[umipos] resume $shiftId: version is ${rawVersion.runtimeType}');
+      debugPrint(
+        '[umipos] resume $shiftId: version is ${rawVersion.runtimeType}',
+      );
       return null;
     }
     debugPrint('[umipos] resume $shiftId at version $version');
@@ -1185,12 +1217,32 @@ final class CashController extends ChangeNotifier {
         '[umipos] cash op refused: ${error.code} '
         '(${error.runtimeType}) details=${error.details}',
       );
+      var snapshot = before.snapshot;
+      var count = before.count;
+      var resolution = before.resolution;
+      var reconciliation = before.reconciliation;
+      if (error.code == 'OPTIMISTIC_VERSION_CONFLICT') {
+        try {
+          // The server refused because this screen holds an older shift version.
+          // Read the current drawer before asking the operator to try again.
+          // The movement dialog keeps the amount and reason, so the next attempt
+          // uses the fresh version without retyping.
+          await _reload();
+          snapshot = _state.snapshot;
+          count = _state.count;
+          resolution = _state.resolution;
+          reconciliation = _state.reconciliation;
+        } catch (_) {
+          // A refused write may be followed by a failed read. Keep the previous
+          // figures and expose the original conflict instead of masking it.
+        }
+      }
       _set(
         CashState(
-          snapshot: before.snapshot,
-          count: before.count,
-          resolution: before.resolution,
-          reconciliation: before.reconciliation,
+          snapshot: snapshot,
+          count: count,
+          resolution: resolution,
+          reconciliation: reconciliation,
           errorCode: error.code,
         ),
       );

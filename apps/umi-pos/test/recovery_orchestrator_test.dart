@@ -112,6 +112,25 @@ void main() {
     expect(controller.status.phase, RecoveryPhase.completed);
   });
 
+  test('policy refresh uses the server-issued replay time', () async {
+    final journal = EncryptedOfflineJournal(_Store(), web: false);
+    final gateway = _Gateway();
+    final controller = OfflineRecoveryController(
+      journal: journal,
+      gateway: gateway,
+      connectivity: _online(),
+    );
+    addTearDown(controller.dispose);
+
+    await controller.refreshPolicy(_scope());
+
+    final snapshot = await journal.load();
+    expect(gateway.beginCalls, 1);
+    expect(gateway.policyCalls, 0);
+    expect(snapshot.cachedPolicy, isNotNull);
+    expect(snapshot.lastTrustedServerTime, isNotNull);
+  });
+
   test('the queue replays by itself when the connection comes back', () async {
     final journal = EncryptedOfflineJournal(_Store(), web: false);
     await journal.append(
@@ -390,6 +409,8 @@ final class _Gateway implements ReplayGateway {
   int resultQueries = 0;
   int resolveCalls = 0;
   int acknowledgements = 0;
+  int beginCalls = 0;
+  int policyCalls = 0;
 
   OfflinePolicy get _policy => OfflinePolicy(
     cash: OfflineCashPolicy(
@@ -430,6 +451,7 @@ final class _Gateway implements ReplayGateway {
 
   @override
   Future<BeginReplayResponse> begin(ReplayScope scope) async {
+    beginCalls++;
     if (authorityError != null) {
       throw AppException(
         category: AppErrorCategory.authentication,
@@ -549,7 +571,11 @@ final class _Gateway implements ReplayGateway {
   );
 
   @override
-  Future<OfflinePolicy> policy(ReplayScope scope) async => _policy;
+  Future<OfflinePolicy> policy(ReplayScope scope) async {
+    policyCalls++;
+    return _policy;
+  }
+
   @override
   Future<void> acknowledge(ReplayScope scope, String reconciliationId) async {
     acknowledgements++;

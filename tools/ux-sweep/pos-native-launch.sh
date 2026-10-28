@@ -131,6 +131,7 @@ setsid nohup "$flutter_bin" run -d linux --debug \
   --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true \
   --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled \
   --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=true \
+  --dart-define=UMIPOS_LOCAL_FIRST_FAST_PATH=true \
   --dart-define=UMIPOS_RELEASE_VERSION="$release_version" \
   --dart-define=UMIPOS_CONTRACT_VERSION="$contract_version" \
   --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1 \

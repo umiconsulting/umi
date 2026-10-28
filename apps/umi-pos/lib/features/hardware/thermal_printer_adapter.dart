@@ -787,8 +787,13 @@ final class GenericThermalPrinterAdapter implements DeviceAdapter {
         url is String &&
         url.trim().isNotEmpty) {
       logo = await _logoSource.raster(url.trim(), widthDots: imageWidthDots);
+      printTrace('printer.logo_raster', {
+        'present': logo != null && !logo.isEmpty,
+        'widthDots': logo?.widthDots ?? 0,
+        'heightDots': logo?.heightDots ?? 0,
+      });
     }
-    return ThermalReceiptRenderer(
+    final document = ThermalReceiptRenderer(
       widthColumns: widthColumns,
       // The paper speaks the café's language: the API puts the merchant's locale on the
       // payload, and a payload from an older build (no locale) falls back to Spanish.
@@ -804,6 +809,10 @@ final class GenericThermalPrinterAdapter implements DeviceAdapter {
       logoRaster: logo,
       paperWidthDots: paperWidthDots,
     );
+    printTrace('printer.document_logo', {
+      'present': document.commands.any((command) => command is ThermalImageCommand),
+    });
+    return document;
   }
 
   ThermalDocument _testDocument() => ThermalDocument([

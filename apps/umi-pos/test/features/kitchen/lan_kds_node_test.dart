@@ -320,6 +320,37 @@ void main() {
     );
   });
 
+  test(
+    'a cloud refresh removes a ticket completed on another terminal',
+    () async {
+      final local = _MemoryLocal();
+      final store = LanKdsStore(local);
+      await store.saveCloudBoard(_merchant, _location, [_ticketMap()]);
+      await store.applyCommand(
+        _merchant,
+        _location,
+        KitchenCommandRequest(
+          action: 'command',
+          commandId: _command,
+          idempotencyKey: _idempotency,
+          correlationId: _correlation,
+          expectedVersion: 1,
+          kitchenOrderId: _ticket,
+          commandType: 'mark_item_ready',
+          itemIds: const [_item],
+        ),
+      );
+
+      expect(await store.snapshot(_merchant, _location), hasLength(1));
+
+      // The other terminal completed the order, so it is absent from the
+      // authoritative board. The local READY overlay must not resurrect it.
+      await store.saveCloudBoard(_merchant, _location, const []);
+
+      expect(await store.snapshot(_merchant, _location), isEmpty);
+    },
+  );
+
   test('a locally fired ticket leads the cached server board', () async {
     final local = _MemoryLocal();
     final store = LanKdsStore(local);

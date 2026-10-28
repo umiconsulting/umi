@@ -628,9 +628,15 @@ final class OfflineRecoveryController extends ChangeNotifier {
   }
 
   Future<void> refreshPolicy(ReplayScope scope) async {
-    final policy = await _gateway.policy(scope);
-    final cash = OfflineCashPolicy.fromJson(policy.cash);
-    await _journal.cachePolicy(policy, DateTime.parse(cash.issuedAt));
+    // Cache policy age starts when the server confirms this download. The
+    // configured issued_at is the age of the policy rules, not the age of this
+    // device's copy. Using it made a daily refresh save an already stale policy
+    // and fall back to online checkout after 24 hours.
+    final session = await _gateway.begin(scope);
+    await _journal.cachePolicy(
+      OfflinePolicy.fromJson(session.policy),
+      DateTime.parse(session.cursor['updatedAt']! as String),
+    );
   }
 
   /// The server's own view of this till's queue, for support.

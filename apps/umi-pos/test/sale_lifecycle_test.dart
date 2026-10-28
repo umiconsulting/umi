@@ -10,8 +10,10 @@ import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/security/operator_permissions.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/core/theme/umi_theme.dart';
+import 'package:umi_pos/features/cart/cart_command_queue.dart';
 import 'package:umi_pos/features/cart/cart_controller.dart';
 import 'package:umi_pos/features/cart/cart_repository.dart';
+import 'package:umi_pos/features/offline/offline_journal.dart';
 import 'package:umi_pos/features/sale/sale_lifecycle_controller.dart';
 import 'package:umi_pos/features/sale/sale_repository.dart';
 import 'package:umi_pos/features/sale/sale_surface.dart';
@@ -339,6 +341,16 @@ final class _Carts implements CartRepository {
   ) async => throw UnimplementedError();
 }
 
+final class _BlockedCarts extends _Carts {
+  _BlockedCarts(this.gate);
+
+  final Completer<Cart> gate;
+
+  @override
+  Future<Cart> create(String merchantId, CreateCartRequest request) =>
+      gate.future;
+}
+
 final class _AccountCarts extends _Carts implements OpenAccountCartRepository {
   int saves = 0;
 
@@ -372,12 +384,33 @@ CartController _cartController([CartRepository? repository]) => CartController(
   ),
 );
 
+CartController _cartControllerWithLocalQueue(CartRepository repository) =>
+    CartController(
+      repository: repository,
+      offlineJournal: EncryptedOfflineJournal(_JournalStore(), web: false),
+      deviceIdentity: () => const CartDeviceIdentity(
+        deviceId: '00000000-0000-4000-8000-000000000010',
+        credentialVersion: 1,
+      ),
+      telemetry: const SafeTelemetry(
+        enabled: false,
+        context: TelemetryContext(
+          environment: 'test',
+          appVersion: 'test',
+          platform: 'test',
+        ),
+        exporter: NoopTelemetryExporter(),
+      ),
+    );
+
 SaleLifecycleController _controller(
   _Sales sales, {
   CartController? cartController,
+  bool localFirstFastPathEnabled = false,
 }) => SaleLifecycleController(
   repository: sales,
   cart: cartController ?? _cartController(),
+  localFirstFastPathEnabled: localFirstFastPathEnabled,
   telemetry: const SafeTelemetry(
     enabled: false,
     context: TelemetryContext(
@@ -388,6 +421,23 @@ SaleLifecycleController _controller(
     exporter: NoopTelemetryExporter(),
   ),
 );
+
+final class _JournalStore implements JournalCipherStore {
+  String? value;
+  String? key;
+
+  @override
+  Future<String?> readCiphertext() async => value;
+
+  @override
+  Future<String?> readKey() async => key;
+
+  @override
+  Future<void> writeCiphertext(String next) async => value = next;
+
+  @override
+  Future<void> writeKey(String next) async => key = next;
+}
 
 Map<String, Object?> _historyTestCart() => {
   ...cart().toJson(),
@@ -526,6 +576,106 @@ void main() {
       expect(sales.starts, 0);
     },
   );
+
+  testWidgets('a local pending cash sale appears in Sales with retry', (
+    tester,
+  ) async {
+    final journal = EncryptedOfflineJournal(_JournalStore(), web: false);
+    final localCart = cart(id: '00000000-0000-4000-8000-000000000021');
+    final confirmedAt = DateTime.utc(2026, 7, 29, 12).toIso8601String();
+    await journal.append(
+      commandId: '00000000-0000-4000-8000-000000000022',
+      deviceId: '00000000-0000-4000-8000-000000000023',
+      credentialVersion: 1,
+      merchantId: merchantId,
+      locationId: locationId,
+      operatorSessionId: operatorId,
+      idempotencyKey: '00000000-0000-4000-8000-000000000024',
+      provisionalId: '00000000-0000-4000-8000-000000000021',
+      commandType: 'pos.checkout.cash',
+      cashAmountMinorUnits: 0,
+      maxPendingCashCount: 3,
+      maxPendingCashMinorUnits: 30000,
+      payload: {
+        'policyVersion': 'policy-1',
+        'policyFingerprint': List.filled(64, 'a').join(),
+        'checkoutIdentity': List.filled(64, 'b').join(),
+        'snapshot': {
+          'checkoutCommand': {
+            'cartId': localCart.id,
+            'locationId': locationId,
+            'operatorSessionId': operatorId,
+            'expectedCartVersion': localCart.version,
+            'paymentMethod': 'cash',
+            'totalsFingerprint': List.filled(64, 'c').join(),
+            'idempotencyKey': '00000000-0000-4000-8000-000000000025',
+            'tenderDrafts': <Object?>[],
+            'tipDraft': null,
+            'discountDrafts': <Object?>[],
+            'approvalIds': <Object?>[],
+            'receiptDelivery': {
+              'destination': 'display',
+              'channel': null,
+              'customerContactId': null,
+            },
+            'cashShiftId': '00000000-0000-4000-8000-000000000026',
+            'customerValue': null,
+          },
+          'cartSnapshot': localCart.toJson(),
+          'totals': {
+            'cartVersion': localCart.version,
+            'fingerprint': List.filled(64, 'c').join(),
+            'totals': localCart.totals,
+            'taxes': {
+              'total': {'currency': 'MXN', 'minorUnits': 0},
+              'entries': <Object?>[],
+            },
+            'discounts': {
+              'total': {'currency': 'MXN', 'minorUnits': 0},
+              'entries': <Object?>[],
+            },
+            'catalogVersion': 'catalog-1',
+            'pricingVersion': 'pricing-1',
+            'taxVersion': 'tax-1',
+            'snapshotAt': confirmedAt,
+            'confirmedAt': confirmedAt,
+          },
+          'catalogVersion': 'catalog-1',
+          'pricingVersion': 'pricing-1',
+          'taxVersion': 'tax-1',
+          'catalogSnapshotAt': confirmedAt,
+          'pricingSnapshotAt': confirmedAt,
+          'taxSnapshotAt': confirmedAt,
+          'currency': 'MXN',
+          'amountDueMinorUnits': 0,
+          'amountReceivedMinorUnits': 0,
+          'changeDueMinorUnits': 0,
+          'businessDate': '2026-07-29',
+        },
+      },
+    );
+    final lifecycle = _controller(_Sales());
+    await lifecycle.open(merchantId, locationId, operatorId);
+
+    await tester.pumpWidget(
+      _scaledHistoryApp(
+        SaleCenterSurface(
+          lifecycle: lifecycle,
+          embedded: true,
+          permissions: OperatorPermissions(['sale.lifecycle']),
+          offlineJournal: journal,
+        ),
+        1,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('Venta pendiente de sincronización'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(PosButton, 'Reintentar'), findsOneWidget);
+  });
 
   test(
     'a fresh operator entry can bind the till without adopting the sale',
@@ -1578,6 +1728,50 @@ void main() {
     await Future.wait([lifecycle.newSale(), lifecycle.newSale()]);
     expect(sales.starts, 1);
     expect(lifecycle.state.phase, SalePhase.buildingCart);
+  });
+
+  test(
+    'the local fast path starts the first account without listing sales',
+    () async {
+      final sales = _Sales()..currentSale = null;
+      final createGate = Completer<Cart>();
+      final carts = _cartControllerWithLocalQueue(_BlockedCarts(createGate));
+      final lifecycle = _controller(
+        sales,
+        cartController: carts,
+        localFirstFastPathEnabled: true,
+      );
+      await lifecycle.open(merchantId, locationId, operatorId);
+      final currentReads = sales.currentReads;
+
+      expect(await lifecycle.newSale(), isTrue);
+      expect(sales.starts, 0);
+      expect(sales.currentReads, currentReads);
+      expect(carts.state.cart, isNotNull);
+      expect(lifecycle.state.phase, SalePhase.buildingCart);
+      expect(carts.supportsLocalWrites, isTrue);
+      createGate.complete(cart());
+      await Future<void>.delayed(Duration.zero);
+      lifecycle.dispose();
+      carts.dispose();
+    },
+  );
+
+  test('local writes require the encrypted queue', () async {
+    final sales = _Sales()..currentSale = null;
+    final carts = _cartController(_Carts());
+    final lifecycle = _controller(
+      sales,
+      cartController: carts,
+      localFirstFastPathEnabled: true,
+    );
+    await lifecycle.open(merchantId, locationId, operatorId);
+
+    expect(await lifecycle.newSale(), isTrue);
+    expect(sales.starts, 1);
+    expect(carts.supportsLocalWrites, isFalse);
+    lifecycle.dispose();
+    carts.dispose();
   });
 
   test('new sale waits for the current account restore', () async {

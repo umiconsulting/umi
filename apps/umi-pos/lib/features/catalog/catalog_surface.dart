@@ -2350,12 +2350,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                       queryAmbiguousPayment:
                           widget.checkout.queryUnknownPayment,
                       beforeContextExit: widget.sales.prepareForOperatorExit,
-                      retryOfflineHardware:
-                          widget.hardware == null ||
-                              (!permissions.allows('hardware.printer.print') &&
-                                  !permissions.allows('hardware.drawer.open'))
-                          ? null
-                          : _retryOfflineHardware,
                     );
                   }
                 case 'diagnostics':
@@ -2968,6 +2962,28 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         embedded: true,
         onResumed: () => setState(() => _setSection(TillSurface.order)),
         onPrint: _receiptPrinter,
+        offlineJournal: widget.offlineJournal,
+        offlineRecovery: widget.offlineRecovery,
+        offlineScope: () {
+          final state = widget.entry.state;
+          final device = state.device;
+          final merchant = state.selectedTenant;
+          final location = state.selectedBranch;
+          final operator = state.operator;
+          if (device == null ||
+              merchant == null ||
+              location == null ||
+              operator == null) {
+            return null;
+          }
+          return ReplayScope(
+            deviceId: device.id,
+            merchantId: merchant.id,
+            locationId: location.id,
+            operatorSessionId: operator.id,
+            credentialVersion: device.credentialVersion,
+          );
+        },
         onKitchenStatus: widget.kitchenStatus == null
             ? null
             : (sale) {
@@ -3078,101 +3094,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       operatorSessionId: operator.id,
       credentialVersion: device.credentialVersion,
     );
-  }
-
-  Future<OfflineHardwareRecoveryResult> _retryOfflineHardware(
-    JournalEntry entry,
-  ) async {
-    final hardware = widget.hardware;
-    final state = widget.entry.state;
-    final tenant = state.selectedTenant;
-    final branch = state.selectedBranch;
-    final operator = state.operator;
-    final posDevice = state.device;
-    final provisionalId = entry.command.provisionalId;
-    final permissions = OperatorPermissions(operator?.permissions ?? const []);
-    if (hardware == null ||
-        tenant == null ||
-        branch == null ||
-        operator == null ||
-        posDevice == null ||
-        provisionalId == null ||
-        (!permissions.allows('hardware.printer.print') &&
-            !permissions.allows('hardware.drawer.open'))) {
-      throw StateError('HARDWARE_OFFLINE_RECOVERY_CONTEXT_REQUIRED');
-    }
-    final command = OfflineCheckoutCommand.fromJson(entry.command.payload);
-    final hardwareScope = HardwareScope(
-      merchantId: tenant.id,
-      locationId: branch.id,
-      operatorSessionId: operator.id,
-      deviceId: posDevice.id,
-      credentialVersion: posDevice.credentialVersion,
-      permissions: operator.permissions.toSet(),
-      registerId: widget.cash.activeRegisterId,
-    );
-    final results = await hardware.retryOfflineCheckoutHardware(
-      hardwareScope,
-      ProvisionalReceipt(
-        provisionalSaleId: provisionalId,
-        status: 'pending_sync',
-        locationName: branch.name,
-        operatorName: operator.staffId,
-        snapshot: command.snapshot,
-        createdAt: entry.command.createdAt,
-        lastSynchronizationAt: null,
-        officialReceipt: entry.officialCommit,
-      ),
-    );
-    return OfflineHardwareRecoveryResult([
-      for (final result in results.whereType<RuntimeCommandResult>())
-        OfflineHardwareRecoveryItem(
-          commandId: result.safeMetadata['commandId']! as String,
-          commandType: result.safeMetadata['commandType']! as String,
-          status: result.status.name,
-          verifyPrint:
-              result.status == RuntimeCommandStatus.unknown &&
-                  (result.safeMetadata['commandType'] == 'print_receipt' ||
-                      result.safeMetadata['commandType'] ==
-                          'controlled_reprint') &&
-                  permissions.allows('hardware.printer.print')
-              ? () => hardware.verifyOfflinePrint(
-                  scope: hardwareScope,
-                  commandId: result.safeMetadata['commandId']! as String,
-                )
-              : null,
-          controlledReprint:
-              result.status == RuntimeCommandStatus.unknown &&
-                  (result.safeMetadata['commandType'] == 'print_receipt' ||
-                      result.safeMetadata['commandType'] ==
-                          'controlled_reprint') &&
-                  permissions.allows('hardware.printer.reprint')
-              ? () async {
-                  final recovered = await hardware.controlledOfflineReprint(
-                    scope: hardwareScope,
-                    commandId: result.safeMetadata['commandId']! as String,
-                  );
-                  if (recovered.status != RuntimeCommandStatus.succeeded) {
-                    throw StateError('HARDWARE_RECOVERY_NEEDS_ATTENTION');
-                  }
-                }
-              : null,
-          repeatDrawerOpen:
-              result.status == RuntimeCommandStatus.unknown &&
-                  result.safeMetadata['commandType'] == 'open_drawer' &&
-                  permissions.allows('hardware.drawer.open')
-              ? () async {
-                  final recovered = await hardware.repeatOfflineDrawerOpen(
-                    scope: hardwareScope,
-                    commandId: result.safeMetadata['commandId']! as String,
-                  );
-                  if (recovered.status != RuntimeCommandStatus.succeeded) {
-                    throw StateError('HARDWARE_RECOVERY_NEEDS_ATTENTION');
-                  }
-                }
-              : null,
-        ),
-    ]);
   }
 
   Future<void> _recoverInBackground() async {
@@ -5127,12 +5048,15 @@ final class _CartPanel extends StatelessWidget {
 
   Future<void> _openCheckout(BuildContext context, {bool split = false}) async {
     if (beforeCheckout != null && !await beforeCheckout!()) return;
+    final cashShiftId = await cash.ensureCheckoutShift(
+      canAdopt: permissions.allows('cash.shift.resume'),
+    );
     if (!context.mounted) return;
     if (split) {
       await showSplitCheckout(
         context,
         checkout: checkout,
-        cashShiftId: cash.activeShiftId,
+        cashShiftId: cashShiftId,
         cart: controller,
         entry: entry,
         sales: sales,
@@ -5142,7 +5066,7 @@ final class _CartPanel extends StatelessWidget {
     await showCheckoutSheet(
       context,
       checkout: checkout,
-      cashShiftId: cash.activeShiftId,
+      cashShiftId: cashShiftId,
       cart: controller,
       entry: entry,
       sales: sales,
@@ -5203,6 +5127,9 @@ final class _CartPanel extends StatelessWidget {
         }
         return cash.recoverOwnShift();
       },
+      onEnsureCashShift: () => cash.ensureCheckoutShift(
+        canAdopt: permissions.allows('cash.shift.resume'),
+      ),
     );
   }
 

@@ -1128,6 +1128,72 @@ export class PosCartRepository {
     input: CartLineInput,
     priced: PricedSelection,
   ): Promise<boolean> {
+    const existing = await client.query<{ identityKey: string }>(
+      `SELECT identity_key AS "identityKey" FROM merchant.pos_cart_line
+       WHERE merchant_id=$1::uuid AND cart_id=$2::uuid AND id=$3::uuid AND fired_at IS NULL`,
+      [merchantId, cartId, lineId],
+    );
+    if (!existing.rows[0]) return false;
+    // A quantity change leaves the product selection intact. Preserve the line ID:
+    // rapid subsequent taps from a till still address that ID. Delete+insert made
+    // each successful update invalidate the next queued command in production.
+    if (existing.rows[0].identityKey === identityKey) {
+      if (
+        !(await this.bump(client, merchantId, cartId, expectedVersion, input.operatorSessionId, {
+          allowFired: true,
+          pendingLineId: lineId,
+        }))
+      ) {
+        return false;
+      }
+      const modifierTotal = priced.modifiers.reduce(
+        (sum, item) => sum + item.priceDelta * item.quantity,
+        0,
+      );
+      const updated = await client.query(
+        `UPDATE merchant.pos_cart_line SET
+           product_name=$4,variant_name=$5,variant_attributes=$6,quantity=$7,note=$8,
+           base_price=$9,variant_delta=$10,modifier_total=$11,tax_rate_basis_points=$12,
+           course_number=$13,updated_at=now()
+         WHERE merchant_id=$1::uuid AND cart_id=$2::uuid AND id=$3::uuid AND fired_at IS NULL`,
+        [
+          merchantId,
+          cartId,
+          lineId,
+          priced.productName,
+          priced.variantName,
+          priced.variantAttributes,
+          input.quantity,
+          input.note,
+          priced.basePrice,
+          priced.variantDelta,
+          modifierTotal,
+          priced.taxRateBasisPoints,
+          input.courseNumber,
+        ],
+      );
+      if (!updated.rowCount) return false;
+      await client.query(`DELETE FROM merchant.pos_cart_line_modifier WHERE line_id=$1::uuid`, [
+        lineId,
+      ]);
+      for (const modifier of priced.modifiers) {
+        await client.query(
+          `INSERT INTO merchant.pos_cart_line_modifier
+            (merchant_id,line_id,group_id,modifier_id,name,quantity,price_delta)
+           VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7)`,
+          [
+            merchantId,
+            lineId,
+            modifier.groupId,
+            modifier.modifierId,
+            modifier.name,
+            modifier.quantity,
+            modifier.priceDelta,
+          ],
+        );
+      }
+      return true;
+    }
     if (
       !(await this.remove(
         client,

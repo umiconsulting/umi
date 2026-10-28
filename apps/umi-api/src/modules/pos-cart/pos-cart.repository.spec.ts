@@ -1,8 +1,10 @@
 import type { PoolClient } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { Cart } from '@umi/contract';
+import type { CartLineInput } from '@umi/contract';
 import type { PgService } from '../../shared/database/pg.service';
 import { PosCartRepository } from './pos-cart.repository';
+import type { PricedSelection } from './pos-cart.repository';
 import { voidAfterPreparationFingerprint } from '../../shared/orders/void-after-preparation-fingerprint';
 
 const MERCHANT = '10000000-0000-4000-8000-000000000001';
@@ -14,6 +16,74 @@ const FIRE_ORDER = '60000000-0000-4000-8000-000000000009';
 const LINE = '70000000-0000-4000-8000-000000000001';
 const COMMAND = '80000000-0000-4000-8000-000000000001';
 const APPROVAL = '90000000-0000-4000-8000-000000000001';
+
+describe('PosCartRepository.replace', () => {
+  it('keeps one line ID across consecutive quantity changes', async () => {
+    let version = 2;
+    let quantity = 1;
+    const query = vi.fn(async (sql: string, params?: unknown[]) => {
+      if (sql.includes('SELECT identity_key')) {
+        return { rows: [{ identityKey: 'concha' }], rowCount: 1 };
+      }
+      if (sql.includes('UPDATE merchant.pos_cart SET')) {
+        if (params?.[2] !== version) return { rows: [], rowCount: 0 };
+        version += 1;
+        return { rows: [], rowCount: 1 };
+      }
+      if (sql.includes('UPDATE merchant.pos_cart_line SET')) {
+        expect(params?.[2]).toBe(LINE);
+        quantity = Number(params?.[6]);
+        return { rows: [], rowCount: 1 };
+      }
+      if (sql.includes('DELETE FROM merchant.pos_cart_line_modifier')) {
+        return { rows: [], rowCount: 0 };
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    });
+    const client = { query } as unknown as PoolClient;
+    const repository = new PosCartRepository({} as PgService);
+    vi.spyOn(repository, 'assertFinanciallyMutable').mockResolvedValue(undefined);
+    const priced: PricedSelection = {
+      productId: '60000000-0000-4000-8000-000000000001',
+      productName: 'Concha',
+      saleAction: 'merchandise',
+      variantId: null,
+      variantName: null,
+      variantAttributes: {},
+      basePrice: 4500,
+      variantDelta: 0,
+      taxRateBasisPoints: 0,
+      currency: 'MXN',
+      modifiers: [],
+    };
+    for (const next of [2, 3, 4, 5]) {
+      const input = {
+        cartId: CART,
+        locationId: LOCATION,
+        operatorSessionId: OPERATOR_SESSION,
+        productId: priced.productId,
+        variantId: null,
+        modifierSelections: [],
+        quantity: next,
+        courseNumber: 1,
+        note: null,
+        expectedVersion: version,
+        idempotencyKey: `00000000-0000-4000-8000-${String(next).padStart(12, '0')}`,
+      } as CartLineInput;
+      await expect(
+        repository.replace(client, MERCHANT, CART, LINE, version, 'concha', input, priced),
+      ).resolves.toBe(true);
+      expect(quantity).toBe(next);
+    }
+    expect(version).toBe(6);
+    expect(
+      query.mock.calls.some(([sql]) => sql.includes('DELETE FROM merchant.pos_cart_line WHERE')),
+    ).toBe(false);
+    expect(
+      query.mock.calls.some(([sql]) => sql.includes('INSERT INTO merchant.pos_cart_line\n')),
+    ).toBe(false);
+  });
+});
 
 describe('PosCartRepository.create', () => {
   it('parks a hidden active account before resuming the selected one', async () => {

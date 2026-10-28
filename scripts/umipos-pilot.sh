@@ -183,6 +183,7 @@ build_release() {
         --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=false \
         --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled \
         --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=false \
+        --dart-define=UMIPOS_LOCAL_FIRST_FAST_PATH=true \
         --dart-define="UMIPOS_RELEASE_VERSION=$RELEASE_VERSION" \
         --dart-define="UMIPOS_RELEASE_GIT_COMMIT=$RELEASE_GIT_COMMIT" \
         --dart-define="UMIPOS_RELEASE_BUILD_TIMESTAMP=$RELEASE_BUILD_TIMESTAMP" \
