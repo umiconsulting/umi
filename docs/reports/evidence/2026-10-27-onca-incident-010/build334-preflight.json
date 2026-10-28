@@ -1,0 +1,6 @@
+{
+  "at": "2026-10-27T21:36:34.735317+00:00",
+  "exit": 0,
+  "stdout": "artifact=/home/juan/Downloads/UmiPOS-1.0.0-production-release-build334-final.apk\nversionCode=334\nsigner=14975f2c374e03b155ab363e17d4a79d4ab32b888ab381bedc3264934cb5c051\nready=Caja serial=100.64.178.95:35049\nready=Barra serial=100.90.102.41:44965\nready=Cocina serial=100.125.137.36:35147\nready=Mesero serial=100.125.102.97:42845\n",
+  "stderr": ""
+}

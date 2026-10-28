@@ -60,10 +60,10 @@ Tools:
 
 Artifacts:
 
-| Artifact | SHA-256 | Use |
-| --- | --- | --- |
-| Parrot POS `2.27.5` | `fdc0492cd7ea3107ec6e74bb520d21a0cc602ac015fba2f7aea449f8dc07d1c3` | Main APK evidence |
-| Flutter POS `3.1.0` | `bc5ebd52e4157b0494333fc71aa5e1ad7839d5cbf552ee1d196e1c6191773d4c` | Open-source APK example |
+| Artifact                 | SHA-256                                                            | Use                     |
+| ------------------------ | ------------------------------------------------------------------ | ----------------------- |
+| Parrot POS `2.27.5`      | `fdc0492cd7ea3107ec6e74bb520d21a0cc602ac015fba2f7aea449f8dc07d1c3` | Main APK evidence       |
+| Flutter POS `3.1.0`      | `bc5ebd52e4157b0494333fc71aa5e1ad7839d5cbf552ee1d196e1c6191773d4c` | Open-source APK example |
 | gPOS Mobile `0.1.0-beta` | `d0d627126ba8b3fc1e8b6a2fd37383c220f50ac17edfe0b3bd3f7996d1900dc3` | Open-source APK example |
 
 ## Iteration cascade
@@ -353,15 +353,15 @@ applies the group in one transaction.
 
 The same rule covers future combinations:
 
-| Operator intent | Atomic effects |
-| --- | --- |
-| Open a dine-in account | Account, table claim, party size, fulfillment type |
-| Open a takeout account | Account, fulfillment type |
-| Change service context | Account, table claim or release, fulfillment type |
-| Add a configured item | Line, modifiers, totals, catalog references |
-| Fire an order | Cart state, kitchen ticket, KDS delivery event |
-| Record a partial payment | Payment, ledger allocation, remaining balance |
-| Close a paid account | Payment, account state, receipt job |
+| Operator intent          | Atomic effects                                     |
+| ------------------------ | -------------------------------------------------- |
+| Open a dine-in account   | Account, table claim, party size, fulfillment type |
+| Open a takeout account   | Account, fulfillment type                          |
+| Change service context   | Account, table claim or release, fulfillment type  |
+| Add a configured item    | Line, modifiers, totals, catalog references        |
+| Fire an order            | Cart state, kitchen ticket, KDS delivery event     |
+| Record a partial payment | Payment, ledger allocation, remaining balance      |
+| Close a paid account     | Payment, account state, receipt job                |
 
 The queue scheduler orders overlapping command groups. A group declares its
 aggregate keys. Two groups with the same account key cannot commit from the same

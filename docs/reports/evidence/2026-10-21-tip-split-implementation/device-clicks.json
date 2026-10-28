@@ -519,10 +519,7 @@
   ],
   "appExceptions": [],
   "restore": {
-    "attempted": [
-      "Comanda: Todo",
-      "Comanda: Comer aquí"
-    ],
+    "attempted": ["Comanda: Todo", "Comanda: Comer aquí"],
     "failed": [
       "Cuentas: Mapa",
       "Cuentas: Mesas 2, 17 mesas",

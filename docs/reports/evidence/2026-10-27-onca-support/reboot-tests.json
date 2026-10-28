@@ -1,0 +1,65 @@
+{
+  "automaticRecoveryVerified": false,
+  "disconnectRecoverySeconds": 10.04,
+  "tests": [
+    {
+      "bootBefore": 4,
+      "bootAfter": 5,
+      "timeoutSeconds": 210,
+      "result": "failed",
+      "cause": "KeepADB skipped boot recovery because persisted_intent_off",
+      "evidence": "boot_recovery source=boot_receiver outcome=skipped detail=persisted_intent_off"
+    },
+    {
+      "bootBefore": 5,
+      "bootAfter": 6,
+      "timeoutSeconds": 210,
+      "result": "failed",
+      "cause": "Android requested network debugging permission again despite Always allow being selected before reboot",
+      "evidence": "AdbDebuggingManager: Expected keyStore, but got tag=null"
+    }
+  ],
+  "manualRecovery": {
+    "serial": "100.64.178.95:43761",
+    "bootCount": 6,
+    "networkPermissionAccepted": true,
+    "operatorLoginConfirmed": true,
+    "operatorHomeObserved": true
+  },
+  "firmware": {
+    "model": "iMin D3",
+    "android": "11",
+    "buildFingerprint": "rockchip/rk3566_rgo/rk3566_rgo:11/RQ3A.210705.001/eng.yeguif.20230926.065226:user/release-keys",
+    "securityPatch": "2022-03-05",
+    "transmissionModeOptionFound": false,
+    "displayId": "1.0.3.4.23_230926",
+    "incremental": "eng.yeguif.20230926.065226",
+    "productDevice": "rk3566_rgo",
+    "updaters": [
+      {
+        "package": "com.neostra.update",
+        "versionName": "5.28",
+        "versionCode": 215
+      },
+      {
+        "package": "android.rockchip.update.service",
+        "versionName": "1.8.9",
+        "versionCode": 39
+      }
+    ],
+    "publicSearchResult": "No confirmed vendor firmware fix for exact build was found in consulted official documentation."
+  },
+  "trustedNetworkDumpAfterManualApproval": {
+    "keyStoreVersion": 1,
+    "containsExpectedNetwork": true,
+    "pairedPublicKeyCount": 2,
+    "trustedWifiCount": 1
+  },
+  "remainingLimit": "Caja requires manual approval of wireless debugging after reboot. A corrected iMin firmware or another vendor-supported remedy is not yet verified.",
+  "nextSteps": [
+    "Obtain a vendor-supported firmware or remedy for this exact iMin D3 build that fixes wireless-debugging network authorization persistence.",
+    "Review the vendor release notes and recovery procedure before any firmware installation.",
+    "After an approved maintenance change, require successful full reboot tests without manual approval before declaring unattended recovery."
+  ],
+  "verifiedCompatibleFirmwareAvailable": false
+}

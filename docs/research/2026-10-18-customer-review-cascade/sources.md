@@ -11,18 +11,18 @@ Evidence labels:
 
 ## Tool record
 
-| Tool | Version | Use | Result |
-| --- | --- | --- | --- |
-| Repository tools | `rg`, `jq`, `curl`, `perl` as installed | Search local documents and parse public feeds | Used |
-| Playwright | 1.62.1 | Open sites that require a JavaScript browser | Used with system Chromium |
-| Chromium | System package | Read vendor community pages | Used |
-| Search Service connector | Current session | Primary web search | Failed with `not available to the model` |
-| Brave Search | Public web interface | Fallback source discovery | Used |
-| DuckDuckGo | Public HTML endpoint | Fallback source discovery | Bot challenge |
-| Apple iTunes RSS | Public review feed | Review samples in MX, AR, US, FR and BR | Used |
-| Google Play | Public app page | Review samples in Spanish MX | Used |
-| Capterra MX | Public review page | Fudo and Soft Restaurant reviews | Used through Chromium |
-| Software Advice | Public review page | Square, Toast and Lightspeed reviews | Used |
+| Tool                     | Version                                 | Use                                           | Result                                   |
+| ------------------------ | --------------------------------------- | --------------------------------------------- | ---------------------------------------- |
+| Repository tools         | `rg`, `jq`, `curl`, `perl` as installed | Search local documents and parse public feeds | Used                                     |
+| Playwright               | 1.62.1                                  | Open sites that require a JavaScript browser  | Used with system Chromium                |
+| Chromium                 | System package                          | Read vendor community pages                   | Used                                     |
+| Search Service connector | Current session                         | Primary web search                            | Failed with `not available to the model` |
+| Brave Search             | Public web interface                    | Fallback source discovery                     | Used                                     |
+| DuckDuckGo               | Public HTML endpoint                    | Fallback source discovery                     | Bot challenge                            |
+| Apple iTunes RSS         | Public review feed                      | Review samples in MX, AR, US, FR and BR       | Used                                     |
+| Google Play              | Public app page                         | Review samples in Spanish MX                  | Used                                     |
+| Capterra MX              | Public review page                      | Fudo and Soft Restaurant reviews              | Used through Chromium                    |
+| Software Advice          | Public review page                      | Square, Toast and Lightspeed reviews          | Used                                     |
 
 Reddit scripted access returned a network-policy block. This pass did not use Reddit as evidence.
 
@@ -30,14 +30,14 @@ Reddit scripted access returned a network-policy block. This pass did not use Re
 
 The second pass used:
 
-| Tool | Use | Result |
-| --- | --- | --- |
-| Apple iTunes RSS | Review samples in US, MX, CA, FR, and BR | 1,596 reviews |
-| Google Play pages | Operator and manager app reviews | Used |
-| GetApp | Verified review summaries and samples | Used |
-| Trustpilot through Jina Reader | Recent independent reviews | Used |
-| PullPush with Reddit links | Public operator posts | Used |
-| Square Community search | Seller reports and vendor replies | Used |
+| Tool                           | Use                                      | Result        |
+| ------------------------------ | ---------------------------------------- | ------------- |
+| Apple iTunes RSS               | Review samples in US, MX, CA, FR, and BR | 1,596 reviews |
+| Google Play pages              | Operator and manager app reviews         | Used          |
+| GetApp                         | Verified review summaries and samples    | Used          |
+| Trustpilot through Jina Reader | Recent independent reviews               | Used          |
+| PullPush with Reddit links     | Public operator posts                    | Used          |
+| Square Community search        | Seller reports and vendor replies        | Used          |
 
 The second pass also encountered these limits:
 

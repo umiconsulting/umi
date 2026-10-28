@@ -8,21 +8,21 @@ A server enters a second round or an open account. The app closes, refreshes or 
 
 ## Independent evidence
 
-| Product | Language | Evidence | Source |
-| --- | --- | --- | --- |
-| Fudo | Spanish MX | A user reports a session exit during order entry and says the order must be entered again. | App Store MX, 2023-06-01 |
-| Fudo | Spanish MX | A user reports that a refresh or update erases data during entry. | App Store MX, 2019-02-09 |
-| Fudo | Spanish MX | A user reports that an Apple update blocks entry and removes some lines. | App Store MX, 2022-08-22 |
-| Fudo | Spanish AR | A Capterra review reports an automatic logout on the first order. | Capterra MX, 2023-07-19 |
-| Odoo | French | Users report a logout each time they close the page. | App Store FR, 2026-10-05 |
-| Odoo | French | Another user reports that login is required each time the app opens. | App Store FR, 2026-03-23 |
-| Odoo | Spanish | A user reports that the session ends often and the app is not usable for long periods. | App Store MX |
-| Square | Spanish MX | A user reports that the session closed and inventory and sales data disappeared. | App Store MX, 2024-07-11 |
-| Clover | English | A user reports repeated logout despite a 14-day stay-signed-in setting. | Clover Go App Store, US |
-| Square | English | A seller lost all open orders after an update to the orders view. | [Square Community](https://community.squareup.com/t5/Orders-Menu-Items-Catalog/I-lost-all-open-orders-with-the-new-update/m-p/821799) |
-| Clover | English | The Orders tab crashed before open orders could be closed. | [Reddit](https://www.reddit.com/r/CloverPOS/comments/1j0paru/orders_app_crashing/) |
-| Lightspeed | English | A full restaurant lost tabs when the app went black during service. | [App Store](https://apps.apple.com/us/app/lightspeed-restaurant-pos-l/id474723658) |
-| Toast | English | A handheld lost the KDS and print path at the table. | [Reddit](https://www.reddit.com/r/ToastPOS/comments/1e32cri/handheld_disconnecting_from_internet/) |
+| Product    | Language   | Evidence                                                                                   | Source                                                                                                                                |
+| ---------- | ---------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Fudo       | Spanish MX | A user reports a session exit during order entry and says the order must be entered again. | App Store MX, 2023-06-01                                                                                                              |
+| Fudo       | Spanish MX | A user reports that a refresh or update erases data during entry.                          | App Store MX, 2019-02-09                                                                                                              |
+| Fudo       | Spanish MX | A user reports that an Apple update blocks entry and removes some lines.                   | App Store MX, 2022-08-22                                                                                                              |
+| Fudo       | Spanish AR | A Capterra review reports an automatic logout on the first order.                          | Capterra MX, 2023-07-19                                                                                                               |
+| Odoo       | French     | Users report a logout each time they close the page.                                       | App Store FR, 2026-10-05                                                                                                              |
+| Odoo       | French     | Another user reports that login is required each time the app opens.                       | App Store FR, 2026-03-23                                                                                                              |
+| Odoo       | Spanish    | A user reports that the session ends often and the app is not usable for long periods.     | App Store MX                                                                                                                          |
+| Square     | Spanish MX | A user reports that the session closed and inventory and sales data disappeared.           | App Store MX, 2024-07-11                                                                                                              |
+| Clover     | English    | A user reports repeated logout despite a 14-day stay-signed-in setting.                    | Clover Go App Store, US                                                                                                               |
+| Square     | English    | A seller lost all open orders after an update to the orders view.                          | [Square Community](https://community.squareup.com/t5/Orders-Menu-Items-Catalog/I-lost-all-open-orders-with-the-new-update/m-p/821799) |
+| Clover     | English    | The Orders tab crashed before open orders could be closed.                                 | [Reddit](https://www.reddit.com/r/CloverPOS/comments/1j0paru/orders_app_crashing/)                                                    |
+| Lightspeed | English    | A full restaurant lost tabs when the app went black during service.                        | [App Store](https://apps.apple.com/us/app/lightspeed-restaurant-pos-l/id474723658)                                                    |
+| Toast      | English    | A handheld lost the KDS and print path at the table.                                       | [Reddit](https://www.reddit.com/r/ToastPOS/comments/1e32cri/handheld_disconnecting_from_internet/)                                    |
 
 ## Vendor behavior
 

@@ -8,16 +8,16 @@ A server walks from the floor to the kitchen. The handheld changes access point 
 
 ## Independent evidence
 
-| Product | Language | Evidence | Source |
-| --- | --- | --- | --- |
-| Toast | English | A user reports random Wi-Fi drops during service. | Toast Community, 2024-01-15 |
-| Toast | English | Another user reports the same failure for six months and says the handhelds are almost useless. | Toast Community, 2024-09-16 |
-| Toast | English | The first user later identifies a dead zone and a competing secured network. | Toast Community, 2024-09-18 |
-| Square | English | A reviewer reports that Wi-Fi loss stops the restaurant workflow. | Software Advice review |
-| Clover | English | A reviewer reports that constant outages affect orders. | Clover Go App Store, US |
-| Toast | English | A handheld lost KDS and expo printing when it left the truck window. | [Reddit](https://www.reddit.com/r/ToastPOS/comments/1e32cri/handheld_disconnecting_from_internet/) |
-| Toast | English | A site saw devices go offline and online although the Internet was healthy. | [Reddit](https://www.reddit.com/r/ToastPOS/comments/14b9m3q/toast_is_always_malfunctioning/) |
-| Square | English | A seller lost all open orders after a view update. | [Square Community](https://community.squareup.com/t5/Orders-Menu-Items-Catalog/I-lost-all-open-orders-with-the-new-update/m-p/821799) |
+| Product | Language | Evidence                                                                                        | Source                                                                                                                                |
+| ------- | -------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Toast   | English  | A user reports random Wi-Fi drops during service.                                               | Toast Community, 2024-01-15                                                                                                           |
+| Toast   | English  | Another user reports the same failure for six months and says the handhelds are almost useless. | Toast Community, 2024-09-16                                                                                                           |
+| Toast   | English  | The first user later identifies a dead zone and a competing secured network.                    | Toast Community, 2024-09-18                                                                                                           |
+| Square  | English  | A reviewer reports that Wi-Fi loss stops the restaurant workflow.                               | Software Advice review                                                                                                                |
+| Clover  | English  | A reviewer reports that constant outages affect orders.                                         | Clover Go App Store, US                                                                                                               |
+| Toast   | English  | A handheld lost KDS and expo printing when it left the truck window.                            | [Reddit](https://www.reddit.com/r/ToastPOS/comments/1e32cri/handheld_disconnecting_from_internet/)                                    |
+| Toast   | English  | A site saw devices go offline and online although the Internet was healthy.                     | [Reddit](https://www.reddit.com/r/ToastPOS/comments/14b9m3q/toast_is_always_malfunctioning/)                                          |
+| Square  | English  | A seller lost all open orders after a view update.                                              | [Square Community](https://community.squareup.com/t5/Orders-Menu-Items-Catalog/I-lost-all-open-orders-with-the-new-update/m-p/821799) |
 
 ## Vendor behavior
 

@@ -142,3 +142,18 @@ regexTarget = 'secret'
 regexes = [
   '''^onca-root-6d54a4e3$''',
 ]
+
+[[allowlists]]
+description = "Identificadores exactos de evidencia, revisión y huella pública de ONCA"
+# Estos valores identifican dos capturas, el commit desplegado y las huellas
+# públicas de la firma de Umi Support. Ninguno permite autenticar una solicitud.
+# La coincidencia exacta conserva la detección de credenciales en los reportes.
+regexTarget = 'secret'
+regexes = [
+  '''^ev_3c578d2241309fc53890603dd4d414e86ceb95adc58d71d9945e4e1299bc05df$''',
+  '''^ev_0ee13baadc774f8ad041a21e3ddab5843880d62ca143587f804fb090a145e522$''',
+  '''^445bedacae9f0aeb1406f7b09b1b27e46b5b5fc8$''',
+  '''^7161292c9708a42db6f0a4ecd30d4f999d739955dcb7553049d6e9c8a9ce220b$''',
+  '''^e557c1faea71be5bd2297d6bb4824d9b5fc760b9$''',
+  '''^719ca258807ec047e73be04606e14e39$''',
+]

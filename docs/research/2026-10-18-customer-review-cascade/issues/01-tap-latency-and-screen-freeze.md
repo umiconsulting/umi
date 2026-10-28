@@ -8,21 +8,21 @@ A server taps a product, a category or a payment method during a busy service. T
 
 ## Independent evidence
 
-| Product | Language | Evidence | Source |
-| --- | --- | --- | --- |
-| Fudo | Spanish MX | A user reports that the app turns gray often and slows the work. | App Store MX, 2025-03-01 |
-| Fudo | Spanish MX | A user reports that the new category index makes products harder to find during order entry. | App Store MX, 2024-09-13 |
-| Lightspeed | English | A restaurant operator reports that the system freezes when the restaurant is busy. | Software Advice review, 2022 |
-| Lightspeed | English | Another review reports that frequent updates slow the system. | Software Advice page 5 |
-| Toast | English | A restaurant operator reports that Toast can slow down during a busy service. | Software Advice review, 2019 |
-| Square | Spanish MX | Several reviews describe an update that removes the product grid or the payment action. | App Store MX, 2023 |
-| Clover | English | A reviewer reports slower performance and loading issues after an update. | Clover Go App Store, US |
-| Square | English | A register became slow on Wi-Fi in July 2026. Cash, card, and reports slowed together; a phone hotspot restored speed. | [Square Community](https://community.squareup.com/t5/Hardware-Setup-Troubleshooting/Square-register-very-slow-laggy-on-wifi/m-p/847362) |
-| Square | English | Tap to pay started several seconds after an update. | [Square Community](https://community.squareup.com/t5/Orders-Menu-Items-Catalog/Latest-POS-update/m-p/679337) |
-| Toast | English | The system froze for 15 to 25 minutes during dinner service. | [Reddit](https://www.reddit.com/r/restaurant/comments/1sul2od/pos_system_randomly_freezing_and_kitchen_printers/) |
-| Toast | English | A reviewer called the system as fast as a 1999 laptop. | [Trustpilot](https://www.trustpilot.com/reviews/6ab46964d685ccf2a0eaddf7) |
-| Lightspeed | English | A reviewer needed two taps for one action. | [App Store](https://apps.apple.com/us/app/lightspeed-restaurant-pos-l/id474723658) |
-| Clover | English | A reviewer called the app slow and unstable after an update. | [App Store](https://apps.apple.com/ca/app/clover/id969311778) |
+| Product    | Language   | Evidence                                                                                                               | Source                                                                                                                                  |
+| ---------- | ---------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Fudo       | Spanish MX | A user reports that the app turns gray often and slows the work.                                                       | App Store MX, 2025-03-01                                                                                                                |
+| Fudo       | Spanish MX | A user reports that the new category index makes products harder to find during order entry.                           | App Store MX, 2024-09-13                                                                                                                |
+| Lightspeed | English    | A restaurant operator reports that the system freezes when the restaurant is busy.                                     | Software Advice review, 2022                                                                                                            |
+| Lightspeed | English    | Another review reports that frequent updates slow the system.                                                          | Software Advice page 5                                                                                                                  |
+| Toast      | English    | A restaurant operator reports that Toast can slow down during a busy service.                                          | Software Advice review, 2019                                                                                                            |
+| Square     | Spanish MX | Several reviews describe an update that removes the product grid or the payment action.                                | App Store MX, 2023                                                                                                                      |
+| Clover     | English    | A reviewer reports slower performance and loading issues after an update.                                              | Clover Go App Store, US                                                                                                                 |
+| Square     | English    | A register became slow on Wi-Fi in July 2026. Cash, card, and reports slowed together; a phone hotspot restored speed. | [Square Community](https://community.squareup.com/t5/Hardware-Setup-Troubleshooting/Square-register-very-slow-laggy-on-wifi/m-p/847362) |
+| Square     | English    | Tap to pay started several seconds after an update.                                                                    | [Square Community](https://community.squareup.com/t5/Orders-Menu-Items-Catalog/Latest-POS-update/m-p/679337)                            |
+| Toast      | English    | The system froze for 15 to 25 minutes during dinner service.                                                           | [Reddit](https://www.reddit.com/r/restaurant/comments/1sul2od/pos_system_randomly_freezing_and_kitchen_printers/)                       |
+| Toast      | English    | A reviewer called the system as fast as a 1999 laptop.                                                                 | [Trustpilot](https://www.trustpilot.com/reviews/6ab46964d685ccf2a0eaddf7)                                                               |
+| Lightspeed | English    | A reviewer needed two taps for one action.                                                                             | [App Store](https://apps.apple.com/us/app/lightspeed-restaurant-pos-l/id474723658)                                                      |
+| Clover     | English    | A reviewer called the app slow and unstable after an update.                                                           | [App Store](https://apps.apple.com/ca/app/clover/id969311778)                                                                           |
 
 **IV:** The reviews describe different products and dates. The repeated failure is uncertainty after a tap.
 
@@ -56,13 +56,13 @@ Evidence:
 
 The device proof in `docs/reports/2026-10-18-offline-kds-flow.md` measured:
 
-| Action | Tap to paint |
-| --- | ---: |
-| Product add on iMin | 155 ms |
-| Fire to kitchen on iMin | 154 ms |
-| KDS start on A9 | 130 ms |
-| KDS item ready on A9 | 117 ms |
-| KDS complete on A9 | 118 ms |
+| Action                  | Tap to paint |
+| ----------------------- | -----------: |
+| Product add on iMin     |       155 ms |
+| Fire to kitchen on iMin |       154 ms |
+| KDS start on A9         |       130 ms |
+| KDS item ready on A9    |       117 ms |
+| KDS complete on A9      |       118 ms |
 
 ## Gap
 

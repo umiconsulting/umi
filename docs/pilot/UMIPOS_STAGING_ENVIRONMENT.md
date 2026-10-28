@@ -135,8 +135,7 @@ not the product's.
 
 ### Main station and LAN peers
 
-The main station adds `UMIPOS_LAN_NODE=host`. It runs the local KDS node on port
-4244. Every other POS or KDS device adds the main station address as
+The main station adds `UMIPOS_LAN_NODE=host`. It runs the local KDS node on port 4244. Every other POS or KDS device adds the main station address as
 `UMIPOS_LAN_HUB`:
 
 ```sh
@@ -152,16 +151,16 @@ a peer.
 The TP-Link Archer C50 v6 that served the Parrot POS deployment was reset and
 rebuilt as the UmiPOS service network on 2026-10-17:
 
-| Setting | Value |
-| --- | --- |
-| SSID (2.4 GHz) | `UmiPOS` |
-| SSID (5 GHz) | `UmiPOS-5G` |
-| Security | WPA2-PSK (AES) — WPA3/SAE off for tablet compatibility |
-| Gateway | `192.168.0.1` |
-| DHCP pool | `192.168.0.100`–`192.168.0.249`, 120-minute leases |
-| iMin D3 reservation | `D0-C8-57-4A-11-6D` → `192.168.0.10` |
-| WAN | DHCP behind the venue router (internet for cloud replay) |
-| WPS | Disabled |
+| Setting             | Value                                                    |
+| ------------------- | -------------------------------------------------------- |
+| SSID (2.4 GHz)      | `UmiPOS`                                                 |
+| SSID (5 GHz)        | `UmiPOS-5G`                                              |
+| Security            | WPA2-PSK (AES) — WPA3/SAE off for tablet compatibility   |
+| Gateway             | `192.168.0.1`                                            |
+| DHCP pool           | `192.168.0.100`–`192.168.0.249`, 120-minute leases       |
+| iMin D3 reservation | `D0-C8-57-4A-11-6D` → `192.168.0.10`                     |
+| WAN                 | DHCP behind the venue router (internet for cloud replay) |
+| WPS                 | Disabled                                                 |
 
 The Wi-Fi passphrase and the router administrator password live in the pilot
 credential sheet, not in this repository. Android tablets must use the **device

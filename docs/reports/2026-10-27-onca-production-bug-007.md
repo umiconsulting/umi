@@ -85,50 +85,163 @@ Cloudflare Pages. El PR 227 completó las traducciones y también está desplega
 | Script de build                                | Sintaxis válida                                          |
 | Producción Dashboard                           | `Restaurar acceso` presente en los catálogos desplegados |
 
-## Acceso remoto pendiente
+## Acceso remoto: recuperación y límite del reinicio
 
-Después de instalar la actualización, Caja dejó de publicar el puerto ADB. La
-máquina conserva conectividad Tailscale, pero KeepADB informó el cierre del
-puerto. La aplicación sigue instalada y la rotación se verificó antes de perder
-ADB.
+Actualización: 27 de octubre de 2026, después del segundo reinicio controlado.
 
-La documentación oficial de iMin confirma que la depuración USB se cierra
-automáticamente cuando el dispositivo se reinicia:
-<https://oss-sg.imin.sg/docs/en/DockingDebugging.html>.
+Caja está conectada por Tailscale en `100.64.178.95:43761`.
+El puerto es dinámico. El receptor recibió el endpoint y reconectó ADB.
+El diagnóstico completo terminó con código 0 en las cuatro terminales.
+Todas usan UmiPOS 333 y KeepADB 1.8.38.
+Después del reinicio, el propietario entró con su PIN en la tablet.
+La lectura de la pantalla confirmó la carta de ONCA y «Nube En línea».
 
-La guía oficial de iMin separa estos estados:
-<https://www.imin.com/faq/>.
+Una desconexión del transporte ADB se recuperó sola en 10.04 segundos.
+Esa prueba no demuestra recuperación después de un reinicio.
 
-| Acción                    | Resultado documentado                                                |
-| ------------------------- | -------------------------------------------------------------------- |
-| Pulsar el botón una vez   | Bloquea o desbloquea la pantalla                                     |
-| Mantenerlo tres segundos  | Muestra las opciones **Reiniciar** y **Apagar**                      |
-| Apagar y encender después | Android realiza un arranque completo                                 |
-| Entrar en reposo          | La red puede desconectarse si **Transmission Mode** está desactivado |
+### Primer reinicio: orden de apagado guardada
 
-Por tanto, apagar la pantalla no debe cerrar las aplicaciones. Un apagado
-completo sí detiene Android y requiere encender el equipo de nuevo. Un reinicio
-también cierra la depuración inalámbrica según iMin.
+El contador de arranques cambió de 4 a 5.
+Tailscale volvió, pero ADB no regresó durante 210 segundos.
+KeepADB conservaba una orden explícita de apagado.
+El registro persistente muestra:
 
-KeepADB documenta que envía `DELETE` cuando el endpoint deja de comprobarse,
-cuando se desactiva la sincronización o cuando cambia la URL:
-<https://github.com/m00sfett/KeepADB/blob/master/docs/webhook-register.md>.
+```text
+2026-10-26T18:21:53-07:00 user_action source=app outcome=disable
+2026-10-27T11:03:27-07:00 boot_completed keepAlive=true
+2026-10-27T11:03:27-07:00 boot_recovery outcome=skipped persisted_intent_off
+```
 
-La secuencia observada es compatible con un reinicio de Caja:
+El registro anterior permite corregir la hipótesis del reporte original.
+Una orden de apagado en KeepADB explica que su servicio no recuperara ADB.
+El registro no identifica a la persona que emitió esa orden.
 
-1. ADB dejó de responder.
-2. KeepADB envió `DELETE /keepadb` a las 18:21:52.
-3. Tailscale también perdió el contacto directo.
-4. Tailscale volvió a estar en línea después.
-5. Ningún puerto ADB volvió a publicarse.
+El propietario activó la depuración desde KeepADB.
+El registro cambió a `lastIntentOff=false`.
+También aceptó «Permitir siempre en esta red» para `UmiPOS`.
+La consulta de Android mostró la red en su almacén de autorización.
 
-No se ejecutó ningún comando para desactivar ADB. La causa exacta requiere
-revisar `Settings.Global.boot_count` en Caja cuando vuelva el acceso.
+### Segundo reinicio: autorización de Android
 
-Para recuperar ADB, una persona debe abrir KeepADB en Caja y confirmar que
-**Mantener siempre activo** está habilitado. El servicio del host reconectará el
-puerto automáticamente cuando reciba el nuevo webhook.
+El contador cambió de 5 a 6.
+KeepADB inició durante el arranque e intentó activar la depuración.
+Android volvió a mostrar la solicitud de permiso para `UmiPOS`.
+La opción «Permitir siempre» apareció sin marcar.
+El propietario confirmó esa pantalla.
+ADB no regresó durante la ventana de 210 segundos.
 
-También debe activarse **Configuración > Batería > Transmission Mode**. iMin
-documenta esta opción para mantener la red activa mientras la pantalla está en
-reposo.
+El registro de Android muestra:
+
+```text
+10-27 11:21:52.227 E AdbDebuggingManager: Expected keyStore, but got tag=null
+10-27 11:21:52.228 E AdbDebuggingManager: Expected keyStore, but got tag=null
+10-27 11:22:38.343 I KeepADBService: Auto-enabling Wireless Debugging (Wi-Fi connected)
+10-27 11:23:39.077 I KeepADBService: Automatic re-enable paused after a readback mismatch (#496)
+```
+
+El propietario aceptó el permiso de nuevo.
+Caja publicó el puerto 43761 y el receptor recuperó ADB.
+La lectura posterior confirmó `adb_wifi_enabled=1`, `boot_count=6` y el servicio activo.
+El almacén serializado volvió a contener la red autorizada.
+
+La recuperación automática después de reiniciar Caja sigue sin aprobar.
+El diagnóstico verde describe la conectividad actual.
+No demuestra persistencia del permiso durante el próximo reinicio.
+
+### Configuración comprobada
+
+- Tailscale es la VPN siempre activa.
+- KeepADB y Tailscale están excluidos del ahorro de batería.
+- KeepADB tiene `WRITE_SECURE_SETTINGS` y `RECEIVE_BOOT_COMPLETED`.
+- «Mantener siempre activo» y la notificación persistente están habilitados.
+- El webhook es `http://100.109.51.39:47123/keepadb`.
+- El receptor está habilitado y activo. El usuario juan tiene `Linger=yes`.
+
+La opción **Transmission Mode** no aparece en el firmware de esta D3.
+El propietario lo confirmó. La lectura de la pantalla de Batería también lo confirmó.
+No se aplicó un ajuste desconocido en su lugar.
+
+La causa inmediata del segundo bloqueo es la solicitud de autorización de Android.
+El error al leer `keyStore` es compatible con el código AOSP 11 consultado.
+El origen exacto dentro del firmware iMin requiere una revisión del fabricante.
+No se instaló firmware, no se activó root y no se fijó el puerto ADB.
+
+### Procedimiento mientras exista este límite
+
+1. Abre KeepADB después de reiniciar.
+2. Activa la depuración inalámbrica si está apagada.
+3. Marca «Permitir siempre en esta red» para la red `UmiPOS` conocida.
+4. Pulsa **Permitir**.
+5. Espera el nuevo webhook.
+6. Ejecuta el diagnóstico completo de la flota.
+
+Mantén el puerto dinámico y usa la dirección de Tailscale.
+No confundas un estado Tailscale en línea con una conexión ADB.
+
+Evidencia: [diagnóstico final](./evidence/2026-10-27-onca-support/doctor-final.json).
+Fuentes y límites: [análisis de KeepADB y Android](../research/2026-10-27-onca-keepadb-boot-recovery.md).
+
+## Comprobación del APK canónico, 27 de octubre
+
+La última build de producción identificada en el repositorio y sus artefactos es 333.
+El APK final es `/home/juan/Downloads/UmiPOS-1.0.0-production-release-build333-final.apk`.
+La revisión de Downloads no encontró un APK UmiPOS con un número mayor.
+Los APK intermedios y de transición de firma quedaron excluidos.
+
+Se usaron `apksigner` y `aapt2` de Android Build Tools 36.0.0.
+Se comparó el SHA-256 del APK instalado con el archivo canónico en cada tablet.
+
+| Tablet | Build | Mismo APK canónico | Firma            | Depurable |
+| ------ | ----: | ------------------ | ---------------- | --------- |
+| Caja   |   333 | Sí                 | Release esperada | No        |
+| Barra  |   333 | Sí                 | Release esperada | No        |
+| Cocina |   333 | Sí                 | Release esperada | No        |
+| Mesero |   333 | Sí                 | Release esperada | No        |
+
+SHA-256 del APK:
+`9fb8b5f94ec40dfcf8e667f1090958f9d5793d3b4a6e85981eb89729a0bf3f84`.
+
+SHA-256 del certificado:
+`14975f2c374e03b155ab363e17d4a79d4ab32b888ab381bedc3264934cb5c051`.
+
+Las cuatro instalaciones ya coincidían. La revisión no requirió reinstalar el APK.
+Evidencia: [verificación de build](./evidence/2026-10-27-onca-support/latest-build-final.json).
+
+## Nueva evidencia de firmware y alternativa local
+
+El actualizador ofrece `1.0.6.4.23_241120`, publicado el 22 de noviembre de 2024.
+Sus notas sólo indican «Optimization system» y «Minor bug fixes».
+No se confirmó que ese paquete ni otra versión del fabricante incluya la corrección de ADB.
+
+Se identificó el parche oficial AOSP `c113a129072f`, bug `236299256`.
+El parche corrige la lectura del archivo que conserva las redes Wi-Fi autorizadas.
+Su descripción coincide con el fallo observado. La inclusión en la OTA sigue sin verificar.
+
+También se evaluó una alternativa sin actualizar Android.
+Un ayudante local de Accesibilidad podría confirmar sólo el diálogo ADB de `UmiPOS`
+y del BSSID conocido después de arrancar.
+Requiere una activación inicial del servicio en la tablet.
+La propuesta no está construida ni probada; no se declaró resuelta la recuperación.
+
+No se instaló firmware ni se activó Accesibilidad durante esta investigación.
+Detalles y fuentes: [investigación de KeepADB y Android](../research/2026-10-27-onca-keepadb-boot-recovery.md).
+Evidencia: [revisión OTA](./evidence/2026-10-27-onca-support/ota-review.json).
+
+## Avance anterior: Umi Support construido antes de la instalación
+
+Se creó un APK firmado de Umi Support 1.0.0 con 45 pruebas aprobadas.
+La instalación y la prueba de reinicio siguen pendientes.
+La recuperación automática de Caja continúa **NO VERIFICADA**.
+Consulta la [entrega y evidencia de Umi Support](./2026-10-27-umi-support-android.md).
+
+## Validación posterior: Umi Support 1.0.1 instalado
+
+Umi Support 1.0.1, código 2, quedó instalado y activo en Caja.
+La primera prueba de 1.0.0 falló por la etiqueta Material «PERMITIR».
+La corrección conserva la comparación literal de la red autorizada.
+El reinicio de la versión corregida pasó de boot_count 7 a 8 y recuperó ADB automáticamente.
+KeepADB publicó el puerto nuevo y el receptor abrió el transporte sin introducir el endpoint.
+El doctor final terminó con código 0 en las cuatro tablets, todas con UmiPOS build 333.
+No se instaló firmware ni se modificaron pagos.
+
+Informe: [Umi Support instalado y probado](./2026-10-27-umi-support-android.md).

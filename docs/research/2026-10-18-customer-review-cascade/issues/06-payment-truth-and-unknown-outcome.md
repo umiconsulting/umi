@@ -8,18 +8,18 @@ The provider shows success. The sale does not. Or the provider shows an unknown 
 
 ## Independent evidence
 
-| Product | Language | Evidence | Source |
-| --- | --- | --- | --- |
-| Square | Spanish MX | A user reports a successful payment that later returned to the guest. | App Store MX, 2025-01-21 |
-| Square | Spanish MX | A user reports that a charged ticket disappears from the system. | App Store MX, 2019-02-07 |
-| Square | Spanish MX | A user reports that hardware stopped after an update. | App Store MX, 2025-02-25 |
-| Toast | English | A user reports duplicate holds on tap-to-pay. | Software Advice review, 2026-06 |
-| Clover | English | A user reports a charge when the order never went through. | Clover App Store, US |
-| Clover | English | A user reports a card charge on a restaurant that was closed. | Clover App Store, US |
-| Square | English | Fifteen offline payments showed zero after reconnect; support resolved one. | [Square Community](https://community.squareup.com/t5/Payments-Troubleshooting/Offline-Payment-Issue/m-p/847771) |
-| Toast | English | A reviewer reported settlement totals that did not match the prior night. | [Trustpilot](https://www.trustpilot.com/reviews/6ab46964d685ccf2a0eaddf7) |
-| Odoo | English | A saved-payment path was not idempotent and could duplicate a payment. | [Odoo PR 273504](https://mergebot.odoo.com/odoo/odoo/pull/273504) |
-| Square | English | A tap sounded successful, then the app later said the payment failed. | [App Store](https://apps.apple.com/ca/app/square-point-of-sale-pos/id335393788) |
+| Product | Language   | Evidence                                                                    | Source                                                                                                          |
+| ------- | ---------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Square  | Spanish MX | A user reports a successful payment that later returned to the guest.       | App Store MX, 2025-01-21                                                                                        |
+| Square  | Spanish MX | A user reports that a charged ticket disappears from the system.            | App Store MX, 2019-02-07                                                                                        |
+| Square  | Spanish MX | A user reports that hardware stopped after an update.                       | App Store MX, 2025-02-25                                                                                        |
+| Toast   | English    | A user reports duplicate holds on tap-to-pay.                               | Software Advice review, 2026-06                                                                                 |
+| Clover  | English    | A user reports a charge when the order never went through.                  | Clover App Store, US                                                                                            |
+| Clover  | English    | A user reports a card charge on a restaurant that was closed.               | Clover App Store, US                                                                                            |
+| Square  | English    | Fifteen offline payments showed zero after reconnect; support resolved one. | [Square Community](https://community.squareup.com/t5/Payments-Troubleshooting/Offline-Payment-Issue/m-p/847771) |
+| Toast   | English    | A reviewer reported settlement totals that did not match the prior night.   | [Trustpilot](https://www.trustpilot.com/reviews/6ab46964d685ccf2a0eaddf7)                                       |
+| Odoo    | English    | A saved-payment path was not idempotent and could duplicate a payment.      | [Odoo PR 273504](https://mergebot.odoo.com/odoo/odoo/pull/273504)                                               |
+| Square  | English    | A tap sounded successful, then the app later said the payment failed.       | [App Store](https://apps.apple.com/ca/app/square-point-of-sale-pos/id335393788)                                 |
 
 ## Vendor behavior
 

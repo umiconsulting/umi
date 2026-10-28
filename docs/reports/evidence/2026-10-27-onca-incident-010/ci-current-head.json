@@ -1,0 +1,58 @@
+{
+  "baseRefName": "fix/onca-20261026",
+  "headRefOid": "e087b3974e52511c2dfa43a042a47217c2191229",
+  "isDraft": true,
+  "state": "OPEN",
+  "checks": [
+    {
+      "name": "lint",
+      "status": "IN_PROGRESS",
+      "conclusion": ""
+    },
+    {
+      "name": "build the iOS target",
+      "status": "IN_PROGRESS",
+      "conclusion": ""
+    },
+    {
+      "name": "contract",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "tokens",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "build-and-test",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "gate",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "CodeRabbit",
+      "status": "COMPLETED",
+      "conclusion": "SKIPPED"
+    },
+    {
+      "name": "Vercel Preview Comments",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "Vercel \u2013 umi-cash",
+      "status": "SUCCESS",
+      "conclusion": null
+    },
+    {
+      "name": "Vercel \u2013 umi-dashboard",
+      "status": "SUCCESS",
+      "conclusion": null
+    }
+  ]
+}

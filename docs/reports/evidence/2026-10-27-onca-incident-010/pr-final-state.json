@@ -1,0 +1,10 @@
+{
+  "baseRefName": "fix/onca-20261026",
+  "headRefOid": "e087b3974e52511c2dfa43a042a47217c2191229",
+  "mergeCommit": {
+    "oid": "069a07fd2670c0225f98b42d6ba5551fd9accfb5"
+  },
+  "mergedAt": "2026-10-27T21:48:12Z",
+  "state": "MERGED",
+  "url": "https://github.com/umiconsulting/umi/pull/228"
+}

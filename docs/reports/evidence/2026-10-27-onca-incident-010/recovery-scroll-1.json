@@ -1,0 +1,587 @@
+[
+  {
+    "page": 1,
+    "nodes": [
+      {
+        "text": "",
+        "content-desc": "Centro de recuperación",
+        "bounds": "[471,163][1450,211]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.",
+        "bounds": "[471,211][1450,240]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "En proceso",
+        "bounds": "[471,240][1450,244]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Servidor: 86 · aceptadas: 53 · conflictos: 0 · cola: 0",
+        "bounds": "[471,255][1450,279]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Enviado a cocina\nEnviada\n#8",
+        "bounds": "[471,301][1450,302]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Enviado a cocina\nEnviada\n#9",
+        "bounds": "[471,302][1450,394]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Enviado a cocina\nEnviada\n#10",
+        "bounds": "[471,394][1450,487]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Enviado a cocina\nEnviada\n#11",
+        "bounds": "[471,487][1450,579]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Venta en efectivo · MXN 60.00\nEnviada · Recibo oficial disponible\n#12",
+        "bounds": "[471,579][1450,671]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Enviado a cocina\nEnviada\n#13",
+        "bounds": "[471,671][1450,763]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Enviado a cocina\nEnviada\n#14",
+        "bounds": "[471,763][1450,855]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Enviado a cocina\nEnviada\n#15",
+        "bounds": "[471,855][1450,915]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Sincronizando ventas pendientes…",
+        "bounds": "[471,915][710,981]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Sincronizar ahora",
+        "bounds": "[471,915][710,981]",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cerrar",
+        "bounds": "[471,981][1450,1047]",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cerrar",
+        "bounds": "[0,0][1920,1058]",
+        "clickable": "true",
+        "enabled": "true"
+      }
+    ]
+  },
+  {
+    "page": 2,
+    "nodes": [
+      {
+        "text": "",
+        "content-desc": "Centro de recuperación",
+        "bounds": "[471,163][1450,211]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.",
+        "bounds": "[471,211][1450,240]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "En proceso",
+        "bounds": "[471,240][1450,244]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Servidor: 86 · aceptadas: 53 · conflictos: 0 · cola: 0",
+        "bounds": "[471,255][1450,279]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Enviado a cocina\nEnviada\n#16",
+        "bounds": "[471,301][1450,303]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#17",
+        "bounds": "[471,303][1450,395]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#18",
+        "bounds": "[471,395][1450,487]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#19",
+        "bounds": "[471,487][1450,579]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nEnviada\n#20",
+        "bounds": "[471,579][1450,672]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#21",
+        "bounds": "[471,672][1450,764]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#22",
+        "bounds": "[471,764][1450,856]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Producto agregado\nResuelta · historial conservado\n#23",
+        "bounds": "[471,856][1450,915]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Sincronizando ventas pendientes…",
+        "bounds": "[471,915][710,981]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Sincronizar ahora",
+        "bounds": "[471,915][710,981]",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cerrar",
+        "bounds": "[471,981][1450,1047]",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cerrar",
+        "bounds": "[0,0][1920,1058]",
+        "clickable": "true",
+        "enabled": "true"
+      }
+    ]
+  },
+  {
+    "page": 3,
+    "nodes": [
+      {
+        "text": "",
+        "content-desc": "Centro de recuperación",
+        "bounds": "[471,163][1450,211]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.",
+        "bounds": "[471,211][1450,240]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "En proceso",
+        "bounds": "[471,240][1450,244]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Servidor: 86 · aceptadas: 53 · conflictos: 0 · cola: 0",
+        "bounds": "[471,255][1450,279]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#24",
+        "bounds": "[471,301][1450,304]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#25",
+        "bounds": "[471,304][1450,396]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#26",
+        "bounds": "[471,396][1450,488]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#27",
+        "bounds": "[471,488][1450,580]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#28",
+        "bounds": "[471,580][1450,672]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cuenta vaciada\nResuelta · historial conservado\n#29",
+        "bounds": "[471,672][1450,765]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cuenta abierta\nEnviada\n#30",
+        "bounds": "[471,765][1450,857]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Tipo de servicio\nEnviada\n#31",
+        "bounds": "[471,857][1450,915]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Sincronizando ventas pendientes…",
+        "bounds": "[471,915][710,981]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Sincronizar ahora",
+        "bounds": "[471,915][710,981]",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cerrar",
+        "bounds": "[471,981][1450,1047]",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cerrar",
+        "bounds": "[0,0][1920,1058]",
+        "clickable": "true",
+        "enabled": "true"
+      }
+    ]
+  },
+  {
+    "page": 4,
+    "nodes": [
+      {
+        "text": "",
+        "content-desc": "Centro de recuperación",
+        "bounds": "[471,163][1450,211]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.",
+        "bounds": "[471,211][1450,240]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "En proceso",
+        "bounds": "[471,240][1450,244]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Servidor: 86 · aceptadas: 53 · conflictos: 0 · cola: 0",
+        "bounds": "[471,255][1450,279]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Producto agregado\nEnviada\n#32",
+        "bounds": "[471,301][1450,305]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Venta en efectivo · MXN 45.00\nEnviada · Recibo oficial disponible\n#33",
+        "bounds": "[471,305][1450,397]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#34",
+        "bounds": "[471,397][1450,489]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cuenta abierta\nResuelta · historial conservado\n#35",
+        "bounds": "[471,489][1450,581]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Tipo de servicio\nResuelta · historial conservado\n#36",
+        "bounds": "[471,581][1450,673]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Producto agregado\nResuelta · historial conservado\n#37",
+        "bounds": "[471,673][1450,765]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#38",
+        "bounds": "[471,765][1450,857]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#39",
+        "bounds": "[471,857][1450,915]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Sincronizando ventas pendientes…",
+        "bounds": "[471,915][710,981]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Sincronizar ahora",
+        "bounds": "[471,915][710,981]",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cerrar",
+        "bounds": "[471,981][1450,1047]",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cerrar",
+        "bounds": "[0,0][1920,1058]",
+        "clickable": "true",
+        "enabled": "true"
+      }
+    ]
+  },
+  {
+    "page": 5,
+    "nodes": [
+      {
+        "text": "",
+        "content-desc": "Centro de recuperación",
+        "bounds": "[471,163][1450,211]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.",
+        "bounds": "[471,211][1450,240]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "En proceso",
+        "bounds": "[471,240][1450,244]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Servidor: 86 · aceptadas: 53 · conflictos: 0 · cola: 0",
+        "bounds": "[471,255][1450,279]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#40",
+        "bounds": "[471,301][1450,306]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cantidad actualizada\nResuelta · historial conservado\n#41",
+        "bounds": "[471,306][1450,398]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cuenta vaciada\nResuelta · historial conservado\n#42",
+        "bounds": "[471,398][1450,490]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Producto agregado\nResuelta · historial conservado\n#43",
+        "bounds": "[471,490][1450,582]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Enviado a cocina\nEnviada\n#44",
+        "bounds": "[471,582][1450,674]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cuenta abierta\nEnviada\n#45",
+        "bounds": "[471,674][1450,766]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Tipo de servicio\nEnviada\n#46",
+        "bounds": "[471,766][1450,858]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Producto agregado\nEnviada\n#47",
+        "bounds": "[471,858][1450,915]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Sincronizando ventas pendientes…",
+        "bounds": "[471,915][710,981]",
+        "clickable": "false",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Sincronizar ahora",
+        "bounds": "[471,915][710,981]",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cerrar",
+        "bounds": "[471,981][1450,1047]",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      {
+        "text": "",
+        "content-desc": "Cerrar",
+        "bounds": "[0,0][1920,1058]",
+        "clickable": "true",
+        "enabled": "true"
+      }
+    ]
+  }
+]

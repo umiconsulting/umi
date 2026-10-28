@@ -20,11 +20,11 @@ post-seating error banner were all exercised in this run.
 
 ## Devices and builds
 
-| Device | Role | Final build |
-| --- | --- | --- |
-| iMin D3, `192.168.0.10` | Main station / LAN host | 161 |
-| Galaxy A9, `192.168.0.102` | KDS | 161 |
-| Galaxy A11, `192.168.0.101` | Portable POS | 161 |
+| Device                      | Role                    | Final build |
+| --------------------------- | ----------------------- | ----------- |
+| iMin D3, `192.168.0.10`     | Main station / LAN host | 161         |
+| Galaxy A9, `192.168.0.102`  | KDS                     | 161         |
+| Galaxy A11, `192.168.0.101` | Portable POS            | 161         |
 
 The router is the `UmiPOS` TP-Link network. The iMin local node answered:
 
@@ -36,26 +36,26 @@ The router is the `UmiPOS` TP-Link network. The iMin local node answered:
 
 The clean staging lane accepted every command:
 
-| Sequence | Command | Result |
-| --- | --- | --- |
-| 1 | `pos.cart.open` | accepted |
-| 2 | `pos.cart.line.add` | accepted |
-| 3 | `pos.cart.fire` | accepted |
-| 4 | `pos.kds.command` / `start_preparation` | accepted |
-| 5 | `pos.kds.command` / `mark_item_ready` | accepted |
-| 6 | `pos.kds.command` / `complete` | accepted |
-| 7 | `pos.table.command` / `seat` | accepted |
-| 8 | `pos.cart.table.set` | accepted |
-| 9 | `pos.table.command` / `served` | accepted |
+| Sequence | Command                                 | Result   |
+| -------- | --------------------------------------- | -------- |
+| 1        | `pos.cart.open`                         | accepted |
+| 2        | `pos.cart.line.add`                     | accepted |
+| 3        | `pos.cart.fire`                         | accepted |
+| 4        | `pos.kds.command` / `start_preparation` | accepted |
+| 5        | `pos.kds.command` / `mark_item_ready`   | accepted |
+| 6        | `pos.kds.command` / `complete`          | accepted |
+| 7        | `pos.table.command` / `seat`            | accepted |
+| 8        | `pos.cart.table.set`                    | accepted |
+| 9        | `pos.table.command` / `served`          | accepted |
 
 Final ledger state:
 
-| Check | Result |
-| --- | --- |
-| Replay cursor | `9` |
-| Accepted commands | `9` |
-| Open conflicts | `0` |
-| Mesa 3 | `served`, party size `2` |
+| Check             | Result                   |
+| ----------------- | ------------------------ |
+| Replay cursor     | `9`                      |
+| Accepted commands | `9`                      |
+| Open conflicts    | `0`                      |
+| Mesa 3            | `served`, party size `2` |
 
 The table commands are encrypted in the same device-order journal as the cart
 and KDS commands. Replay calls the existing table service, using the same
@@ -65,12 +65,12 @@ permission, idempotency, audit and room rules as the live route.
 
 The A11 used its own journal while the API was stopped:
 
-| Sequence | Command | Result |
-| --- | --- | --- |
-| 1 | `pos.table.command` / `seat` | accepted |
-| 2 | `pos.cart.open` | accepted |
-| 3 | `pos.cart.table.set` | accepted |
-| 4 | `pos.table.command` / `served` | accepted |
+| Sequence | Command                        | Result   |
+| -------- | ------------------------------ | -------- |
+| 1        | `pos.table.command` / `seat`   | accepted |
+| 2        | `pos.cart.open`                | accepted |
+| 3        | `pos.cart.table.set`           | accepted |
+| 4        | `pos.table.command` / `served` | accepted |
 
 The A11 finished with zero open conflicts and Mesa 4 `served` for two guests.
 
@@ -78,15 +78,15 @@ The A11 finished with zero open conflicts and Mesa 4 `served` for two guests.
 
 Measured by `TapLatencyProbe` on the profile builds:
 
-| Action | Tap to paint | Frame build | Frame raster |
-| --- | ---: | ---: | ---: |
-| Product add, iMin | **155 ms** | 19 ms | 29 ms |
-| Fire to kitchen, iMin | **154 ms** | 4 ms | 31 ms |
-| Start preparation, A9 | **130 ms** | 4 ms | 3 ms |
-| Item ready, A9 | **117 ms** | 5 ms | 2 ms |
-| Complete ticket, A9 | **118 ms** | 3 ms | 2 ms |
-| Seat party dialog, iMin | **204 ms** | 1 ms | 22 ms |
-| Mark served, iMin | **145 ms** | 11 ms | 17 ms |
+| Action                  | Tap to paint | Frame build | Frame raster |
+| ----------------------- | -----------: | ----------: | -----------: |
+| Product add, iMin       |   **155 ms** |       19 ms |        29 ms |
+| Fire to kitchen, iMin   |   **154 ms** |        4 ms |        31 ms |
+| Start preparation, A9   |   **130 ms** |        4 ms |         3 ms |
+| Item ready, A9          |   **117 ms** |        5 ms |         2 ms |
+| Complete ticket, A9     |   **118 ms** |        3 ms |         2 ms |
+| Seat party dialog, iMin |   **204 ms** |        1 ms |        22 ms |
+| Mark served, iMin       |   **145 ms** |       11 ms |        17 ms |
 
 No action waited on an API response. The fire tap was `154 ms`; the old
 fire-to-KDS ready interaction showed a multi-second spinner before the local
@@ -114,16 +114,16 @@ projection.
 
 After the proof, staging was returned to a clean baseline:
 
-| Check | Result |
-| --- | --- |
-| Active carts | `0` |
-| Active table visits | `0` |
-| Replay commands | `0` |
-| Device replay cursor | `0` |
-| API | healthy on `offline-table-2.40` |
-| iMin | logged in, empty cart |
-| A9 | logged in, KDS empty |
-| A11 | build 161, logged out and idle |
+| Check                | Result                          |
+| -------------------- | ------------------------------- |
+| Active carts         | `0`                             |
+| Active table visits  | `0`                             |
+| Replay commands      | `0`                             |
+| Device replay cursor | `0`                             |
+| API                  | healthy on `offline-table-2.40` |
+| iMin                 | logged in, empty cart           |
+| A9                   | logged in, KDS empty            |
+| A11                  | build 161, logged out and idle  |
 
 The temporary iMin Admin ONCA PIN for this round is `0493`. The original staff
 row is backed up at
@@ -142,13 +142,13 @@ both POS devices signed in simultaneously.
 
 ## Artifacts
 
-| Artifact | SHA-256 |
-| --- | --- |
-| `app-staging-lan-host-b161.apk` | `59917021ccf681a297a7fa589464549dccf260a0adec6ded7082a02be94526c5` |
+| Artifact                                     | SHA-256                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------ |
+| `app-staging-lan-host-b161.apk`              | `59917021ccf681a297a7fa589464549dccf260a0adec6ded7082a02be94526c5` |
 | `app-staging-lan-peer-192.168.0.10-b161.apk` | `1d16e59d8f4f8ed476d5731334110a04a7882d104109465680aa7d4b57ad5af0` |
-| API image | `ghcr.io/umiconsulting/umi-api:offline-table-2.40` |
-| Contract | `2.40.0` |
-| Forward migration | `046_offline_table_commands.sql` |
+| API image                                    | `ghcr.io/umiconsulting/umi-api:offline-table-2.40`                 |
+| Contract                                     | `2.40.0`                                                           |
+| Forward migration                            | `046_offline_table_commands.sql`                                   |
 
 The API image was built from dirty commit
 `3654bd905cbeb957adde115d842f4fb53f512539` and loaded into the staging host;

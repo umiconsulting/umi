@@ -5,8 +5,8 @@ Generated: 2026-10-21T11:20:10.876Z · device D3 · Android 11 (SDK 30) · Physi
 Sign-in: skipped
 
 | Surface | Pressable | Under 48px | Unnamed |
-| --- | --- | --- | --- |
-| Caja | 7 | 0 | 0 |
+| ------- | --------- | ---------- | ------- |
+| Caja    | 7         | 0          | 0       |
 
 ## Controls under 48 px
 

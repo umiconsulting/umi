@@ -38,7 +38,7 @@ no cierres la aplicación.
 
 Si una venta no se puede enviar, el encabezado deja de bajar el contador. Abre
 `⋮` → **Centro de recuperación**: cada fila dice qué pasó y el botón dice qué
-hacer. Por ejemplo, si dice *La mesa ya está ocupada*, elige otra mesa; no
+hacer. Por ejemplo, si dice _La mesa ya está ocupada_, elige otra mesa; no
 vuelvas a intentar la misma.
 
 Una terminal que se **bloqueó** necesita el enlace para volver a abrir sesión

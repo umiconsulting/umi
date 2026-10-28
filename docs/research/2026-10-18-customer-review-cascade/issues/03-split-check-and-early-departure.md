@@ -8,22 +8,22 @@ One guest must leave before the table finishes. The guest wants to pay a known a
 
 ## Independent evidence
 
-| Product | Language | Evidence | Source |
-| --- | --- | --- | --- |
-| Square | English | A small-tavern owner reports difficulty with split checks. | Square Community |
-| Square | English | A user says item split and seat split are hard to discover in Square for Restaurants. | Square Community, 2019-06-17 |
-| Square | English | Users ask for a single-item split for shared food and wine. | Square Feature Requests, 2017 to 2023 |
-| Square | English | A guest who leaves early must move items to a new check. | Square Community, 2023-03-12 |
-| Square | English | A user reports that each split payment adds 15 to 20 seconds because the operator must return to the floor plan. | Square Community, 2023-03-25 |
-| Toast | English | A split of four requires the waiter to type each amount and can create input errors. | Toast Community, 2025-02-02 |
-| Lightspeed | English | One reviewer calls check splitting the most laborious split flow used. | Software Advice review, 2017 |
-| Fudo | Spanish MX | A reviewer says opening an account, paying and creating an account are all complicated. | App Store MX, 2026-01-07 |
-| Square | English | A split ticket reached the KDS again and the kitchen made duplicate food. | [Square Community](https://community.squareup.com/t5/Payments-Troubleshooting/Square-KDS-Duplicate-Tickets-when-Splitting-Checks/m-p/241602) |
-| Square | English | A tavern owner paid for Restaurants Plus only to split checks. | [Square Community](https://community.squareup.com/t5/Food-Beverage/Square-for-Restaurants-Plus-splitting-a-check/m-p/823452) |
-| Square | English | Square Terminal did not allow split payments from the main iPad flow. | [Square Community](https://community.squareup.com/t5/Orders-Menu-Items-Catalog/Square-Terminal-for-Split-payment/m-p/736487) |
-| Odoo | English | Standard Odoo split by product or customer but not equally. | [Reddit](https://www.reddit.com/r/Odoo/comments/1sn2dwr/odoo_pos_split_bill_equally/) |
-| Toast | English | Suggested tips used a pre-discount base after a kitchen comp. | [Reddit](https://www.reddit.com/r/ToastPOS/comments/1u2juo3/toast_calculating_tips_on_prediscount_totals_for/) |
-| Clover | English | Open pre-auth tabs assigned tips to the employee who opened the tab. | [Reddit](https://www.reddit.com/r/CloverPOS/comments/1ba9y68/pre_auth_confuses_tips_from_open_orders_at_shift/) |
+| Product    | Language   | Evidence                                                                                                         | Source                                                                                                                                       |
+| ---------- | ---------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Square     | English    | A small-tavern owner reports difficulty with split checks.                                                       | Square Community                                                                                                                             |
+| Square     | English    | A user says item split and seat split are hard to discover in Square for Restaurants.                            | Square Community, 2019-06-17                                                                                                                 |
+| Square     | English    | Users ask for a single-item split for shared food and wine.                                                      | Square Feature Requests, 2017 to 2023                                                                                                        |
+| Square     | English    | A guest who leaves early must move items to a new check.                                                         | Square Community, 2023-03-12                                                                                                                 |
+| Square     | English    | A user reports that each split payment adds 15 to 20 seconds because the operator must return to the floor plan. | Square Community, 2023-03-25                                                                                                                 |
+| Toast      | English    | A split of four requires the waiter to type each amount and can create input errors.                             | Toast Community, 2025-02-02                                                                                                                  |
+| Lightspeed | English    | One reviewer calls check splitting the most laborious split flow used.                                           | Software Advice review, 2017                                                                                                                 |
+| Fudo       | Spanish MX | A reviewer says opening an account, paying and creating an account are all complicated.                          | App Store MX, 2026-01-07                                                                                                                     |
+| Square     | English    | A split ticket reached the KDS again and the kitchen made duplicate food.                                        | [Square Community](https://community.squareup.com/t5/Payments-Troubleshooting/Square-KDS-Duplicate-Tickets-when-Splitting-Checks/m-p/241602) |
+| Square     | English    | A tavern owner paid for Restaurants Plus only to split checks.                                                   | [Square Community](https://community.squareup.com/t5/Food-Beverage/Square-for-Restaurants-Plus-splitting-a-check/m-p/823452)                 |
+| Square     | English    | Square Terminal did not allow split payments from the main iPad flow.                                            | [Square Community](https://community.squareup.com/t5/Orders-Menu-Items-Catalog/Square-Terminal-for-Split-payment/m-p/736487)                 |
+| Odoo       | English    | Standard Odoo split by product or customer but not equally.                                                      | [Reddit](https://www.reddit.com/r/Odoo/comments/1sn2dwr/odoo_pos_split_bill_equally/)                                                        |
+| Toast      | English    | Suggested tips used a pre-discount base after a kitchen comp.                                                    | [Reddit](https://www.reddit.com/r/ToastPOS/comments/1u2juo3/toast_calculating_tips_on_prediscount_totals_for/)                               |
+| Clover     | English    | Open pre-auth tabs assigned tips to the employee who opened the tab.                                             | [Reddit](https://www.reddit.com/r/CloverPOS/comments/1ba9y68/pre_auth_confuses_tips_from_open_orders_at_shift/)                              |
 
 **IV:** The strongest repeated complaint is not the absence of a split. It is the number of manual steps and the loss of account context.
 

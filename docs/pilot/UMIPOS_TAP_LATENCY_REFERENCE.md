@@ -81,11 +81,11 @@ every ten seconds and the product-detail warm-up completed. The question was
 whether the work that makes the till survive an outage made the ordinary tap
 slower.
 
-| Action                                   | n   | tap → paint       | frame build | frame raster |
-| ---------------------------------------- | --- | ----------------- | ----------- | ------------ |
-| Catalogue category switch                | 6   | 148–155 ms        | 3–8 ms      | 34–37 ms     |
-| Add a simple product, empty account      | 6   | 160–214 ms        | 19–37 ms    | 27–40 ms     |
-| Add a simple product, two-line account   | 6   | 180–190 ms        | 34–40 ms    | 34–37 ms     |
+| Action                                 | n   | tap → paint | frame build | frame raster |
+| -------------------------------------- | --- | ----------- | ----------- | ------------ |
+| Catalogue category switch              | 6   | 148–155 ms  | 3–8 ms      | 34–37 ms     |
+| Add a simple product, empty account    | 6   | 160–214 ms  | 19–37 ms    | 27–40 ms     |
+| Add a simple product, two-line account | 6   | 180–190 ms  | 34–40 ms    | 34–37 ms     |
 
 Category switches sit roughly 10 ms above §2.1 — inside the jitter of synthetic
 `adb input tap` and not a change in the frame itself, whose build is 3–8 ms.

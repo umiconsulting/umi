@@ -1,0 +1,10 @@
+{
+  "format": [
+    "lint\tFormat check\t2026-10-27T21:36:14.0248454Z [^[[33mwarn^[[39m] Code style issues found in 12 files. Run Prettier with --write to fix.",
+    "lint\tFormat check\t2026-10-27T21:36:14.1133157Z ##[error]Process completed with exit code 1."
+  ],
+  "scanMetadata": [
+    "lint\tSecret scan (gitleaks)\t2026-10-27T21:36:21.5093534Z ^[[90m9:36PM^[[0m ^[[33mWRN^[[0m ^[[1mleaks found: 1^[[0m",
+    "lint\tSecret scan (gitleaks)\t2026-10-27T21:36:21.5199978Z ##[error]Process completed with exit code 1."
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "time": "2026-10-27T20:30:47.423534+00:00",
+  "version": "1.0.1",
+  "version_code": 2,
+  "serial": "100.64.178.95:38475",
+  "apk_sha256": "32e7bf83ed3d189f19c943acb613f0709070c8b2839170d6c3caf0b47a98a77d",
+  "accessibility_retained": true,
+  "service_bound": true,
+  "dialog_was_present": true,
+  "dialog_gone": true,
+  "adb_wifi_enabled": "1",
+  "screenshot": "dialog-canary-v1.0.1.png",
+  "requires_visual_verification_of_result": false,
+  "visual_result_confirmed": "Permiso solicitado para la red autorizada",
+  "canary_passed": true
+}

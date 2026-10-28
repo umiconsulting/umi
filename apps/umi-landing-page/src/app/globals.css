@@ -618,7 +618,8 @@ p {
   height: 100%;
   object-fit: contain;
   opacity: 0;
-  filter: drop-shadow(0 26px 34px rgba(12, 20, 45, 0.22)) drop-shadow(0 6px 10px rgba(12, 20, 45, 0.1));
+  filter: drop-shadow(0 26px 34px rgba(12, 20, 45, 0.22))
+    drop-shadow(0 6px 10px rgba(12, 20, 45, 0.1));
   transition: opacity 480ms ease;
 }
 .pos-frame.is-active {
@@ -641,7 +642,9 @@ p {
   background: #fff;
   color: var(--ink);
   cursor: pointer;
-  transition: border-color 160ms ease, color 160ms ease;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
 }
 .pos-arrow:hover {
   border-color: var(--blue);
@@ -662,7 +665,9 @@ p {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: color 160ms ease, border-color 160ms ease;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
 }
 .pos-tab:hover {
   color: var(--ink);

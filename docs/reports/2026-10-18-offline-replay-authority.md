@@ -71,4 +71,3 @@ The prior staging environment file is retained at
   zero. Closing and reopening the screen shows the correct `Online` state.
 - A production cutover must apply migration 047 before the new API image.
 - A fresh LAN KDS peer test with no WAN remains open.
-

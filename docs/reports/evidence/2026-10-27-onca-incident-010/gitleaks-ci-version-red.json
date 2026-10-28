@@ -1,0 +1,23 @@
+[
+  {
+    "RuleID": "generic-api-key",
+    "Description": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+    "StartLine": 98,
+    "EndLine": 98,
+    "StartColumn": 452,
+    "EndColumn": 478,
+    "Match": "umi-api:REDACTED`",
+    "Secret": "REDACTED",
+    "File": "docs/reports/2026-10-24-onca-production-bug-001.md",
+    "SymlinkFile": "",
+    "Commit": "e8beee4f6229eb8e16357041b1ef60aabfb05a21",
+    "Link": "https://github.com/umiconsulting/umi/blob/e8beee4f6229eb8e16357041b1ef60aabfb05a21/docs/reports/2026-10-24-onca-production-bug-001.md?plain=1#L98",
+    "Entropy": 3.5724313,
+    "Author": "umi-juanlopez",
+    "Email": "284223172+umi-juanlopez@users.noreply.github.com",
+    "Date": "2026-10-24T17:59:58Z",
+    "Message": "docs(onca): record root fix image and deployment state",
+    "Tags": [],
+    "Fingerprint": "e8beee4f6229eb8e16357041b1ef60aabfb05a21:docs/reports/2026-10-24-onca-production-bug-001.md:generic-api-key:98"
+  }
+]

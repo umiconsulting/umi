@@ -1,0 +1,52 @@
+{
+  "at": "2026-10-27T21:49:59.364777+00:00",
+  "devices": [
+    {
+      "role": "caja",
+      "target": "100.64.178.95:35049",
+      "versionCode": "334",
+      "apkSha256": "c8b3b81335c742b6a6a696e8d32c5c92b93376b7ab47d8d66c908d57f9329e09",
+      "launch": "Starting: Intent { cmp=co.umiconsulting.umi_pos.estacion/co.umiconsulting.umi_pos.MainActivity }\nStatus: ok\nLaunchState: COLD\nActivity: co.umiconsulting.umi_pos.estacion/co.umiconsulting.umi_pos.MainActivity\nTotalTime: 4040\nWaitTime: 4065\nComplete\n",
+      "flags": [
+        "flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]",
+        "pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]"
+      ]
+    },
+    {
+      "role": "barra",
+      "target": "100.90.102.41:44965",
+      "versionCode": "334",
+      "apkSha256": "c8b3b81335c742b6a6a696e8d32c5c92b93376b7ab47d8d66c908d57f9329e09",
+      "launch": "Starting: Intent { cmp=co.umiconsulting.umi_pos.estacion/co.umiconsulting.umi_pos.MainActivity }\nStatus: ok\nLaunchState: COLD\nActivity: co.umiconsulting.umi_pos.estacion/co.umiconsulting.umi_pos.MainActivity\nTotalTime: 580\nWaitTime: 589\nComplete\n",
+      "flags": [
+        "flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]",
+        "pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]",
+        "android.permission.POST_NOTIFICATIONS: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+      ]
+    },
+    {
+      "role": "cocina",
+      "target": "100.125.137.36:35147",
+      "versionCode": "334",
+      "apkSha256": "c8b3b81335c742b6a6a696e8d32c5c92b93376b7ab47d8d66c908d57f9329e09",
+      "launch": "Starting: Intent { cmp=co.umiconsulting.umi_pos.estacion/co.umiconsulting.umi_pos.MainActivity }\nStatus: ok\nLaunchState: COLD\nActivity: co.umiconsulting.umi_pos.estacion/co.umiconsulting.umi_pos.MainActivity\nTotalTime: 725\nWaitTime: 730\nComplete\n",
+      "flags": [
+        "flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]",
+        "pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]",
+        "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+      ]
+    },
+    {
+      "role": "mesero",
+      "target": "100.125.102.97:42845",
+      "versionCode": "334",
+      "apkSha256": "c8b3b81335c742b6a6a696e8d32c5c92b93376b7ab47d8d66c908d57f9329e09",
+      "launch": "Starting: Intent { cmp=co.umiconsulting.umi_pos.estacion/co.umiconsulting.umi_pos.MainActivity }\nStatus: ok\nLaunchState: COLD\nActivity: co.umiconsulting.umi_pos.estacion/co.umiconsulting.umi_pos.MainActivity\nTotalTime: 510\nWaitTime: 545\nComplete\n",
+      "flags": [
+        "flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP KILL_AFTER_RESTORE ]",
+        "pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP KILL_AFTER_RESTORE ]",
+        "android.permission.POST_NOTIFICATIONS: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+      ]
+    }
+  ]
+}

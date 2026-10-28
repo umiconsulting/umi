@@ -12,17 +12,17 @@ The evidence is in
 
 ## Current verified state
 
-| Slice | State | Evidence |
-| --- | --- | --- |
-| One start action and table-first account | Verified on iMin | [Build 169 report](../reports/2026-10-18-account-first-interaction-slice.md) |
-| Account split entry and one ledger | Verified on iMin | [Build 170 report](../reports/2026-10-18-account-split-slice.md) |
-| Portable table state | Verified on A11 | [Device report](../reports/2026-10-18-manual-end-to-end-devices.md) |
-| KDS item ready and ticket complete | Verified on A9 | [Device report](../reports/2026-10-18-manual-end-to-end-devices.md) |
-| Replay after an ended operator session | Verified on staging | [Replay report](../reports/2026-10-18-offline-replay-authority.md) |
-| Repeat one configured line | Implemented and tested | Build 172 test suite |
-| Tap budget under peak cart load | Partial | Product add measured at 155 ms; peak run is open |
-| Equal and item split proposals | Open | Needs contract work |
-| LAN KDS write with no WAN | Open | Needs peer and network run |
+| Slice                                    | State                  | Evidence                                                                     |
+| ---------------------------------------- | ---------------------- | ---------------------------------------------------------------------------- |
+| One start action and table-first account | Verified on iMin       | [Build 169 report](../reports/2026-10-18-account-first-interaction-slice.md) |
+| Account split entry and one ledger       | Verified on iMin       | [Build 170 report](../reports/2026-10-18-account-split-slice.md)             |
+| Portable table state                     | Verified on A11        | [Device report](../reports/2026-10-18-manual-end-to-end-devices.md)          |
+| KDS item ready and ticket complete       | Verified on A9         | [Device report](../reports/2026-10-18-manual-end-to-end-devices.md)          |
+| Replay after an ended operator session   | Verified on staging    | [Replay report](../reports/2026-10-18-offline-replay-authority.md)           |
+| Repeat one configured line               | Implemented and tested | Build 172 test suite                                                         |
+| Tap budget under peak cart load          | Partial                | Product add measured at 155 ms; peak run is open                             |
+| Equal and item split proposals           | Open                   | Needs contract work                                                          |
+| LAN KDS write with no WAN                | Open                   | Needs peer and network run                                                   |
 
 ## Priority 0 — trust under load
 
@@ -102,18 +102,18 @@ The evidence is in
 
 ## Order and dependencies
 
-| Order | Change | Depends on |
-| --- | --- | --- |
-| 1 | Tap response budget | Device latency probe |
-| 2 | Restart recovery proof | Local working copy |
-| 3 | Split kitchen-command test | Payment ledger |
-| 4 | No-WAN service proof | Main host, peer and KDS |
-| 5 | Split job separation | Server item-allocation contract |
-| 6 | Account work queue | Authoritative balance data |
-| 7 | Device recovery surface | Hardware status |
-| 8 | Line action sheet | Transfer contract |
-| 9 | Reconciliation recovery | Replay state test |
-| 10 | Local identity through restart | Session and storage design |
+| Order | Change                         | Depends on                      |
+| ----- | ------------------------------ | ------------------------------- |
+| 1     | Tap response budget            | Device latency probe            |
+| 2     | Restart recovery proof         | Local working copy              |
+| 3     | Split kitchen-command test     | Payment ledger                  |
+| 4     | No-WAN service proof           | Main host, peer and KDS         |
+| 5     | Split job separation           | Server item-allocation contract |
+| 6     | Account work queue             | Authoritative balance data      |
+| 7     | Device recovery surface        | Hardware status                 |
+| 8     | Line action sheet              | Transfer contract               |
+| 9     | Reconciliation recovery        | Replay state test               |
+| 10    | Local identity through restart | Session and storage design      |
 
 ## Measurement
 
@@ -124,4 +124,3 @@ The evidence is in
 - Kitchen commands created by one financial split.
 - Local POS and KDS availability during a WAN outage.
 - Pending queue depth and age after reconnect.
-

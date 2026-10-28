@@ -8,19 +8,19 @@ The guest asks for a receipt. The printer shows an error or loses its address. T
 
 ## Independent evidence
 
-| Product | Language | Evidence | Source |
-| --- | --- | --- | --- |
-| Square | Spanish MX | An update removes ticket and kitchen printing. | App Store MX, 2023-09-23 |
-| Square | English | An operator reports that updates remove printer profiles. | Software Advice review, 2026-08 |
-| Square | English | A reviewer reports duplicate and triple prints with delays. | Software Advice review |
-| Lightspeed | English | A user reports a 45 to 60 minute support call after a power loss. | Software Advice review, 2022 |
-| Lightspeed | English | A user reports printer IP loss and offline cash-up problems. | Software Advice page 5 |
-| Soft Restaurant | Spanish MX | A user reports that ticket printing and the cash drawer do not work after subscription and recommended hardware purchase. | Google Play MX, 2023-11-30 |
-| Soft Restaurant | Spanish MX | A user reports that the Cloud app needs special hardware for thermal printers. | Google Play MX, 2025-09-04 |
-| Square | English | Printers lost connection during restaurant service. | [Square Community](https://community.squareup.com/t5/Orders-Menu-Items-Catalog/Printers-keep-disconnecting-Restaurant-POS/m-p/399491) |
-| Toast | English | Kitchen printers lost connection during dinner service. | [Reddit](https://www.reddit.com/r/restaurant/comments/1sul2od/pos_system_randomly_freezing_and_kitchen_printers/) |
-| Lightspeed | English | A reviewer reported constant printer errors and billing issues. | [App Store](https://apps.apple.com/us/app/lightspeed-restaurant-pos-l/id474723658) |
-| Soft Restaurant | Spanish MX | Public tutorials demonstrate station connection and update errors. | [YouTube](https://www.youtube.com/watch?v=DGNeWJL92V4) |
+| Product         | Language   | Evidence                                                                                                                  | Source                                                                                                                                |
+| --------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Square          | Spanish MX | An update removes ticket and kitchen printing.                                                                            | App Store MX, 2023-09-23                                                                                                              |
+| Square          | English    | An operator reports that updates remove printer profiles.                                                                 | Software Advice review, 2026-08                                                                                                       |
+| Square          | English    | A reviewer reports duplicate and triple prints with delays.                                                               | Software Advice review                                                                                                                |
+| Lightspeed      | English    | A user reports a 45 to 60 minute support call after a power loss.                                                         | Software Advice review, 2022                                                                                                          |
+| Lightspeed      | English    | A user reports printer IP loss and offline cash-up problems.                                                              | Software Advice page 5                                                                                                                |
+| Soft Restaurant | Spanish MX | A user reports that ticket printing and the cash drawer do not work after subscription and recommended hardware purchase. | Google Play MX, 2023-11-30                                                                                                            |
+| Soft Restaurant | Spanish MX | A user reports that the Cloud app needs special hardware for thermal printers.                                            | Google Play MX, 2025-09-04                                                                                                            |
+| Square          | English    | Printers lost connection during restaurant service.                                                                       | [Square Community](https://community.squareup.com/t5/Orders-Menu-Items-Catalog/Printers-keep-disconnecting-Restaurant-POS/m-p/399491) |
+| Toast           | English    | Kitchen printers lost connection during dinner service.                                                                   | [Reddit](https://www.reddit.com/r/restaurant/comments/1sul2od/pos_system_randomly_freezing_and_kitchen_printers/)                     |
+| Lightspeed      | English    | A reviewer reported constant printer errors and billing issues.                                                           | [App Store](https://apps.apple.com/us/app/lightspeed-restaurant-pos-l/id474723658)                                                    |
+| Soft Restaurant | Spanish MX | Public tutorials demonstrate station connection and update errors.                                                        | [YouTube](https://www.youtube.com/watch?v=DGNeWJL92V4)                                                                                |
 
 ## Vendor behavior
 

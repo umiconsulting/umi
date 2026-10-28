@@ -20,23 +20,23 @@ from **1.55 s to 0.51 s**. The printer write itself is **162–191 ms**.
 Server timestamps are from `merchant.hardware_command_event`; "duration" is
 from command creation to terminal `succeeded`.
 
-| Case | Before | Final build 167 |
-| --- | ---: | ---: |
-| Official receipt, same receipt path | 1,551 ms | — |
-| Official receipt after cold app start | — | **512 ms** |
-| Receipt copy, warm process (pre-change) | 647 ms | — |
-| Controlled reprint, final behaviour | — | **695 ms** |
+| Case                                    |   Before | Final build 167 |
+| --------------------------------------- | -------: | --------------: |
+| Official receipt, same receipt path     | 1,551 ms |               — |
+| Official receipt after cold app start   |        — |      **512 ms** |
+| Receipt copy, warm process (pre-change) |   647 ms |               — |
+| Controlled reprint, final behaviour     |        — |      **695 ms** |
 
 Instrumented build 166 showed the remaining cold-path budget precisely:
 
-| Stage | Time |
-| --- | ---: |
-| Server creates the hardware command | 189–211 ms |
-| Server accepts `dispatching` | about 150 ms |
-| Persisted logo read plus receipt render | 6–9 ms |
-| ESC/POS encode | 1 ms |
-| USB write, 14,493 bytes | 162–191 ms |
-| Final server transition | 169–220 ms |
+| Stage                                   |         Time |
+| --------------------------------------- | -----------: |
+| Server creates the hardware command     |   189–211 ms |
+| Server accepts `dispatching`            | about 150 ms |
+| Persisted logo read plus receipt render |       6–9 ms |
+| ESC/POS encode                          |         1 ms |
+| USB write, 14,493 bytes                 |   162–191 ms |
+| Final server transition                 |   169–220 ms |
 
 The logo cache was read from SQLite in **8 ms** after a process restart. Before
 the change, the same cold path fetched and rasterised the PNG again and measured
@@ -88,14 +88,14 @@ history without probing USB. The controlled reprint completed in 695 ms.
 
 ## Device and artifact
 
-| Item | Value |
-| --- | --- |
-| iMin D3 | `192.168.0.10`, build 167 |
-| Printer | Epson TM-T20IIIL, USB, 48 columns |
-| APK | `apps/umi-pos/build/app/outputs/flutter-apk/app-staging-lan-host-b167.apk` |
-| APK SHA-256 | `0a5c0bc9ae0bc9773c719d094fbe7058781ebe2676b21e1f37ae7774ea62c1a6` |
-| Contract | 2.40.0 |
-| API | `ghcr.io/umiconsulting/umi-api:offline-table-2.40` |
+| Item        | Value                                                                      |
+| ----------- | -------------------------------------------------------------------------- |
+| iMin D3     | `192.168.0.10`, build 167                                                  |
+| Printer     | Epson TM-T20IIIL, USB, 48 columns                                          |
+| APK         | `apps/umi-pos/build/app/outputs/flutter-apk/app-staging-lan-host-b167.apk` |
+| APK SHA-256 | `0a5c0bc9ae0bc9773c719d094fbe7058781ebe2676b21e1f37ae7774ea62c1a6`         |
+| Contract    | 2.40.0                                                                     |
+| API         | `ghcr.io/umiconsulting/umi-api:offline-table-2.40`                         |
 
 The final iMin state is logged in with an empty cart.
 Staging contains the test sales and the commands from rejected diagnostic

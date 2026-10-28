@@ -1,0 +1,29 @@
+{
+  "at": "2026-10-27T21:03:19.098123+00:00",
+  "serial": "100.64.178.95:35049",
+  "account": "020",
+  "action": "Single second confirmation tap on displayed MXN60 as requested to reproduce the error",
+  "owner_confirmed_cash_received": 10000,
+  "displayed_total": 6000,
+  "reported_error_reproduced": true,
+  "nodes_after": [
+    {
+      "text": "No pude confirmar el estado actual de la cuenta. Revisa la conexión y el Centro de recuperación antes de cobrar. Si la terminal ya confirmó un pago, no lo repitas.",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[219,504][1701,532]"
+    },
+    {
+      "text": "Reintentar",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[891,554][1029,620]"
+    },
+    {
+      "text": "Cerrar",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[910,631][1010,697]"
+    }
+  ]
+}

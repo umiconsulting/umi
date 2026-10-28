@@ -95,12 +95,12 @@ Parrot does not make the second boundary hold the first one hostage.
 
 Production iMin, 2026-10-22:
 
-| Action | Observed | Layer |
-| --- | ---: | --- |
-| First product with no account | about 1.8 s | sequential `POST /sales`, then `POST /cart/lines` |
-| Open checkout sheet | about 5.3 s | repeated policy reads, cart read, missing-checkout probe, partial-ledger read |
-| Cash checkout | about 2.0 s before refusal | two `POST /checkout` calls |
-| External/manual tender through paid | about 5.7 s | capture, settlement, preview and commit |
+| Action                              |                   Observed | Layer                                                                         |
+| ----------------------------------- | -------------------------: | ----------------------------------------------------------------------------- |
+| First product with no account       |                about 1.8 s | sequential `POST /sales`, then `POST /cart/lines`                             |
+| Open checkout sheet                 |                about 5.3 s | repeated policy reads, cart read, missing-checkout probe, partial-ledger read |
+| Cash checkout                       | about 2.0 s before refusal | two `POST /checkout` calls                                                    |
+| External/manual tender through paid |                about 5.7 s | capture, settlement, preview and commit                                       |
 
 Source inspection explains each delay:
 
@@ -169,19 +169,19 @@ Cloud API + PostgreSQL ledger
 
 ## Acceptance criteria
 
-| Scenario | Target |
-| --- | ---: |
-| Product added to an existing account | local paint p95 < 250 ms |
-| First product opens a new account | local paint p95 < 300 ms |
-| Dismiss WAN during account and catalogue use | no spinner for cached operations |
-| Open checkout from a local account | interactive p95 < 1 s |
-| Cash payment to paid/closed screen | p95 < 2 s |
-| First local split payment | p95 < 500 ms, before cloud acknowledgement |
-| Duplicate submit | one payment and one close event |
-| Process killed after local payment | restart returns the paid state and pending outbox row |
-| Two devices edit one account | one accepted revision; other gets a visible, resolvable conflict |
-| WAN restored after several sales | batches apply once, in account order |
-| Card authorization fails | no paid/closed local projection is created |
+| Scenario                                     |                                                           Target |
+| -------------------------------------------- | ---------------------------------------------------------------: |
+| Product added to an existing account         |                                         local paint p95 < 250 ms |
+| First product opens a new account            |                                         local paint p95 < 300 ms |
+| Dismiss WAN during account and catalogue use |                                 no spinner for cached operations |
+| Open checkout from a local account           |                                            interactive p95 < 1 s |
+| Cash payment to paid/closed screen           |                                                        p95 < 2 s |
+| First local split payment                    |                       p95 < 500 ms, before cloud acknowledgement |
+| Duplicate submit                             |                                  one payment and one close event |
+| Process killed after local payment           |            restart returns the paid state and pending outbox row |
+| Two devices edit one account                 | one accepted revision; other gets a visible, resolvable conflict |
+| WAN restored after several sales             |                             batches apply once, in account order |
+| Card authorization fails                     |                       no paid/closed local projection is created |
 
 ## Alternatives
 
@@ -204,8 +204,8 @@ idempotency and an append-only audit while keeping server-side reconciliation.
 - Local payment mutation: `ev_ee774a59941f029654d8b809872ed7a2fe77efe2fed25222b5cbf059a4108f6e`
 - Local automatic close: `ev_b01c5aa287f122f93d951d2a4350e54660d0fc21281d90073cfa091e66aacd4b`
 - Local split creation: `ev_0e6dcb49ed0c6e4401630494e71f8fbd5d1f77904b2c90970bac1355fa94f674`
-- Local API surface: `ev_3c578d2241309fc53890603dd4d414e86ceb95adc58d71d9945e4e1299bc05df`
-- POS local API routing: `ev_0ee13baadc774f8ad041a21e3ddab5843880d62ca143587f804fb090a145e522`
+- Evidence for the local routes: `ev_3c578d2241309fc53890603dd4d414e86ceb95adc58d71d9945e4e1299bc05df`
+- Evidence for POS routing: `ev_0ee13baadc774f8ad041a21e3ddab5843880d62ca143587f804fb090a145e522`
 - Foreground service/topology: `ev_35cffc47c5120fa5653199952bcaeed092432373074900f51113007271b97068`
 - Background cloud sync: `ev_b26daf8c638de5ae77ee053ef0e59118a841a755d5fa6b1baf2c7bc9038563c9`
 - Static inspection establishes classes, dependencies, configuration and local write order.

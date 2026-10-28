@@ -31,15 +31,15 @@ what to do without opening every table.
 
 ## What the competition is doing
 
-| Stage | Square | Toast | Lightspeed | Fudo MX |
-| --- | --- | --- | --- | --- |
-| Start | Tap a table on the floor plan and enter guest count; add items and send. Open tickets are a separate, explicitly named flow. **HD** | New order screen carries tab name, table, guests, server, dining option and menu. **HD/LC** | Direct sale or Table Service; items can carry seat and course. **HD** | Open a table with party size, customer, waiter and comment, then add products. **HD/LC** |
-| Identify the account | Open ticket name, table or seat. Split check and split payment are different operations. **HD** | Tab name, guest count, server and table; account menu also changes customer. **HD/LC** | Order/check with covers and seats. **HD** | Table number and current consumption; map/list show table states. **HD/LC** |
-| Find/resume | Floor plan or open-ticket search. **HD** | Floor plan, numeric check lookup or all checks. **HD/LC** | Payments screen and table/seat views. **HD** | Table map/list, table selected directly. **HD/LC** |
-| Edit | Order detail with Repeat, Modify, Move here and course grouping. **LC** | Item modifiers, repeat, hold, stay, send; account menu for customer, dining option and void. **LC** | Select items for payment; split shared items; seats and courses. **HD** | Product search and editing on the open order. **LC** |
-| Split | Split check by item/seat or split payment by amount. **HD** | Split by item, seat or evenly; partial tenders remain on one check. **HD** | Split by covers, seats or selected items; partial payment amounts. **HD** | By amount, person or item; tip is added to each partial charge. **HD** |
-| Pay | Tip/settlement behavior is separate from the check split. **HD** | Each guest adds a tip during that guest's payment. **HD** | Payment amount, received amount and Add tip; overpayment can become gratuity. **HD** | Partial payment screen shows account total, amount, method, tip and final charge. **LC/HD** |
-| Finish service | Payment does not itself prove the physical table is clean and ready. **I from documented table states** | Paid, dirty and available are separate operational states. **HD** | Reservations distinguish paid from departed. **HD** | Table list keeps explicit table states. **HD** |
+| Stage                | Square                                                                                                                              | Toast                                                                                               | Lightspeed                                                                           | Fudo MX                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| Start                | Tap a table on the floor plan and enter guest count; add items and send. Open tickets are a separate, explicitly named flow. **HD** | New order screen carries tab name, table, guests, server, dining option and menu. **HD/LC**         | Direct sale or Table Service; items can carry seat and course. **HD**                | Open a table with party size, customer, waiter and comment, then add products. **HD/LC**    |
+| Identify the account | Open ticket name, table or seat. Split check and split payment are different operations. **HD**                                     | Tab name, guest count, server and table; account menu also changes customer. **HD/LC**              | Order/check with covers and seats. **HD**                                            | Table number and current consumption; map/list show table states. **HD/LC**                 |
+| Find/resume          | Floor plan or open-ticket search. **HD**                                                                                            | Floor plan, numeric check lookup or all checks. **HD/LC**                                           | Payments screen and table/seat views. **HD**                                         | Table map/list, table selected directly. **HD/LC**                                          |
+| Edit                 | Order detail with Repeat, Modify, Move here and course grouping. **LC**                                                             | Item modifiers, repeat, hold, stay, send; account menu for customer, dining option and void. **LC** | Select items for payment; split shared items; seats and courses. **HD**              | Product search and editing on the open order. **LC**                                        |
+| Split                | Split check by item/seat or split payment by amount. **HD**                                                                         | Split by item, seat or evenly; partial tenders remain on one check. **HD**                          | Split by covers, seats or selected items; partial payment amounts. **HD**            | By amount, person or item; tip is added to each partial charge. **HD**                      |
+| Pay                  | Tip/settlement behavior is separate from the check split. **HD**                                                                    | Each guest adds a tip during that guest's payment. **HD**                                           | Payment amount, received amount and Add tip; overpayment can become gratuity. **HD** | Partial payment screen shows account total, amount, method, tip and final charge. **LC/HD** |
+| Finish service       | Payment does not itself prove the physical table is clean and ready. **I from documented table states**                             | Paid, dirty and available are separate operational states. **HD**                                   | Reservations distinguish paid from departed. **HD**                                  | Table list keeps explicit table states. **HD**                                              |
 
 ### Square
 
@@ -204,22 +204,22 @@ silently re-firing kitchen work or discarding account-level discounts.
 **I:** an account should be understood as:
 
 > `Account # + location/table + party + customer + server + current balance +
-> lifecycle state`
+lifecycle state`
 
 `Order` and `Accounts` become two views of that account, not two unrelated
 modules.
 
 ### 2. Give every account one obvious next action
 
-| State | Primary action |
-| --- | --- |
-| Empty draft | Add first item, or discard automatically |
-| Has unsent items | Send to kitchen |
-| Sent, waiting | Continue order |
-| Bill requested | Start payment |
-| Partially paid | Collect remaining balance |
-| Fully paid, guests present | Mark departed |
-| Needs cleaning | Mark clean |
+| State                      | Primary action                           |
+| -------------------------- | ---------------------------------------- |
+| Empty draft                | Add first item, or discard automatically |
+| Has unsent items           | Send to kitchen                          |
+| Sent, waiting              | Continue order                           |
+| Bill requested             | Start payment                            |
+| Partially paid             | Collect remaining balance                |
+| Fully paid, guests present | Mark departed                            |
+| Needs cleaning             | Mark clean                               |
 
 Secondary actions belong behind one menu. Avoid presenting `Checkout`,
 `Send`, `Save and leave`, `New account` and `Open account` with equal weight.

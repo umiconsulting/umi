@@ -341,11 +341,11 @@ stopped to create the outage rather than a fake connectivity flag.
 
 ### What was measured
 
-| Moment                            | Before                       | After                                     |
-| --------------------------------- | ---------------------------- | ----------------------------------------- |
-| Header while the API was dead     | `En línea` for minutes       | `Conexión inestable` ≤ 8 s, `Sin conexión` ≤ 33 s |
-| Offline cash commit (tap → receipt) | ~12 s (client 15 s timeout) | **< 1 s**                                 |
-| Reconnect to sale accepted        | never (no probe, no replay)  | ~10–40 s, unattended                      |
+| Moment                              | Before                      | After                                             |
+| ----------------------------------- | --------------------------- | ------------------------------------------------- |
+| Header while the API was dead       | `En línea` for minutes      | `Conexión inestable` ≤ 8 s, `Sin conexión` ≤ 33 s |
+| Offline cash commit (tap → receipt) | ~12 s (client 15 s timeout) | **< 1 s**                                         |
+| Reconnect to sale accepted          | never (no probe, no replay) | ~10–40 s, unattended                              |
 
 ### What was broken, and why it was invisible
 
@@ -400,7 +400,7 @@ Two more surfaced in the same run and are fixed:
 
 - The recovery centre listed rows as `#1 … #7` with the same sentence on each.
   It now names what happened and where it stands: `Venta en efectivo ·
-  MXN 120.00 — Pendiente de envío`, `Producto agregado — Enviada`.
+MXN 120.00 — Pendiente de envío`, `Producto agregado — Enviada`.
 - `blocked` is sticky against the reachability probe, so a probe cannot reopen a
   till whose credentials were refused.
 
@@ -423,8 +423,8 @@ Two more surfaced in the same run and are fixed:
   ten minutes. The endpoint still 503s on staging because FCM is not configured
   there, which is the correct answer for that deployment.
 - Every guard in the checkout block still reports `price_changed`, including a
-  cart-identity mismatch. *(Split into `cart_mismatch` /
-  `offline_limit_exceeded`; not yet deployed.)*
+  cart-identity mismatch. _(Split into `cart_mismatch` /
+  `offline_limit_exceeded`; not yet deployed.)_
 - ~~The receipt header mark renders as a doubled stroke~~ — it was **not** the
   logo. The provisional sale screen put a 64 px `PosIcon` straight into a
   `Column(crossAxisAlignment: stretch)`, and `PosIcon` is a `SizedBox.square`
@@ -493,7 +493,7 @@ Cappuccino, 180.00), and the price guard correctly refused to charge 60 for it.
 The guard did its job — the till never charged the wrong amount — but the
 operator is left with a sale that can never land. Two things are needed:
 
-- `pos.cart.open` replay must produce a *new* cart when the operator started a
+- `pos.cart.open` replay must produce a _new_ cart when the operator started a
   new account, rather than adopting the session's previous one.
 - The refusal currently reports `price_changed` for every guard in that block,
   including a cart-identity mismatch; the classification should name the cart
@@ -590,7 +590,7 @@ to look at the payload.
 
 **The assignment itself now lands.** With a clean journal and a free table
 (Mesa 4), the offline counter flow ran end to end: fresh account, one
-Cappuccino, `Cobrar`, picker from the local plan, Mesa 4, *Usar mesa* — and the
+Cappuccino, `Cobrar`, picker from the local plan, Mesa 4, _Usar mesa_ — and the
 cash sheet opened for MXN 60.00. On reconnect the server shows
 `pos_cart bffa9e50…` with `table_id = 21460337` (Mesa 4) in `building_cart`, and
 the previous Mesa 2 cart moved to `suspended`. That is the outcome the operator
@@ -607,7 +607,7 @@ shape and the next session should start by logging the exact `code` from
 retry had already applied the same assignment, which the repository treats as
 idempotent. Either way the command should settle as `accepted` when the cart's
 `table_id` already equals the requested table, and the client should pass
-`tableName` on this path too (the optimistic paint shows *Cuenta* without the
+`tableName` on this path too (the optimistic paint shows _Cuenta_ without the
 table name; the assignment itself is correct).
 
 **Fixed for the retry case, deployed.** A `CART_ALREADY_ASSIGNED` or
@@ -621,7 +621,7 @@ already marked conflicted on the device.
 The client now passes `tableName` on the counter path too. Verified after a
 restart: the till restored the server cart as **Cuenta 019 · Mesa 4** with the
 queue empty and the header online, so the table survives the app and the chip
-names it instead of saying *Cuenta*.
+names it instead of saying _Cuenta_.
 
 Still unverified live, and covered only by the unit test above: the
 idempotent-settle branch. Reproducing it needs a lost batch response or an
@@ -630,7 +630,7 @@ online retry racing the journal, neither of which can be staged from the UI.
 ### A refused sale now says what to do
 
 The classification work had a hole on the other side of the wire. New codes
-fell through to the default action — *Sincronizar* — which re-sends a command
+fell through to the default action — _Sincronizar_ — which re-sends a command
 that is going to be refused again, and every conflict row read the same
 "Requiere tu revisión" with no reason.
 
@@ -641,13 +641,13 @@ replaying it:
   ocupada. Elige otra mesa y vuelve a cobrar."** — not a code, not a generic
   sentence.
 - The action follows the reason: `table_unavailable` and `cart_mismatch` offer
-  *Actualizar datos autorizados* (look at the world again), and
+  _Actualizar datos autorizados_ (look at the world again), and
   `offline_limit_exceeded` offers manager review. Re-sending the same command is
   no longer offered for any of them.
 
-The screenshot from that run: rows #1 and #2 *Enviada*, #3 with a warning icon
-and the sentence above, and the action bar showing *Actualizar datos
-autorizados*. Covered by `a refusal the till can act on offers the right next
+The screenshot from that run: rows #1 and #2 _Enviada_, #3 with a warning icon
+and the sentence above, and the action bar showing _Actualizar datos
+autorizados_. Covered by `a refusal the till can act on offers the right next
 step`; the wording itself is what the screenshot shows.
 
 ### The receipt now turns into the official one
@@ -694,12 +694,12 @@ operator touching anything, and staging's
 
 ### Measured, 2026-10-17 (iMin D3, office LAN)
 
-| Question | Answer |
-| --- | --- |
-| Is there a shared LAN? | Yes. iMin `192.168.1.10/24`, gateway `192.168.1.1`; the workstation is `192.168.1.9` on the same /24 |
-| Can the main device serve to it? | **Yes.** A toybox `nc` loop on `:8080` answered `HTTP/1.1 200` from the workstation (`umi-lan`) |
-| Are the other terminals present? | ARP shows `.5`, `.6`, `.14`, `.15`. `.6` (the A11) answers ARP but not ICMP, and `adb connect .6:44063` returns *no route to host* — adb-over-wifi is off there, so I cannot drive that peer from here |
-| Is the KDS a separate app? | **No.** `apps/` holds `umi-pos`, `umi-api`, `umi-cash`, `umi-dashboard`, `umi-landing-page`. The KDS is `device.type == 'kds'` inside the same POS client |
+| Question                         | Answer                                                                                                                                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Is there a shared LAN?           | Yes. iMin `192.168.1.10/24`, gateway `192.168.1.1`; the workstation is `192.168.1.9` on the same /24                                                                                                   |
+| Can the main device serve to it? | **Yes.** A toybox `nc` loop on `:8080` answered `HTTP/1.1 200` from the workstation (`umi-lan`)                                                                                                        |
+| Are the other terminals present? | ARP shows `.5`, `.6`, `.14`, `.15`. `.6` (the A11) answers ARP but not ICMP, and `adb connect .6:44063` returns _no route to host_ — adb-over-wifi is off there, so I cannot drive that peer from here |
+| Is the KDS a separate app?       | **No.** `apps/` holds `umi-pos`, `umi-api`, `umi-cash`, `umi-dashboard`, `umi-landing-page`. The KDS is `device.type == 'kds'` inside the same POS client                                              |
 
 The last row decides the shape of this stage. There is no second client to teach a
 new protocol; there is one client, pointed at one API, in three roles.
@@ -719,8 +719,8 @@ Cheaper to prototype, but it creates a second consistency model next to the
 journal, and the two will disagree.
 
 **C. Nothing until the cloud story is exhausted.** Legitimate: the till now sells,
-prints, reopens and settles with no link. What it cannot do is *show the KDS an
-order the counter took* while both are offline.
+prints, reopens and settles with no link. What it cannot do is _show the KDS an
+order the counter took_ while both are offline.
 
 ### The blocker that decides everything: offline authentication
 
@@ -757,7 +757,7 @@ proven while the kitchen leg had not. Ran on the iMin against staging:
 
 - Cuenta 021, dine-in, 9 Cappuccino and 2 Americano limón mineral (MXN 720.00),
   `Enviar a cocina`.
-- Both lines flipped from *Pendiente de enviar* to **En cola**, the fire button
+- Both lines flipped from _Pendiente de enviar_ to **En cola**, the fire button
   was replaced by `Cobrar`, and `merchant.kitchen_order` went from 5 to 6.
 - Ticket `883aaf6f…` in `queued` with exactly those two lines and quantities,
   both routed to station `dafcef9a…`.
@@ -780,7 +780,7 @@ numbered step in the commercial walkthrough, and it is the first thing to check
 if a pilot says "the KDS is empty".
 
 The KDS tablet itself could not be observed from here — it is not adb-reachable
-(`adb connect 192.168.1.6:44063` reports *no route to host*) — so this leg is
+(`adb connect 192.168.1.6:44063` reports _no route to host_) — so this leg is
 proven at the API and configuration layer, not on the kitchen screen.
 
 ## 14. The café's mark, and why it was never there
@@ -851,12 +851,12 @@ speed, no "sin conexión" workflow for staff to learn. That settles the model:
 ### What is built
 
 `BoundedApiClient` now has a second lane. When the cloud cannot be reached
-*at all* — connection refused, name not resolving, no route — the same call is
+_at all_ — connection refused, name not resolving, no route — the same call is
 made against `UMIPOS_LAN_HUB` (a compile-time address, e.g.
 `http://192.168.1.10:8099`). The lane is used **only** when the request provably
 never left the device: the failure is tagged `TRANSPORT_FAILURE_PRE_SEND` at the
 point where `_client.send` throws, before any response is read. A timeout or a
-connection dropped mid-response is an *unknown outcome* and stays with the lane
+connection dropped mid-response is an _unknown outcome_ and stays with the lane
 that may have executed it — replaying that against a second server is how one
 sale becomes two.
 
@@ -1070,14 +1070,14 @@ and rebuilt as the UmiPOS service network. The old network could not be joined:
 The reset restored the label defaults, which let the quick-setup wizard run over
 a headless browser. The resulting network:
 
-| Setting | Value |
-| --- | --- |
-| SSID | `UmiPOS` / `UmiPOS-5G` |
-| Security | WPA2-PSK AES (WPA3 off) |
-| Gateway / subnet | `192.168.0.1` / `192.168.0.0/24` |
-| DHCP pool | `.100`–`.249` |
+| Setting             | Value                                |
+| ------------------- | ------------------------------------ |
+| SSID                | `UmiPOS` / `UmiPOS-5G`               |
+| Security            | WPA2-PSK AES (WPA3 off)              |
+| Gateway / subnet    | `192.168.0.1` / `192.168.0.0/24`     |
+| DHCP pool           | `.100`–`.249`                        |
 | iMin D3 reservation | `D0-C8-57-4A-11-6D` → `192.168.0.10` |
-| WPS | Off |
+| WPS                 | Off                                  |
 
 Evidence gathered from the new network:
 
@@ -1098,10 +1098,10 @@ resolver.
 
 Artifacts after the network change:
 
-| Build | Artifact | SHA-256 |
-| --- | --- | --- |
-| Host | `app-staging-lan-host.apk` | `b61de9d04ce70587f193dabd3b9730223891a90ca30cf95aad7025583af8e1f3` |
-| Peer | `app-staging-lan-peer-192.168.0.10.apk` | `149bace4d5972c608e3c24dd2ea904f1c1bf92baf4a8f6e1f8fc59dc526b8454` |
+| Build | Artifact                                | SHA-256                                                            |
+| ----- | --------------------------------------- | ------------------------------------------------------------------ |
+| Host  | `app-staging-lan-host.apk`              | `b61de9d04ce70587f193dabd3b9730223891a90ca30cf95aad7025583af8e1f3` |
+| Peer  | `app-staging-lan-peer-192.168.0.10.apk` | `149bace4d5972c608e3c24dd2ea904f1c1bf92baf4a8f6e1f8fc59dc526b8454` |
 
 The peer was rebuilt with `--dart-define=UMIPOS_LAN_HUB=http://192.168.0.10:4244`
 on commit `3654bd905cbeb957adde115d842f4fb53f512539`; the host build did not

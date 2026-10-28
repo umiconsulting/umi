@@ -36,14 +36,14 @@ Si el cliente envía una foto propia del mostrador y del personal, se rehace la 
 
 ## Set de referencias
 
-| Archivo | Fuente | Uso |
-| --- | --- | --- |
-| `01-kalala-barra-chapultepec.jpg` | Fotograma de Maps, septiembre de 2023 | Materiales de la barra: azulejo rojo y blanco, lámparas de fibra, máquina de espresso, bóveda blanca. |
-| `02-kalala-fachada-chapultepec.jpg` | Maps, julio de 2023 | Identidad del local: arcos blancos, teja terracota, reja rosa, letras KALALA, flores. |
-| `03-kalala-interior-congreso.jpg` | Instagram, octubre de 2026 | Referencia alterna. No usar en la misma imagen que Chapultepec. |
-| `04-wallet-kalala-captura.jpg` | Captura del cliente | Contexto del pase completo. No usar como pantalla final. |
-| `05-wallet-kalala-pase-demo.jpg` | Captura del cliente, QR sustituido | Pase exacto para la pantalla. QR de demostración. |
-| `06-kalala-logo.png` | Activo de la landing | Logotipo para composición posterior, no para la pantalla. |
+| Archivo                             | Fuente                                | Uso                                                                                                   |
+| ----------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `01-kalala-barra-chapultepec.jpg`   | Fotograma de Maps, septiembre de 2023 | Materiales de la barra: azulejo rojo y blanco, lámparas de fibra, máquina de espresso, bóveda blanca. |
+| `02-kalala-fachada-chapultepec.jpg` | Maps, julio de 2023                   | Identidad del local: arcos blancos, teja terracota, reja rosa, letras KALALA, flores.                 |
+| `03-kalala-interior-congreso.jpg`   | Instagram, octubre de 2026            | Referencia alterna. No usar en la misma imagen que Chapultepec.                                       |
+| `04-wallet-kalala-captura.jpg`      | Captura del cliente                   | Contexto del pase completo. No usar como pantalla final.                                              |
+| `05-wallet-kalala-pase-demo.jpg`    | Captura del cliente, QR sustituido    | Pase exacto para la pantalla. QR de demostración.                                                     |
+| `06-kalala-logo.png`                | Activo de la landing                  | Logotipo para composición posterior, no para la pantalla.                                             |
 
 El QR del pase demo apunta a `https://umi.mx/demo/KLC-0001` y decodifica correctamente. No es un pase válido.
 

@@ -1,0 +1,108 @@
+{
+  "at": "2026-10-27T21:50:03.898107+00:00",
+  "exit": 0,
+  "result": {
+    "host": {
+      "machineId": "97d302e7018b42eb80e9a56e78dab7b6",
+      "tailscaleIp": "100.109.51.39",
+      "keepadbService": "active",
+      "adapterCount": 4
+    },
+    "apiHealthy": true,
+    "devices": [
+      {
+        "role": "Caja",
+        "tailscaleName": "onca-caja-principal",
+        "tailscaleIp": "100.64.178.95",
+        "checks": {
+          "tailscaleOnline": true,
+          "endpointActive": true,
+          "adbState": "device",
+          "serial": "100.64.178.95:35049",
+          "model": "D3",
+          "android": "11",
+          "umiposVersion": "334",
+          "umiposDebuggable": false,
+          "adbWifiEnabled": "1",
+          "alwaysOnVpn": "com.tailscale.ipn",
+          "keepadbVersion": "1.8.38",
+          "keepadbService": true,
+          "keepadbBatteryExempt": true,
+          "tailscaleBatteryExempt": true,
+          "bootCount": "8"
+        },
+        "failures": []
+      },
+      {
+        "role": "Barra",
+        "tailscaleName": "onca-barra",
+        "tailscaleIp": "100.90.102.41",
+        "checks": {
+          "tailscaleOnline": true,
+          "endpointActive": true,
+          "adbState": "device",
+          "serial": "100.90.102.41:44965",
+          "model": "SM-X210",
+          "android": "16",
+          "umiposVersion": "334",
+          "umiposDebuggable": false,
+          "adbWifiEnabled": "1",
+          "alwaysOnVpn": "com.tailscale.ipn",
+          "keepadbVersion": "1.8.38",
+          "keepadbService": true,
+          "keepadbBatteryExempt": true,
+          "tailscaleBatteryExempt": true,
+          "bootCount": "131"
+        },
+        "failures": []
+      },
+      {
+        "role": "Cocina",
+        "tailscaleName": "onca-cocina",
+        "tailscaleIp": "100.125.137.36",
+        "checks": {
+          "tailscaleOnline": true,
+          "endpointActive": true,
+          "adbState": "device",
+          "serial": "100.125.137.36:35147",
+          "model": "SM-X210",
+          "android": "16",
+          "umiposVersion": "334",
+          "umiposDebuggable": false,
+          "adbWifiEnabled": "1",
+          "alwaysOnVpn": "com.tailscale.ipn",
+          "keepadbVersion": "1.8.38",
+          "keepadbService": true,
+          "keepadbBatteryExempt": true,
+          "tailscaleBatteryExempt": true,
+          "bootCount": "315"
+        },
+        "failures": []
+      },
+      {
+        "role": "Mesero",
+        "tailscaleName": "onca-mesero",
+        "tailscaleIp": "100.125.102.97",
+        "checks": {
+          "tailscaleOnline": true,
+          "endpointActive": true,
+          "adbState": "device",
+          "serial": "100.125.102.97:42845",
+          "model": "SM-X133",
+          "android": "16",
+          "umiposVersion": "334",
+          "umiposDebuggable": false,
+          "adbWifiEnabled": "1",
+          "alwaysOnVpn": "com.tailscale.ipn",
+          "keepadbVersion": "1.8.38",
+          "keepadbService": true,
+          "keepadbBatteryExempt": true,
+          "tailscaleBatteryExempt": true,
+          "bootCount": "24"
+        },
+        "failures": []
+      }
+    ]
+  },
+  "stderr": ""
+}

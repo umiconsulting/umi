@@ -188,11 +188,11 @@ have the `write:packages` scope.
 
 ## Device artifacts
 
-| Artifact | SHA-256 |
-| --- | --- |
-| `apps/umi-pos/build/app/outputs/flutter-apk/app-staging-lan-host-b192.apk` | `5a1e2931de6952e762edbae55e2d56546885ad3ad7b3ef0bffa524417fffe304` |
+| Artifact                                                                                | SHA-256                                                            |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `apps/umi-pos/build/app/outputs/flutter-apk/app-staging-lan-host-b192.apk`              | `5a1e2931de6952e762edbae55e2d56546885ad3ad7b3ef0bffa524417fffe304` |
 | `apps/umi-pos/build/app/outputs/flutter-apk/app-staging-lan-peer-192.168.0.10-b192.apk` | `60a0943d3f9f736ec30a73c7fe06592ce44164abefd75c22e4a25bf039e915c6` |
-| `apps/umi-pos/build/app/outputs/flutter-apk/app-staging-lan-host-clean-b192.apk` | `4dcdcda04cca89834c7bdb1d94e5dd99a4dda9808eeabb56c98e21bbc5f7a15c` |
+| `apps/umi-pos/build/app/outputs/flutter-apk/app-staging-lan-host-clean-b192.apk`        | `4dcdcda04cca89834c7bdb1d94e5dd99a4dda9808eeabb56c98e21bbc5f7a15c` |
 
 ## Device state
 

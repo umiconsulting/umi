@@ -149,10 +149,7 @@
           "y": 942,
           "width": 425,
           "height": 39,
-          "center": [
-            539,
-            962
-          ]
+          "center": [539, 962]
         },
         {
           "label": "Solicitar apertura de cajón",
@@ -161,10 +158,7 @@
           "y": 942,
           "width": 425,
           "height": 39,
-          "center": [
-            975,
-            962
-          ]
+          "center": [975, 962]
         }
       ],
       "unnamed": 0,

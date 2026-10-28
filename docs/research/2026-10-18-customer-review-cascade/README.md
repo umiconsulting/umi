@@ -26,17 +26,17 @@ Umi already has the right system layers for these failures. The remaining work i
 
 The inventory comes from the repository matrix and the account-flow study.
 
-| Provider | Market role | Review sources used | Evidence result |
-| --- | --- | --- | --- |
-| Square | US and global | App Store MX and US, Square Community, Software Advice | Strong split coverage and many operator complaints |
-| Toast | US | Toast Community, Software Advice | Strong account model and repeated network/KDS reports |
-| Lightspeed | US, Canada and global | App Store US and Canada, Software Advice | Repeated freeze, offline and split effort reports |
-| Odoo | Global | App Store MX, FR, ES and BR, official docs | Repeated mobile session and usability reports |
-| PoloTab | Mexico | Official product pages only | No independent review corpus found |
-| Fudo | Mexico and LatAm | App Store MX and AR, Google Play MX, Capterra MX | Repeated session, draft and payment-screen reports |
-| Soft Restaurant | Mexico | Google Play MX, Capterra MX, official manual | Few independent reviews; hardware and support reports |
-| Clover | US and global | App Store US, official help center | Outage, lost-order and slow-workflow reports |
-| Parrot | Mexico | App Store MX, local artifact study | Very small review corpus; one hard crash report |
+| Provider        | Market role           | Review sources used                                    | Evidence result                                       |
+| --------------- | --------------------- | ------------------------------------------------------ | ----------------------------------------------------- |
+| Square          | US and global         | App Store MX and US, Square Community, Software Advice | Strong split coverage and many operator complaints    |
+| Toast           | US                    | Toast Community, Software Advice                       | Strong account model and repeated network/KDS reports |
+| Lightspeed      | US, Canada and global | App Store US and Canada, Software Advice               | Repeated freeze, offline and split effort reports     |
+| Odoo            | Global                | App Store MX, FR, ES and BR, official docs             | Repeated mobile session and usability reports         |
+| PoloTab         | Mexico                | Official product pages only                            | No independent review corpus found                    |
+| Fudo            | Mexico and LatAm      | App Store MX and AR, Google Play MX, Capterra MX       | Repeated session, draft and payment-screen reports    |
+| Soft Restaurant | Mexico                | Google Play MX, Capterra MX, official manual           | Few independent reviews; hardware and support reports |
+| Clover          | US and global         | App Store US, official help center                     | Outage, lost-order and slow-workflow reports          |
+| Parrot          | Mexico                | App Store MX, local artifact study                     | Very small review corpus; one hard crash report       |
 
 The set has nine products. The repository also covers Fresh KDS, GoTab, REVO and Loyverse for narrower questions. This pass does not treat them as full table-account competitors.
 
@@ -46,16 +46,16 @@ The repository also names providers that answer a narrower part of the same
 job. They stay in scope as evidence sources. A missing public review set is a
 stated limit, not a claim that the product is weak.
 
-| Provider | Scope | Official source | Independent review source | Evidence result |
-| --- | --- | --- | --- | --- |
-| Fresh KDS | Kitchen display | Fresh help centre and product pages | 61 public Google Play reviews | Repeated dropped tickets, freezes, slow recall and device connection reports |
-| GoTab | Full-service ordering and payment | GoTab success centre | App Store listings have no usable review sample | Product behavior documented; customer friction `NV` |
-| REVO XEF | Spain and LatAm restaurant POS | REVO support articles | App Store and Google Play listings have no usable review sample | Product behavior documented; customer friction `NV` |
-| Loyverse | Café, retail and small restaurant POS | Loyverse help centre | App Store and Google Play reviews | Repeated open-ticket, partial-payment and slow back-office reports |
-| Wansoft | Mexico restaurant POS | Wansoft support centre | No stable public review corpus found | Product behavior documented; customer friction `NV` |
-| Consul Rest | Mexico restaurant POS | Consul Rest operator wiki | No stable public review corpus found | Product behavior documented; customer friction `NV` |
-| Pacto | Mexico miniPOS | Pacto product pages | No stable public review corpus found | Partial official evidence; some pages returned 404 |
-| SambaPOS | Turkey and global restaurant POS | SambaPOS documentation and forum | Four public Google Play reviews on the mobile client | Repeated setup and variant failures; small sample |
+| Provider    | Scope                                 | Official source                     | Independent review source                                       | Evidence result                                                              |
+| ----------- | ------------------------------------- | ----------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Fresh KDS   | Kitchen display                       | Fresh help centre and product pages | 61 public Google Play reviews                                   | Repeated dropped tickets, freezes, slow recall and device connection reports |
+| GoTab       | Full-service ordering and payment     | GoTab success centre                | App Store listings have no usable review sample                 | Product behavior documented; customer friction `NV`                          |
+| REVO XEF    | Spain and LatAm restaurant POS        | REVO support articles               | App Store and Google Play listings have no usable review sample | Product behavior documented; customer friction `NV`                          |
+| Loyverse    | Café, retail and small restaurant POS | Loyverse help centre                | App Store and Google Play reviews                               | Repeated open-ticket, partial-payment and slow back-office reports           |
+| Wansoft     | Mexico restaurant POS                 | Wansoft support centre              | No stable public review corpus found                            | Product behavior documented; customer friction `NV`                          |
+| Consul Rest | Mexico restaurant POS                 | Consul Rest operator wiki           | No stable public review corpus found                            | Product behavior documented; customer friction `NV`                          |
+| Pacto       | Mexico miniPOS                        | Pacto product pages                 | No stable public review corpus found                            | Partial official evidence; some pages returned 404                           |
+| SambaPOS    | Turkey and global restaurant POS      | SambaPOS documentation and forum    | Four public Google Play reviews on the mobile client            | Repeated setup and variant failures; small sample                            |
 
 Reference-only names such as TouchBistro, Revel, Shopify POS, Micros and
 Simphony appear in source discovery or adjacent comparisons. They do not yet
@@ -118,16 +118,16 @@ One review is one testimony. A repeated problem needs independent authors. Vendo
 
 ## Cross-provider findings
 
-| Finding | Providers with independent evidence | User cost | Evidence strength |
-| --- | --- | --- | --- |
-| Screen delay or freeze under load | Lightspeed, Square, Toast, Fudo, Clover | Taps repeat; checkout stops; staff lose trust | Strong |
-| Session end or draft loss | Fudo, Odoo, Square, Clover | Work must be entered again; money and kitchen state diverge | Strong |
-| Split or partial payment takes too many steps | Square, Toast, Lightspeed | Guest waits; staff make amount errors; checks fragment | Strong |
-| Kitchen state lags or tickets duplicate | Toast, Square, Clover | Cold food; duplicate work; missed items | Strong |
-| Handheld loses Wi-Fi or changes network | Toast | Service stops until staff repair the device | Medium |
-| Payment state is unclear or reverses | Square, Toast, Clover | Staff cannot say whether money arrived | Strong |
-| Printer or terminal recovery needs support | Lightspeed, Soft Restaurant, Square | Receipts stop; cash-up delays; manual reconciliation | Medium |
-| Reports or inventory disagree with the sale | Clover, Odoo, Soft Restaurant, Square | Owners cannot reconcile money or stock | Medium |
+| Finding                                       | Providers with independent evidence     | User cost                                                   | Evidence strength |
+| --------------------------------------------- | --------------------------------------- | ----------------------------------------------------------- | ----------------- |
+| Screen delay or freeze under load             | Lightspeed, Square, Toast, Fudo, Clover | Taps repeat; checkout stops; staff lose trust               | Strong            |
+| Session end or draft loss                     | Fudo, Odoo, Square, Clover              | Work must be entered again; money and kitchen state diverge | Strong            |
+| Split or partial payment takes too many steps | Square, Toast, Lightspeed               | Guest waits; staff make amount errors; checks fragment      | Strong            |
+| Kitchen state lags or tickets duplicate       | Toast, Square, Clover                   | Cold food; duplicate work; missed items                     | Strong            |
+| Handheld loses Wi-Fi or changes network       | Toast                                   | Service stops until staff repair the device                 | Medium            |
+| Payment state is unclear or reverses          | Square, Toast, Clover                   | Staff cannot say whether money arrived                      | Strong            |
+| Printer or terminal recovery needs support    | Lightspeed, Soft Restaurant, Square     | Receipts stop; cash-up delays; manual reconciliation        | Medium            |
+| Reports or inventory disagree with the sale   | Clover, Odoo, Soft Restaurant, Square   | Owners cannot reconcile money or stock                      | Medium            |
 
 ## Issue files
 
@@ -157,16 +157,16 @@ One review is one testimony. A repeated problem needs independent authors. Vendo
 
 The score uses five levels. A high score is more urgent.
 
-| Rank | Slice | Frequency | Cost | Money/data risk | Recovery | Umi fit | Total |
-| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | Protect the draft and session | 5 | 5 | 5 | 5 | 5 | 25 |
-| 2 | Keep every tap local | 5 | 5 | 4 | 4 | 5 | 23 |
-| 3 | One account split path | 4 | 4 | 5 | 4 | 5 | 22 |
-| 4 | KDS state under load | 4 | 5 | 4 | 4 | 5 | 22 |
-| 5 | Unknown payment recovery | 3 | 5 | 5 | 5 | 5 | 23 |
-| 6 | Handheld roaming recovery | 3 | 4 | 3 | 4 | 5 | 19 |
-| 7 | Printer queue recovery | 3 | 4 | 3 | 4 | 4 | 18 |
-| 8 | Report and inventory trust | 3 | 4 | 4 | 3 | 4 | 18 |
+| Rank | Slice                         | Frequency | Cost | Money/data risk | Recovery | Umi fit | Total |
+| ---: | ----------------------------- | --------: | ---: | --------------: | -------: | ------: | ----: |
+|    1 | Protect the draft and session |         5 |    5 |               5 |        5 |       5 |    25 |
+|    2 | Keep every tap local          |         5 |    5 |               4 |        4 |       5 |    23 |
+|    3 | One account split path        |         4 |    4 |               5 |        4 |       5 |    22 |
+|    4 | KDS state under load          |         4 |    5 |               4 |        4 |       5 |    22 |
+|    5 | Unknown payment recovery      |         3 |    5 |               5 |        5 |       5 |    23 |
+|    6 | Handheld roaming recovery     |         3 |    4 |               3 |        4 |       5 |    19 |
+|    7 | Printer queue recovery        |         3 |    4 |               3 |        4 |       4 |    18 |
+|    8 | Report and inventory trust    |         3 |    4 |               4 |        3 |       4 |    18 |
 
 ## Next implementation order
 

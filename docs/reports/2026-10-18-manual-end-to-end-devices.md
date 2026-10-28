@@ -17,11 +17,11 @@ The secure device identity and operator session survived both local resets.
 
 ## Device state
 
-| Device | Role | Build | Address |
-| --- | --- | --- | --- |
-| iMin D3 | Main station and fixed POS | 172 | `192.168.0.10:37913` |
-| Galaxy Tab A11 | Portable POS peer | 172 | `192.168.0.101:41693` |
-| Galaxy Tab A9 | KDS test device | 171 cloud KDS | `192.168.0.102:39115` |
+| Device         | Role                       | Build         | Address               |
+| -------------- | -------------------------- | ------------- | --------------------- |
+| iMin D3        | Main station and fixed POS | 172           | `192.168.0.10:37913`  |
+| Galaxy Tab A11 | Portable POS peer          | 172           | `192.168.0.101:41693` |
+| Galaxy Tab A9  | KDS test device            | 171 cloud KDS | `192.168.0.102:39115` |
 
 Operator PIN: `0493`.
 
@@ -148,9 +148,8 @@ The iMin returned to `Online` with no unsynced badge.
 
 ## Artifacts
 
-| Artifact | SHA-256 |
-| --- | --- |
-| `app-staging-lan-host-b172.apk` | `391256b5f0c076dda9ee58f986f387b9cc03e576b8b8990e8bdff067ba3b47e0` |
+| Artifact                                     | SHA-256                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------ |
+| `app-staging-lan-host-b172.apk`              | `391256b5f0c076dda9ee58f986f387b9cc03e576b8b8990e8bdff067ba3b47e0` |
 | `app-staging-lan-peer-192.168.0.10-b172.apk` | `dbd54ff23abcc45a729dd29abbc5133f4292844f40cebfa6bfc2d4e9936fff66` |
-| `app-staging-kds-cloud-b171.apk` | `f79ba2f3a2272052f8a1c8fa57786efb47bc9c2035eb6ff1564321a1fcf1b4af` |
-
+| `app-staging-kds-cloud-b171.apk`             | `f79ba2f3a2272052f8a1c8fa57786efb47bc9c2035eb6ff1564321a1fcf1b4af` |

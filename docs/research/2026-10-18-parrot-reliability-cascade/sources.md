@@ -2,20 +2,20 @@
 
 ## Local artifacts
 
-| Source | Evidence |
-| --- | --- |
-| Parrot POS `2.27.5` APK | Static observation. Package `io.parrotsoftware.parrotpos`. SHA-256 `fdc0492cd7ea3107ec6e74bb520d21a0cc602ac015fba2f7aea449f8dc07d1c3`. |
-| Parrot Room schema strings | Static observation from DEX. Operational tables and `dbSyncStatus` columns. |
-| Parrot `DBSyncStatus` | Static observation. Values `DONE`, `PROCESSING`, `SENDING`, `SYNC_REQUIRED`, `VERIFY_UPDATED_AT`. |
-| Parrot `DBSyncObject` | Static observation. Methods `getSyncId`, `getSyncStatus`, `getSyncUpdatedAt`. |
-| Parrot `SyncRepositoryImpl` | Static observation. Merges 23 sync flows. A sync state selects a worker. |
-| Parrot `UploadWorker` | Static observation. Runs a channel task and maps result to WorkManager success or failure. |
-| Parrot `UploadTask` | Static observation. Chunks records and runs chunk uploads concurrently. This is a risk when order matters. |
-| Parrot `NetworkService` and `DiscoveryManager` | Static observation. NSD discovery, device sync, device status, and role data. |
-| Parrot `TrueTime` classes | Static observation. NTP host pool, timekeeper, cache, event receiver, and verification worker. |
-| Parrot manifest | Static observation. Ktor resources, foreground service, sync status activity, diagnostic activity, device overview, Datadog and Firebase components. |
-| Flutter POS `3.1.0` APK | Public MIT release. SHA-256 `bc5ebd52e4157b0494333fc71aa5e1ad7839d5cbf552ee1d196e1c6191773d4c`. |
-| gPOS Mobile `0.1.0-beta` APK | Public MIT release. SHA-256 `d0d627126ba8b3fc1e8b6a2fd37383c220f50ac17edfe0b3bd3f7996d1900dc3`. |
+| Source                                         | Evidence                                                                                                                                             |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Parrot POS `2.27.5` APK                        | Static observation. Package `io.parrotsoftware.parrotpos`. SHA-256 `fdc0492cd7ea3107ec6e74bb520d21a0cc602ac015fba2f7aea449f8dc07d1c3`.               |
+| Parrot Room schema strings                     | Static observation from DEX. Operational tables and `dbSyncStatus` columns.                                                                          |
+| Parrot `DBSyncStatus`                          | Static observation. Values `DONE`, `PROCESSING`, `SENDING`, `SYNC_REQUIRED`, `VERIFY_UPDATED_AT`.                                                    |
+| Parrot `DBSyncObject`                          | Static observation. Methods `getSyncId`, `getSyncStatus`, `getSyncUpdatedAt`.                                                                        |
+| Parrot `SyncRepositoryImpl`                    | Static observation. Merges 23 sync flows. A sync state selects a worker.                                                                             |
+| Parrot `UploadWorker`                          | Static observation. Runs a channel task and maps result to WorkManager success or failure.                                                           |
+| Parrot `UploadTask`                            | Static observation. Chunks records and runs chunk uploads concurrently. This is a risk when order matters.                                           |
+| Parrot `NetworkService` and `DiscoveryManager` | Static observation. NSD discovery, device sync, device status, and role data.                                                                        |
+| Parrot `TrueTime` classes                      | Static observation. NTP host pool, timekeeper, cache, event receiver, and verification worker.                                                       |
+| Parrot manifest                                | Static observation. Ktor resources, foreground service, sync status activity, diagnostic activity, device overview, Datadog and Firebase components. |
+| Flutter POS `3.1.0` APK                        | Public MIT release. SHA-256 `bc5ebd52e4157b0494333fc71aa5e1ad7839d5cbf552ee1d196e1c6191773d4c`.                                                      |
+| gPOS Mobile `0.1.0-beta` APK                   | Public MIT release. SHA-256 `d0d627126ba8b3fc1e8b6a2fd37383c220f50ac17edfe0b3bd3f7996d1900dc3`.                                                      |
 
 ## Public source examples
 
@@ -52,12 +52,10 @@
 ## Engineering and research
 
 - M. Kleppmann, A. Wiggins, P. van Hardenberg, and M. McGranaghan,
-  [Local-first software](https://www.inkandswitch.com/essay/local-first/),
-  2019. Seven ideals include no spinners, multi-device access, optional
+  [Local-first software](https://www.inkandswitch.com/essay/local-first/), 2019. Seven ideals include no spinners, multi-device access, optional
   network, collaboration, long-term preservation, privacy, and ownership.
 - H. Garcia-Molina and K. Salem,
-  [Sagas](https://www.cs.cornell.edu/andru/cs711/2002fa/reading/sagas.pdf),
-  1987. Long transactions can use compensating transactions instead of one
+  [Sagas](https://www.cs.cornell.edu/andru/cs711/2002fa/reading/sagas.pdf), 1987. Long transactions can use compensating transactions instead of one
   atomic transaction.
 - Chris Richardson,
   [Transactional outbox](https://microservices.io/patterns/data/transactional-outbox.html).

@@ -42,20 +42,20 @@ That chain is now resolved at the state owner:
 
 ## Device flows completed
 
-| Flow | Result | Evidence |
-| --- | --- | --- |
-| Stale local queue cleared automatically after restart | Pass | Queue advanced from 5 conflicts to accepted/resolved without manual approval |
-| Edit and increase quantity while local work is painted | Pass | Five rapid taps produced quantity 6; edit, repeat, remove, split and charge stayed interactive |
-| Cash checkout | Pass | `POST /checkout` 201; paid screen and receipt shown |
-| Partial cash refund with manager PIN | Pass | `EX-0001`, MXN 60.00 | `09-partial-refund-done.png` |
-| Sale void with manager PIN | Pass | `EX-0002`, server row `exception_type=void` | `10-void-done.png` |
-| KDS item ready persists across reads | Pass | Ready state remained after refresh |
-| KDS start, recall with reason, re-prepare and complete | Pass | Ticket returned to preparation and later left the board |
-| Move party from Mesa 4 to Mesa 3 | Pass | Timer preserved; Mesa 4 became dirty | `11-table-moved.png` |
-| Open a temporary tableless account | Pass | Resumable account with no synthetic floor-table UUID | `07-temporary-table-account.png` |
-| KDS all-stations view with queued and cancelled work | Pass | Assigned, cancelled and newly fired tickets visible together | `12-kds-all.png` |
-| Station-less KDS ticket rendered inline | Pass | Automated widget fixture |
-| Samsung A9 opens the staged tablet build | Pass to authentication | `13-a9-login.png`; supplied PIN was not valid for that package/branch |
+| Flow                                                   | Result                 | Evidence                                                                                       |
+| ------------------------------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------- |
+| Stale local queue cleared automatically after restart  | Pass                   | Queue advanced from 5 conflicts to accepted/resolved without manual approval                   |
+| Edit and increase quantity while local work is painted | Pass                   | Five rapid taps produced quantity 6; edit, repeat, remove, split and charge stayed interactive |
+| Cash checkout                                          | Pass                   | `POST /checkout` 201; paid screen and receipt shown                                            |
+| Partial cash refund with manager PIN                   | Pass                   | `EX-0001`, MXN 60.00                                                                           | `09-partial-refund-done.png`     |
+| Sale void with manager PIN                             | Pass                   | `EX-0002`, server row `exception_type=void`                                                    | `10-void-done.png`               |
+| KDS item ready persists across reads                   | Pass                   | Ready state remained after refresh                                                             |
+| KDS start, recall with reason, re-prepare and complete | Pass                   | Ticket returned to preparation and later left the board                                        |
+| Move party from Mesa 4 to Mesa 3                       | Pass                   | Timer preserved; Mesa 4 became dirty                                                           | `11-table-moved.png`             |
+| Open a temporary tableless account                     | Pass                   | Resumable account with no synthetic floor-table UUID                                           | `07-temporary-table-account.png` |
+| KDS all-stations view with queued and cancelled work   | Pass                   | Assigned, cancelled and newly fired tickets visible together                                   | `12-kds-all.png`                 |
+| Station-less KDS ticket rendered inline                | Pass                   | Automated widget fixture                                                                       |
+| Samsung A9 opens the staged tablet build               | Pass to authentication | `13-a9-login.png`; supplied PIN was not valid for that package/branch                          |
 
 ## Verification
 

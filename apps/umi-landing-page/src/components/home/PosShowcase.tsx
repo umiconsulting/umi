@@ -39,8 +39,8 @@ export default function PosShowcase() {
             </h2>
           </div>
           <p>
-            El mismo equipo para tomar la orden y cerrar la cuenta. Cambia de pantalla para ver
-            cada parte del día.
+            El mismo equipo para tomar la orden y cerrar la cuenta. Cambia de pantalla para ver cada
+            parte del día.
           </p>
         </div>
 
@@ -60,7 +60,12 @@ export default function PosShowcase() {
         </div>
 
         <div className="pos-controls">
-          <button type="button" className="pos-arrow" onClick={() => go(-1)} aria-label="Pantalla anterior">
+          <button
+            type="button"
+            className="pos-arrow"
+            onClick={() => go(-1)}
+            aria-label="Pantalla anterior"
+          >
             <ArrowLeft size={18} strokeWidth={1.6} />
           </button>
           <div className="pos-tabs" role="tablist" aria-label="Pantallas del sistema">
@@ -77,7 +82,12 @@ export default function PosShowcase() {
               </button>
             ))}
           </div>
-          <button type="button" className="pos-arrow" onClick={() => go(1)} aria-label="Pantalla siguiente">
+          <button
+            type="button"
+            className="pos-arrow"
+            onClick={() => go(1)}
+            aria-label="Pantalla siguiente"
+          >
             <ArrowRight size={18} strokeWidth={1.6} />
           </button>
         </div>

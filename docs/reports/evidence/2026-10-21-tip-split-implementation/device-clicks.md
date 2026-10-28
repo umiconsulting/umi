@@ -4,16 +4,16 @@ Generated: 2026-10-21T10:59:41.508Z · device 192.168.0.10:37913 · package co.u
 
 Presses: 48 · swallowed (screen and pixels did not move): 1 · broke the app: 0 · the control was no longer where it was aimed: 7
 
-| Screen | Reached | Pressed | Swallowed | Committing (not pressed) |
-| --- | --- | --- | --- | --- |
-| Comanda | yes | 8 | 0 | 0 |
-| Cuentas | yes | 8 | 0 | 1 |
-| KDS | yes | 8 | 1 | 1 |
-| Ventas | yes | 7 | 0 | 1 |
-| Ventas → Ventas suspendidas | yes | 4 | 0 | 3 |
-| Ventas → Ventas canceladas | yes | 4 | 0 | 0 |
-| Caja | yes | 1 | 0 | 5 |
-| Ajustes | yes | 8 | 0 | 0 |
+| Screen                      | Reached | Pressed | Swallowed | Committing (not pressed) |
+| --------------------------- | ------- | ------- | --------- | ------------------------ |
+| Comanda                     | yes     | 8       | 0         | 0                        |
+| Cuentas                     | yes     | 8       | 0         | 1                        |
+| KDS                         | yes     | 8       | 1         | 1                        |
+| Ventas                      | yes     | 7       | 0         | 1                        |
+| Ventas → Ventas suspendidas | yes     | 4       | 0         | 3                        |
+| Ventas → Ventas canceladas  | yes     | 4       | 0         | 0                        |
+| Caja                        | yes     | 1       | 0         | 5                        |
+| Ajustes                     | yes     | 8       | 0         | 0                        |
 
 ## Presses that did nothing
 
