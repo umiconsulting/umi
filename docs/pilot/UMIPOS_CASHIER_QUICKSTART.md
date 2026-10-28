@@ -21,6 +21,29 @@
 
 La terminal externa registra un resultado externo. UmiPOS no controla al proveedor de pago durante el piloto.
 
+## Sin conexión
+
+La terminal sigue vendiendo cuando se cae el internet. No esperes a que vuelva y
+no cierres la aplicación.
+
+1. El aviso del encabezado cambia a `Sin conexión` y aparece `N sin sincronizar`.
+   Ese número son ventas guardadas **en esta terminal**: no es un error y no
+   impide cobrar.
+2. Cobra normal. El recibo sale marcado `Venta pendiente de sincronización` y
+   trae un folio provisional. Ese folio es lo que le das al cliente si pregunta.
+3. Cuando vuelve la conexión, la terminal envía las ventas sola. El recibo
+   cambia a `Venta sincronizada` y muestra el folio oficial.
+4. No repitas un cobro, no cierres la sesión y no reinicies la terminal para
+   "arreglarlo": la venta ya está guardada y repetirla puede cobrar dos veces.
+
+Si una venta no se puede enviar, el encabezado deja de bajar el contador. Abre
+`⋮` → **Centro de recuperación**: cada fila dice qué pasó y el botón dice qué
+hacer. Por ejemplo, si dice *La mesa ya está ocupada*, elige otra mesa; no
+vuelvas a intentar la misma.
+
+Una terminal que se **bloqueó** necesita el enlace para volver a abrir sesión
+con tu PIN. Si ya está abierta, sigue vendiendo aunque no haya internet.
+
 ## Excepciones
 
 - Usa `Suspender` para conservar una venta sin cobrar.

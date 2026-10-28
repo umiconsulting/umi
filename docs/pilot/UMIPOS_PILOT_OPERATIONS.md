@@ -118,7 +118,16 @@ El sistema registra el hecho financiero. El personal mantiene la custodia físic
 
 Usa impresión automática según la política. Usa `COPY` para una copia. Si aparece `UnknownOutcome`, consulta el comando. No repitas la transacción financiera.
 
-Offline permite una venta elegible en efectivo y un recibo provisional. Bloquea stored value, rewards y mutaciones sensibles. Cuando regrese la conexión, espera el replay y resuelve cada conflicto.
+Sin conexión la caja sigue operando: abre desde su copia local, vende en
+efectivo con recibo provisional, asigna mesa y encola las órdenes. Bloquea
+stored value, rewards y mutaciones sensibles. Al volver la conexión sincroniza
+sola, sin que el personal toque nada; el recibo pasa de `Venta pendiente de
+sincronización` a `Venta sincronizada`. Un conflicto se resuelve en
+`Centro de recuperación`, donde cada fila dice el motivo y el botón indica el
+siguiente paso.
+
+Una terminal **bloqueada** todavía necesita red para validar el PIN: si la caja
+se bloqueó sin conexión, se abre la sesión cuando vuelva el enlace.
 
 ## Caminata de preparación comercial
 
@@ -134,8 +143,13 @@ Ejecuta esta caminata en un despliegue limpio con la fixture designada:
 8. Crea una venta con cliente y confirma loyalty.
 9. Ejecuta un reembolso aprobado.
 10. Resuelve una falla simulada de impresión.
-11. Cierra el turno y revisa auditoría.
-12. Ejecuta `pnpm pilot:readiness`.
+11. Corta la conexión, cobra una venta en efectivo, restaura el enlace y
+    confirma que se sincroniza sola y que el recibo queda sincronizado.
+12. Confirma que el KDS tiene **estación asignada**: `ticketBelongsToDevice`
+    exige `stationId`, y sin esa asignación el tablet responde
+    `ticket_not_found` a cada comanda aunque la comanda exista y esté ruteada.
+13. Cierra el turno y revisa auditoría.
+14. Ejecuta `pnpm pilot:readiness`.
 
 La fixture crea datos antes de la caminata. La caminata usa Dashboard, POS y KDS. No usa SQL ni una llamada manual a la API.
 

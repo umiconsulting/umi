@@ -1,4 +1,12 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  Equals,
+  IsBoolean,
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 /**
  * Landing-page contact form (POST /api/leads/contact, alias /api/contact).
@@ -18,6 +26,16 @@ export class ContactDto {
   @IsString()
   @MaxLength(200)
   company?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(24)
+  phone?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  @Equals(true)
+  privacyAccepted?: boolean;
 
   // Product interest key (conversaflow|kds|cash|suite|indeciso) or free text.
   @IsOptional()

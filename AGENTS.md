@@ -158,6 +158,13 @@ Prefer existing artifacts and owners over inventing parallel structures.
 
 ## Agent skills
 
+### Feature work
+
+Use `$product-feature-review` for each request to create, review, research, or
+explain a feature. Load the skill before you inspect the implementation, research
+the competition, or answer. This rule applies to short questions and routine
+changes. Use the skill's evidence, UX, reliability, and verification rules.
+
 ### Issue tracker
 
 Work items and specs live in **Azure Boards** — organization `https://dev.azure.com/umiconsulting`,
