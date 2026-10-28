@@ -65,8 +65,6 @@ El formulario nuevo envía `privacyAccepted: true`; la ruta nueva de Next exige 
 El aviso de privacidad de la landing conserva datos pendientes de aprobación en su README y DESIGN.
 Este PR conserva el trabajo solicitado. La publicación pública del formulario requiere completar esa aprobación antes del merge.
 
-## Herramientas
-
 ## Validación local
 
 - Compilación, lint y pruebas de los paquetes afectados: ocho tareas aprobadas.
