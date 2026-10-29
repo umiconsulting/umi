@@ -15,6 +15,7 @@ import {
   type KitchenOrderStatus,
 } from './kitchen-domain';
 import { loadKitchenProjection } from './kitchen-projector';
+import { kitchenFulfillmentType } from './kitchen-fulfillment';
 
 export type UnassignedAction = 'resolve_routes' | 'discard';
 
@@ -101,6 +102,7 @@ export async function readUnassigned(client: PoolClient, merchantId: string, loc
     source_order_id: string;
     public_reference: string;
     source: string;
+    fulfillment_type: string | null;
     status: KitchenOrderStatus;
     priority: string;
     business_date: string;
@@ -158,6 +160,7 @@ export async function readUnassigned(client: PoolClient, merchantId: string, loc
         stationId: null,
         stationName: 'Sin estación',
         source: order.source,
+        fulfillmentType: kitchenFulfillmentType(order.fulfillment_type),
         status: order.cancelled ? 'cancelled' : 'exception',
         priority: order.priority,
         businessDate: order.business_date,

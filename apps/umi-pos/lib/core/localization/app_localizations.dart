@@ -2912,6 +2912,30 @@ abstract class AppLocalizations {
   /// **'KDS'**
   String get kitchenBoardTitle;
 
+  /// No description provided for @kitchenFulfillmentDineIn.
+  ///
+  /// In es, this message translates to:
+  /// **'Para comer aquí'**
+  String get kitchenFulfillmentDineIn;
+
+  /// No description provided for @kitchenFulfillmentTakeout.
+  ///
+  /// In es, this message translates to:
+  /// **'Para llevar'**
+  String get kitchenFulfillmentTakeout;
+
+  /// No description provided for @kitchenFulfillmentDelivery.
+  ///
+  /// In es, this message translates to:
+  /// **'A domicilio'**
+  String get kitchenFulfillmentDelivery;
+
+  /// No description provided for @kitchenFulfillmentUnknown.
+  ///
+  /// In es, this message translates to:
+  /// **'Tipo sin especificar'**
+  String get kitchenFulfillmentUnknown;
+
   /// No description provided for @kitchenStationAll.
   ///
   /// In es, this message translates to:

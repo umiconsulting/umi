@@ -2,6 +2,7 @@ import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/storage/local_working_copy.dart';
 import '../../shared/business_day.dart';
+import '../offline/offline_journal.dart';
 
 /// The kitchen work a LAN peer can read while the uplink is down.
 ///
@@ -9,13 +10,15 @@ import '../../shared/business_day.dart';
 /// KDS command is applied here at once, then journalled by the hub and replayed
 /// to the cloud later.
 final class LanKdsStore {
-  LanKdsStore(this._local);
+  LanKdsStore(this._local, {EncryptedOfflineJournal? journal})
+    : _journal = journal;
 
   static const namespace = 'kds';
   static const clockNamespace = 'lan_clock';
   static const _placeholderStation = '00000000-0000-4000-8000-000000000000';
 
   final LocalWorkingCopy _local;
+  final EncryptedOfflineJournal? _journal;
 
   String _scope(String merchantId, String locationId) =>
       '$merchantId:$locationId';
@@ -321,6 +324,11 @@ final class LanKdsStore {
     final localSources = {
       for (final cart in carts) cart.firedOrderId ?? cart.id,
     };
+    final officialTypes = <String, Object?>{
+      for (final order in base)
+        if (order['sourceOrderId'] case final String source)
+          source: order['fulfillmentType'],
+    };
     final merged = <String, Map<String, Object?>>{
       for (final order in base)
         if (order['sourceOrderId'] case final String source) source: order,
@@ -344,13 +352,19 @@ final class LanKdsStore {
         continue;
       }
       if ((order['version'] as num? ?? 0) > (server['version'] as num? ?? 0)) {
-        merged[source] = order;
+        merged[source] = {...order, 'fulfillmentType': officialTypes[source]};
       }
     }
     final localOnly = <Map<String, Object?>>[];
     for (final cart in carts) {
       final source = cart.firedOrderId ?? cart.id;
-      if (merged.containsKey(source)) continue;
+      final existing = merged[source];
+      if (existing != null) {
+        if (!officialTypes.containsKey(source)) {
+          existing['fulfillmentType'] = cart.fulfillmentType;
+        }
+        continue;
+      }
       localOnly.add(
         _ticketFromCart(
           merchantId,
@@ -360,6 +374,8 @@ final class LanKdsStore {
         ),
       );
     }
+    final orders = [...localOnly, ...merged.values];
+    await _applyPendingFulfillment(merchantId, locationId, carts, orders);
     final events =
         (documents['events']?['events'] as List<Object?>? ?? const [])
             .whereType<Map<String, Object?>>()
@@ -370,7 +386,7 @@ final class LanKdsStore {
       // A ticket fired while the uplink is down is new work. Put that work at
       // the front of the rail, where a cook who opens the board can see it,
       // instead of below a long server backlog.
-      orders: [...localOnly, ...merged.values],
+      orders: orders,
       events: events,
       nextSequence:
           next?.toInt() ??
@@ -378,6 +394,69 @@ final class LanKdsStore {
               ? 1
               : (events.last['sequence'] as num? ?? 0).toInt() + 1),
     );
+  }
+
+  /// Only an explicit pending choice can replace an official order type.
+  Future<void> _applyPendingFulfillment(
+    String merchantId,
+    String locationId,
+    List<Cart> carts,
+    List<Map<String, Object?>> orders,
+  ) async {
+    final journal = _journal;
+    if (journal == null || !journal.supportsSecureOffline || carts.isEmpty) {
+      return;
+    }
+    final OfflineJournalSnapshot snapshot;
+    try {
+      snapshot = await journal.load();
+    } on OfflineJournalException {
+      // Keep the official snapshot when local intent cannot be read safely.
+      return;
+    }
+    String? resolveCartId(String id) {
+      final visited = <String>{};
+      while (visited.add(id)) {
+        final next = snapshot.mappings[id];
+        if (next == null) return id;
+        id = next;
+      }
+      return null;
+    }
+
+    final sources = <String, String>{};
+    for (final cart in carts) {
+      final id = resolveCartId(cart.id);
+      if (id != null) sources[id] = cart.firedOrderId ?? cart.id;
+    }
+    final entries =
+        snapshot.entries.where((entry) {
+          final command = entry.command;
+          return command.merchantId == merchantId &&
+              command.locationId == locationId &&
+              (command.commandType == 'pos.cart.fulfillment.set' ||
+                  command.commandType == 'pos.cart.table.set') &&
+              (entry.status == JournalStatus.pending ||
+                  entry.status == JournalStatus.replaying ||
+                  entry.status == JournalStatus.unknown);
+        }).toList()..sort(
+          (a, b) =>
+              a.command.deviceSequence.compareTo(b.command.deviceSequence),
+        );
+    for (final entry in entries) {
+      final command = entry.command;
+      final cartId = command.payload['cartId'];
+      if (cartId is! String) continue;
+      final source = sources[resolveCartId(cartId)];
+      if (source == null) continue;
+      final type = command.commandType == 'pos.cart.table.set'
+          ? 'dine_in'
+          : command.payload['fulfillmentType'];
+      if (type != 'dine_in' && type != 'takeout') continue;
+      for (final order in orders) {
+        if (order['sourceOrderId'] == source) order['fulfillmentType'] = type;
+      }
+    }
   }
 
   Future<void> _saveOverlay(
@@ -434,6 +513,7 @@ final class LanKdsStore {
       'stationId': station?.id ?? _placeholderStation,
       if (station != null) 'stationName': station.name,
       'source': 'pos',
+      'fulfillmentType': cart.fulfillmentType,
       'status': 'queued',
       'priority': 'normal',
       'businessDate':

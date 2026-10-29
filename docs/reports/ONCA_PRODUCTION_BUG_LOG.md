@@ -212,3 +212,17 @@ El pago se registró previamente mediante un clic real en POS 333 y no se repiti
 
 Código, APK, ZIP de Umi Support, bitácora y evidencia permanecen en juan-PC.
 El [resumen final](./2026-10-27-onca-support-handoff.md) contiene rutas, hashes, acceso verificado y límites.
+
+## Mejora del 29 de octubre: tipo de pedido en KDS
+
+El propietario pidió que Barra y Cocina distingan las comandas para comer aquí y
+para llevar. Aprobó etiquetas azul y violeta con iconos de mesa y bolsa.
+
+El cambio añade el dato al contrato y a las lecturas del API y LAN. La revisión
+también corrigió la modalidad local después de iniciar preparación y protegió
+el dato oficial frente a carritos antiguos. Pasaron 99 pruebas del contrato,
+135 del API y 142 de Flutter.
+
+El cambio se entrega por PR. La instalación y la prueba real quedan pendientes;
+Juan-PC está desconectada. El informe y el procedimiento de validación están en
+[`2026-10-29-onca-kds-fulfillment.md`](./2026-10-29-onca-kds-fulfillment.md).

@@ -831,7 +831,7 @@ packages:
       path: "../../packages/contract/generated/dart"
       relative: true
     source: path
-    version: "2.45.0"
+    version: "2.46.0"
   uuid:
     dependency: transitive
     description:
