@@ -1,0 +1,25 @@
+{
+  "confirmed": true,
+  "system": "iMin D3 Android 11",
+  "locale": "es-CL",
+  "resource_button_label": "Permitir",
+  "observed_accessibility_button_label": "PERMITIR",
+  "cause": "Material transforma el texto del botón a mayúsculas; la versión 1.0.0 exigía el texto original del recurso.",
+  "red_regression": {
+    "tests": 48,
+    "failures": 2
+  },
+  "fixed_version": "1.0.1",
+  "fix": "Aceptar el texto original o su transformación completa a mayúsculas con la locale de SystemUI.",
+  "network_message_matching": "literal and unchanged",
+  "trusted_ssid": "UmiPOS",
+  "trusted_bssid": "bc:07:1d:ca:ae:61",
+  "green_tests": {
+    "tests": 48,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "canary_dialog_approved_by_helper": true,
+  "real_reboot_automatic_recovery": true
+}

@@ -1,0 +1,56 @@
+{
+  "started_at": "2026-10-27T20:32:12.489252+00:00",
+  "old_serial": "100.64.178.95:38475",
+  "boot_count_before": 7,
+  "wifi_bssid_before": "bc:07:1d:ca:ae:61",
+  "version": "1.0.1",
+  "version_code": 2,
+  "manual_network_dialog_approval_required": false,
+  "manual_adb_connect_used": false,
+  "manual_endpoint_entered": false,
+  "events": [
+    {
+      "elapsed_seconds": 0.0,
+      "endpoint": {
+        "active": true,
+        "received_at": "2026-10-27T20:23:49Z",
+        "observed_at": "2026-10-27T20:23:49.603Z",
+        "reported_endpoint": "192.168.0.10:38475",
+        "source": "100.64.178.95",
+        "target": "100.64.178.95:38475",
+        "event_id": "keepadb-v2-wlan-adb-97ebf66e175443a8"
+      },
+      "adb": [["100.64.178.95:38475", "offline"]]
+    },
+    {
+      "elapsed_seconds": 75.1,
+      "endpoint": {
+        "active": true,
+        "received_at": "2026-10-27T20:33:37Z",
+        "observed_at": "2026-10-27T20:33:38.368Z",
+        "reported_endpoint": "192.168.0.10:35049",
+        "source": "100.64.178.95",
+        "target": "100.64.178.95:35049",
+        "event_id": "keepadb-v2-wlan-adb-d001a024e15ad032"
+      },
+      "adb": [
+        ["100.64.178.95:35049", "device"],
+        ["100.64.178.95:38475", "offline"]
+      ]
+    }
+  ],
+  "success": true,
+  "reconnected_serial": "100.64.178.95:35049",
+  "boot_count_after": 8,
+  "recovery_seconds": 75.1,
+  "endpoint_after": {
+    "active": true,
+    "received_at": "2026-10-27T20:33:37Z",
+    "observed_at": "2026-10-27T20:33:38.368Z",
+    "reported_endpoint": "192.168.0.10:35049",
+    "source": "100.64.178.95",
+    "target": "100.64.178.95:35049",
+    "event_id": "keepadb-v2-wlan-adb-d001a024e15ad032"
+  },
+  "finished_at": "2026-10-27T20:33:39.202416+00:00"
+}

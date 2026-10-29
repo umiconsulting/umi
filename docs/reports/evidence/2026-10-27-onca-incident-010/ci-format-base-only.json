@@ -1,0 +1,62 @@
+[
+  {
+    "file": "apps/umi-api/src/modules/pos-checkout/pos-checkout.service.ts",
+    "inputSha256": "943e96db7388e8c61379474f7d201ce77a99d020e150b57d89ed8356014af072",
+    "formattedSha256": "9a50ee3da3e80f7e89c29aa8238f087e30ff767698d8643bfc259bc02fb15f67"
+  },
+  {
+    "file": "docs/reports/2026-10-22-official-receipt-and-logo.md",
+    "inputSha256": "90dbcc2686cffc01b1e54b4deeb7276bbb7abe1c78df64db129ccbdff48381df",
+    "formattedSha256": "278fd8951ec9c3e7b2d5b5a07a4fc7e7f7df5da98e5a8a9059584b48fecceebc"
+  },
+  {
+    "file": "docs/reports/2026-10-22-split-first-payment-one-tap.md",
+    "inputSha256": "f11219517d114d00abab239144aa948b0cfc43ea8aede34acf69437e3c7127a4",
+    "formattedSha256": "3d02e0ed9f3db5d04b634b38e69f528207c989f68dd1eb9202956530488e66a0"
+  },
+  {
+    "file": "docs/reports/2026-10-24-onca-production-bug-001.md",
+    "inputSha256": "494d6c5f887b85d3c8af46bbd78bc4722b1a87dc82f0230ef5f1221769b3dd95",
+    "formattedSha256": "f12841dcb4a4c26579bad00198aea8f64ca88a2839d4ef9ed97e57834c7a2c7a"
+  },
+  {
+    "file": "docs/reports/2026-10-24-onca-production-bug-002.md",
+    "inputSha256": "50c05cb2a4567c9926f6083be2426057c205920db347ff7b59384c0de12f053f",
+    "formattedSha256": "25af600c99f9d0692c9852a757b25f9154abc502caa085f64082d30b35f1261a"
+  },
+  {
+    "file": "docs/reports/2026-10-24-onca-production-bug-003.md",
+    "inputSha256": "73e8cd63841c9b162f674543267aec848e52b60fdfac63904b2746fda7b80731",
+    "formattedSha256": "7af2e373cd259c38ec1b79a1054306d33375fdda65a14817d574883b3a7a86bb"
+  },
+  {
+    "file": "docs/reports/2026-10-24-onca-remote-support-persistence.md",
+    "inputSha256": "4e61e1ecc21cf48e20c4891fe67bf67593e3d64fb7c792c3b850c3ca35186e1a",
+    "formattedSha256": "dff8d32fa05f7cbbc83631c368b778c99abcc895b4f0fee90c193a4f8ae6f157"
+  },
+  {
+    "file": "docs/reports/2026-10-26-onca-keepadb-fleet.md",
+    "inputSha256": "2cda58f4716d4c8f0c469f3606fdbf6d26674e1cdd3d42e7612c2dca80d2a1d3",
+    "formattedSha256": "53be2947f75e906670df83dd1bd64013a7213263619d1d4688dc67276f99cca9"
+  },
+  {
+    "file": "docs/reports/2026-10-26-onca-production-bug-005.md",
+    "inputSha256": "d88727bd102afe34e60f3dd0e461423fd168d6be597c2248cab32fc347c20de0",
+    "formattedSha256": "10118e73c29a3e0dd501ab2ee2eaf4a492e8f47a0122cdd21efbf92a6048827e"
+  },
+  {
+    "file": "docs/reports/2026-10-26-onca-production-bug-006.md",
+    "inputSha256": "201c79782a3f0e5467b7b0eb750b8b416855de597e15f3af03513751339fac92",
+    "formattedSha256": "37a4c88081c427f0048c20cf33cee326c233d205f533cafdaf8086b5981661fb"
+  },
+  {
+    "file": "docs/reports/2026-10-27-onca-production-bug-007.md",
+    "inputSha256": "9ac81402e11fa1b318a4bdaa2a3a88b25034f36efe7b1a1392e591d4eecffd0f",
+    "formattedSha256": "cc4407cb6606a62e99e9aab9b12bc5dfca1e9cf816b7591850ea3eeb82c28273"
+  },
+  {
+    "file": "docs/reports/ONCA_PRODUCTION_BUG_LOG.md",
+    "inputSha256": "c13b155dfd46429c7211d0d04cfe8b9981e36ec7012a399a47bab533dd402ae3",
+    "formattedSha256": "55ae4c10016402e939f28ff7bc523f02868e7aaedd022d4c6dbbf082cbdadd81"
+  }
+]

@@ -2,6 +2,15 @@
 
 Actualizado: 2026-08-13
 
+> **Este manifiesto describe RC3 y NO incluye el trabajo local-first.**
+> RC3 lleva el contrato `2.12.0`; la rama actual construye `2.39.0` con la
+> operación sin conexión descrita en
+> [UMIPOS_LOCAL_FIRST_IMPLEMENTATION_PLAN.md](UMIPOS_LOCAL_FIRST_IMPLEMENTATION_PLAN.md)
+> §10–§13 (arranque sin enlace, venta en efectivo y mesa journalizadas, replay
+> automático, recibo sincronizado). Los digests de aquí corresponden a artefactos
+> de agosto: no los uses para desplegar esta rama. El manifiesto de máquina debe
+> regenerarse al cortar el RC que incluya ese trabajo.
+
 ## Identidad
 
 | Campo                    | Valor                                                              |

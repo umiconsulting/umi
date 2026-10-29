@@ -1,0 +1,161 @@
+{
+  "verifiedAt": "2026-10-27T18:23:35.325Z",
+  "merchantId": "dbfb6dd1-bf05-42cc-8f60-2035c1b6647b",
+  "businessDate": "2026-10-26",
+  "apiVersion": "onca-445bedac",
+  "apiCommit": "445bedacae9f0aeb1406f7b09b1b27e46b5b5fc8",
+  "nodeVersion": "v22.23.4",
+  "sales": [
+    {
+      "account": 17,
+      "status": "committed",
+      "sale_id": "35b98af4-6800-4f01-a0b1-297059c27067",
+      "payment_id": "d87744b7-73c0-4862-baf0-2fbb81a3b99b",
+      "method": "cash",
+      "receipt_id": "02eaa84e-924f-4b11-9f25-a6099423cabc",
+      "receipt_number": "0032",
+      "business_date": "2026-10-26",
+      "amount_minor_units": 29500,
+      "cash_shift_id": "11690246-a628-46f9-b229-56bfd5857522"
+    },
+    {
+      "account": 18,
+      "status": "committed",
+      "sale_id": "425b7458-361b-41b0-a4ce-d540438e8a49",
+      "payment_id": "e000fc83-5ec5-4cd5-a001-a926be585289",
+      "method": "external_terminal",
+      "receipt_id": "1708a48d-f6fb-4110-bc27-17df057e9768",
+      "receipt_number": "0031",
+      "business_date": "2026-10-26",
+      "amount_minor_units": 54500,
+      "cash_shift_id": null
+    },
+    {
+      "account": 20,
+      "status": "committed",
+      "sale_id": "116791d3-7ca3-4be7-8d2c-962f48f96866",
+      "payment_id": "cdc047b2-fe68-436a-9f99-ea6364ec57ff",
+      "method": "bank_transfer",
+      "receipt_id": "c75d81fc-8213-4850-92ca-2522bc0d25f1",
+      "receipt_number": "0033",
+      "business_date": "2026-10-26",
+      "amount_minor_units": 22000,
+      "cash_shift_id": null
+    },
+    {
+      "account": 24,
+      "status": "committed",
+      "sale_id": "ad9db249-5c7d-49ad-83e2-729a3c77f7bd",
+      "payment_id": "07a5cbdb-b527-4347-a956-b714d1ea3730",
+      "method": "external_terminal",
+      "receipt_id": "1bf3ff5f-4d0b-4a5d-a499-fcafc6e7ae29",
+      "receipt_number": "0034",
+      "business_date": "2026-10-26",
+      "amount_minor_units": 37000,
+      "cash_shift_id": null
+    },
+    {
+      "account": 31,
+      "status": "committed",
+      "sale_id": "b1592cae-862a-4f9c-b5de-121c7845070f",
+      "payment_id": "9663c052-b037-4d7a-b654-93e969aefc2f",
+      "method": "external_terminal",
+      "receipt_id": "159b3fda-9ba2-453a-af76-23d1758c09b7",
+      "receipt_number": "0035",
+      "business_date": "2026-10-26",
+      "amount_minor_units": 18500,
+      "cash_shift_id": null
+    },
+    {
+      "account": 33,
+      "status": "committed",
+      "sale_id": "89f53b10-083e-42a2-b8b2-9ca34755eeca",
+      "payment_id": "f6d63456-94f1-48ca-a558-5adae3747fc1",
+      "method": "external_terminal",
+      "receipt_id": "5b8c9cc5-12d8-4da6-a4b1-f13a34614379",
+      "receipt_number": "0036",
+      "business_date": "2026-10-26",
+      "amount_minor_units": 5000,
+      "cash_shift_id": null
+    },
+    {
+      "account": 36,
+      "status": "committed",
+      "sale_id": "a5ab98f7-926b-4aa8-a89c-87e196172404",
+      "payment_id": "07894e57-2bda-40d3-bc6b-4316974f2e20",
+      "method": "external_terminal",
+      "receipt_id": "244e4e53-1871-4c61-b8d2-a20655766a08",
+      "receipt_number": "0037",
+      "business_date": "2026-10-26",
+      "amount_minor_units": 39000,
+      "cash_shift_id": null
+    },
+    {
+      "account": 38,
+      "status": "committed",
+      "sale_id": "9a9d744e-87ae-4326-810e-01d91fa772b3",
+      "payment_id": "10da290d-0f7b-430a-a0d5-c88cb0b6855e",
+      "method": "external_terminal",
+      "receipt_id": "89a89385-b65f-4ade-8d43-e29fc0ea8f6b",
+      "receipt_number": "0038",
+      "business_date": "2026-10-26",
+      "amount_minor_units": 35000,
+      "cash_shift_id": null
+    }
+  ],
+  "totalMinorUnits": 240500,
+  "cancelledAccounts": [
+    {
+      "id": "4b93093b-9db2-49b6-8fbd-832311c5abae",
+      "account": 11,
+      "status": "abandoned",
+      "lifecycle_state": "cancelled",
+      "version": 6,
+      "hash": "0b2db74c5b6570cef3750b9442bff58c"
+    },
+    {
+      "id": "c2dfb91d-5401-48db-877b-6688a5e7d36f",
+      "account": 37,
+      "status": "abandoned",
+      "lifecycle_state": "cancelled",
+      "version": 17,
+      "hash": "69f9e1d599e43d23648d2c61abe86c78"
+    }
+  ],
+  "cashShifts": [
+    {
+      "id": "11690246-a628-46f9-b229-56bfd5857522",
+      "business_date": "2026-10-26",
+      "status": "closed",
+      "ledger_sequence": 20
+    },
+    {
+      "id": "5ab9526b-ce87-4a09-bbe2-38ca0b8e66dd",
+      "business_date": "2026-10-27",
+      "status": "open",
+      "ledger_sequence": 1
+    }
+  ],
+  "audit": [
+    {
+      "event_type": "support.sale.reconciled",
+      "count": 8
+    }
+  ],
+  "cleanupAuditCount": 1,
+  "openAccountsApiCount": 0,
+  "cashLedgerDelta": 0,
+  "newKitchenTickets": 0,
+  "cashAlreadyCountedInClosedShift": {
+    "account": 17,
+    "minorUnits": 29500,
+    "shiftId": "11690246-a628-46f9-b229-56bfd5857522",
+    "ownerConfirmed": true
+  },
+  "paymentEvidence": {
+    "account018": "Reused existing succeeded terminal payment",
+    "otherAccounts": "Owner confirmed paid amounts, methods, and complete delivery"
+  },
+  "account011": "Cancelled at owner request; empty account and T1 released",
+  "account037": "Excluded; unchanged"
+}

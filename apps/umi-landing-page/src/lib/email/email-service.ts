@@ -43,17 +43,6 @@ export interface EmailMetrics {
 }
 
 // Tipos específicos para mejorar type safety
-interface EmailLogData {
-  to: string;
-  subject: string;
-  status: 'sent' | 'failed';
-  messageId?: string;
-  error?: string;
-  campaign?: string | undefined;
-  leadId?: string | undefined;
-  sentAt: Date;
-}
-
 interface NodemailerInfo {
   messageId: string;
   envelope: {
@@ -78,7 +67,11 @@ const getEmailConfig = (): EmailConfig => {
   const smtpUser = process.env.SMTP_USER;
   const smtpPassword = process.env.SMTP_PASSWORD;
 
-  if (smtpHost && smtpPassword && !smtpPassword.trim().startsWith('xsmtpsib-')) {
+  if (
+    smtpHost?.toLowerCase() === 'smtp-relay.brevo.com' &&
+    smtpPassword &&
+    !smtpPassword.trim().startsWith('xsmtpsib-')
+  ) {
     console.warn(
       '⚠️ SMTP_PASSWORD no parece ser una clave SMTP Standard de Brevo. Debe empezar con xsmtpsib-, no con una API key ni contraseña de cuenta.',
     );
@@ -212,7 +205,7 @@ export class EmailService {
         await this.delay(1000);
       } catch (error) {
         failed++;
-        console.error(`❌ Error enviando email a ${email.to}:`, error);
+        console.error('email_bulk_send_failed', error instanceof Error ? error.name : 'unknown');
       }
     }
 
@@ -275,40 +268,15 @@ export class EmailService {
   }
 
   private logEmailSent(options: SendEmailOptions, info: NodemailerInfo) {
-    console.log(`✅ Email enviado: ${options.to} - ${options.subject}`);
-    console.log(`📬 Message ID: ${info.messageId}`);
-
-    // En producción, guardar en base de datos
-    this.saveEmailLog({
-      to: options.to,
-      subject: options.subject,
-      status: 'sent',
+    console.info('email_sent', {
+      campaign: options.campaign || 'general',
       messageId: info.messageId,
-      campaign: options.campaign || undefined,
-      leadId: options.leadId || undefined,
-      sentAt: new Date(),
     });
   }
 
   private logEmailError(options: SendEmailOptions, error: Error) {
-    console.error(`❌ Error enviando email: ${options.to} - ${error.message}`);
-
-    // En producción, guardar en base de datos
-    this.saveEmailLog({
-      to: options.to,
-      subject: options.subject,
-      status: 'failed',
-      error: error.message,
-      campaign: options.campaign || undefined,
-      leadId: options.leadId || undefined,
-      sentAt: new Date(),
-    });
-  }
-
-  private async saveEmailLog(logData: EmailLogData) {
-    // En producción, implementar guardado en base de datos
-    // Por ahora, solo console.log para debugging
-    console.log('📊 Email log:', JSON.stringify(logData, null, 2));
+    const code = 'code' in error && typeof error.code === 'string' ? error.code : error.name;
+    console.error('email_send_failed', { campaign: options.campaign || 'general', code });
   }
 
   private delay(ms: number): Promise<void> {

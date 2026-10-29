@@ -1,0 +1,50 @@
+{
+  "skill": {
+    "path": "/home/juan/umi-onca-bugfix-20261024/.agents/skills/onca-production-support",
+    "required": {
+      "SKILL.md": true,
+      "agents/openai.yaml": true,
+      "references": true,
+      "scripts": true
+    },
+    "scripts": [
+      {
+        "name": "authorize-onca-support-key.sh",
+        "executable": true
+      },
+      {
+        "name": "install-umipos-fleet.py",
+        "executable": true
+      },
+      {
+        "name": "onca-support-doctor.py",
+        "executable": true
+      }
+    ],
+    "sha256": "6870e309f8a14fcd63dbb6136727b138ff9f10fbc8c8e488a04533a0baf4a699"
+  },
+  "receiver": {
+    "is-enabled": "enabled",
+    "is-active": "active",
+    "linger": "Linger=yes"
+  },
+  "umiSupportPackage": ["versionCode=2 minSdk=30 targetSdk=36", "versionName=1.0.1"],
+  "accessibilityServices": "co.umiconsulting.umi_support/co.umiconsulting.umi_support.SupportAccessibilityService",
+  "releaseBundle": [
+    {
+      "file": "/home/juan/umi-support-releases/1.0.1/Umi-Support-1.0.1-SHA256.txt",
+      "sha256": "2a6da71b89e5f0cec6a34162defbd623d375ba853fe2f4ec062d200377546e6d",
+      "owner": "juan"
+    },
+    {
+      "file": "/home/juan/umi-support-releases/1.0.1/Umi-Support-1.0.1-onca-20261027.apk",
+      "sha256": "32e7bf83ed3d189f19c943acb613f0709070c8b2839170d6c3caf0b47a98a77d",
+      "owner": "juan"
+    },
+    {
+      "file": "/home/juan/umi-support-releases/1.0.1/Umi-Support-1.0.1-source.zip",
+      "sha256": "e794d35fca47548a20da6e386e6ddd28e7d44b866d3e58dec08b94ee64891da3",
+      "owner": "juan"
+    }
+  ]
+}

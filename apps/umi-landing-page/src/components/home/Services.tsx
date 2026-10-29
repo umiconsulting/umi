@@ -16,7 +16,7 @@ const PRODUCTS = [
   {
     tag: '01',
     icon: MessageSquareText,
-    kicker: 'ConversaFlow',
+    kicker: 'Agente IA',
     title: 'Pedidos y atención por WhatsApp con memoria operativa.',
     desc: 'Convierte conversaciones en pedidos, eventos, jobs y mensajes salientes trazables. El backend conserva la verdad operativa y normaliza lo que cada app consume.',
     bullets: [
@@ -58,7 +58,7 @@ const PRODUCTS = [
     icon: MonitorDot,
     kicker: 'Umi Dashboard',
     title: 'Vista de dueño con pedidos, miembros, cocina e ingresos.',
-    desc: 'El panel reúne señales vivas de Cash, KDS y ConversaFlow para que la gerencia entienda la operación sin abrir cinco herramientas.',
+    desc: 'El panel reúne señales vivas de Cash, KDS y el Agente IA para que la gerencia entienda la operación sin abrir cinco herramientas.',
     bullets: ['Métricas en vivo', 'Centro de acción', 'Estaciones KDS', 'Actividad de wallet'],
     signal: 'La operación deja de estar escondida',
     visual: 'Foto: dueño revisando dashboard',

@@ -277,7 +277,9 @@ async function dismissOverlay() {
     const focus =
       shell('dumpsys', 'window', 'displays')
         .split('\n')
-        .find((line) => line.includes('mCurrentFocus')) ?? '';
+        .findLast(
+          (line) => line.includes('mCurrentFocus') && !line.includes('mCurrentFocus=null'),
+        ) ?? '';
     if (!focus.includes(PKG)) {
       shell('monkey', '-p', PKG, '-c', 'android.intent.category.LAUNCHER', '1');
       await sleep(6000);

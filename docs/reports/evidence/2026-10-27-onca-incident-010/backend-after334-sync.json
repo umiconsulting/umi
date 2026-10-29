@@ -1,0 +1,133 @@
+{
+  "at": "2026-10-27T21:53:55.676Z",
+  "cart": [
+    {
+      "id": "61fd1209-2094-4ac2-8b65-4bf1bd449fdc",
+      "status": "committed",
+      "version": 6,
+      "lifecycle_state": "committed",
+      "fired_order_id": "996aa98c-3a10-4756-a7ac-1572a44f76c7",
+      "daily_account_number": "20",
+      "business_date": "2026-10-27T00:00:00.000Z",
+      "updated_at": "2026-10-27T21:30:48.975Z"
+    }
+  ],
+  "lines": [
+    {
+      "id": "ac3da5dc-9923-4beb-b3e0-34cdc58f7dcd",
+      "product_name": "Capuccino",
+      "quantity": 1,
+      "base_price": "6000",
+      "variant_delta": "0",
+      "modifier_total": "0",
+      "fired_at": "2026-10-27T20:45:17.489Z"
+    },
+    {
+      "id": "fcd6b62a-3f7d-4fba-b156-48dfeb4a1e71",
+      "product_name": "Coricos pack",
+      "quantity": 1,
+      "base_price": "3000",
+      "variant_delta": "0",
+      "modifier_total": "0",
+      "fired_at": "2026-10-27T21:30:48.975Z"
+    },
+    {
+      "id": "423283bf-6bbc-45c2-9d94-31f3674519ca",
+      "product_name": "Chocorico",
+      "quantity": 1,
+      "base_price": "1000",
+      "variant_delta": "0",
+      "modifier_total": "0",
+      "fired_at": "2026-10-27T21:30:48.975Z"
+    }
+  ],
+  "sales": [
+    {
+      "id": "4712e168-fd99-4d5d-b968-c14607af6661",
+      "cart_id": "61fd1209-2094-4ac2-8b65-4bf1bd449fdc",
+      "order_id": "996aa98c-3a10-4756-a7ac-1572a44f76c7",
+      "payment_attempt_id": "b21732b3-5f9d-48e0-ab90-4ce068632112",
+      "receipt_snapshot_id": "c0fd6bb3-43ab-436d-9b52-b7e16b756a97",
+      "committed_at": "2026-10-27T21:30:48.975Z",
+      "server_repriced_totals": null
+    }
+  ],
+  "payments": [
+    {
+      "id": "b21732b3-5f9d-48e0-ab90-4ce068632112",
+      "order_id": "996aa98c-3a10-4756-a7ac-1572a44f76c7",
+      "amount": "10000",
+      "method": "cash",
+      "status": "captured",
+      "paid_at": "2026-10-27T21:30:48.975Z"
+    }
+  ],
+  "attempts": [
+    {
+      "id": "b21732b3-5f9d-48e0-ab90-4ce068632112",
+      "method": "cash",
+      "amount_minor_units": "10000",
+      "status": "succeeded",
+      "created_at": "2026-10-27T21:30:48.975Z"
+    }
+  ],
+  "drafts": [
+    {
+      "id": "da91f9bf-da5f-4ce6-b176-2205f52c5a74",
+      "state": "completed",
+      "version": 3,
+      "recovery_state": "none",
+      "payment_summary": {
+        "tip": null,
+        "state": "completed",
+        "change": {
+          "currency": "MXN",
+          "minorUnits": 0
+        },
+        "tenders": [
+          {
+            "type": "cash",
+            "change": {
+              "currency": "MXN",
+              "minorUnits": 0
+            },
+            "status": "draft",
+            "applied": {
+              "currency": "MXN",
+              "minorUnits": 10000
+            },
+            "received": {
+              "currency": "MXN",
+              "minorUnits": 10000
+            },
+            "tenderId": "2c79ff15-b2e8-4614-827f-8a9cdf162b72",
+            "authorizationId": null
+          }
+        ],
+        "amountDue": {
+          "currency": "MXN",
+          "minorUnits": 10000
+        },
+        "discounts": {
+          "total": {
+            "currency": "MXN",
+            "minorUnits": 0
+          },
+          "entries": []
+        },
+        "checkoutId": "da91f9bf-da5f-4ce6-b176-2205f52c5a74",
+        "appliedAmount": {
+          "currency": "MXN",
+          "minorUnits": 10000
+        },
+        "remainingBalance": {
+          "currency": "MXN",
+          "minorUnits": 0
+        },
+        "partialPaymentState": "fully_covered"
+      },
+      "created_at": "2026-10-27T21:30:48.055Z",
+      "updated_at": "2026-10-27T21:30:48.975Z"
+    }
+  ]
+}

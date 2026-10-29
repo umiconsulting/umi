@@ -1,0 +1,254 @@
+{
+  "at": "2026-10-27T20:55:05.991155+00:00",
+  "serial": "100.64.178.95:35049",
+  "account": "020",
+  "action": "Tap payment method Efectivo in actual POS",
+  "nodes_after": [
+    {
+      "text": "Cobrar pedido",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[33,79][960,119]"
+    },
+    {
+      "text": "Cerrar",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[960,66][1026,132]"
+    },
+    {
+      "text": "Cerrar",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[960,66][1026,132]"
+    },
+    {
+      "text": "ONCA · ONCA · Cajero ONCA",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[33,132][1026,157]"
+    },
+    {
+      "text": "TOTAL",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[66,212][125,235]"
+    },
+    {
+      "text": "MXN 100.00",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[66,238][358,293]"
+    },
+    {
+      "text": "Subtotal",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[33,342][524,371]"
+    },
+    {
+      "text": "MXN 100.00",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[910,342][1026,371]"
+    },
+    {
+      "text": "Impuestos incluidos",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[33,382][524,411]"
+    },
+    {
+      "text": "MXN 13.80",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[922,382][1026,411]"
+    },
+    {
+      "text": "Fecha operativa: 2026-10-27",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[33,417][1026,441]"
+    },
+    {
+      "text": "Selección de pago",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[33,474][1026,503]"
+    },
+    {
+      "text": "Efectivo",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[33,514][519,613]"
+    },
+    {
+      "text": "Terminal manual",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[541,514][1026,613]"
+    },
+    {
+      "text": "Transferencia bancaria",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[33,635][519,734]"
+    },
+    {
+      "text": "Efectivo recibido",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[33,767][1026,879]"
+    },
+    {
+      "text": "100.00",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[54,821][1006,861]"
+    },
+    {
+      "text": "Importe exacto",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[33,890][273,956]"
+    },
+    {
+      "text": "MXN 100.00",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[284,890][524,956]"
+    },
+    {
+      "text": "MXN 200.00",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[535,890][775,956]"
+    },
+    {
+      "text": "MXN 500.00",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[786,890][1026,956]"
+    },
+    {
+      "text": "Propina",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[33,1011][1026,1040]"
+    },
+    {
+      "text": "Sin propina",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[33,1040][179,1047]"
+    },
+    {
+      "text": "10%",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[190,1040][275,1047]"
+    },
+    {
+      "text": "15%",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[286,1040][372,1047]"
+    },
+    {
+      "text": "20%",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[383,1040][468,1047]"
+    },
+    {
+      "text": "1",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1059,66][1328,200]"
+    },
+    {
+      "text": "2",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1339,66][1607,200]"
+    },
+    {
+      "text": "3",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1618,66][1887,200]"
+    },
+    {
+      "text": "4",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1059,211][1328,346]"
+    },
+    {
+      "text": "5",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1339,211][1607,346]"
+    },
+    {
+      "text": "6",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1618,211][1887,346]"
+    },
+    {
+      "text": "7",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1059,357][1328,491]"
+    },
+    {
+      "text": "8",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1339,357][1607,491]"
+    },
+    {
+      "text": "9",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1618,357][1887,491]"
+    },
+    {
+      "text": ".",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1059,502][1328,636]"
+    },
+    {
+      "text": "0",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1339,502][1607,636]"
+    },
+    {
+      "text": "Cambio",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[1092,690][1170,719]"
+    },
+    {
+      "text": "Cobrar · MXN 100.00",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1059,882][1887,970]"
+    },
+    {
+      "text": "MXN 0.00",
+      "clickable": "false",
+      "enabled": "true",
+      "bounds": "[1662,680][1854,728]"
+    },
+    {
+      "text": "Cerrar",
+      "clickable": "true",
+      "enabled": "true",
+      "bounds": "[1059,981][1887,1047]"
+    }
+  ]
+}

@@ -38,10 +38,13 @@ El pedido comercial usa `pickup` para algunos pedidos que el POS denomina
 - Propagación del dato en las comandas locales y en las lecturas por LAN.
 - Artefactos del contrato y traducciones regenerados con las herramientas del repositorio.
 
-La base es `fix/onca-20261026`, commit
+La implementación partió de `fix/onca-20261026`, commit
 `069a07fd2670c0225f98b42d6ba5551fd9accfb5`. Incluye la corrección de sincronización
 entregada con la build 334. Esta tarea se desarrolla en
 `feat/onca-kds-fulfillment-20261029` y no cambia el despliegue actual.
+
+La rama incorpora `main` para preparar los PR hacia `main` y `staging`.
+La resolución conserva la bitácora completa y el contrato 2.46.0 en `pubspec.lock`.
 
 El cambio reutiliza columnas existentes. No requiere una migración de datos.
 

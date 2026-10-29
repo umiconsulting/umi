@@ -1,0 +1,280 @@
+{
+  "verifiedAt": "2026-10-27T19:26:18.987Z",
+  "account016": {
+    "cart": {
+      "id": "199ee7cf-ff8b-469f-a2e3-07c93a63aebd",
+      "status": "draft",
+      "lifecycle_state": "suspended",
+      "version": 14,
+      "table_name": "Cardón",
+      "fired_order_id": "e1c716f0-2144-496a-88b2-e6e57f7ae092",
+      "operator_session_id": "a567f08f-a0f2-46c5-a7f4-efc95c6f5e14",
+      "business_date": "2026-10-27"
+    },
+    "lines": [
+      {
+        "id": "b171ba1a-dd33-4995-b9aa-c2e0f1dd1a3a",
+        "product_name": "Dirty chai",
+        "quantity": 1,
+        "fired_at": "2026-10-27T19:17:43.166Z",
+        "order_item_id": "1612f7ba-374e-4f56-83b7-52309d7bdd14",
+        "kitchen_configuration": {
+          "requires_preparation": true,
+          "preparation_target_seconds": 300
+        }
+      },
+      {
+        "id": "7cbcfef1-09f0-49a0-836a-e74313345151",
+        "product_name": "Moca",
+        "quantity": 1,
+        "fired_at": "2026-10-27T19:17:43.166Z",
+        "order_item_id": "01d40bd8-4e39-4072-90d6-288f23c3727c",
+        "kitchen_configuration": {
+          "requires_preparation": true,
+          "preparation_target_seconds": 300
+        }
+      },
+      {
+        "id": "c630323f-c28b-4f82-a2fa-f31b69c6fcb2",
+        "product_name": "Coricos pack",
+        "quantity": 1,
+        "fired_at": "2026-10-27T19:17:43.166Z",
+        "order_item_id": "79d4f688-9472-4654-a735-c40a8450c805",
+        "kitchen_configuration": {
+          "requires_preparation": false,
+          "preparation_target_seconds": null
+        }
+      },
+      {
+        "id": "2db69923-8bb0-4ab0-884b-73a9e079dbdf",
+        "product_name": "Chocorico",
+        "quantity": 5,
+        "fired_at": "2026-10-27T19:17:43.166Z",
+        "order_item_id": "579f80e2-aaf7-476f-9e17-f6f570fd45c9",
+        "kitchen_configuration": {
+          "requires_preparation": false,
+          "preparation_target_seconds": null
+        }
+      }
+    ],
+    "kitchenOrders": [
+      {
+        "id": "43cd98e6-c775-44a8-b0ae-5bb1ba70a2a5",
+        "public_reference": "Cuenta 016 · Cardón",
+        "status": "completed",
+        "version": "5",
+        "completed_at": "2026-10-27T19:18:10.202Z",
+        "source_order_id": "e1c716f0-2144-496a-88b2-e6e57f7ae092"
+      }
+    ],
+    "kitchenItems": [
+      {
+        "id": "003d2a3f-3136-4e26-a498-661a067c3b9a",
+        "product_name": "Dirty chai",
+        "quantity": 1,
+        "station_id": "81fff2aa-705d-48bb-b75d-7406ca36acb4",
+        "status": "ready",
+        "station_completed_at": "2026-10-27T19:18:10.139Z"
+      },
+      {
+        "id": "387936b4-6d16-4556-b8f7-b1a1bdeceb17",
+        "product_name": "Moca",
+        "quantity": 1,
+        "station_id": "81fff2aa-705d-48bb-b75d-7406ca36acb4",
+        "status": "ready",
+        "station_completed_at": "2026-10-27T19:18:10.145Z"
+      }
+    ],
+    "financialCounts": {
+      "payments": 0,
+      "sales": 0
+    },
+    "ownerConfirmedUnpaid": true,
+    "ownerConfirmedPreparedManually": true
+  },
+  "account017": {
+    "sales": [
+      {
+        "id": "bf2b7d4b-3f6d-4217-a8ee-162c76a63613",
+        "daily_account_number": "17",
+        "status": "committed",
+        "lifecycle_state": "committed",
+        "fulfillment_type": "takeout",
+        "sale_id": "696a562b-f6e4-4403-8582-210b4216ae7f",
+        "payment_id": "8f33bf4d-aa65-4c0a-b4eb-9b1f7a1a990f",
+        "payment_status": "succeeded",
+        "method": "bank_transfer",
+        "receipt_id": "1cda95ce-f054-4e61-a717-b2cab275cff1",
+        "receipt_number": "0015",
+        "business_date": "2026-10-27",
+        "amount_minor_units": 36000
+      }
+    ],
+    "financialCounts": {
+      "payments": 1,
+      "sales": 1
+    },
+    "ownerConfirmedCheckoutWorks": true,
+    "reportedPriorErrorNotCaptured": true
+  },
+  "session": {
+    "id": "a567f08f-a0f2-46c5-a7f4-efc95c6f5e14",
+    "state": "active",
+    "permission_count": 49,
+    "can_fire": true,
+    "within_current_role": true
+  },
+  "audit": [
+    {
+      "event_type": "operator.permissions_reconciled",
+      "reason_code": "stale_operator_permissions",
+      "request_id": "onca-008-permissions-20261027",
+      "metadata": {
+        "added": ["order.fire"],
+        "cartId": "199ee7cf-ff8b-469f-a2e3-07c93a63aebd",
+        "reason": "Existing role grant absent from recovered session snapshot",
+        "source": "onca-production-support",
+        "account": 16,
+        "deviceId": "c4521c2a-6c70-4b12-9477-6110257910ff",
+        "cartVersion": 12,
+        "operatorStaffId": "30bb2dfc-46da-402e-a39d-599bbaa4df77",
+        "administrativeSupport": true,
+        "canonicalRoleVerified": true
+      }
+    }
+  ],
+  "repair": {
+    "source": "onca-production-support",
+    "operatorSessionId": "a567f08f-a0f2-46c5-a7f4-efc95c6f5e14",
+    "addedPermissions": ["order.fire"],
+    "permissionCountBefore": 48,
+    "permissionCountAfter": 49,
+    "canonicalRoleVerified": true,
+    "auditRequestId": "onca-008-permissions-20261027",
+    "dryRunRolledBack": true,
+    "applied": true,
+    "cartAndLinesUnchangedByRepair": true
+  },
+  "symptomProbe": {
+    "path": "/home/juan/.local/state/onca-support-20261027/incident-008/verify-order016-send.py",
+    "before": {
+      "account": "016",
+      "pendingLinesVisible": true,
+      "sendButtonVisible": false,
+      "exitCode": 2
+    },
+    "after": {
+      "ownerConfirmedSendWorks": true,
+      "canonicalOrderAndSingleKitchenTicketVerified": true,
+      "allCartLinesFired": true,
+      "kitchenPreparationCompleted": true
+    }
+  },
+  "fleetDiagnosis": {
+    "exitCode": 0,
+    "expectedBuild": 333,
+    "host": {
+      "machineId": "97d302e7018b42eb80e9a56e78dab7b6",
+      "tailscaleIp": "100.109.51.39",
+      "keepadbService": "active",
+      "adapterCount": 4
+    },
+    "apiHealthy": true,
+    "devices": [
+      {
+        "role": "Caja",
+        "tailscaleName": "onca-caja-principal",
+        "tailscaleIp": "100.64.178.95",
+        "checks": {
+          "tailscaleOnline": true,
+          "endpointActive": true,
+          "adbState": "device",
+          "serial": "100.64.178.95:43761",
+          "model": "D3",
+          "android": "11",
+          "umiposVersion": "333",
+          "umiposDebuggable": false,
+          "adbWifiEnabled": "1",
+          "alwaysOnVpn": "com.tailscale.ipn",
+          "keepadbVersion": "1.8.38",
+          "keepadbService": true,
+          "keepadbBatteryExempt": true,
+          "tailscaleBatteryExempt": true,
+          "bootCount": "6"
+        },
+        "failures": []
+      },
+      {
+        "role": "Barra",
+        "tailscaleName": "onca-barra",
+        "tailscaleIp": "100.90.102.41",
+        "checks": {
+          "tailscaleOnline": true,
+          "endpointActive": true,
+          "adbState": "device",
+          "serial": "100.90.102.41:44965",
+          "model": "SM-X210",
+          "android": "16",
+          "umiposVersion": "333",
+          "umiposDebuggable": false,
+          "adbWifiEnabled": "1",
+          "alwaysOnVpn": "com.tailscale.ipn",
+          "keepadbVersion": "1.8.38",
+          "keepadbService": true,
+          "keepadbBatteryExempt": true,
+          "tailscaleBatteryExempt": true,
+          "bootCount": "131"
+        },
+        "failures": []
+      },
+      {
+        "role": "Cocina",
+        "tailscaleName": "onca-cocina",
+        "tailscaleIp": "100.125.137.36",
+        "checks": {
+          "tailscaleOnline": true,
+          "endpointActive": true,
+          "adbState": "device",
+          "serial": "100.125.137.36:35147",
+          "model": "SM-X210",
+          "android": "16",
+          "umiposVersion": "333",
+          "umiposDebuggable": false,
+          "adbWifiEnabled": "1",
+          "alwaysOnVpn": "com.tailscale.ipn",
+          "keepadbVersion": "1.8.38",
+          "keepadbService": true,
+          "keepadbBatteryExempt": true,
+          "tailscaleBatteryExempt": true,
+          "bootCount": "315"
+        },
+        "failures": []
+      },
+      {
+        "role": "Mesero",
+        "tailscaleName": "onca-mesero",
+        "tailscaleIp": "100.125.102.97",
+        "checks": {
+          "tailscaleOnline": true,
+          "endpointActive": true,
+          "adbState": "device",
+          "serial": "100.125.102.97:42845",
+          "model": "SM-X133",
+          "android": "16",
+          "umiposVersion": "333",
+          "umiposDebuggable": false,
+          "adbWifiEnabled": "1",
+          "alwaysOnVpn": "com.tailscale.ipn",
+          "keepadbVersion": "1.8.38",
+          "keepadbService": true,
+          "keepadbBatteryExempt": true,
+          "tailscaleBatteryExempt": true,
+          "bootCount": "24"
+        },
+        "failures": []
+      }
+    ]
+  },
+  "paymentActionsPerformedBySupport": 0,
+  "operatorCreatedAccount017While016Open": true
+}

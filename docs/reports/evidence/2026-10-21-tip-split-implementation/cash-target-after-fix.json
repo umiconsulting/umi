@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-10-21T11:20:10.876Z",
+  "serial": "192.168.0.10:37913",
+  "device": {
+    "ro.product.model": "D3",
+    "ro.build.version.release": "11",
+    "ro.build.version.sdk": "30",
+    "size": "Physical size: 1920x1080"
+  },
+  "minTarget": 48,
+  "surfaces": [
+    {
+      "surface": "Caja",
+      "reached": true,
+      "note": null,
+      "nodes": 16,
+      "pressable": 7,
+      "undersized": [],
+      "unnamed": 0,
+      "labels": [
+        "umi",
+        "ESTACIÓN",
+        "Comanda",
+        "Cuentas",
+        "KDS",
+        "Ventas",
+        "Caja",
+        "Ajustes",
+        "Centro de caja",
+        "Este turno quedó abierto de un día anterior y el cajón es suyo hasta que se cierre. Cuenta la caja y ciérralo antes de seguir con el día: así el efectivo de hoy no se mezcla con el de ayer.",
+        "Caja 1 2026-10-21 Abierto hace 163 h 14 min Actualizado 04:20 Versión onca-commissioning-v2 · Vigente hasta 2099-12-31",
+        "Turno abierto",
+        "La cuenta del cajón FONDO INICIAL MXN 2,000.00 VENTAS EN EFECTIVO MXN 774.31 INGRESOS MXN 0.00 RETIROS −MXN 90.00 CAJA FUERTE MXN 0.00 AJUSTES MXN 0.00",
+        "Reintentar",
+        "Cierre de turno 1 Contar la caja Cuenta las denominaciones del cajón y envía el total. 2 Registrar la diferencia Explica la diferencia para que quede en el historial. 3 Conciliar el turno El sistema compara el esperado contra el contado. 4 Cerrar turno El cierre es definitivo; el turno deja de aceptar efectivo."
+      ],
+      "screenshot": "/tmp/ux/tip-split/cash-target-after-fix-shots/caja.png"
+    }
+  ],
+  "appExceptions": []
+}

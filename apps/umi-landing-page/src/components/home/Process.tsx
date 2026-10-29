@@ -7,7 +7,7 @@ const STEPS = [
   {
     n: '01',
     t: 'Conversación',
-    d: 'El cliente escribe por WhatsApp. ConversaFlow entiende intención, contexto y negocio antes de convertir el mensaje en trabajo operativo.',
+    d: 'El cliente escribe por WhatsApp. El Agente IA entiende intención, contexto y negocio antes de convertir el mensaje en trabajo operativo.',
     dur: 'Entrada',
   },
   {

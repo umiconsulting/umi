@@ -15,7 +15,7 @@ import Link from 'next/link';
 
 const PRODUCTS = [
   {
-    name: 'ConversaFlow',
+    name: 'Agente IA',
     note: 'Pedidos WhatsApp',
     icon: MessageSquareText,
     tone: 'text-[#8FD2C0]',

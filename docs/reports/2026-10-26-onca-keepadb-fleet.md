@@ -1,6 +1,6 @@
 # KeepADB en la flota ONCA
 
-Fecha local: 26 de octubre de 2026
+Fecha inicial: 26 de octubre de 2026. Actualización: 27 de octubre de 2026
 
 ## Alcance
 
@@ -8,17 +8,17 @@ La flota de ONCA en Tailscale contiene cuatro equipos con nombre `onca-*`:
 
 | Equipo         | Tailscale             | Estado actual de ADB             | KeepADB              |
 | -------------- | --------------------- | -------------------------------- | -------------------- |
-| Caja principal | `onca-caja-principal` | `100.64.178.95:37137` conectado  | Verificado: `1.8.38` |
+| Caja principal | `onca-caja-principal` | `100.64.178.95:43761` conectado  | Verificado: `1.8.38` |
 | Barra          | `onca-barra`          | `100.90.102.41:44965` conectado  | Verificado: `1.8.38` |
-| Cocina         | `onca-cocina`         | `100.125.137.36:37123` conectado | Verificado: `1.8.38` |
+| Cocina         | `onca-cocina`         | `100.125.137.36:35147` conectado | Verificado: `1.8.38` |
 | Mesero         | `onca-mesero`         | `100.125.102.97:42845` conectado | Verificado: `1.8.38` |
 
-El endpoint de Cocina se registró como `100.125.137.36:37123` a partir del
-puerto local `192.168.0.102:37123`.
+Los puertos son dinámicos. La tabla muestra la última lectura del diagnóstico.
+Caja sigue pendiente de recuperar ADB sin permiso local después de un reinicio.
 
 No se incluye `test-umi-a11` porque su nombre no empieza con `onca-`.
 
-## Verificación de Caja
+## Verificación inicial de Caja, 26 de octubre
 
 ADB leyó los siguientes valores en la iMin:
 
@@ -34,7 +34,7 @@ ADB leyó los siguientes valores en la iMin:
 - `always_on_vpn_app=com.tailscale.ipn`.
 - Wi-Fi `UmiPOS`.
 
-## Verificación de Barra
+## Verificación inicial de Barra, 26 de octubre
 
 ADB leyó los siguientes valores en la A9+:
 
@@ -47,7 +47,7 @@ ADB leyó los siguientes valores en la A9+:
 - `always_on_vpn_app=com.tailscale.ipn`.
 - Wi-Fi `UmiPOS`.
 
-## Verificación de Cocina
+## Verificación inicial de Cocina, 26 de octubre
 
 ADB leyó los siguientes valores en la segunda A9+:
 
@@ -60,7 +60,7 @@ ADB leyó los siguientes valores en la segunda A9+:
 - `always_on_vpn_app=com.tailscale.ipn`.
 - Wi-Fi `UmiPOS-5G`.
 
-## Verificación de Mesero
+## Verificación inicial de Mesero, 26 de octubre
 
 ADB leyó los siguientes valores en el equipo:
 
@@ -120,12 +120,49 @@ En KeepADB se deben confirmar dos opciones:
 - **Mantener siempre activo**;
 - webhook `http://100.109.51.39:47123/keepadb`.
 
-KeepADB conserva la depuración activa después de reinicios y cambios de red.
-No evita un emparejamiento eliminado ni la confirmación de seguridad de Android.
+KeepADB intenta recuperar la depuración si la orden guardada sigue encendida.
+«Mantener siempre activo» no sustituye esa orden ni el permiso de Android.
+La prueba de Caja muestra que la autorización puede solicitarse de nuevo al reiniciar.
 
-## Prueba de reconexión
+## Prueba de reconexión del 26 de octubre
 
 Después de configurar los cuatro equipos, ADB se desconectó de forma manual.
 Barra volvió a conectar en el siguiente intento. Caja necesitó dos intentos
 mientras Android reabría el puerto y volvió a conectar sin intervención.
 Cocina volvió a conectar en el siguiente intento sobre `37123`.
+
+## Verificación del 27 de octubre
+
+El diagnóstico final terminó con código 0 en los cuatro equipos, con UmiPOS 333.
+El receptor está habilitado y activo. El usuario juan tiene `Linger=yes`.
+La VPN siempre activa y las excepciones de batería están correctas.
+
+Una desconexión ADB se recuperó en 10.04 segundos.
+Los dos reinicios de Caja agotaron 210 segundos sin ADB.
+El primero omitió el arranque de KeepADB por `persisted_intent_off`.
+La activación desde KeepADB corrigió esa orden guardada.
+El segundo inició KeepADB, pero Android pidió otra vez el permiso de red.
+El sistema registró `Expected keyStore, but got tag=null`.
+
+El propietario aceptó el permiso. Caja publicó el puerto 43761 y ADB volvió.
+El contador de arranques quedó en 6.
+El propietario entró de nuevo a UmiPOS y se observó la pantalla principal.
+La recuperación automática después de reiniciar Caja sigue pendiente.
+
+En esta iMin D3 no aparece **Transmission Mode**.
+No se aplicó un ajuste desconocido en su lugar.
+
+Consulta el [incidente 007](./2026-10-27-onca-production-bug-007.md)
+y el [análisis de fuentes](../research/2026-10-27-onca-keepadb-boot-recovery.md).
+Evidencia: [doctor final](./evidence/2026-10-27-onca-support/doctor-final.json).
+
+## Identidad del firmware y versión de aplicación
+
+Caja informa firmware `1.0.3.4.23_230926` y dispositivo `rk3566_rgo`.
+Su actualizador `com.neostra.update` tiene versión 5.28.
+No se identificó una corrección oficial confirmada para la autorización ADB después de reiniciar.
+
+La última build de producción identificada es 333.
+Los cuatro APK instalados son idénticos al APK final por SHA-256.
+La firma es la release esperada y ninguna instalación es depurable.
+Evidencia: [identidad del APK](./evidence/2026-10-27-onca-support/latest-build-final.json).

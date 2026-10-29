@@ -1,36 +1,23 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Umi landing page
 
-## Getting Started
+The public page presents Umi as one connected operation for independent restaurants. The current direction is **Editorial Tide**. Read [DESIGN.md](DESIGN.md) for the layout rules, image sources, and publication gate.
 
-First, run the development server:
+## Local commands
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Run commands from the repository root:
+
+```sh
+pnpm --filter @umi/landing dev
+pnpm --filter @umi/landing build
+pnpm --filter @umi/landing exec jest --config jest.config.js --runInBand src/app/api/contact/__tests__/route.test.ts
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app uses Next.js 15.5.20. Its local route at `/api/contact` sends a demo request by email. If `NEXT_PUBLIC_UMI_API_BASE` is set at build time, the form sends the same request to the central Umi API. Both routes require the team notification to succeed before they report success.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Client material
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The page names ONCA for the full integration and Kalala Café and El Gran Ribera for Umi Cash. The images in `public/editorial` come from Umi product evidence and existing client brand files. The ONCA team photo is pending; do not substitute stock or generated people imagery for it.
 
-## Learn More
+## Publication gate
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The page at `/aviso-de-privacidad` is a draft. Confirm the responsible legal entity, address, processors, transfers, and retention period. Approve the final notice before the demo form collects public submissions. The source for the current notice draft is the [Mexican personal data law](https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPDPPP.pdf), articles 14 to 16.

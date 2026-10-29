@@ -1,0 +1,7 @@
+{
+  "status": "approved",
+  "scope": "Static read-only review of uppercase hotfix",
+  "important_findings": [],
+  "reviewed_change": "Resource label or full locale-specific Material uppercase; full network identity stays literal.",
+  "verification_completed": true
+}

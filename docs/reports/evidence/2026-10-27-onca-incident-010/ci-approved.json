@@ -1,0 +1,13 @@
+{
+  "head": "e087b3974e52511c2dfa43a042a47217c2191229",
+  "base": "fix/onca-20261026",
+  "required": {
+    "lint": "SUCCESS",
+    "contract": "SUCCESS",
+    "tokens": "SUCCESS",
+    "build-and-test": "SUCCESS",
+    "gate": "SUCCESS"
+  },
+  "ios": "not awaited; excluded from this Android hotfix",
+  "at": "2026-10-27T21:48:08.566712+00:00"
+}

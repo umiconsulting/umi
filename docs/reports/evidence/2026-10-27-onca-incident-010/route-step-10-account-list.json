@@ -1,0 +1,521 @@
+{
+  "at": "2026-10-27T21:11:04.155044+00:00",
+  "endpoint": "100.64.178.95:35049",
+  "action": "Lista",
+  "before": [
+    {
+      "text": "",
+      "content-desc": "umi",
+      "class": "android.view.View",
+      "bounds": "[90,77][163,127]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cuentas",
+      "class": "android.view.View",
+      "bounds": "[275,76][381,111]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Lista",
+      "class": "android.widget.Button",
+      "bounds": "[403,61][490,127]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Mapa",
+      "class": "android.widget.Button",
+      "bounds": "[498,61][591,127]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Iniciar pedido",
+      "class": "android.widget.Button",
+      "bounds": "[613,55][781,132]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "ESTACIÓN",
+      "class": "android.view.View",
+      "bounds": "[90,132][163,149]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Comanda",
+      "class": "android.widget.Button",
+      "bounds": "[0,195][253,272]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cuentas",
+      "class": "android.widget.Button",
+      "bounds": "[0,278][253,355]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "KDS",
+      "class": "android.widget.Button",
+      "bounds": "[0,360][253,437]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Ventas",
+      "class": "android.widget.Button",
+      "bounds": "[0,443][253,520]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Caja",
+      "class": "android.widget.Button",
+      "bounds": "[0,525][253,602]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Ajustes",
+      "class": "android.widget.Button",
+      "bounds": "[0,608][253,685]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Mesas",
+      "class": "android.view.View",
+      "bounds": "[281,175][1389,210]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Jardin, 8 mesas",
+      "class": "android.widget.Button",
+      "bounds": "[275,232][453,298]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Pasillo, 3 mesas",
+      "class": "android.widget.Button",
+      "bounds": "[464,232][645,298]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Toca una mesa para ver el detalle",
+      "class": "android.view.View",
+      "bounds": "[1098,254][1344,276]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Huayacán, 4 lugares, Libre",
+      "class": "android.widget.Button",
+      "bounds": "[601,391][770,559]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Pared, 4 lugares, Libre",
+      "class": "android.widget.Button",
+      "bounds": "[800,437][922,558]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Macetero",
+      "class": "android.view.View",
+      "bounds": "[619,587][752,627]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Brasil, 4 lugares, Libre",
+      "class": "android.widget.Button",
+      "bounds": "[1042,590][1163,711]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cardón, 4 lugares, Libre",
+      "class": "android.widget.Button",
+      "bounds": "[1187,385][1280,609]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Luz, 4 lugares, Libre",
+      "class": "android.widget.Button",
+      "bounds": "[459,650][561,915]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cofea, 4 lugares, Libre",
+      "class": "android.widget.Button",
+      "bounds": "[647,744][768,865]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Capiro, 4 lugares, Libre",
+      "class": "android.widget.Button",
+      "bounds": "[866,744][987,865]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Macetero",
+      "class": "android.view.View",
+      "bounds": "[798,747][837,861]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "11 mesas",
+      "class": "android.view.View",
+      "bounds": "[1400,182][1473,204]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Tabachín, 4 lugares, Libre",
+      "class": "android.widget.Button",
+      "bounds": "[1142,756][1282,896]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Alejar",
+      "class": "android.view.View",
+      "bounds": "[1206,1003][1272,1058]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Alejar",
+      "class": "android.widget.Button",
+      "bounds": "[1206,1003][1272,1058]",
+      "clickable": "false",
+      "enabled": "false"
+    },
+    {
+      "text": "",
+      "content-desc": "Acercar",
+      "class": "android.view.View",
+      "bounds": "[1272,1003][1338,1058]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Acercar",
+      "class": "android.widget.Button",
+      "bounds": "[1272,1003][1338,1058]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Libre",
+      "class": "android.view.View",
+      "bounds": "[298,1025][335,1047]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Ocupada",
+      "class": "android.view.View",
+      "bounds": "[375,1025][441,1047]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Pedido tomado",
+      "class": "android.view.View",
+      "bounds": "[481,1025][593,1047]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Servido",
+      "class": "android.view.View",
+      "bounds": "[633,1025][689,1047]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Por cobrar",
+      "class": "android.view.View",
+      "bounds": "[729,1025][806,1047]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Por limpiar",
+      "class": "android.view.View",
+      "bounds": "[846,1025][926,1047]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Ajustar",
+      "class": "android.widget.Button",
+      "bounds": "[1338,1003][1447,1058]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Mesa temporal",
+      "class": "android.widget.Button",
+      "bounds": "[1609,160][1821,226]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "● En línea",
+      "class": "android.view.View",
+      "bounds": "[1506,182][1581,204]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Actualizar",
+      "class": "android.view.View",
+      "bounds": "[1827,160][1893,226]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Actualizar",
+      "class": "android.widget.Button",
+      "bounds": "[1827,160][1893,226]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Toca una mesa para ver su detalle.",
+      "class": "android.view.View",
+      "bounds": "[1481,333][1800,362]",
+      "clickable": "false",
+      "enabled": "true"
+    }
+  ],
+  "after": [
+    {
+      "text": "",
+      "content-desc": "umi",
+      "class": "android.view.View",
+      "bounds": "[90,77][163,127]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cuentas",
+      "class": "android.view.View",
+      "bounds": "[275,76][381,111]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Lista",
+      "class": "android.widget.Button",
+      "bounds": "[403,61][490,127]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Mapa",
+      "class": "android.widget.Button",
+      "bounds": "[498,61][591,127]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Iniciar pedido",
+      "class": "android.widget.Button",
+      "bounds": "[613,55][781,132]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "ESTACIÓN",
+      "class": "android.view.View",
+      "bounds": "[90,132][163,149]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Comanda",
+      "class": "android.widget.Button",
+      "bounds": "[0,195][253,272]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cuentas",
+      "class": "android.widget.Button",
+      "bounds": "[0,278][253,355]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "KDS",
+      "class": "android.widget.Button",
+      "bounds": "[0,360][253,437]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Ventas",
+      "class": "android.widget.Button",
+      "bounds": "[0,443][253,520]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Caja",
+      "class": "android.widget.Button",
+      "bounds": "[0,525][253,602]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Ajustes",
+      "class": "android.widget.Button",
+      "bounds": "[0,608][253,685]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Todas las fechas",
+      "class": "android.widget.Button",
+      "bounds": "[253,154][444,220]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Días anteriores",
+      "class": "android.widget.Button",
+      "bounds": "[452,154][631,220]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Todas",
+      "class": "android.widget.Button",
+      "bounds": "[653,154][750,220]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Comer aquí",
+      "class": "android.widget.Button",
+      "bounds": "[758,154][904,220]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Para llevar",
+      "class": "android.widget.Button",
+      "bounds": "[912,154][1052,220]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cuenta 020\nAbrió: Cajero ONCA\nhace 26 min\n2 pendientes de enviar\n1 enviado",
+      "class": "android.view.View",
+      "bounds": "[253,320][1920,413]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cuenta 020\nSin mesa · 27/10 13:45 · Por enviar\nMXN 100.00",
+      "class": "android.widget.Button",
+      "bounds": "[253,320][1920,413]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Actualizar",
+      "class": "android.view.View",
+      "bounds": "[1854,237][1920,303]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Actualizar",
+      "class": "android.widget.Button",
+      "bounds": "[1854,237][1920,303]",
+      "clickable": "true",
+      "enabled": "true"
+    }
+  ]
+}

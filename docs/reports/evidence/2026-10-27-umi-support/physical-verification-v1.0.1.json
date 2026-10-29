@@ -1,0 +1,28 @@
+{
+  "verified_at": "2026-10-27T20:34:48.811989+00:00",
+  "version": "1.0.1",
+  "version_code": 2,
+  "apk_sha256": "32e7bf83ed3d189f19c943acb613f0709070c8b2839170d6c3caf0b47a98a77d",
+  "serial": "100.64.178.95:35049",
+  "accessibility_bound": true,
+  "accessibility_enabled": true,
+  "boot_count": 8,
+  "reboot_test_success": true,
+  "recovery_seconds": 75.1,
+  "new_endpoint_received_automatically": true,
+  "manual_adb_connect_used": false,
+  "manual_endpoint_entered": false,
+  "fleet_doctor_exit": 0,
+  "fleet_build": 333,
+  "devices_verified": 4,
+  "umipos_restored_to_foreground": true,
+  "foreground": [
+    "mResumedActivity: ActivityRecord{9bf8923 u0 co.umiconsulting.umi_pos.estacion/co.umiconsulting.umi_pos.MainActivity t673}"
+  ],
+  "financial_actions": false,
+  "visual_result_verified": true,
+  "visual_result": "Permiso solicitado para la red autorizada",
+  "elapsed_since_reboot_request_seconds": 86.7,
+  "observation_seconds": 75.1,
+  "fully_powered_off_tested": false
+}

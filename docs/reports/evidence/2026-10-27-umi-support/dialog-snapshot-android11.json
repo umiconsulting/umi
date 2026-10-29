@@ -1,0 +1,73 @@
+{
+  "captured_at": "2026-10-27T20:25:24.962837+00:00",
+  "serial": "100.64.178.95:38475",
+  "source": "Installed SystemUI WifiDebuggingActivityAlias protected by android.permission.DUMP; same authorized SSID/BSSID",
+  "locale": "es-CL",
+  "nodes": [
+    {
+      "resource-id": "android:id/alertTitle",
+      "text": "¿Quieres permitir la depuración inalámbrica en esta red?",
+      "class": "android.widget.TextView",
+      "package": "com.android.systemui",
+      "checkable": "false",
+      "checked": "false",
+      "clickable": "false",
+      "enabled": "true",
+      "focusable": "false",
+      "focused": "false",
+      "bounds": "[583,411][1336,445]"
+    },
+    {
+      "resource-id": "android:id/message",
+      "text": "Nombre de red (SSID)\n\"UmiPOS\"\n\nDirección Wi‑Fi (BSSID)\nbc:07:1d:ca:ae:61",
+      "class": "android.widget.TextView",
+      "package": "com.android.systemui",
+      "checkable": "false",
+      "checked": "false",
+      "clickable": "false",
+      "enabled": "true",
+      "focusable": "false",
+      "focused": "false",
+      "bounds": "[550,445][1369,575]"
+    },
+    {
+      "resource-id": "android:id/alwaysUse",
+      "text": "Permitir siempre en esta red",
+      "class": "android.widget.CheckBox",
+      "package": "com.android.systemui",
+      "checkable": "true",
+      "checked": "false",
+      "clickable": "true",
+      "enabled": "true",
+      "focusable": "true",
+      "focused": "false",
+      "bounds": "[569,575][1348,619]"
+    },
+    {
+      "resource-id": "android:id/button2",
+      "text": "CANCELAR",
+      "class": "android.widget.Button",
+      "package": "com.android.systemui",
+      "checkable": "false",
+      "checked": "false",
+      "clickable": "true",
+      "enabled": "true",
+      "focusable": "true",
+      "focused": "false",
+      "bounds": "[1104,647][1234,721]"
+    },
+    {
+      "resource-id": "android:id/button1",
+      "text": "PERMITIR",
+      "class": "android.widget.Button",
+      "package": "com.android.systemui",
+      "checkable": "false",
+      "checked": "false",
+      "clickable": "true",
+      "enabled": "true",
+      "focusable": "true",
+      "focused": "false",
+      "bounds": "[1234,647][1352,721]"
+    }
+  ]
+}

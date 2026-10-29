@@ -1,0 +1,14 @@
+{
+  "flutter": {
+    "exit": 0,
+    "output": "{\n  \"frameworkVersion\": \"3.47.5\",\n  \"channel\": \"stable\",\n  \"repositoryUrl\": \"https://github.com/flutter/flutter.git\",\n  \"frameworkRevision\": \"6a19cca56475dbfba1478ee68d7bd0c2ef891da1\",\n  \"frameworkCommitDate\": \"2026-09-17 14:13:22 -0400\",\n  \"engineRevision\": \"af7e796e161ae0bb1ff0758c71a7105418bd9ded\",\n  \"engineCommitDate\": \"2026-09-16 18:35:09.000Z\",\n  \"engineContentHash\": \"ab598368592da0064197e2bc15c7f5b0a2c6bb1f\",\n  \"engineBuildDate\": \"2026-09-16 12:35:21.428\",\n  \"dartSdkVersion\": \"3.13.4\",\n  \"devToolsVersion\": \"2.60.0\",\n  \"flutterVersion\": \"3.47.5\",\n  \"flutterRoot\": \"/home/juan/.local/opt/flutter\"\n}"
+  },
+  "adb": {
+    "exit": 0,
+    "output": "Android Debug Bridge version 1.0.41\nVersion 37.0.0-android-tools\nInstalled as /usr/bin/adb\nRunning on Linux 7.2.8-arch1-2 (x86_64)"
+  },
+  "python": {
+    "exit": 0,
+    "output": "Python 3.14.7"
+  }
+}

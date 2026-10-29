@@ -98,7 +98,7 @@ const ContactForm = ({ onSubmit, isLoading = false, errorMessage }: ContactFormP
               <div>
                 <h4 className="mb-1 font-extrabold text-umi-blue-deep">Lectura por producto</h4>
                 <p className="text-sm font-semibold leading-[1.45] text-[rgba(20,33,66,0.62)]">
-                  Dónde entra ConversaFlow, KDS, Cash, Dashboard o Logs
+                  Dónde entra el Agente IA, KDS, Cash, Dashboard o Logs
                 </p>
               </div>
             </div>

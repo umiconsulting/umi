@@ -1,0 +1,535 @@
+{
+  "generatedAt": "2026-10-21T10:59:41.508Z",
+  "serial": "192.168.0.10:37913",
+  "package": "co.umiconsulting.umi_pos",
+  "limitPerScreen": 8,
+  "screens": [
+    {
+      "title": "Comanda",
+      "surface": "Comanda",
+      "mode": null,
+      "reached": true,
+      "clicks": [
+        {
+          "control": "Iniciar pedido",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Más",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Cuenta",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Todo",
+          "outcome": "ok",
+          "changed": false,
+          "alreadyActive": true,
+          "errors": []
+        },
+        {
+          "control": "Pan",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Bebidas",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Pizzas",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Americano  ·  MXN 50.00",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        }
+      ],
+      "skipped": [],
+      "initiallySelected": [
+        {
+          "name": "Todo",
+          "nth": 0
+        },
+        {
+          "name": "Comer aquí",
+          "nth": 0
+        }
+      ]
+    },
+    {
+      "title": "Cuentas",
+      "surface": "Cuentas",
+      "mode": null,
+      "reached": true,
+      "clicks": [
+        {
+          "control": "Lista",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Mapa",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Iniciar pedido",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Mesas 2, 17 mesas",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": true,
+          "errors": []
+        },
+        {
+          "control": "Mesas, 0 mesas",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Salón, 0 mesas",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Mesa 1, 4 lugares, Ocupada, 1 personas, Cuenta 219, Tiempo 159:38 h",
+          "outcome": "gone",
+          "changed": false
+        },
+        {
+          "control": "Mesa 2, 4 lugares, Por limpiar",
+          "outcome": "gone",
+          "changed": false
+        }
+      ],
+      "skipped": [
+        {
+          "name": "Ajustar",
+          "family": "destructive",
+          "why": "destroys or commits work in progress"
+        }
+      ],
+      "initiallySelected": [
+        {
+          "name": "Mapa",
+          "nth": 0
+        },
+        {
+          "name": "Mesas 2, 17 mesas",
+          "nth": 0
+        }
+      ]
+    },
+    {
+      "title": "KDS",
+      "surface": "KDS",
+      "mode": null,
+      "reached": true,
+      "clicks": [
+        {
+          "control": "Silenciar sonidos",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Actualizar",
+          "outcome": "ok",
+          "changed": false,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Sin estación · 0",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Todos",
+          "outcome": "ok",
+          "changed": false,
+          "alreadyActive": true,
+          "errors": []
+        },
+        {
+          "control": "Barra",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Cocina",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Hoy (1)",
+          "outcome": "gone",
+          "changed": false
+        },
+        {
+          "control": "Anteriores (10)",
+          "outcome": "gone",
+          "changed": false
+        }
+      ],
+      "skipped": [
+        {
+          "name": "Empezar",
+          "family": "destructive",
+          "why": "destroys or commits work in progress"
+        }
+      ],
+      "initiallySelected": []
+    },
+    {
+      "title": "Ventas",
+      "surface": "Ventas",
+      "mode": null,
+      "reached": true,
+      "clicks": [
+        {
+          "control": "Todas las ventas",
+          "outcome": "ok",
+          "changed": false,
+          "alreadyActive": true,
+          "errors": []
+        },
+        {
+          "control": "Ventas suspendidas",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Ventas canceladas",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Acciones de la venta",
+          "outcome": "gone",
+          "changed": false
+        },
+        {
+          "control": "Acciones de la venta",
+          "outcome": "gone",
+          "changed": false
+        },
+        {
+          "control": "Acciones de la venta",
+          "outcome": "gone",
+          "changed": false
+        },
+        {
+          "control": "Más recientes primero",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        }
+      ],
+      "skipped": [
+        {
+          "name": "Reanudar venta",
+          "family": "money",
+          "why": "charges, tenders or totals a sale"
+        }
+      ],
+      "initiallySelected": [
+        {
+          "name": "Todas las ventas",
+          "nth": 0
+        }
+      ]
+    },
+    {
+      "title": "Ventas → Ventas suspendidas",
+      "surface": "Ventas",
+      "mode": "Ventas suspendidas",
+      "reached": true,
+      "clicks": [
+        {
+          "control": "Todas las ventas",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Ventas suspendidas",
+          "outcome": "ok",
+          "changed": false,
+          "alreadyActive": true,
+          "errors": []
+        },
+        {
+          "control": "Ventas canceladas",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Más recientes primero",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        }
+      ],
+      "skipped": [
+        {
+          "name": "Reanudar venta",
+          "family": "money",
+          "why": "charges, tenders or totals a sale"
+        },
+        {
+          "name": "Reanudar venta",
+          "family": "money",
+          "why": "charges, tenders or totals a sale"
+        },
+        {
+          "name": "Reanudar venta",
+          "family": "money",
+          "why": "charges, tenders or totals a sale"
+        }
+      ],
+      "initiallySelected": [
+        {
+          "name": "Ventas suspendidas",
+          "nth": 0
+        }
+      ]
+    },
+    {
+      "title": "Ventas → Ventas canceladas",
+      "surface": "Ventas",
+      "mode": "Ventas canceladas",
+      "reached": true,
+      "clicks": [
+        {
+          "control": "Todas las ventas",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Ventas suspendidas",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Ventas canceladas",
+          "outcome": "ok",
+          "changed": false,
+          "alreadyActive": true,
+          "errors": []
+        },
+        {
+          "control": "Más recientes primero",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        }
+      ],
+      "skipped": [],
+      "initiallySelected": [
+        {
+          "name": "Ventas canceladas",
+          "nth": 0
+        }
+      ]
+    },
+    {
+      "title": "Caja",
+      "surface": "Caja",
+      "mode": null,
+      "reached": true,
+      "clicks": [
+        {
+          "control": "Reintentar",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        }
+      ],
+      "skipped": [
+        {
+          "name": "Entrada de efectivo",
+          "family": "money",
+          "why": "charges, tenders or totals a sale"
+        },
+        {
+          "name": "Salida de efectivo",
+          "family": "money",
+          "why": "charges, tenders or totals a sale"
+        },
+        {
+          "name": "Retiro a caja fuerte",
+          "family": "shift",
+          "why": "moves shift or drawer state"
+        },
+        {
+          "name": "Solicitar apertura de cajón",
+          "family": "shift",
+          "why": "moves shift or drawer state"
+        },
+        {
+          "name": "Contar el cajón",
+          "family": "shift",
+          "why": "moves shift or drawer state"
+        }
+      ],
+      "initiallySelected": []
+    },
+    {
+      "title": "Ajustes",
+      "surface": "Ajustes",
+      "mode": null,
+      "reached": true,
+      "clicks": [
+        {
+          "control": "Seguir al sistema",
+          "outcome": "ok",
+          "changed": false,
+          "alreadyActive": true,
+          "errors": []
+        },
+        {
+          "control": "Clara",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Oscura",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Medianoche",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Seguir al sistema",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Grande",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Muy grande",
+          "outcome": "ok",
+          "changed": true,
+          "alreadyActive": false,
+          "errors": []
+        },
+        {
+          "control": "Seguir al sistema",
+          "outcome": "ok",
+          "changed": false,
+          "alreadyActive": true,
+          "errors": []
+        }
+      ],
+      "skipped": [],
+      "initiallySelected": [
+        {
+          "name": "Seguir al sistema",
+          "nth": 0
+        },
+        {
+          "name": "Seguir al sistema",
+          "nth": 1
+        },
+        {
+          "name": "Seguir al sistema",
+          "nth": 2
+        },
+        {
+          "name": "Seguir al sistema",
+          "nth": 3
+        }
+      ]
+    }
+  ],
+  "appExceptions": [],
+  "restore": {
+    "attempted": ["Comanda: Todo", "Comanda: Comer aquí"],
+    "failed": [
+      "Cuentas: Mapa",
+      "Cuentas: Mesas 2, 17 mesas",
+      "Ventas: Todas las ventas",
+      "Ventas → Ventas suspendidas: Ventas suspendidas",
+      "Ventas → Ventas canceladas: Ventas canceladas",
+      "Ajustes: Seguir al sistema",
+      "Ajustes: Seguir al sistema",
+      "Ajustes: Seguir al sistema",
+      "Ajustes: Seguir al sistema"
+    ]
+  }
+}

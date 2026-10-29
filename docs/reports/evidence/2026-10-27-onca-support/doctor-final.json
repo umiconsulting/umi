@@ -1,0 +1,108 @@
+{
+  "exitCode": 0,
+  "command": "python3 .agents/skills/onca-production-support/scripts/onca-support-doctor.py --expected-build 333 --json",
+  "host": {
+    "machineId": "97d302e7018b42eb80e9a56e78dab7b6",
+    "tailscaleIp": "100.109.51.39",
+    "keepadbService": "active",
+    "adapterCount": 4
+  },
+  "apiHealthy": true,
+  "devices": [
+    {
+      "role": "Caja",
+      "tailscaleName": "onca-caja-principal",
+      "tailscaleIp": "100.64.178.95",
+      "checks": {
+        "tailscaleOnline": true,
+        "endpointActive": true,
+        "adbState": "device",
+        "serial": "100.64.178.95:43761",
+        "model": "D3",
+        "android": "11",
+        "umiposVersion": "333",
+        "umiposDebuggable": false,
+        "adbWifiEnabled": "1",
+        "alwaysOnVpn": "com.tailscale.ipn",
+        "keepadbVersion": "1.8.38",
+        "keepadbService": true,
+        "keepadbBatteryExempt": true,
+        "tailscaleBatteryExempt": true,
+        "bootCount": "6"
+      },
+      "failures": []
+    },
+    {
+      "role": "Barra",
+      "tailscaleName": "onca-barra",
+      "tailscaleIp": "100.90.102.41",
+      "checks": {
+        "tailscaleOnline": true,
+        "endpointActive": true,
+        "adbState": "device",
+        "serial": "100.90.102.41:44965",
+        "model": "SM-X210",
+        "android": "16",
+        "umiposVersion": "333",
+        "umiposDebuggable": false,
+        "adbWifiEnabled": "1",
+        "alwaysOnVpn": "com.tailscale.ipn",
+        "keepadbVersion": "1.8.38",
+        "keepadbService": true,
+        "keepadbBatteryExempt": true,
+        "tailscaleBatteryExempt": true,
+        "bootCount": "131"
+      },
+      "failures": []
+    },
+    {
+      "role": "Cocina",
+      "tailscaleName": "onca-cocina",
+      "tailscaleIp": "100.125.137.36",
+      "checks": {
+        "tailscaleOnline": true,
+        "endpointActive": true,
+        "adbState": "device",
+        "serial": "100.125.137.36:35147",
+        "model": "SM-X210",
+        "android": "16",
+        "umiposVersion": "333",
+        "umiposDebuggable": false,
+        "adbWifiEnabled": "1",
+        "alwaysOnVpn": "com.tailscale.ipn",
+        "keepadbVersion": "1.8.38",
+        "keepadbService": true,
+        "keepadbBatteryExempt": true,
+        "tailscaleBatteryExempt": true,
+        "bootCount": "315"
+      },
+      "failures": []
+    },
+    {
+      "role": "Mesero",
+      "tailscaleName": "onca-mesero",
+      "tailscaleIp": "100.125.102.97",
+      "checks": {
+        "tailscaleOnline": true,
+        "endpointActive": true,
+        "adbState": "device",
+        "serial": "100.125.102.97:42845",
+        "model": "SM-X133",
+        "android": "16",
+        "umiposVersion": "333",
+        "umiposDebuggable": false,
+        "adbWifiEnabled": "1",
+        "alwaysOnVpn": "com.tailscale.ipn",
+        "keepadbVersion": "1.8.38",
+        "keepadbService": true,
+        "keepadbBatteryExempt": true,
+        "tailscaleBatteryExempt": true,
+        "bootCount": "24"
+      },
+      "failures": []
+    }
+  ],
+  "verifiedAt": "2026-10-27T18:29:39.901606+00:00",
+  "rebootPersistenceVerified": false,
+  "rebootPersistenceLimit": "Caja requires Android network permission after reboot; current connectivity is restored."
+}

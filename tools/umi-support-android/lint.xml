@@ -1,0 +1,6 @@
+<lint>
+    <!-- Se reutiliza Gradle 9.1.0, compatible con AGP 9.0.1 y ya validado en juan-PC. -->
+    <issue id="AndroidGradlePluginVersion">
+        <ignore path="gradle/wrapper/gradle-wrapper.properties" />
+    </issue>
+</lint>

@@ -36,7 +36,7 @@ export class LeadsService {
   /**
    * Contact form: notify Umi (reply-to the prospect) + auto-reply the prospect.
    * Email-only — no lead row is created (matches the ported /api/contact). Throws
-   * when BOTH sends fail so the controller can surface a 500.
+   * when the internal notification fails so the controller can surface a 500.
    */
   async sendContact(dto: ContactDto): Promise<{ sent: number; failed: number }> {
     const to = this.internalEmail();
@@ -51,16 +51,23 @@ export class LeadsService {
       html: contactInternalTemplate(dto),
       replyTo: dto.email,
     });
-    const autoReply = await this.email.send({
-      to: dto.email,
-      subject: 'Hemos recibido tu consulta - Umi',
-      html: contactAutoReplyTemplate(dto),
-    });
-    const sent = (internal ? 1 : 0) + (autoReply ? 1 : 0);
-    const failed = 2 - sent;
-    if (sent === 0) {
-      throw new Error('contact_email_send_failed');
+    if (!internal) {
+      throw new Error('contact_internal_email_send_failed');
     }
+    let autoReply = null;
+    try {
+      autoReply = await this.email.send({
+        to: dto.email,
+        subject: 'Hemos recibido tu consulta - Umi',
+        html: contactAutoReplyTemplate(dto),
+      });
+    } catch (error) {
+      this.logger.warn(
+        `contact_auto_reply_failed: ${error instanceof Error ? error.name : 'unknown'}`,
+      );
+    }
+    const sent = 1 + (autoReply ? 1 : 0);
+    const failed = 2 - sent;
     return { sent, failed };
   }
 

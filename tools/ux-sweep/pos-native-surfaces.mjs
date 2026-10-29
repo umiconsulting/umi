@@ -50,7 +50,7 @@ const NO_FAIL = process.argv.includes('--no-fail');
  * The navigation the operator sees, top to bottom of the rail. The label is the accessible name
  * the rail publishes, so the click goes through the same control a person presses.
  */
-const SURFACES = ['Comanda', 'Caja', 'Ventas', 'Mesas', 'Cocina', 'Pedidos', 'Ajustes'];
+const SURFACES = ['Comanda', 'Cuentas', 'KDS', 'Ventas', 'Caja', 'Ajustes'];
 
 /**
  * THE INNER MODES OF A SURFACE, BY THE LABEL THE OPERATOR PRESSES.
@@ -63,8 +63,6 @@ const SURFACES = ['Comanda', 'Caja', 'Ventas', 'Mesas', 'Cocina', 'Pedidos', 'Aj
  */
 const MODES = {
   Ventas: ['Ventas suspendidas', 'Ventas canceladas'],
-  Mesas: ['Ver lista'],
-  Cocina: ['Preparación'],
 };
 
 /** The pointer-target floor every control shares (plan §5.2, `--control-min`). */

@@ -1,0 +1,87 @@
+{
+  "at": "2026-10-27T21:27:18.813460+00:00",
+  "action": "reopen app without clearing data",
+  "beforeLabels": [
+    "Centro de recuperación",
+    "Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.",
+    "En proceso",
+    "Servidor: 86 · aceptadas: 53 · conflictos: 0 · cola: 0",
+    "Cantidad actualizada\nEnviada\n#80",
+    "Producto agregado\nEnviada\n#81",
+    "Cantidad actualizada\nEnviada\n#82",
+    "Enviado a cocina\nEnviada\n#83",
+    "Enviado a cocina\nEnviada\n#84",
+    "Producto agregado\nEnviada\n#85",
+    "Producto agregado\nEnviada\n#86",
+    "Sincronizando ventas pendientes…",
+    "Sincronizar ahora",
+    "Cerrar",
+    "Cerrar"
+  ],
+  "afterLabels": [
+    "Centro de recuperación",
+    "Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.",
+    "En proceso",
+    "Servidor: 86 · aceptadas: 53 · conflictos: 0 · cola: 0",
+    "Cantidad actualizada\nEnviada\n#80",
+    "Producto agregado\nEnviada\n#81",
+    "Cantidad actualizada\nEnviada\n#82",
+    "Enviado a cocina\nEnviada\n#83",
+    "Enviado a cocina\nEnviada\n#84",
+    "Producto agregado\nEnviada\n#85",
+    "Producto agregado\nEnviada\n#86",
+    "Sincronizando ventas pendientes…",
+    "Sincronizar ahora",
+    "Cerrar",
+    "Cerrar"
+  ],
+  "backendBefore": {
+    "at": "2026-10-27T21:26:56.444Z",
+    "cart": [
+      {
+        "id": "61fd1209-2094-4ac2-8b65-4bf1bd449fdc",
+        "status": "draft",
+        "version": 6,
+        "lifecycle_state": "building_cart",
+        "fired_order_id": "996aa98c-3a10-4756-a7ac-1572a44f76c7",
+        "daily_account_number": "20",
+        "business_date": "2026-10-27T00:00:00.000Z",
+        "updated_at": "2026-10-27T20:48:12.190Z"
+      }
+    ],
+    "lines": [
+      {
+        "id": "ac3da5dc-9923-4beb-b3e0-34cdc58f7dcd",
+        "product_name": "Capuccino",
+        "quantity": 1,
+        "base_price": "6000",
+        "variant_delta": "0",
+        "modifier_total": "0",
+        "fired_at": "2026-10-27T20:45:17.489Z"
+      },
+      {
+        "id": "fcd6b62a-3f7d-4fba-b156-48dfeb4a1e71",
+        "product_name": "Coricos pack",
+        "quantity": 1,
+        "base_price": "3000",
+        "variant_delta": "0",
+        "modifier_total": "0",
+        "fired_at": null
+      },
+      {
+        "id": "423283bf-6bbc-45c2-9d94-31f3674519ca",
+        "product_name": "Chocorico",
+        "quantity": 1,
+        "base_price": "1000",
+        "variant_delta": "0",
+        "modifier_total": "0",
+        "fired_at": null
+      }
+    ],
+    "sales": [],
+    "payments": [],
+    "attempts": [],
+    "drafts": []
+  },
+  "afterLabelsValidation": "Invalid: UIAutomator returned null root and left an old XML file. Fresh PNG screenshots verify the reopened app."
+}

@@ -1,0 +1,82 @@
+{
+  "reviewedAt": "2026-10-27",
+  "installedFirmware": "1.0.3.4.23_230926",
+  "manufacturer": "neostra",
+  "model": "D3",
+  "productDevice": "rk3566_rgo",
+  "offeredUpdate": {
+    "version": "1.0.6.4.23_241120",
+    "releaseDate": "2024-11-22",
+    "sizeMiBDisplayed": 132.97,
+    "offeredBy": "com.neostra.update/.GoogleOtaClient",
+    "releaseNotes": ["1.Optimization system", "2.Minor bug fixes"]
+  },
+  "officialUpstreamFix": {
+    "title": "Fix ADB key file reading",
+    "bug": "236299256",
+    "commit": "c113a129072f3c73c8b56fcd35ee117ede11abe9",
+    "originalCommit": "efb8194ec4f4c60817999aa190c931a41f2196c7",
+    "changeId": "Iae955aca17e873288d58b16f184bd4d325d50d86",
+    "authorDate": "2022-06-15",
+    "mergeDate": "2022-06-28",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/c113a129072f",
+    "documentedBehavior": "ADB authorization file was written correctly but its parser could not read it; authorized Wi-Fi networks were not restored."
+  },
+  "matchesObservedFailure": "Strongly consistent with Expected keyStore, but got tag=null and renewed network approval after reboot; exact vendor framework binary not compared.",
+  "offeredUpdateContainsFix": null,
+  "otherVendorReleaseConfirmedToContainFix": false,
+  "packageInspection": {
+    "firmwarePackageDownloaded": false,
+    "firmwarePackageAnalyzed": false,
+    "installedUpdaterApkRead": true,
+    "publicMetadataHosts": ["fota5p.adups.cn", "fota5p.adups.com"],
+    "publicPackageUrlFound": false,
+    "appPrivateDataAccessed": false
+  },
+  "permissionFinding": {
+    "manageDebuggingProtection": "signature|privileged",
+    "ordinaryAdbPermissionGrantAvailable": false,
+    "accessibilityServicesEnabled": false
+  },
+  "changesApplied": {
+    "firmwareInstalled": false,
+    "rebootPerformed": false,
+    "productionAppBuildUnchanged": 333
+  },
+  "nextStep": "Confirm vendor inclusion of AOSP bug 236299256 in the exact offered D3 build, or run a controlled post-update reboot test after an authorized firmware update.",
+  "primarySources": [
+    "https://android.googlesource.com/platform/frameworks/base/+/c113a129072f",
+    "https://android.googlesource.com/platform/frameworks/base/+/c113a129072f%5E%21/",
+    "https://doc.neostra.com/doc/cjwt/tssbfaq/d3xl/d3-faq/",
+    "https://doc.neostra.com/doc/kfzts/kfzts/"
+  ],
+  "localRecoveryAlternative": {
+    "status": "proposed; not implemented or tested on Caja",
+    "method": "Local Android AccessibilityService acts on WifiDebuggingActivity after boot",
+    "requiresFirmwareUpdate": false,
+    "requiresRoot": false,
+    "requiresInitialAccessibilityConsent": true,
+    "permittedSystemPackage": "com.android.systemui",
+    "permittedActivity": "com.android.systemui.wifi.WifiDebuggingActivity",
+    "permittedSsid": "UmiPOS",
+    "permittedBssid": "bc:07:1d:ca:ae:61",
+    "actions": [
+      "Verify the exact ADB network authorization dialog and known network",
+      "Select Always allow for the known network",
+      "Activate the dialog positive button",
+      "Let KeepADB publish its dynamic TLS ADB endpoint"
+    ],
+    "verifiedFacts": [
+      "Android AccessibilityService supports package filtering and UI actions",
+      "AOSP 11 WifiDebuggingActivity uses a checkbox and positive button to call allowWirelessDebugging",
+      "MANAGE_DEBUGGING is signature|privileged on this device"
+    ],
+    "unverified": [
+      "Vendor dialog response to accessibility actions",
+      "Accessibility service recovery after a full Caja reboot"
+    ],
+    "acceptanceTest": "A full reboot with no manual approval, increased boot_count, new endpoint received, ADB recovered, and fleet doctor exit 0",
+    "source": "https://developer.android.com/reference/android/accessibilityservice/AccessibilityService",
+    "dialogSource": "https://github.com/aosp-mirror/platform_frameworks_base/blob/android-11.0.0_r48/packages/SystemUI/src/com/android/systemui/wifi/WifiDebuggingActivity.java"
+  }
+}
