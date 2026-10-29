@@ -138,6 +138,7 @@ abstract final class PosGlyphs {
   static const searchOff = PosGlyph('search_off');
   static const settingsOutlined = PosGlyph('settings_outlined');
   static const shoppingCartOutlined = PosGlyph('shopping_cart_outlined');
+  static const shoppingBagOutlined = PosGlyph('shopping_bag_outlined');
   static const soupKitchenOutlined = PosGlyph('soup_kitchen_outlined');
   static const starOutline = PosGlyph('star_outline');
   static const starsOutlined = PosGlyph('stars_outlined');
@@ -649,6 +650,17 @@ class _GlyphPainter extends CustomPainter {
       line(3, 9, 9, 9);
       line(17, 3, 17, 21);
       c.drawArc(const Rect.fromLTWH(14, 3, 6, 10), -1.57, 3.14, false, p);
+    } else if (name == 'shopping_bag_outlined') {
+      box(5, 7, 14, 14, 2);
+      c.drawPath(
+        Path()
+          ..moveTo(9, 9)
+          ..lineTo(9, 6)
+          ..quadraticBezierTo(9, 3, 12, 3)
+          ..quadraticBezierTo(15, 3, 15, 6)
+          ..lineTo(15, 9),
+        p,
+      );
     } else if (name.contains('cart')) {
       line(2, 3, 5, 3);
       line(5, 3, 8, 16);

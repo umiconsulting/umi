@@ -5,6 +5,7 @@ import '../../core/security/operator_permissions.dart';
 import '../../core/theme/pos_ui.dart';
 import '../entry/entry_controller.dart';
 import 'kitchen_board_controller.dart';
+import 'kitchen_fulfillment_badge.dart';
 import 'kitchen_ticket_age.dart';
 
 /// Work without a station needs an explicit routing decision, regardless of age.
@@ -151,9 +152,19 @@ class KitchenUnassignedSurface extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                order.publicReference,
-                style: PosTheme.of(context).textTheme.titleLarge,
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    order.publicReference,
+                    style: PosTheme.of(context).textTheme.titleLarge,
+                  ),
+                  KitchenFulfillmentBadge(
+                    fulfillmentType: order.fulfillmentType,
+                  ),
+                ],
               ),
               Text('${es ? 'Fecha' : 'Date'}: ${order.businessDate}'),
               if (age != null) Text('${es ? 'Antigüedad' : 'Age'}: $age'),

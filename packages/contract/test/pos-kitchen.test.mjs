@@ -13,6 +13,43 @@ import {
 
 const id = (last) => `00000000-0000-4000-8000-${last.padStart(12, '0')}`;
 
+const ticket = {
+  id: id('1'),
+  sourceOrderId: id('2'),
+  publicReference: 'Cuenta 021',
+  merchantId: id('3'),
+  locationId: id('4'),
+  stationId: id('5'),
+  source: 'pos',
+  status: 'queued',
+  priority: 'normal',
+  businessDate: '2026-10-29',
+  queuedAt: '2026-10-29T18:00:00.000Z',
+  preparationStartedAt: null,
+  updatedAt: '2026-10-29T18:00:00.000Z',
+  version: 1,
+  lastEventSequence: 0,
+  firedThroughCourse: 1,
+  items: [],
+};
+
+for (const fulfillmentType of ['dine_in', 'takeout', 'delivery', null]) {
+  test(`kitchen projection preserves fulfillment ${fulfillmentType}`, () => {
+    const parsed = KitchenOrderProjection.parse({ ...ticket, fulfillmentType });
+    assert.equal(parsed.fulfillmentType, fulfillmentType);
+  });
+}
+
+test('kitchen projection accepts an older snapshot without an order type', () => {
+  assert.equal(KitchenOrderProjection.parse(ticket).fulfillmentType, undefined);
+});
+
+test('kitchen projection rejects unnormalized fulfillment values', () => {
+  for (const fulfillmentType of ['pickup', 'unknown', '']) {
+    assert.equal(KitchenOrderProjection.safeParse({ ...ticket, fulfillmentType }).success, false);
+  }
+});
+
 test('unassigned commands use order identity and preview, never client-selected stations', () => {
   const request = {
     locationId: id('1'),

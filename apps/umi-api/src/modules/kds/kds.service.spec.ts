@@ -367,6 +367,56 @@ describe('KdsService.board', () => {
   });
 });
 
+describe('kitchen fulfillment on device and POS boards', () => {
+  const cases = [
+    ['dine_in', 'dine_in'],
+    ['pickup', 'takeout'],
+    ['takeout', 'takeout'],
+    ['delivery', 'delivery'],
+    [null, null],
+    [undefined, null],
+    ['unsupported', null],
+  ] as const;
+
+  for (const reader of ['device', 'pos'] as const) {
+    it.each(cases)(`${reader} board exposes %s as %s`, async (stored, expected) => {
+      const { svc, repo } = make();
+      repo.listStations.mockResolvedValue([{ id: 'station-1' }]);
+      repo.boardSnapshot.mockResolvedValue([
+        {
+          ticket_id: 'o1',
+          source_transaction_id: 'order-1',
+          public_reference: 'Cuenta 021 · Mesa 3',
+          merchant_id: 't1',
+          source_channel: 'pos',
+          fulfillment_type: stored,
+          location_id: 'loc-1',
+          business_date: '2026-10-29',
+          priority: 'normal',
+          version: 1,
+          status: 'queued',
+          station_id: 'station-1',
+          station_name: 'Barra',
+          created_at: '2026-10-29T18:00:00.000Z',
+          updated_at: '2026-10-29T18:00:00.000Z',
+          last_event_sequence: '1',
+          fired_through_course: 1,
+          items: [],
+        },
+      ]);
+      const snapshot =
+        reader === 'device'
+          ? (await svc.board(SESSION, { action: 'snapshot' })).body
+          : await svc.boardForPos(
+              { id: 'user-1', email: null, sessionId: 'session-1', deviceId: 'device-1' },
+              't1',
+              { locationId: 'loc-1', operatorSessionId: 'operator-1' },
+            );
+      expect(snapshot).toMatchObject({ data: [{ fulfillmentType: expected }] });
+    });
+  }
+});
+
 describe('KdsService.command — transition_ticket', () => {
   const order = {
     id: 'o1',

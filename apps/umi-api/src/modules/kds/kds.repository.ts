@@ -177,6 +177,7 @@ export interface TicketRow {
   public_reference?: string;
   merchant_id: string;
   source_channel: string | null;
+  fulfillment_type?: string | null;
   location_id?: string;
   priority?: string;
   business_date?: string;
@@ -1236,7 +1237,7 @@ export class KdsRepository {
   ): Promise<TicketRow[]> {
     const { rows } = await this.pg.query<TicketRow>(
       `SELECT v.id::text AS ticket_id,v.source_order_id::text AS source_transaction_id,
-              v.public_reference,
+              v.public_reference,v.fulfillment_type,
               v.merchant_id::text AS merchant_id,v.source AS source_channel,
               CASE WHEN cancellation.cancelled THEN 'cancelled' ELSE v.status END AS status,
               v.location_id::text,v.priority,v.business_date::text,

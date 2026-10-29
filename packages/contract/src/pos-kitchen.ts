@@ -97,6 +97,8 @@ export const KitchenOrderProjection = z
     stationName: z.string().min(1).max(160).optional(),
     ...optionalAlertSettings,
     source: z.enum(['whatsapp', 'pos', 'web', 'dashboard']),
+    // Optional for cached snapshots and clients that use an older API.
+    fulfillmentType: z.enum(['dine_in', 'takeout', 'delivery']).nullable().optional(),
     status: KitchenOrderStatus,
     priority: KitchenPriority,
     businessDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

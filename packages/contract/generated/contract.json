@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "1be3c317177b82e26c82b37ff6b1bee27c347889057008cb0e824f40e7ff4c80",
-  "contractVersion": "2.45.0",
+  "contentHash": "95f2ac7fef8eef0abeab453e5f5f004477da0398685a2272fa8aadaa75f4cd12",
+  "contractVersion": "2.46.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -55156,6 +55156,21 @@
                     "minimum": 1,
                     "type": "integer"
                   },
+                  "fulfillmentType": {
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "dine_in",
+                          "takeout",
+                          "delivery"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "id": {
                     "format": "uuid",
                     "type": "string"
@@ -56046,6 +56061,21 @@
           "minimum": 1,
           "type": "integer"
         },
+        "fulfillmentType": {
+          "anyOf": [
+            {
+              "enum": [
+                "dine_in",
+                "takeout",
+                "delivery"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "id": {
           "format": "uuid",
           "type": "string"
@@ -56601,6 +56631,21 @@
           "minimum": 1,
           "type": "integer"
         },
+        "fulfillmentType": {
+          "anyOf": [
+            {
+              "enum": [
+                "dine_in",
+                "takeout",
+                "delivery"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "id": {
           "format": "uuid",
           "type": "string"
@@ -56939,6 +56984,21 @@
                 "maximum": 20,
                 "minimum": 1,
                 "type": "integer"
+              },
+              "fulfillmentType": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "dine_in",
+                      "takeout",
+                      "delivery"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "id": {
                 "format": "uuid",

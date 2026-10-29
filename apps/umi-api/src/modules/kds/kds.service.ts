@@ -27,6 +27,7 @@ import {
   type EventRow,
   type DeviceListRow,
 } from './kds.repository';
+import { kitchenFulfillmentType } from './kitchen-fulfillment';
 import {
   asSixDigitPin,
   asText,
@@ -1566,6 +1567,7 @@ function toSnapshotRow(t: TicketRow) {
     merchantId: t.merchant_id,
     locationId: (t as TicketRow & { location_id?: string }).location_id,
     source: t.source_channel,
+    fulfillmentType: kitchenFulfillmentType(t.fulfillment_type),
     status: t.status,
     priority: (t as TicketRow & { priority?: string }).priority ?? 'normal',
     stationId: t.station_id,

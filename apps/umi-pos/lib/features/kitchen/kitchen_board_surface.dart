@@ -14,6 +14,7 @@ import '../offline/connectivity_controller.dart';
 import 'kitchen_alerts.dart';
 import 'kitchen_audio.dart';
 import 'kitchen_board_controller.dart';
+import 'kitchen_fulfillment_badge.dart';
 import 'kitchen_ticket_age.dart';
 import 'kitchen_unassigned_surface.dart';
 
@@ -851,6 +852,10 @@ final class _UnassignedTicketCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: UmiSpacing.sm),
+                  KitchenFulfillmentBadge(
+                    fulfillmentType: order.fulfillmentType,
+                  ),
+                  const SizedBox(height: UmiSpacing.sm),
                   for (final raw in order.items)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
@@ -1034,6 +1039,9 @@ final class _TicketCard extends StatelessWidget {
                     spacing: UmiSpacing.sm,
                     runSpacing: UmiSpacing.xs,
                     children: [
+                      KitchenFulfillmentBadge(
+                        fulfillmentType: order.fulfillmentType,
+                      ),
                       // Which station owes this ticket. A till is handed one card per
                       // station for the same cuenta, so without the name two cards are
                       // the same card; a station device has one, where the label is a
