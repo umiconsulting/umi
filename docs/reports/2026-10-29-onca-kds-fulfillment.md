@@ -123,6 +123,26 @@ usan las herramientas existentes; no se creó un ejecutor propio.
 La Mac usa Node 25.9.0. pnpm informa que el dashboard exige Node 22; esta tarea
 prueba el contrato y el API. CI usa Node 22 para la validación del repositorio.
 
+## Corrección del CI del PR 230
+
+El job `lint` falló en el paso de Gitleaks. ESLint y el formato pasaron.
+Los nueve hallazgos corresponden a seis valores públicos: dos identificadores de
+evidencia, un commit y tres huellas de la llave pública de Umi Support.
+
+La corrección adopta únicamente las excepciones exactas de `.gitleaks.toml` que
+ya contiene `main`, desde el commit `9578f079`. Cada expresión tiene anclas de
+inicio y fin. El workflow conserva el escaneo completo con `--all`.
+
+La comprobación local usa Gitleaks 8.30.1, obtenido del
+[release oficial](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1)
+y verificado con su checksum. El escaneo de 677 commits de `origin` produjo
+nueve hallazgos antes del cambio y cero después. Doce comprobaciones adicionales
+aceptaron los seis valores exactos y detectaron los seis valores con un sufijo.
+
+```sh
+gitleaks git --no-banner --redact --exit-code 1 --log-opts=--remotes=origin
+```
+
 ## Entrega y comprobaciones pendientes
 
 El usuario pidió entregar mediante PR con la cuenta `umiconsulting-dev`.
