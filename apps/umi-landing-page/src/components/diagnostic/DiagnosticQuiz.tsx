@@ -300,7 +300,7 @@ const DiagnosticQuiz = () => {
     const level = getLevelName();
     switch (level) {
       case 'Inicial':
-        return 'Activar ConversaFlow como puerta de entrada y definir el contrato mínimo de pedido, cliente y estado.';
+        return 'Activar el Agente IA como puerta de entrada y definir el contrato mínimo de pedido, cliente y estado.';
       case 'Intermedio':
         return 'Conectar KDS, Cash y Dashboard para eliminar huecos entre cocina, recompensas y decisión gerencial.';
       case 'Avanzado':
@@ -333,7 +333,7 @@ const DiagnosticQuiz = () => {
       case 'Inicial':
         return [
           {
-            title: 'Base ConversaFlow',
+            title: 'Base Agente IA',
             description: 'Convertir conversaciones y pedidos en registros operativos claros.',
           },
           {

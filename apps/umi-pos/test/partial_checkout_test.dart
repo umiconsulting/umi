@@ -58,6 +58,8 @@ final class _CartRepo implements CartRepository {
 
 final class _Repo implements CheckoutRepository, PartialPaymentRepository {
   bool enableBankTransfer = false;
+  bool enableManualTerminal = false;
+  bool enableMixedTender = false;
   final drafts = <Map<String, Object?>>[];
   final commands = <Map<String, Object?>>[];
   final finalCommands = <CheckoutCommand>[];
@@ -68,6 +70,7 @@ final class _Repo implements CheckoutRepository, PartialPaymentRepository {
   bool writeSkipped = false;
   bool loseFinalResponseOnce = false;
   bool finalResponseLost = false;
+  bool accountMissing = false;
 
   Map<String, Object?> get snapshot {
     final applied = drafts.fold<int>(0, (sum, draft) {
@@ -106,7 +109,7 @@ final class _Repo implements CheckoutRepository, PartialPaymentRepository {
     String cartId,
     CheckoutPartialPaymentQuery query,
   ) async {
-    if (drafts.isEmpty && unresolved == null) {
+    if (accountMissing) {
       throw const AppException(
         category: AppErrorCategory.unknown,
         code: 'RESOURCE_NOT_FOUND',
@@ -156,7 +159,7 @@ final class _Repo implements CheckoutRepository, PartialPaymentRepository {
     PosCheckoutPolicyQuery query,
   ) async => CheckoutPolicy.fromJson({
     'version': 'test',
-    'manualTerminalEnabled': false,
+    'manualTerminalEnabled': enableManualTerminal,
     'bankTransferEnabled': enableBankTransfer,
     'bankTransferDetails': enableBankTransfer
         ? <String, Object?>{
@@ -167,8 +170,8 @@ final class _Repo implements CheckoutRepository, PartialPaymentRepository {
           }
         : null,
     'merchantLogoUrl': null,
-    'mixedTenderEnabled': false,
-    'maximumTenderLines': 1,
+    'mixedTenderEnabled': enableMixedTender,
+    'maximumTenderLines': enableMixedTender ? 8 : 1,
     'manualTerminalApprovalThreshold': {'minorUnits': 50000, 'currency': 'MXN'},
     'manualTerminalApprovalPermission': 'checkout.terminal.approve',
     'tip': {
@@ -233,6 +236,7 @@ final class _Repo implements CheckoutRepository, PartialPaymentRepository {
 Future<(CartController, CheckoutController)> _pump(
   WidgetTester tester,
   _Repo repository, {
+  bool canConfirmManualTerminal = false,
   Future<bool?> Function(int amountMinor, bool selected)?
   onShowBankTransferDetails,
 }) async {
@@ -272,7 +276,7 @@ Future<(CartController, CheckoutController)> _pump(
         checkout: checkout,
         cart: cart,
         operatorSessionId: _operator,
-        canConfirmManualTerminal: false,
+        canConfirmManualTerminal: canConfirmManualTerminal,
         cashShiftId: _shift,
         onShowBankTransferDetails:
             onShowBankTransferDetails ?? (_, _) async => false,
@@ -284,6 +288,53 @@ Future<(CartController, CheckoutController)> _pump(
 }
 
 void main() {
+  testWidgets(
+    'a split terminal leg confirms without asking the operator to type a receipt folio',
+    (tester) async {
+      final repository = _Repo()
+        ..enableManualTerminal = true
+        ..enableMixedTender = true
+        ..drafts.add({
+          'id': '00000000-0000-4000-8000-000000000080',
+          'type': 'cash',
+          'amount': {'minorUnits': 4000, 'currency': 'MXN'},
+          'amountReceived': {'minorUnits': 4000, 'currency': 'MXN'},
+          'status': 'confirmed_success',
+          'correlationId': null,
+        });
+      final (cart, checkout) = await _pump(
+        tester,
+        repository,
+        canConfirmManualTerminal: true,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('partial-principal')),
+        '76.00',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('partial-method-manual_terminal')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('partial-charge')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Receipt reference'), findsNothing);
+      await tester.tap(find.text('Yes, paid'));
+      await tester.pumpAndSettle();
+
+      expect(repository.commands, hasLength(1));
+      expect(
+        repository.commands.single['confirmationReference'],
+        'operator_confirmed_terminal_screen',
+      );
+
+      await tester.pumpWidget(const SizedBox());
+      cart.dispose();
+      checkout.dispose();
+    },
+  );
+
   testWidgets('transfer opens the existing bank card for this exact payment', (
     tester,
   ) async {
@@ -374,8 +425,6 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('partial-charge')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Refresh'));
       await tester.pumpAndSettle();
@@ -572,12 +621,6 @@ void main() {
       expect(find.text('Charge MXN 40.00'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('partial-charge')));
       await tester.pumpAndSettle();
-      expect(
-        find.text('After the first payment', findRichText: true),
-        findsNothing,
-      );
-      await tester.tap(find.text('Continue'));
-      await tester.pumpAndSettle();
       expect(repository.commands, hasLength(1));
       expect((repository.commands.single['tender'] as Map)['amount'], {
         'minorUnits': 4000,
@@ -592,6 +635,19 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Charge MXN 86.00'), findsOneWidget);
+      expect(find.byKey(const ValueKey('partial-tip-owner')), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('partial-cash-received')),
+        '100.00',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('partial-cash-change')),
+          matching: find.text('MXN 14.00'),
+        ),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const ValueKey('partial-charge')));
       await tester.pumpAndSettle();
       expect(repository.commands, hasLength(2));
@@ -611,6 +667,26 @@ void main() {
     },
   );
 
+  testWidgets('a closed account shows a refusal and no charge action', (
+    tester,
+  ) async {
+    final repository = _Repo()..accountMissing = true;
+    final (cart, checkout) = await _pump(tester, repository);
+
+    expect(
+      find.text(
+        'This account was already closed or saved from another screen. Return to Accounts to open it again.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('partial-charge')), findsNothing);
+    expect(repository.commands, isEmpty);
+
+    await tester.pumpWidget(const SizedBox());
+    cart.dispose();
+    checkout.dispose();
+  });
+
   testWidgets(
     'lost response requires ledger read and never creates a new leg',
     (tester) async {
@@ -618,8 +694,6 @@ void main() {
       final (cart, checkout) = await _pump(tester, repository);
       await tester.tap(find.byKey(const ValueKey('partial-equal-2')));
       await tester.tap(find.byKey(const ValueKey('partial-charge')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
       expect(find.textContaining('may have been recorded'), findsOneWidget);
       expect(

@@ -23,6 +23,52 @@ import 'checkout_controller.dart';
 import 'partial_checkout_surface.dart';
 import 'tender_identity.dart';
 
+/// Name the refusal the server or the offline policy already identified.
+///
+/// The full-screen failure state used to ignore this mapping and reduce every
+/// known refusal to the generic "could not complete safely" sentence. Keep the
+/// fallback for genuinely unknown failures, but do not hide an actionable code.
+String checkoutFailureMessage(AppLocalizations l, String? code) {
+  if (code == null) return l.checkoutFailed;
+  return switch (code) {
+    'insufficient_cash' => l.insufficientCashMessage,
+    'invalid_amount' => l.invalidTenderMessage,
+    'totals_changed' => l.totalsConfirmedBody,
+    'remaining_balance' => l.remainingBalanceMessage,
+    'approval_required' => l.approvalRequiredMessage,
+    'terminal_outcome_unknown' ||
+    'CART_PAYMENT_UNRESOLVED' ||
+    'PAYMENT_UNKNOWN' ||
+    'PAYMENT_OUTCOME_UNKNOWN' ||
+    'TERMINAL_OUTCOME_UNKNOWN' => l.paymentUnknownBody,
+    'terminal_reported_failure' => l.terminalFailureMessage,
+    'terminal_declined' => l.terminalDeclinedNoChargeMessage,
+    'terminal_approved' => l.terminalApprovedCollectMessage,
+    'TENDER_PROVIDER_UNAVAILABLE' ||
+    'TERMINAL_TENDER_UNAVAILABLE' => l.terminalUnavailableMessage,
+    'TERMINAL_BUSY' => l.terminalBusyMessage,
+    'tip_rejected' => l.tipRejectedMessage,
+    'discount_rejected' => l.discountRejectedMessage,
+    'EXTERNAL_PAYMENT_NOT_COMMITTED' => l.externalPaymentNotCommittedMessage,
+    'OFFLINE_ADVANCED_TENDER_BLOCKED' => l.offlineAdvancedTenderBlockedMessage,
+    'CART_VERSION_CONFLICT' ||
+    'CART_VALIDATION_FAILED' ||
+    'CHECKOUT_CART_CHANGED' ||
+    'OPTIMISTIC_VERSION_CONFLICT' => l.checkoutCartChangedBody,
+    'OFFLINE_SYNC_PENDING' ||
+    'policy_missing' ||
+    'policy_invalid' ||
+    'policy_disabled' ||
+    'policy_expired' ||
+    'trusted_time_unavailable' ||
+    'fingerprint_mismatch' ||
+    'sale_count_limit' ||
+    'accumulated_amount_limit' ||
+    'queue_capacity_exceeded' => l.checkoutCartNotReadyBody,
+    _ => l.checkoutFailed,
+  };
+}
+
 Future<bool?> _showBankTransferDetailsDialog(
   BuildContext context, {
   required CheckoutController checkout,
@@ -94,15 +140,14 @@ Future<void> showSplitCheckout(
           selected: selected,
         ),
   );
-  if (checkout.state.phase == CheckoutPhase.completed) {
+  final paid = _checkoutHasFinancialResult(checkout.state.phase);
+  if (paid) {
     await sales.checkoutCommitted();
   } else {
     sales.checkoutStopped();
   }
   sales.finishCheckoutPresentation(
-    force:
-        checkout.state.phase == CheckoutPhase.completed ||
-        sales.state.phase == SalePhase.committed,
+    force: paid || sales.state.phase == SalePhase.committed,
   );
 }
 
@@ -148,6 +193,7 @@ Future<void> showCheckoutSheet(
   ReceiptPrintRequest? onPrint,
   Future<String?> Function(String holdState)? onRecoverCashShift,
   Future<String?> Function()? onOpenCashShift,
+  Future<String?> Function()? onEnsureCashShift,
   // The till's wake-up from the API: the server resolves a card attempt about a
   // second after the terminal answers, and this is what tells the waiting screen
   // so instead of the terminal's own ten- and forty-second windows.
@@ -182,6 +228,7 @@ Future<void> showCheckoutSheet(
           onPrint: onPrint,
           onRecoverCashShift: onRecoverCashShift,
           onOpenCashShift: onOpenCashShift,
+          onEnsureCashShift: onEnsureCashShift,
           deviceChannel: deviceChannel,
           cardTerminalPollStart: cardTerminalPollStart,
           cardTerminalPollCap: cardTerminalPollCap,
@@ -191,10 +238,11 @@ Future<void> showCheckoutSheet(
       ),
     ),
   );
+  final paid = _checkoutHasFinancialResult(checkout.state.phase);
   // A hardware back press on the paid receipt returns here without the
   // "Nuevo pedido" action. Mark the sale committed before the cart is
   // cleared, or the paid account stays visible and offers "Cobrar" again.
-  if (checkout.state.phase == CheckoutPhase.completed) {
+  if (paid) {
     await sales.checkoutCommitted();
   }
   // The payment is the authority that this cart is no longer editable. Clear
@@ -202,11 +250,12 @@ Future<void> showCheckoutSheet(
   // `checkingOut -> committed` transition. A completed split used to leave the
   // paid account painted and offer `Cobrar` again.
   sales.finishCheckoutPresentation(
-    force:
-        checkout.state.phase == CheckoutPhase.completed ||
-        sales.state.phase == SalePhase.committed,
+    force: paid || sales.state.phase == SalePhase.committed,
   );
 }
+
+bool _checkoutHasFinancialResult(CheckoutPhase phase) =>
+    phase == CheckoutPhase.completed;
 
 final class _CheckoutSheet extends StatefulWidget {
   const _CheckoutSheet({
@@ -219,6 +268,7 @@ final class _CheckoutSheet extends StatefulWidget {
     this.onPrint,
     required this.onRecoverCashShift,
     required this.onOpenCashShift,
+    required this.onEnsureCashShift,
     required this.deviceChannel,
     required this.cardTerminalPollStart,
     required this.cardTerminalPollCap,
@@ -241,6 +291,7 @@ final class _CheckoutSheet extends StatefulWidget {
   /// drawer but left no shift to charge against.
   final Future<String?> Function(String holdState)? onRecoverCashShift;
   final Future<String?> Function()? onOpenCashShift;
+  final Future<String?> Function()? onEnsureCashShift;
   final DeviceChannelSocketClient? deviceChannel;
   final Duration cardTerminalPollStart;
   final Duration cardTerminalPollCap;
@@ -280,6 +331,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   bool splitArmed = false;
   bool _partialInProgress = false;
   bool _partialRouteOpen = false;
+  bool _chargeInFlight = false;
+  late String? _checkoutCashShiftId;
 
   /// The recovered draft holds a tender combination this location cannot take.
   ///
@@ -373,6 +426,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   @override
   void initState() {
     super.initState();
+    _checkoutCashShiftId = widget.cashShiftId;
     widget.checkout.reset();
     widget.checkout.addListener(_changed);
     widget.customerValue?.addListener(_changed);
@@ -494,7 +548,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
               'checkout.terminal.confirm',
             ) ==
             true,
-        cashShiftId: widget.cashShiftId,
+        cashShiftId: _checkoutCashShiftId,
         onShowBankTransferDetails: (amountMinor, selected) {
           final policy = widget.checkout.policy;
           if (policy?.bankTransferDetails == null) {
@@ -554,10 +608,13 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     }
     if (mounted) setState(() {});
     _loadCustomerValuePreview();
-    if (widget.checkout.state.phase == CheckoutPhase.completed && !committed) {
+    if (_checkoutHasFinancialResult(widget.checkout.state.phase) &&
+        !committed) {
       committed = true;
       unawaited(widget.sales.checkoutCommitted());
-      unawaited(_revealFundedGiftCardAfterCommit());
+      if (widget.checkout.state.phase == CheckoutPhase.completed) {
+        unawaited(_revealFundedGiftCardAfterCommit());
+      }
     }
   }
 
@@ -771,15 +828,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
             context,
             state.result!,
             state.postCommitWarning,
-          ),
-          CheckoutPhase.provisional => _provisional(
-            context,
-            state.provisionalReceipt!,
-          ),
-          CheckoutPhase.provisionalSynced => _provisional(
-            context,
-            state.provisionalReceipt!,
-            officialSaleId: state.officialSaleId,
           ),
           CheckoutPhase.paymentUnknown => _unknown(context, state.result!),
           CheckoutPhase.processing || CheckoutPhase.repricing => Center(
@@ -1412,15 +1460,15 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         Semantics(
                           liveRegion: true,
                           child: Text(
-                            _recoveryMessage(l, state.errorCode!),
+                            checkoutFailureMessage(l, state.errorCode!),
                             style: TextStyle(
                               color: PosTheme.of(context).colorScheme.error,
                             ),
                           ),
                         ),
                       ],
-                      if (state.phase ==
-                          CheckoutPhase.confirmationRequired) ...[
+                      if (state.phase == CheckoutPhase.confirmationRequired &&
+                          !_chargeInFlight) ...[
                         const SizedBox(height: UmiSpacing.lg),
                         Semantics(
                           liveRegion: true,
@@ -1527,6 +1575,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       // live again, because those are decisions.
                       onPressed:
                           !_amountsReadable ||
+                              _chargeInFlight ||
                               (cashEnabled &&
                                   _minorUnits(cashReceived.text) <
                                       ((terminalEnabled ||
@@ -1540,11 +1589,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                               recoveredTenderConflict ||
                               cardCaptureInFlight ||
                               cardWaiting ||
-                              // A split whose legs do not add up to the bill
-                              // cannot be charged; the reading above says by
-                              // how much.
-                              (_splitMode &&
-                                  _tenderLegCount >= 2 &&
+                              // Never send an external payment for a different
+                              // amount than the bill, even with one tender.
+                              ((terminalEnabled ||
+                                      cardEnabled ||
+                                      bankEnabled) &&
                                   _tenderedLegsMinorUnits != grandTotal)
                           ? null
                           : state.phase == CheckoutPhase.awaitingApproval
@@ -1556,10 +1605,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       child: Text(
                         state.phase == CheckoutPhase.awaitingApproval
                             ? l.managerApprovalAction
-                            : state.phase ==
-                                      CheckoutPhase.confirmationRequired &&
-                                  !dirty
-                            ? l.confirmAndPayAction
                             // The total rides on the button, so the cashier confirms
                             // the amount at the moment of the tap (SOTA convention).
                             : '${l.checkoutAction} · ${_money({'currency': totals.grandTotal['currency'], 'minorUnits': grandTotal})}',
@@ -1615,7 +1660,20 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       if (terminalEnabled) '${l.manualTerminalLabel}: ${money(terminalAmount)}',
       if (bankEnabled) '${l.bankTransferLabel}: ${money(bankAmount)}',
     ];
+    final grandTotal = _dueMinorUnits(totals);
+    final difference = _tenderedLegsMinorUnits - grandTotal;
     if (legs.length < 2) {
+      if ((terminalEnabled || cardEnabled || bankEnabled) && difference != 0) {
+        return _TenderNotice(
+          tone: scheme.errorContainer,
+          ink: scheme.onErrorContainer,
+          icon: PosGlyphs.reportProblemOutlined,
+          title: l.tenderMismatchTitle,
+          body: difference < 0
+              ? l.tenderShortBy(amount(-difference))
+              : l.tenderOverBy(amount(difference)),
+        );
+      }
       // An armed split with one leg is half a decision: name the next step
       // instead of leaving the operator to guess what the control did.
       if (!_splitMode) return const SizedBox.shrink();
@@ -1627,8 +1685,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         body: l.splitTenderPickSecond,
       );
     }
-    final grandTotal = _dueMinorUnits(totals);
-    final difference = _tenderedLegsMinorUnits - grandTotal;
     return _TenderNotice(
       tone: scheme.surfaceContainerHighest,
       ink: scheme.onSurface,
@@ -2792,7 +2848,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
 
   bool _partialControlOffered(CheckoutPolicy? policy) =>
       widget.checkout.canCollectPartialPayments &&
-      (widget.cashShiftId != null ||
+      (_checkoutCashShiftId != null ||
           (policy?.manualTerminalEnabled == true &&
               widget.entry.state.operator?.permissions.contains(
                     'checkout.terminal.confirm',
@@ -3428,59 +3484,144 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
 
   String _stableId(String kind) => tenderId(widget.cart.state.cart!.id, kind);
 
+  Future<bool> _refreshOnlineCart() async {
+    final cart = await widget.cart.refreshForCheckout();
+    if (!mounted) return false;
+    if (cart != null) return true;
+    await _showCartNotReady();
+    return false;
+  }
+
+  Future<void> _showCartNotReady() async {
+    final l = AppLocalizations.of(context);
+    await showPosDialog<void>(
+      context: context,
+      builder: (dialogContext) => PosAlertDialog(
+        title: Text(l.checkoutCartNotReadyTitle),
+        content: Text(l.checkoutCartNotReadyBody),
+        actions: [
+          PosButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l.closeAction),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showCartChanged() async {
+    final l = AppLocalizations.of(context);
+    await showPosDialog<void>(
+      context: context,
+      builder: (dialogContext) => PosAlertDialog(
+        title: Text(l.checkoutCartChangedTitle),
+        content: Text(l.checkoutCartChangedBody),
+        actions: [
+          PosButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l.closeAction),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _review(TotalsPreview totals) async {
-    final shownDue = _dueMinorUnits(totals);
-    // Nothing is left to type once the operator commits, so the field lets go of the focus here.
-    //
-    // THIS DOES NOT DISMISS THE KEYBOARD ON THE iMin, and the comment says so rather than pretending
-    // otherwise: measured on 2026-10-11, `dumpsys input_method` still reports `mInputShown=true`
-    // three to ten seconds after `Pagado`, Gboard's log shows the numeric IME being attached
-    // (`inputType=8001`) at the moment of the charge, and no editable is focused in the semantics
-    // tree. `unfocus` here, `unfocus` plus `TextInput.hide` on the result screen, and
-    // `TextInput.hide` here as well were each measured — none of them closed it, and `BACK` does.
-    // The defect and the evidence are in `docs/reports/2026-10-11-imin-keyboard-stays-open.md`; the
-    // next step is to trace the text-input channel during a charge rather than guess again.
-    FocusManager.instance.primaryFocus?.unfocus();
-    unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.hide'));
-    // A card tender is charged on a real terminal BEFORE the checkout runs, and
-    // the checkout waits for the terminal's answer. Every other path (cash, the
-    // manual terminal, an already-answered card) falls through to the ordinary
-    // review below.
-    if (cardEnabled && cardStatus == 'not_started') {
-      await _chargeCardTerminal(totals);
-      if (!mounted) return;
-      return;
-    }
-    if (terminalEnabled &&
-        (terminalStatus != 'confirmed_success' ||
-            _confirmedManualTerminalMinorUnits !=
-                _minorUnits(terminalAmount.text)) &&
-        !await _confirmManualTerminalCharge()) {
-      return;
-    }
-    if (bankEnabled && !await _confirmBankReceived()) return;
-    dirty = false;
-    widget.sales.checkoutStarted();
-    await _sendReview(totals);
-    if (!mounted) return;
-    // One-tap checkout: the cashier saw and verified this total before tapping
-    // Cobrar. The preview is a server recompute for integrity — if it matches
-    // what they saw, commit now in the same action. If UMI recomputed a
-    // DIFFERENT total, fall through to the confirmation screen so the cashier
-    // sees the new number (an inaccurate charge is the costly error to prevent).
-    final reviewed = widget.checkout.state;
-    if (reviewed.phase == CheckoutPhase.confirmationRequired && !dirty) {
-      final repriced =
-          reviewed.result?.confirmation['totals'] as Map<String, Object?>?;
-      final newTotal = repriced == null
-          ? null
-          : (TotalsPreview.fromJson(repriced).grandTotal['minorUnits'] as num?)
-                ?.toInt();
-      if (newTotal != null && newTotal == shownDue) {
-        await _makeValuePairWhole(totals);
-        if (!mounted) return;
-        await widget.checkout.confirm();
+    if (_chargeInFlight) return;
+    setState(() => _chargeInFlight = true);
+    try {
+      final shownDue = _dueMinorUnits(totals);
+      final externalTender = cardEnabled || terminalEnabled || bankEnabled;
+      final shownVersion = widget.cart.state.cart?.version;
+      if (widget.checkout.usesLocalCheckout) {
+        if (externalTender) {
+          await _showCartNotReady();
+          return;
+        }
+      } else if (!await _refreshOnlineCart()) {
+        return;
       }
+      if (!mounted) return;
+      if (externalTender && widget.cart.state.cart?.version != shownVersion) {
+        await _showCartChanged();
+        return;
+      }
+      if (externalTender && _tenderedLegsMinorUnits != shownDue) {
+        await _showCartChanged();
+        return;
+      }
+      // Nothing is left to type once the operator commits, so the field lets go of the focus here.
+      //
+      // THIS DOES NOT DISMISS THE KEYBOARD ON THE iMin, and the comment says so rather than pretending
+      // otherwise: measured on 2026-10-11, `dumpsys input_method` still reports `mInputShown=true`
+      // three to ten seconds after `Pagado`, Gboard's log shows the numeric IME being attached
+      // (`inputType=8001`) at the moment of the charge, and no editable is focused in the semantics
+      // tree. `unfocus` here, `unfocus` plus `TextInput.hide` on the result screen, and
+      // `TextInput.hide` here as well were each measured — none of them closed it, and `BACK` does.
+      // The defect and the evidence are in `docs/reports/2026-10-11-imin-keyboard-stays-open.md`; the
+      // next step is to trace the text-input channel during a charge rather than guess again.
+      FocusManager.instance.primaryFocus?.unfocus();
+      unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.hide'));
+      // A card tender is charged on a real terminal BEFORE the checkout runs, and
+      // the checkout waits for the terminal's answer. Every other path (cash, the
+      // manual terminal, an already-answered card) falls through to the ordinary
+      // review below.
+      if (cardEnabled && cardStatus == 'not_started') {
+        await _chargeCardTerminal(totals);
+        if (!mounted) return;
+        return;
+      }
+      if (terminalEnabled &&
+          (terminalStatus != 'confirmed_success' ||
+              _confirmedManualTerminalMinorUnits !=
+                  _minorUnits(terminalAmount.text)) &&
+          !await _confirmManualTerminalCharge()) {
+        return;
+      }
+      if (bankEnabled && !await _confirmBankReceived()) return;
+      if (cashEnabled && _checkoutCashShiftId == null) {
+        _checkoutCashShiftId = await widget.onEnsureCashShift?.call();
+        if (!mounted) return;
+      }
+      dirty = false;
+      widget.sales.checkoutStarted();
+      await _sendReview(totals);
+      if (!mounted) return;
+      // One-tap checkout: the cashier saw and verified this total before tapping
+      // Cobrar. The preview is a server recompute for integrity — if it matches
+      // what they saw, commit now in the same action. If UMI recomputed a
+      // DIFFERENT total, fall through to the confirmation screen so the cashier
+      // sees the new number (an inaccurate charge is the costly error to prevent).
+      final reviewed = widget.checkout.state;
+      if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+        final repricedProbe =
+            reviewed.result?.confirmation['totals'] as Map<String, Object?>?;
+        final newTotalProbe = repricedProbe == null
+            ? null
+            : (TotalsPreview.fromJson(repricedProbe).grandTotal['minorUnits']
+                      as num?)
+                  ?.toInt();
+        debugPrint(
+          '[umipos] checkout review phase=${reviewed.phase.name} '
+          'dirty=$dirty newTotal=$newTotalProbe shownDue=$shownDue',
+        );
+      }
+      if (reviewed.phase == CheckoutPhase.confirmationRequired) {
+        final repriced =
+            reviewed.result?.confirmation['totals'] as Map<String, Object?>?;
+        final newTotal = repriced == null
+            ? null
+            : (TotalsPreview.fromJson(repriced).grandTotal['minorUnits']
+                      as num?)
+                  ?.toInt();
+        if (newTotal != null && newTotal == shownDue) {
+          await _makeValuePairWhole(totals);
+          if (!mounted) return;
+          await widget.checkout.confirm();
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _chargeInFlight = false);
     }
   }
 
@@ -3525,7 +3666,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       authority: offlineAuthority,
       locationName: entry.selectedBranch?.name ?? '',
       operatorName: operator?.staffId ?? cart.operatorSessionId,
-      cashShiftId: widget.cashShiftId,
+      cashShiftId: _checkoutCashShiftId,
       cashReceivedMinorUnits: cashEnabled
           ? _minorUnits(cashReceived.text)
           : null,
@@ -3594,7 +3735,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         cashEnabled = true;
         method = 'cash';
         _balanceTenderFields(totals);
-        cardMessage = _recoveryMessage(l, error.code);
+        cardMessage = checkoutFailureMessage(l, error.code);
       });
       return;
     }
@@ -3983,168 +4124,55 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     storedValueTenders = const [];
   }
 
-  String _recoveryMessage(AppLocalizations l, String code) => switch (code) {
-    'insufficient_cash' => l.insufficientCashMessage,
-    // The tender the server refused, at the moment it refused it. The checkout
-    // reports this as `invalid_amount`, which had no message, so every refusal
-    // of this kind fell through to "the charge could not be completed safely" -
-    // true, useless, and the reason a dead end looked like a server fault.
-    'invalid_amount' => l.invalidTenderMessage,
-    'totals_changed' => l.totalsConfirmedBody,
-    'remaining_balance' => l.remainingBalanceMessage,
-    'approval_required' => l.approvalRequiredMessage,
-    'terminal_outcome_unknown' => l.paymentUnknownBody,
-    'terminal_reported_failure' => l.terminalFailureMessage,
-    // The terminal's own answer, read back to the operator on the tender screen
-    // the sale returns to. A decline is not a failure of ours and not a sale:
-    // nothing was taken, so the sentence has to say so before it offers cash.
-    'terminal_declined' => l.terminalDeclinedNoChargeMessage,
-    'terminal_approved' => l.terminalApprovedCollectMessage,
-    // The card tile charges BEFORE the checkout, so a refusal here is a tender
-    // refusal and not a checkout failure: the sale is still open on this screen.
-    'TENDER_PROVIDER_UNAVAILABLE' ||
-    'TERMINAL_TENDER_UNAVAILABLE' => l.terminalUnavailableMessage,
-    'TERMINAL_BUSY' => l.terminalBusyMessage,
-    'tip_rejected' => l.tipRejectedMessage,
-    'discount_rejected' => l.discountRejectedMessage,
-    'OFFLINE_ADVANCED_TENDER_BLOCKED' => l.offlineAdvancedTenderBlockedMessage,
-    _ => l.checkoutFailed,
-  };
-
-  Widget _provisional(
-    BuildContext context,
-    ProvisionalReceipt receipt, {
-    String? officialSaleId,
-  }) {
-    final l = AppLocalizations.of(context);
-    final spanish = Localizations.localeOf(context).languageCode == 'es';
-    final synced = officialSaleId != null;
-    final snapshot = OfflineCheckoutSnapshot.fromJson(receipt.snapshot);
-    final totals = TotalsConfirmation.fromJson(snapshot.totals);
-    final preview = TotalsPreview.fromJson(totals.totals);
-    final cart = Cart.fromJson(snapshot.cartSnapshot);
-    return Semantics(
-      liveRegion: true,
-      label: synced
-          ? (spanish ? 'Venta sincronizada' : 'Sale synchronised')
-          : l.provisionalSalePendingTitle,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Centered, not stretched. A `PosIcon` is a `SizedBox.square` around
-          // a painter that scales by the box's width and height separately, and
-          // this Column stretches its children — so the 64 px cloud was being
-          // laid out 1 800 px wide and painted 28:1 flat, which on the receipt
-          // screen looked like a torn dark ribbon above the title.
-          Center(
-            child: PosIcon(
-              synced ? PosGlyphs.cloudDoneOutlined : PosGlyphs.cloudOffOutlined,
-              size: 64,
-            ),
-          ),
-          Text(
-            synced
-                ? (spanish ? 'Venta sincronizada' : 'Sale synchronised')
-                : l.provisionalSalePendingTitle,
-            textAlign: TextAlign.center,
-            style: PosTheme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: UmiSpacing.md),
-          Text(
-            synced
-                ? (spanish
-                      ? 'La venta ya es oficial. El folio de abajo identifica la venta en el servidor.'
-                      : 'The sale is official. The reference below identifies it on the server.')
-                : l.provisionalSalePendingBody,
-            textAlign: TextAlign.center,
-          ),
-          PosSelectableText(
-            officialSaleId ?? receipt.provisionalSaleId,
-            textAlign: TextAlign.center,
-          ),
-          Text(receipt.locationName, textAlign: TextAlign.center),
-          Text(receipt.operatorName, textAlign: TextAlign.center),
-          const PosDivider(),
-          Expanded(
-            child: ListView(
-              children: [
-                for (final raw in cart.items)
-                  Builder(
-                    builder: (context) {
-                      final line = CartItem.fromJson(raw);
-                      return PosListRow(
-                        title: Text(line.productName),
-                        subtitle: Text(
-                          [
-                            if (line.variant != null)
-                              line.variant!['name'] as String,
-                            ...line.modifiers.map(
-                              (modifier) => modifier['name']! as String,
-                            ),
-                          ].join(' · '),
-                        ),
-                        trailing: Text('${line.quantity}'),
-                      );
-                    },
-                  ),
-              ],
-            ),
-          ),
-          _AmountRow(label: l.taxLabel, value: _money(preview.tax)),
-          _AmountRow(
-            label: l.totalLabel,
-            value: _money(preview.grandTotal),
-            emphasized: true,
-          ),
-          _AmountRow(
-            label: l.cashReceivedLabel,
-            value: _money({
-              'currency': snapshot.currency,
-              'minorUnits': snapshot.amountReceivedMinorUnits,
-            }),
-          ),
-          _AmountRow(
-            label: l.changeDueLabel,
-            value: _money({
-              'currency': snapshot.currency,
-              'minorUnits': snapshot.changeDueMinorUnits,
-            }),
-          ),
-          Text('${l.businessDateLabel}: ${snapshot.businessDate}'),
-          const Spacer(),
-          PosButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l.returnToCatalogAction),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _confirm(TotalsPreview totals) async {
-    if (terminalEnabled &&
-        (terminalStatus != 'confirmed_success' ||
-            _confirmedManualTerminalMinorUnits !=
-                _minorUnits(terminalAmount.text))) {
-      if (!await _confirmManualTerminalCharge()) return;
+    if (_chargeInFlight) return;
+    setState(() => _chargeInFlight = true);
+    try {
+      if (widget.checkout.usesLocalCheckout) {
+        if (cardEnabled || terminalEnabled || bankEnabled) {
+          await _showCartNotReady();
+          return;
+        }
+      } else {
+        final reviewedVersion = widget.cart.state.cart?.version;
+        if (!await _refreshOnlineCart()) return;
+        if (widget.cart.state.cart?.version != reviewedVersion) {
+          await _showCartChanged();
+          return;
+        }
+      }
       if (!mounted) return;
-      await _sendReview(totals);
+      if ((cardEnabled || terminalEnabled || bankEnabled) &&
+          _tenderedLegsMinorUnits != _dueMinorUnits(totals)) {
+        await _showCartChanged();
+        return;
+      }
+      if (terminalEnabled &&
+          (terminalStatus != 'confirmed_success' ||
+              _confirmedManualTerminalMinorUnits !=
+                  _minorUnits(terminalAmount.text))) {
+        if (!await _confirmManualTerminalCharge()) return;
+        if (!mounted) return;
+        await _sendReview(totals);
+        if (!mounted) return;
+      }
+      if (bankEnabled && !bankConfirmed) {
+        if (!await _confirmBankReceived()) return;
+        if (!mounted) return;
+        await _sendReview(totals);
+        if (!mounted) return;
+      }
+      // The confirmationRequired screen already shows the recomputed totals and
+      // the "Confirmar y cobrar" button, so a second modal asking the same thing
+      // was pure friction — commit directly. A customer's value still owes its
+      // half of the pair, so the charge goes through the same three steps the
+      // one-tap path uses.
+      await _makeValuePairWhole(totals);
       if (!mounted) return;
+      await widget.checkout.confirm();
+    } finally {
+      if (mounted) setState(() => _chargeInFlight = false);
     }
-    if (bankEnabled && !bankConfirmed) {
-      if (!await _confirmBankReceived()) return;
-      if (!mounted) return;
-      await _sendReview(totals);
-      if (!mounted) return;
-    }
-    // The confirmationRequired screen already shows the recomputed totals and
-    // the "Confirmar y cobrar" button, so a second modal asking the same thing
-    // was pure friction — commit directly. A customer's value still owes its
-    // half of the pair, so the charge goes through the same three steps the
-    // one-tap path uses.
-    await _makeValuePairWhole(totals);
-    if (!mounted) return;
-    await widget.checkout.confirm();
   }
 
   /// Wait for the customer-value preview the commit has to carry, then push it to the checkout.
@@ -4370,12 +4398,25 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     });
     final l = AppLocalizations.of(context);
     final es = Localizations.localeOf(context).languageCode == 'es';
-    final receipt = ReceiptSnapshot.fromJson(result.receipt!);
     final summary = result.paymentSummary == null
         ? null
         : PaymentSummary.fromJson(result.paymentSummary!);
-    final currency = receipt.grandTotal['currency'] as String? ?? '';
-    final totalMinor = (receipt.grandTotal['minorUnits'] as num?)?.toInt() ?? 0;
+    final receipt = result.receipt == null
+        ? null
+        : ReceiptSnapshot.fromJson(result.receipt!);
+    final confirmedTotals = result.confirmation['totals'];
+    final confirmedGrandTotal = confirmedTotals is Map
+        ? confirmedTotals['grandTotal']
+        : null;
+    final total =
+        receipt?.grandTotal ??
+        summary?.amountDue ??
+        (confirmedGrandTotal is Map
+            ? confirmedGrandTotal.cast<String, Object?>()
+            : null) ??
+        const <String, Object?>{'minorUnits': 0, 'currency': 'MXN'};
+    final currency = total['currency'] as String? ?? 'MXN';
+    final totalMinor = (total['minorUnits'] as num?)?.toInt() ?? 0;
     final changeMinor = summary == null
         ? 0
         : (summary.change['minorUnits'] as num?)?.toInt() ?? 0;
@@ -4441,58 +4482,59 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
-            _money(receipt.grandTotal),
+            _money(total),
             style: display?.copyWith(fontWeight: FontWeight.w800),
           ),
         ),
         const SizedBox(height: UmiSpacing.md),
         Text(
           '${es ? 'Recibiste' : 'Received'}: ${_money(money(receivedMinor))}   ·   '
-          '${es ? 'Consumo' : 'Total'}: ${_money(receipt.grandTotal)}',
+          '${es ? 'Consumo' : 'Total'}: ${_money(total)}',
           textAlign: TextAlign.center,
           style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
             color: PosTheme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         const Spacer(),
-        Row(
-          children: [
-            Expanded(
-              child: PosOutlineButton.icon(
-                onPressed: () => _showReceiptDetail(
-                  context,
-                  receipt,
-                  // The receipt's own id is what the server files the print job
-                  // against, and it comes from the committed sale.
-                  receiptId: result.sale?['receiptId'] as String?,
-                  snapshot: result.receipt,
+        if (receipt != null)
+          Row(
+            children: [
+              Expanded(
+                child: PosOutlineButton.icon(
+                  onPressed: () => _showReceiptDetail(
+                    context,
+                    receipt,
+                    // The receipt's own id is what the server files the print job
+                    // against, and it comes from the committed sale.
+                    receiptId: result.sale?['receiptId'] as String?,
+                    snapshot: result.receipt,
+                  ),
+                  icon: const PosIcon(PosGlyphs.receiptLongOutlined),
+                  label: Text(es ? 'Ver comprobante' : 'View receipt'),
                 ),
-                icon: const PosIcon(PosGlyphs.receiptLongOutlined),
-                label: Text(es ? 'Ver comprobante' : 'View receipt'),
               ),
-            ),
-            const SizedBox(width: UmiSpacing.md),
-            Expanded(
-              child: PosButton(
-                style: PosButton.styleFrom(
-                  minimumSize: const Size.fromHeight(56),
-                ),
-                onPressed: () async {
-                  if (!committed) {
-                    committed = true;
-                    await widget.sales.checkoutCommitted();
-                  }
-                  widget.sales.finishCheckoutPresentation(force: true);
-                  if (context.mounted) Navigator.pop(context);
-                },
-                child: Text(es ? 'Nuevo pedido' : 'New order'),
-              ),
-            ),
-          ],
-        ),
+              const SizedBox(width: UmiSpacing.md),
+              Expanded(child: _nextOrder(context, committed, es)),
+            ],
+          )
+        else
+          _nextOrder(context, committed, es),
       ],
     );
   }
+
+  Widget _nextOrder(BuildContext context, bool committed, bool es) => PosButton(
+    style: PosButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+    onPressed: () async {
+      if (!committed) {
+        committed = true;
+        await widget.sales.checkoutCommitted();
+      }
+      widget.sales.finishCheckoutPresentation(force: true);
+      if (context.mounted) Navigator.pop(context);
+    },
+    child: Text(es ? 'Nuevo pedido' : 'New order'),
+  );
 
   Future<void> _showReceiptDetail(
     BuildContext context,
@@ -4523,7 +4565,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     final l = AppLocalizations.of(context);
     final state = widget.checkout.state;
     final hold = state.holdState;
-    var body = l.checkoutFailed;
+    var body = checkoutFailureMessage(l, code);
     Widget action = PosButton.tonal(
       onPressed: widget.checkout.reset,
       child: Text(l.retryAction),
@@ -5071,14 +5113,9 @@ final class _KeyButton extends StatelessWidget {
 }
 
 final class _AmountRow extends StatelessWidget {
-  const _AmountRow({
-    required this.label,
-    required this.value,
-    this.emphasized = false,
-  });
+  const _AmountRow({required this.label, required this.value});
   final String label;
   final String value;
-  final bool emphasized;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -5088,17 +5125,7 @@ final class _AmountRow extends StatelessWidget {
       children: [
         Expanded(child: Text(label)),
         const SizedBox(width: UmiSpacing.sm),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: emphasized
-                ? const UmiOperatorTokens()
-                      .money(PosTheme.of(context).textTheme)
-                      .copyWith(fontSize: 24)
-                : null,
-          ),
-        ),
+        Flexible(child: Text(value, textAlign: TextAlign.right)),
       ],
     ),
   );

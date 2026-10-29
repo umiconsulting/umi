@@ -594,40 +594,96 @@ export class PosCashRepository {
     dto: CashMovementRequest,
   ): Promise<CashMovement> {
     const shift = await client.query<{
+      status: string;
       registerId: string;
       currency: string;
       businessDate: string;
       version: number;
       sequence: string;
+      holdingDeviceId: string;
+      responsibleOperatorId: string;
     }>(
-      `SELECT register_id::text AS "registerId",currency,business_date::text AS "businessDate",
-              version,ledger_sequence::text AS sequence
+      `SELECT status,register_id::text AS "registerId",currency,
+              business_date::text AS "businessDate",version,
+              ledger_sequence::text AS sequence,
+              holding_device_id::text AS "holdingDeviceId",
+              responsible_operator_id::text AS "responsibleOperatorId"
        FROM merchant.cash_shift
        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
-         AND responsible_operator_id=$4::uuid AND holding_device_id=$5::uuid
-         AND status='open' AND version=$6
        FOR UPDATE`,
-      [
-        dto.shiftId,
-        merchantId,
-        dto.locationId,
-        authorization.operatorId,
-        authorization.deviceId,
-        dto.expectedShiftVersion,
-      ],
+      [dto.shiftId, merchantId, dto.locationId],
     );
     const current = shift.rows[0];
-    if (!current || current.currency !== dto.amount.currency) throw new Error('SHIFT_NOT_OPEN');
+    if (!current) {
+      throw new CashRefusal('RESOURCE_NOT_FOUND', 404, {
+        reason: 'shift_not_found',
+        shiftId: dto.shiftId,
+      });
+    }
+    if (current.version !== dto.expectedShiftVersion) {
+      throw new CashRefusal('OPTIMISTIC_VERSION_CONFLICT', 409, {
+        reason: 'shift_changed',
+        shiftId: dto.shiftId,
+        shiftStatus: current.status,
+        shiftVersion: current.version,
+        expectedShiftVersion: dto.expectedShiftVersion,
+      });
+    }
+    if (current.status !== 'open') {
+      throw new CashRefusal('INVALID_SHIFT_TRANSITION', 409, {
+        reason: 'shift_state_not_open',
+        shiftId: dto.shiftId,
+        shiftStatus: current.status,
+        shiftVersion: current.version,
+      });
+    }
+    if (current.holdingDeviceId !== authorization.deviceId) {
+      throw new CashRefusal('INVALID_SHIFT_TRANSITION', 409, {
+        reason: 'shift_held_by_another_device',
+        shiftId: dto.shiftId,
+        holdingDeviceId: current.holdingDeviceId,
+        actingDeviceId: authorization.deviceId,
+      });
+    }
+    if (current.responsibleOperatorId !== authorization.operatorId) {
+      throw new CashRefusal('INVALID_SHIFT_TRANSITION', 409, {
+        reason: 'shift_operator_changed',
+        shiftId: dto.shiftId,
+        responsibleOperatorId: current.responsibleOperatorId,
+        actingOperatorId: authorization.operatorId,
+      });
+    }
+    if (current.currency !== dto.amount.currency) {
+      throw new CashRefusal('VALIDATION_FAILED', 400, {
+        reason: 'shift_currency_mismatch',
+        shiftId: dto.shiftId,
+        shiftCurrency: current.currency,
+        movementCurrency: dto.amount.currency,
+      });
+    }
     const policy = await this.policy(client, merchantId, dto.locationId, current.currency);
-    if (!policy.allowedMovementTypes.includes(dto.type)) throw new Error('CASH_POLICY_DENIED');
+    if (!policy.allowedMovementTypes.includes(dto.type)) {
+      throw new CashRefusal('CASH_POLICY_DENIED', 409, {
+        movementType: dto.type,
+        allowedMovementTypes: policy.allowedMovementTypes.join(','),
+      });
+    }
     if (
       dto.amount.minorUnits >= policy.movementApprovalThreshold.minorUnits &&
       dto.approvalId === null
     ) {
-      throw new Error('APPROVAL_REQUIRED');
+      throw new CashRefusal('APPROVAL_REQUIRED', 409, {
+        movementType: dto.type,
+        amountMinorUnits: dto.amount.minorUnits,
+        approvalThresholdMinorUnits: policy.movementApprovalThreshold.minorUnits,
+      });
     }
     if (dto.approvalId) {
-      if (!dto.actionFingerprint) throw new Error('APPROVAL_FINGERPRINT_REQUIRED');
+      if (!dto.actionFingerprint) {
+        throw new CashRefusal('APPROVAL_FINGERPRINT_REQUIRED', 409, {
+          movementType: dto.type,
+        });
+      }
       const expectedFingerprint = createHash('sha256')
         .update(
           [
@@ -644,7 +700,9 @@ export class PosCashRepository {
         )
         .digest('hex');
       if (dto.actionFingerprint !== expectedFingerprint) {
-        throw new Error('APPROVAL_FINGERPRINT_MISMATCH');
+        throw new CashRefusal('APPROVAL_FINGERPRINT_MISMATCH', 409, {
+          movementType: dto.type,
+        });
       }
       await this.consumeApproval(client, dto.approvalId, {
         merchantId,
@@ -657,7 +715,11 @@ export class PosCashRepository {
     if (dto.type === 'paid_out' || dto.type === 'safe_drop') {
       const expected = await this.expectedCash(client, dto.shiftId);
       if (dto.amount.minorUnits > expected.expectedDrawerCash.minorUnits) {
-        throw new Error('INSUFFICIENT_EXPECTED_CASH');
+        throw new CashRefusal('INSUFFICIENT_EXPECTED_CASH', 409, {
+          movementType: dto.type,
+          requestedMinorUnits: dto.amount.minorUnits,
+          expectedDrawerCashMinorUnits: expected.expectedDrawerCash.minorUnits,
+        });
       }
     }
     const sequence = Number(current.sequence) + 1;

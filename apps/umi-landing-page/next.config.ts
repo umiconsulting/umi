@@ -13,11 +13,6 @@ try {
   Reflect.deleteProperty(globalThis, 'localStorage');
 }
 
-const nextConfig: NextConfig = {
-  /* config options here */
-  images: {
-    domains: ['images.unsplash.com'],
-  },
-};
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

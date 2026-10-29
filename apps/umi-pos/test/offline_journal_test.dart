@@ -81,6 +81,70 @@ void main() {
     expect((await journal.load()).pendingCount, 1);
   });
 
+  test(
+    'a cash conflict blocks its mapped account but not another account',
+    () async {
+      final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+      final provisionalCart = _id(110);
+      final officialCart = _id(111);
+      final otherCart = _id(112);
+      await journal.append(
+        commandId: _id(113),
+        deviceId: _id(114),
+        credentialVersion: 1,
+        merchantId: _id(115),
+        locationId: _id(116),
+        operatorSessionId: _id(117),
+        idempotencyKey: _id(118),
+        commandType: 'pos.cart.open',
+        provisionalId: provisionalCart,
+        payload: const {},
+      );
+      await journal.apply(
+        ReplayResult(
+          commandId: _id(113),
+          deviceSequence: 1,
+          status: 'accepted',
+          officialId: officialCart,
+          officialCommit: null,
+          serverConflictReference: null,
+          failure: null,
+        ),
+      );
+      await journal.append(
+        commandId: _id(119),
+        deviceId: _id(114),
+        credentialVersion: 1,
+        merchantId: _id(115),
+        locationId: _id(116),
+        operatorSessionId: _id(117),
+        idempotencyKey: _id(120),
+        commandType: 'pos.checkout.cash',
+        payload: {
+          'snapshot': {
+            'checkoutCommand': {'cartId': provisionalCart},
+          },
+        },
+        maxPendingCashCount: 3,
+        maxPendingCashMinorUnits: 10000,
+        cashAmountMinorUnits: 4500,
+      );
+      await journal.apply(
+        ReplayResult(
+          commandId: _id(119),
+          deviceSequence: 2,
+          status: 'conflict',
+          officialId: null,
+          officialCommit: null,
+          serverConflictReference: _id(121),
+          failure: const {'classification': 'server_validation_failed'},
+        ),
+      );
+      expect(journal.hasPendingForCart(officialCart), isTrue);
+      expect(journal.hasPendingForCart(otherCart), isFalse);
+    },
+  );
+
   test('a re-enrolled device starts a clean replay stream', () async {
     final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
     for (var offset = 0; offset < 2; offset++) {

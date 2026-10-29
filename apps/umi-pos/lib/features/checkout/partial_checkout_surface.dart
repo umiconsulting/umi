@@ -429,12 +429,15 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
     } on AppException catch (failure) {
       if (!mounted) return;
       if (failure.code == 'RESOURCE_NOT_FOUND') {
-        final empty = _localLedger();
         setState(() {
-          ledger = empty;
-          _ledgerVerified = true;
-          if (!uncertain) _seedRemaining(empty);
-          if (uncertain && pendingCommand != null) retryReady = true;
+          ledger = null;
+          _ledgerVerified = false;
+          pendingCommand = null;
+          retryReady = false;
+          error = label(
+            'Esta cuenta ya se cerró o se guardó desde otra pantalla. Vuelve a Cuentas para abrirla de nuevo.',
+            'This account was already closed or saved from another screen. Return to Accounts to open it again.',
+          );
         });
       } else {
         setState(() => error = _errorMessage(failure));
@@ -458,36 +461,9 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
     }
   }
 
-  Future<bool> _confirmFreeze() async {
-    if (tenderDrafts.isNotEmpty) return true;
-    return await showPosDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) => PosAlertDialog(
-            title: Text(label('Iniciar cobro dividido', 'Start split payment')),
-            content: Text(
-              label(
-                'Después del primer pago, la comanda queda fija hasta cerrar la cuenta. Verifica los productos antes de continuar.',
-                'After the first payment, the order stays fixed until the account closes. Check the items before continuing.',
-              ),
-            ),
-            actions: [
-              PosTextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: Text(label('Volver', 'Back')),
-              ),
-              PosButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: Text(label('Continuar', 'Continue')),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
-
   Future<String?> _confirmExternal() async {
-    final reference = TextEditingController();
+    final needsReference = method != 'manual_terminal';
+    final reference = needsReference ? TextEditingController() : null;
     final policy = widget.checkout.policy;
     final details = policy?.bankTransferDetails;
     final result = await showPosDialog<String>(
@@ -524,17 +500,19 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                   if (details['accountNumber'] != null)
                     Text('${details['accountNumber']}'),
                 ],
-                const SizedBox(height: UmiSpacing.md),
-                PosField(
-                  controller: reference,
-                  decoration: PosFieldDecoration(
-                    labelText: label(
-                      'Folio del comprobante',
-                      'Receipt reference',
+                if (needsReference) ...[
+                  const SizedBox(height: UmiSpacing.md),
+                  PosField(
+                    controller: reference,
+                    decoration: PosFieldDecoration(
+                      labelText: label(
+                        'Folio del comprobante',
+                        'Receipt reference',
+                      ),
                     ),
+                    onChanged: (_) => update(() {}),
                   ),
-                  onChanged: (_) => update(() {}),
-                ),
+                ],
               ],
             ),
           ),
@@ -544,17 +522,20 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
               child: Text(label('Cancelar', 'Cancel')),
             ),
             PosButton(
-              onPressed: reference.text.trim().isEmpty
+              onPressed: needsReference && reference!.text.trim().isEmpty
                   ? null
-                  : () =>
-                        Navigator.of(dialogContext).pop(reference.text.trim()),
+                  : () => Navigator.of(dialogContext).pop(
+                      needsReference
+                          ? reference!.text.trim()
+                          : 'operator_confirmed_terminal_screen',
+                    ),
               child: Text(label('Sí, se cobró', 'Yes, paid')),
             ),
           ],
         ),
       ),
     );
-    reference.dispose();
+    reference?.dispose();
     return result;
   }
 
@@ -640,7 +621,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
   }
 
   Future<void> _collect() async {
-    if (!canCollect || !await _confirmFreeze() || !mounted) return;
+    if (!canCollect || !mounted) return;
     String? reference;
     if (method != 'cash') {
       reference = await _confirmExternal();
@@ -826,6 +807,10 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                       children: [
                         if (ledger == null && busy)
                           const Center(child: PosSpinner()),
+                        if (error != null) ...[
+                          _notice(error!),
+                          const SizedBox(height: UmiSpacing.md),
+                        ],
                         if (ledger != null) ...[
                           Wrap(
                             spacing: UmiSpacing.md,
@@ -1152,30 +1137,6 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                                   'Open a cash shift or enable a payment method to split this account.',
                                 ),
                               ),
-                            if (method == 'cash') ...[
-                              const SizedBox(height: UmiSpacing.md),
-                              PosField(
-                                key: const ValueKey('partial-cash-received'),
-                                controller: cashReceived,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                inputFormatters: cashAmountFormatters,
-                                decoration: PosFieldDecoration(
-                                  labelText: label(
-                                    'Efectivo recibido',
-                                    'Cash received',
-                                  ),
-                                ),
-                                onChanged: (_) => cashReceivedEdited = true,
-                              ),
-                              if (receivedMinor != null &&
-                                  receivedMinor! >= charge)
-                                Text(
-                                  '${label('Cambio', 'Change')}: ${money(receivedMinor! - charge)}',
-                                ),
-                            ],
                             const SizedBox(height: UmiSpacing.md),
                             Text(
                               '${label('Consumo', 'Portion')} ${money(principalMinor ?? 0)} + '
@@ -1185,10 +1146,6 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                               style: theme.textTheme.titleMedium,
                             ),
                           ],
-                        ],
-                        if (error != null) ...[
-                          const SizedBox(height: UmiSpacing.md),
-                          _notice(error!),
                         ],
                       ],
                     ),
@@ -1200,30 +1157,91 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
               Padding(
                 padding: const EdgeInsets.all(UmiSpacing.lg),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 900),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: PosButton(
-                      key: ValueKey(
-                        canFinalize ? 'partial-finalize' : 'partial-charge',
-                      ),
-                      onPressed: canFinalize && !busy && !finalizationUnknown
-                          ? _finalize
-                          : canCollect
-                          ? _collect
-                          : null,
-                      child: Text(
-                        canFinalize
-                            ? label('Cerrar cuenta', 'Close account')
-                            : '${label('Cobrar', 'Charge')} ${money(charge)}',
-                      ),
-                    ),
-                  ),
+                  constraints: const BoxConstraints(maxWidth: 1400),
+                  child: _checkoutBar(),
                 ),
               ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _checkoutBar() {
+    final action = PosButton(
+      key: ValueKey(canFinalize ? 'partial-finalize' : 'partial-charge'),
+      onPressed: canFinalize && !busy && !finalizationUnknown
+          ? _finalize
+          : canCollect
+          ? _collect
+          : null,
+      child: Text(
+        canFinalize
+            ? label('Cerrar cuenta', 'Close account')
+            : '${label('Cobrar', 'Charge')} ${money(charge)}',
+      ),
+    );
+    final blockedHere = hasUnknown || uncertain || finalizationUnknown;
+    if (canFinalize || blockedHere || method != 'cash') return action;
+
+    final received = receivedMinor;
+    final difference = received == null ? null : received - charge;
+    final cash = PosField(
+      key: const ValueKey('partial-cash-received'),
+      controller: cashReceived,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: cashAmountFormatters,
+      decoration: PosFieldDecoration(
+        labelText: label('Efectivo recibido', 'Cash received'),
+      ),
+      onChanged: (_) => cashReceivedEdited = true,
+    );
+    final change = Column(
+      key: const ValueKey('partial-cash-change'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          difference != null && difference < 0
+              ? label('Falta', 'Amount due')
+              : label('Cambio', 'Change'),
+          style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+            color: PosTheme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        Text(
+          difference == null ? '—' : money(difference.abs()),
+          style: PosTheme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 760) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              cash,
+              const SizedBox(height: UmiSpacing.sm),
+              change,
+              const SizedBox(height: UmiSpacing.sm),
+              action,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            SizedBox(width: 280, child: cash),
+            const SizedBox(width: UmiSpacing.lg),
+            SizedBox(width: 180, child: change),
+            const SizedBox(width: UmiSpacing.lg),
+            Expanded(child: action),
+          ],
+        );
+      },
     );
   }
 

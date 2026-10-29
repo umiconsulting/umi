@@ -130,19 +130,21 @@ async function insertKitchenItems(
   sourceOrderId: string,
   kitchenOrderId: string,
   projection: KitchenProjection,
-): Promise<void> {
+): Promise<number> {
+  let insertedItems = 0;
   for (const line of projection.rows) {
     const assignment = projection.routeByLine.get(line.lineId);
     if (!assignment) continue;
     const selectedRoute = projection.routeRows.find((route) => route.id === assignment.routeId);
-    await client.query(
+    const inserted = await client.query<{ id: string }>(
       `INSERT INTO merchant.kitchen_order_item
          (merchant_id,location_id,kitchen_order_id,source_order_id,source_order_item_id,
           station_id,status,product_id,product_name,variant_name,modifiers,quantity,
           course_number,preparation_note,display_order,route_reason,target_seconds)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8::uuid,$9,$10,
                $11::jsonb,$12,$13,$14,$15,$16,$17)
-       ON CONFLICT (merchant_id,source_order_item_id) DO NOTHING`,
+       ON CONFLICT (merchant_id,source_order_item_id) DO NOTHING
+       RETURNING id::text`,
       [
         merchantId,
         projection.locationId,
@@ -163,6 +165,7 @@ async function insertKitchenItems(
         selectedRoute?.targetSeconds ?? line.targetSeconds,
       ],
     );
+    insertedItems += inserted.rows.length;
   }
 
   await client.query(
@@ -170,6 +173,7 @@ async function insertKitchenItems(
       WHERE merchant_id=$1::uuid AND id=$2::uuid`,
     [merchantId, kitchenOrderId, JSON.stringify(projection.routeSnapshot)],
   );
+  return insertedItems;
 }
 
 export async function projectKitchenOrder(
@@ -299,7 +303,19 @@ export async function appendKitchenItems(
 
   const projection = await loadKitchenProjection(client, merchantId, sourceOrderId);
   if (!projection) return null;
-  await insertKitchenItems(client, merchantId, sourceOrderId, kitchenOrderId, projection);
+  const insertedItems = await insertKitchenItems(
+    client,
+    merchantId,
+    sourceOrderId,
+    kitchenOrderId,
+    projection,
+  );
+  if (insertedItems === 0) {
+    // Checkout calls this with the order's complete item set even when no new
+    // lines were added. Re-running the idempotent insert must not reopen a
+    // finished or cancelled ticket and make it look like new kitchen work.
+    return kitchenOrderId;
+  }
 
   const reopened = await client.query<{ version: number; status: string }>(
     `UPDATE merchant.kitchen_order

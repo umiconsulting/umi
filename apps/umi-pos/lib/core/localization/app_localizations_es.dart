@@ -451,6 +451,20 @@ class AppLocalizationsEs extends AppLocalizations {
       'No fue posible completar el cobro de forma segura.';
 
   @override
+  String get checkoutCartNotReadyTitle => 'Cuenta pendiente de actualizar';
+
+  @override
+  String get checkoutCartNotReadyBody =>
+      'No pude confirmar el estado actual de la cuenta. Revisa la conexión y el Centro de recuperación antes de cobrar. Si la terminal ya confirmó un pago, no lo repitas.';
+
+  @override
+  String get checkoutCartChangedTitle => 'Revisa el cobro';
+
+  @override
+  String get checkoutCartChangedBody =>
+      'La cuenta o el importe aplicado cambió. Revisa que coincidan antes de continuar. Si la terminal ya confirmó un pago, no lo repitas.';
+
+  @override
   String get provisionalSalePendingTitle => 'Venta pendiente de sincronización';
 
   @override
@@ -667,6 +681,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get offlineAdvancedTenderBlockedMessage =>
       'Reconecta para usar la terminal manual, el pago mixto, las propinas o los descuentos. La venta se conserva.';
+
+  @override
+  String get externalPaymentNotCommittedMessage =>
+      'El pago externo quedó confirmado, pero la venta no se cerró. No cobres de nuevo: vuelve a intentar cerrar la cuenta o solicita ayuda.';
 
   @override
   String get recoveryQueryTitle => 'Consultar resultado guardado';
@@ -1910,6 +1928,9 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get singleMethodOnlyNote =>
       'Esta sucursal cobra con un solo método por venta.';
+
+  @override
+  String get tenderMismatchTitle => 'El importe no coincide con el total';
 
   @override
   String tenderShortBy(String amount) {

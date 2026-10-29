@@ -1,0 +1,90 @@
+{
+  "at": "2026-10-27T21:08:54.611Z",
+  "cart": [
+    {
+      "id": "61fd1209-2094-4ac2-8b65-4bf1bd449fdc",
+      "status": "draft",
+      "version": 6,
+      "lifecycle_state": "building_cart",
+      "fulfillment_type": "takeout",
+      "fired_order_id": "996aa98c-3a10-4756-a7ac-1572a44f76c7",
+      "daily_account_number": "20",
+      "business_date": "2026-10-27T00:00:00.000Z",
+      "updated_at": "2026-10-27T20:48:12.190Z"
+    }
+  ],
+  "lines": [
+    {
+      "id": "ac3da5dc-9923-4beb-b3e0-34cdc58f7dcd",
+      "product_name": "Capuccino",
+      "quantity": 1,
+      "base_price": "6000",
+      "variant_delta": "0",
+      "modifier_total": "0",
+      "fired_at": "2026-10-27T20:45:17.489Z",
+      "updated_at": "2026-10-27T20:45:17.489Z"
+    },
+    {
+      "id": "fcd6b62a-3f7d-4fba-b156-48dfeb4a1e71",
+      "product_name": "Coricos pack",
+      "quantity": 1,
+      "base_price": "3000",
+      "variant_delta": "0",
+      "modifier_total": "0",
+      "fired_at": null,
+      "updated_at": "2026-10-27T20:48:04.429Z"
+    },
+    {
+      "id": "423283bf-6bbc-45c2-9d94-31f3674519ca",
+      "product_name": "Chocorico",
+      "quantity": 1,
+      "base_price": "1000",
+      "variant_delta": "0",
+      "modifier_total": "0",
+      "fired_at": null,
+      "updated_at": "2026-10-27T20:48:12.190Z"
+    }
+  ],
+  "sales": [],
+  "payments": [],
+  "attempts": [],
+  "drafts": [],
+  "commands": [
+    {
+      "command_id": "7bf4c934-9b35-4318-81c4-37395d753de0",
+      "command_type": "pos.checkout.cancel",
+      "status": "succeeded",
+      "failure_code": null,
+      "correlation_id": "0c8e5740-9215-4ff3-8d22-9857241613f3",
+      "started_at": "2026-10-27T21:07:52.401Z",
+      "completed_at": "2026-10-27T21:07:52.401Z"
+    },
+    {
+      "command_id": "03d7f31f-4436-4e96-8064-61b23f3bbabe",
+      "command_type": "pos.checkout.cancel",
+      "status": "succeeded",
+      "failure_code": null,
+      "correlation_id": "b52decc3-aeaf-440c-b9da-3f695fae97c6",
+      "started_at": "2026-10-27T20:48:39.402Z",
+      "completed_at": "2026-10-27T20:48:39.402Z"
+    },
+    {
+      "command_id": "b9f60ab1-9087-4c62-aa8d-b0c951483708",
+      "command_type": "pos.checkout.cancel",
+      "status": "succeeded",
+      "failure_code": null,
+      "correlation_id": "2a9f7811-9fe6-4304-9d5e-fae2115e92c7",
+      "started_at": "2026-10-27T20:46:58.906Z",
+      "completed_at": "2026-10-27T20:46:58.906Z"
+    },
+    {
+      "command_id": "cb72bbb3-aa8c-4aef-85f1-522f2130c18b",
+      "command_type": "pos.checkout.cancel",
+      "status": "succeeded",
+      "failure_code": null,
+      "correlation_id": "b4b44046-e6b6-4d9b-8edd-e92e034092f8",
+      "started_at": "2026-10-27T20:45:28.910Z",
+      "completed_at": "2026-10-27T20:45:28.910Z"
+    }
+  ]
+}

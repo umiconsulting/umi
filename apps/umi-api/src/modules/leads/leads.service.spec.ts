@@ -27,6 +27,8 @@ describe('LeadsService.sendContact', () => {
       name: 'Ana',
       email: 'ana@cafe.mx',
       company: 'Café Luna',
+      phone: '+52 667 000 0000',
+      privacyAccepted: true,
     });
     expect(r).toEqual({ sent: 2, failed: 0 });
     expect(h.email.send).toHaveBeenCalledTimes(2);
@@ -34,12 +36,34 @@ describe('LeadsService.sendContact', () => {
     expect(h.email.send).toHaveBeenCalledWith(
       expect.objectContaining({ to: 'hola@umiconsulting.co', replyTo: 'ana@cafe.mx' }),
     );
+    expect(h.email.send.mock.calls[0]?.[0]?.html).toContain('+52 667 000 0000');
   });
 
-  it('throws when both sends fail', async () => {
+  it('throws when the internal notification fails and skips the auto-reply', async () => {
     const h = make({ CONTACT_TO_EMAIL: 'hola@umiconsulting.co' });
     h.email.send.mockResolvedValue(null);
     await expect(h.svc.sendContact({ name: 'Ana', email: 'ana@cafe.mx' })).rejects.toThrow();
+    expect(h.email.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps success when only the auto-reply fails', async () => {
+    const h = make({ CONTACT_TO_EMAIL: 'hola@umiconsulting.co' });
+    h.email.send.mockResolvedValueOnce({ messageId: 'm1' }).mockResolvedValueOnce(null);
+    await expect(h.svc.sendContact({ name: 'Ana', email: 'ana@cafe.mx' })).resolves.toEqual({
+      sent: 1,
+      failed: 1,
+    });
+  });
+
+  it('keeps success when the auto-reply throws after internal delivery', async () => {
+    const h = make({ CONTACT_TO_EMAIL: 'hola@umiconsulting.co' });
+    h.email.send
+      .mockResolvedValueOnce({ messageId: 'm1' })
+      .mockRejectedValueOnce(new Error('SMTP unavailable'));
+    await expect(h.svc.sendContact({ name: 'Ana', email: 'ana@cafe.mx' })).resolves.toEqual({
+      sent: 1,
+      failed: 1,
+    });
   });
 
   it('fails closed (no send) when no internal recipient is configured', async () => {

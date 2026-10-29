@@ -1,0 +1,42 @@
+{
+  "clickedAt": "2026-10-27T21:53:50.729007+00:00",
+  "since": "2026-10-27T21:53:45Z",
+  "until": "2026-10-27T21:54:10Z",
+  "requests": [
+    {
+      "timestamp": "2026-10-27T21:53:49.971Z",
+      "method": "GET",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/offline/diagnostics",
+      "requestId": "5585733e-bf68-4d2e-92d6-241be490721a",
+      "correlationId": "2a2d9110-980a-454a-a346-1eb663b87273"
+    },
+    {
+      "timestamp": "2026-10-27T21:53:50.400Z",
+      "method": "POST",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/offline/replay/begin",
+      "requestId": "eb852013-4e83-49c3-a00d-395f5d80b652",
+      "correlationId": "3727ae35-ed99-4001-9f75-322a9ee953a3"
+    },
+    {
+      "timestamp": "2026-10-27T21:53:51.076Z",
+      "method": "GET",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/offline/diagnostics",
+      "requestId": "8abeecf1-cc49-4ec8-b918-8d9b4a9a76f9",
+      "correlationId": "5d048d89-fb5a-4afd-84f5-411b1eace49b"
+    },
+    {
+      "timestamp": "2026-10-27T21:53:51.898Z",
+      "method": "GET",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/offline/diagnostics",
+      "requestId": "f6102004-1844-4df3-bdb7-7979302f07f8",
+      "correlationId": "4f6e3bbf-3430-4886-8275-c0f0f6ff8a91"
+    },
+    {
+      "timestamp": "2026-10-27T21:53:51.965Z",
+      "method": "GET",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/offline/diagnostics",
+      "requestId": "df05b521-89d4-43fc-92d0-686a83c41511",
+      "correlationId": "a8477314-9a39-452e-9b3c-ef1101bd9847"
+    }
+  ]
+}

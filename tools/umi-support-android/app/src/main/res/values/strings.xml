@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">Umi Support</string>
+    <string name="accessibility_description">Acepta únicamente el permiso de depuración inalámbrica de Android para la red UmiPOS y el punto de acceso autorizado de ONCA. Marca Permitir siempre y pulsa Permitir. Puedes pausar esta función desde Umi Support.</string>
+    <string name="heading">Conexión de soporte</string>
+    <string name="intro">Umi Support confirma el permiso de red. KeepADB comunica el puerto a la computadora de soporte.</string>
+    <string name="trusted_network">Red autorizada: %1$s\nPunto de acceso: %2$s</string>
+    <string name="paused">Recuperación pausada</string>
+    <string name="configured">Automatización habilitada</string>
+    <string name="needs_accessibility">Falta activar Accesibilidad</string>
+    <string name="activate">Activar recuperación</string>
+    <string name="pause">Pausar recuperación</string>
+    <string name="settings">Abrir ajustes de Accesibilidad</string>
+    <string name="keepadb">Abrir KeepADB</string>
+    <string name="consent_title">Activar Umi Support</string>
+    <string name="consent_body">Umi Support aceptará automáticamente el permiso de depuración inalámbrica sólo para UmiPOS y el punto de acceso que aparece aquí. Después, activa Umi Support en Accesibilidad. Puedes pausar la automatización cuando quieras.</string>
+    <string name="accept">Aceptar y continuar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="last_action">Último resultado: %1$s</string>
+    <string name="not_yet">Sin acciones registradas</string>
+    <string name="checked">Casilla marcada para la red autorizada</string>
+    <string name="requested">Permiso solicitado para la red autorizada</string>
+    <string name="failed">Android no aceptó la acción; revisa el permiso en la pantalla</string>
+    <string name="unsupported">El diálogo del sistema no es compatible; se requiere revisión</string>
+    <string name="connected">Servicio de Accesibilidad conectado</string>
+    <string name="stopped">Intentos terminados; revisa el permiso en la pantalla</string>
+    <string name="unavailable">Esta opción no está disponible en el dispositivo</string>
+    <string name="settings_not_saved">No se pudo guardar la configuración. Desactiva Umi Support en Accesibilidad antes de reiniciar.</string>
+    <string name="footnote">La computadora de soporte debe permanecer encendida y conectada a Tailscale. KeepADB debe conservar Mantener siempre activo.</string>
+</resources>

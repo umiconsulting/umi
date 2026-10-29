@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
 
@@ -11,6 +13,8 @@ import '../../shared/widgets/receipt_print_action.dart';
 import '../../shared/widgets/station_document.dart';
 import '../exception/exception_controller.dart';
 import '../exception/exception_surface.dart';
+import '../offline/offline_journal.dart';
+import '../offline/replay_engine.dart';
 import 'sale_lifecycle_controller.dart';
 
 Future<void> showSuspendSaleDialog(
@@ -334,6 +338,9 @@ final class SaleCenterSurface extends StatefulWidget {
     this.exceptions,
     this.onPrint,
     this.onKitchenStatus,
+    this.offlineJournal,
+    this.offlineRecovery,
+    this.offlineScope,
     this.embedded = false,
     this.active = true,
     this.onResumed,
@@ -348,6 +355,9 @@ final class SaleCenterSurface extends StatefulWidget {
   final ReceiptPrintRequest? onPrint;
   final Future<PosKitchenStatusResult> Function(SaleSnapshot sale)?
   onKitchenStatus;
+  final EncryptedOfflineJournal? offlineJournal;
+  final OfflineRecoveryController? offlineRecovery;
+  final ReplayScope? Function()? offlineScope;
 
   @override
   State<SaleCenterSurface> createState() => SaleCenterSurfaceState();
@@ -359,11 +369,16 @@ final class SaleCenterSurfaceState extends State<SaleCenterSurface> {
   final _controlsKey = GlobalKey(debugLabel: 'sale-history-controls');
   String? filter;
   String sort = 'newest';
+  List<_PendingSale> _pending = const [];
+  final Set<String> _retrying = {};
+  List<_PendingSale> get _visiblePending =>
+      filter == 'cancelled' ? const [] : _pending;
 
   @override
   void initState() {
     super.initState();
     widget.lifecycle.addListener(_changed);
+    widget.offlineRecovery?.addListener(_offlineChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && widget.active) _reload();
     });
@@ -382,6 +397,7 @@ final class SaleCenterSurfaceState extends State<SaleCenterSurface> {
   @override
   void dispose() {
     widget.lifecycle.removeListener(_changed);
+    widget.offlineRecovery?.removeListener(_offlineChanged);
     search.dispose();
     super.dispose();
   }
@@ -390,11 +406,89 @@ final class SaleCenterSurfaceState extends State<SaleCenterSurface> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _reload() => widget.lifecycle.loadHistory(
-    state: filter,
-    search: search.text,
-    sort: sort,
-  );
+  void _offlineChanged() => unawaited(_refreshPendingAndHistory());
+
+  Future<void> _refreshPendingAndHistory() async {
+    final before = _pending.map((item) => item.entry.command.commandId).toSet();
+    await _loadPendingSales();
+    final after = _pending.map((item) => item.entry.command.commandId).toSet();
+    if (before.isNotEmpty && before.difference(after).isNotEmpty && mounted) {
+      await widget.lifecycle.loadHistory(
+        state: filter,
+        search: search.text,
+        sort: sort,
+      );
+    }
+  }
+
+  Future<void> _loadPendingSales() async {
+    final journal = widget.offlineJournal;
+    if (journal == null) return;
+    try {
+      final snapshot = await journal.load();
+      final pending = <_PendingSale>[];
+      for (final entry in snapshot.activeCash) {
+        final command = OfflineCheckoutCommand.fromJson(entry.command.payload);
+        final checkoutSnapshot = OfflineCheckoutSnapshot.fromJson(
+          command.snapshot,
+        );
+        final cart = Cart.fromJson(checkoutSnapshot.cartSnapshot);
+        pending.add(
+          _PendingSale(
+            entry: entry,
+            sale: SaleSnapshot(
+              id: entry.command.commandId,
+              state: 'pending_sync',
+              cart: cart.toJson(),
+              label: null,
+              customer: null,
+              originalOperatorSessionId: entry.command.operatorSessionId,
+              currentOperatorSessionId: entry.command.operatorSessionId,
+              suspendedAt: null,
+              cancelledAt: null,
+              cancellationReasonCode: null,
+              cancellationReason: null,
+              committedSaleId: null,
+              sourceOrderId: null,
+              receiptId: null,
+              receiptRef: null,
+              updatedAt: entry.command.createdAt,
+            ),
+          ),
+        );
+      }
+      if (!mounted) return;
+      setState(() => _pending = pending);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _pending = const []);
+    }
+  }
+
+  Future<void> _reload() async {
+    await _loadPendingSales();
+    await widget.lifecycle.loadHistory(
+      state: filter,
+      search: search.text,
+      sort: sort,
+    );
+  }
+
+  Future<void> _retryPending(_PendingSale pending) async {
+    final recovery = widget.offlineRecovery;
+    final scope = widget.offlineScope?.call();
+    if (recovery == null || scope == null) return;
+    final id = pending.entry.command.commandId;
+    setState(() => _retrying.add(id));
+    try {
+      await recovery.recover(scope);
+    } finally {
+      if (mounted) {
+        setState(() => _retrying.remove(id));
+        await _loadPendingSales();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -463,6 +557,7 @@ final class SaleCenterSurfaceState extends State<SaleCenterSurface> {
                   ];
                   final status = _historyStatus(l);
                   final count =
+                      _visiblePending.length +
                       widget.lifecycle.state.history.length +
                       (widget.lifecycle.canLoadMoreHistory ? 1 : 0);
                   final reflow =
@@ -522,9 +617,14 @@ final class SaleCenterSurfaceState extends State<SaleCenterSurface> {
 
   Widget? _historyStatus(AppLocalizations l) =>
       widget.lifecycle.historyRefreshing
-      ? Center(
-          child: Semantics(liveRegion: true, child: Text(l.saleHistoryLoading)),
-        )
+      ? _visiblePending.isNotEmpty
+            ? null
+            : Center(
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(l.saleHistoryLoading),
+                ),
+              )
       : widget.lifecycle.historyRefreshFailed
       ? Center(
           child: Column(
@@ -536,7 +636,7 @@ final class SaleCenterSurfaceState extends State<SaleCenterSurface> {
             ],
           ),
         )
-      : widget.lifecycle.state.history.isEmpty
+      : widget.lifecycle.state.history.isEmpty && _visiblePending.isEmpty
       ? Center(
           child: Semantics(
             liveRegion: true,
@@ -550,16 +650,22 @@ final class SaleCenterSurfaceState extends State<SaleCenterSurface> {
       : null;
 
   int? _historyItemIndex(Key key) {
+    if (key is ValueKey<String>) {
+      final pending = _visiblePending.indexWhere(
+        (item) => item.entry.command.commandId == key.value,
+      );
+      if (pending >= 0) return pending;
+    }
     if (key == const ValueKey('history-load-more')) {
       return widget.lifecycle.canLoadMoreHistory
-          ? widget.lifecycle.state.history.length
+          ? _visiblePending.length + widget.lifecycle.state.history.length
           : null;
     }
     if (key is! ValueKey<String>) return null;
     final index = widget.lifecycle.state.history.indexWhere(
       (sale) => sale.id == key.value,
     );
-    return index < 0 ? null : index;
+    return index < 0 ? null : _visiblePending.length + index;
   }
 
   /// The mark on a sale in the list: the state's glyph in white on a filled tile.
@@ -599,7 +705,38 @@ final class SaleCenterSurfaceState extends State<SaleCenterSurface> {
   }
 
   Widget _historyItem(BuildContext context, AppLocalizations l, int index) {
-    if (index == widget.lifecycle.state.history.length) {
+    final pendingSales = _visiblePending;
+    if (index < pendingSales.length) {
+      final pending = pendingSales[index];
+      final id = pending.entry.command.commandId;
+      final retrying = _retrying.contains(id);
+      return _SaleHistoryRecord(
+        key: ValueKey(id),
+        sale: pending.sale,
+        leading: _stateBadge(context, pending.sale.state),
+        title: Text(_historyLabel(pending.sale, l)),
+        subtitle: Text(
+          [
+            _saleMoment(pending.sale),
+            l.provisionalSalePendingTitle,
+            if (pending.entry.lastSafeErrorCategory case final String code)
+              operatorErrorMessage(context, code),
+          ].join(' · '),
+        ),
+        trailing: PosButton.tonal(
+          onPressed: retrying ? null : () => _retryPending(pending),
+          child: Text(
+            retrying
+                ? (Localizations.localeOf(context).languageCode == 'es'
+                      ? 'Sincronizando'
+                      : 'Synchronising')
+                : l.retryAction,
+          ),
+        ),
+      );
+    }
+    final historyIndex = index - pendingSales.length;
+    if (historyIndex == widget.lifecycle.state.history.length) {
       return Padding(
         key: const ValueKey('history-load-more'),
         padding: const EdgeInsets.all(UmiSpacing.md),
@@ -631,7 +768,7 @@ final class SaleCenterSurfaceState extends State<SaleCenterSurface> {
         ),
       );
     }
-    final sale = widget.lifecycle.state.history[index];
+    final sale = widget.lifecycle.state.history[historyIndex];
     final customer = sale.customer == null
         ? null
         : SaleCustomerSummary.fromJson(sale.customer!);
@@ -904,6 +1041,13 @@ String _historyLabel(SaleSnapshot sale, AppLocalizations l) {
   return names.length == 1
       ? names.first
       : '${names.first} +${names.length - 1}';
+}
+
+final class _PendingSale {
+  const _PendingSale({required this.entry, required this.sale});
+
+  final JournalEntry entry;
+  final SaleSnapshot sale;
 }
 
 final class _SaleHistoryRecord extends StatelessWidget {

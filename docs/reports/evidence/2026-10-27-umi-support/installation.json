@@ -1,0 +1,11 @@
+{
+  "time": "2026-10-27T20:14:43.442079+00:00",
+  "serial": "100.64.178.95:43761",
+  "package": "co.umiconsulting.umi_support",
+  "version_code": 1,
+  "apk_sha256": "475e29cce6f0fe2f6c887b3a302a11f3b60696b4272c7c12554e1ade0782358f",
+  "installed": true,
+  "app_opened": true,
+  "accessibility_enabled": false,
+  "reboot_tested": false
+}

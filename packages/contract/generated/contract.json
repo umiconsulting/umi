@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "8c493bc196297e63fc202e78936de9a853de6d9a69f2fb0966b71d5cc058462a",
-  "contractVersion": "2.44.0",
+  "contentHash": "1be3c317177b82e26c82b37ff6b1bee27c347889057008cb0e824f40e7ff4c80",
+  "contractVersion": "2.45.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -835,6 +835,8 @@
             "REGISTER_NOT_AVAILABLE",
             "REGISTER_HELD_BY_ACTIVE_TILL",
             "CASH_SHIFT_REQUIRED",
+            "CASH_POLICY_DENIED",
+            "INSUFFICIENT_EXPECTED_CASH",
             "INVALID_SHIFT_TRANSITION",
             "RECIPE_CHANGED",
             "RESTOCK_INTENT_NOT_ELIGIBLE",
@@ -858,6 +860,7 @@
             "KITCHEN_ORDER_NOT_ROUTED",
             "KITCHEN_PERMISSION_REQUIRED",
             "APPROVAL_REQUIRED",
+            "APPROVAL_FINGERPRINT_REQUIRED",
             "APPROVAL_FINGERPRINT_MISMATCH",
             "APPROVAL_INVALID",
             "PAYMENT_DECLINED",
@@ -1057,6 +1060,8 @@
                 "REGISTER_NOT_AVAILABLE",
                 "REGISTER_HELD_BY_ACTIVE_TILL",
                 "CASH_SHIFT_REQUIRED",
+                "CASH_POLICY_DENIED",
+                "INSUFFICIENT_EXPECTED_CASH",
                 "INVALID_SHIFT_TRANSITION",
                 "RECIPE_CHANGED",
                 "RESTOCK_INTENT_NOT_ELIGIBLE",
@@ -1080,6 +1085,7 @@
                 "KITCHEN_ORDER_NOT_ROUTED",
                 "KITCHEN_PERMISSION_REQUIRED",
                 "APPROVAL_REQUIRED",
+                "APPROVAL_FINGERPRINT_REQUIRED",
                 "APPROVAL_FINGERPRINT_MISMATCH",
                 "APPROVAL_INVALID",
                 "PAYMENT_DECLINED",
@@ -104411,6 +104417,10 @@
       "public": true,
       "retryable": false
     },
+    "APPROVAL_FINGERPRINT_REQUIRED": {
+      "public": true,
+      "retryable": false
+    },
     "APPROVAL_INVALID": {
       "public": true,
       "retryable": false
@@ -104460,6 +104470,10 @@
       "retryable": false
     },
     "CART_VERSION_CONFLICT": {
+      "public": true,
+      "retryable": false
+    },
+    "CASH_POLICY_DENIED": {
       "public": true,
       "retryable": false
     },
@@ -104616,6 +104630,10 @@
       "retryable": false
     },
     "INSUFFICIENT_CASH": {
+      "public": true,
+      "retryable": false
+    },
+    "INSUFFICIENT_EXPECTED_CASH": {
       "public": true,
       "retryable": false
     },

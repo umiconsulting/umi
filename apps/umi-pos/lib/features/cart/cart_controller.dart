@@ -183,6 +183,13 @@ final class CartController extends ChangeNotifier {
     return _queue?.pendingCount ?? 0;
   }
 
+  bool get hasPendingForCurrentCart {
+    final cartId = _state.cart?.id;
+    if (cartId == null) return pendingSyncCount > 0;
+    return (_queue?.hasPending ?? false) ||
+        (_journal?.hasPendingForCart(cartId) ?? false);
+  }
+
   void _journalCountChanged() {
     if (!_disposed) notifyListeners();
   }
@@ -194,6 +201,8 @@ final class CartController extends ChangeNotifier {
       (_queue?.hasPending ?? false);
 
   bool get supportsOpenAccounts => _repository is OpenAccountCartRepository;
+  bool get supportsLocalWrites =>
+      _queue != null && (_journal?.supportsSecureOffline ?? false);
   bool get supportsAccountDetails =>
       _repository is AccountDetailsCartRepository;
 
@@ -404,6 +413,16 @@ final class CartController extends ChangeNotifier {
   /// previous account when replay reaches it. No command is dropped merely
   /// because the operator changed customers.
   Future<bool> preserveForAccountSwitch() async {
+    return preservePendingCommands();
+  }
+
+  /// Make every painted cart command durable before a local financial commit.
+  ///
+  /// The checkout consumes the same encrypted journal. Without this barrier a
+  /// line still waiting in the in-memory lane could be missing when replay
+  /// reaches the checkout, and the server would refuse a total built on that
+  /// line.
+  Future<bool> preservePendingCommands() async {
     final queue = _queue;
     if (queue == null || !queue.hasPending) return true;
     return queue.preservePendingCommands();
@@ -858,6 +877,33 @@ final class CartController extends ChangeNotifier {
       }
     } on AppException catch (error) {
       _failure(error);
+    }
+  }
+
+  /// Read the server cart before an online charge uses its version.
+  /// A pending local write can change that version after the read.
+  Future<Cart?> refreshForCheckout() async {
+    if (_state.cart == null ||
+        _merchantId == null ||
+        _locationId == null ||
+        _operatorSessionId == null ||
+        _inFlight ||
+        (_queue?.hasPending ?? false)) {
+      return null;
+    }
+    try {
+      final refreshed = await _readSelected();
+      if (_inFlight || (_queue?.hasPending ?? false)) return null;
+      if (!_isWritable(refreshed)) {
+        _releaseAccount();
+        return null;
+      }
+      unawaited(_persistCart(refreshed));
+      _set(CartState(phase: CartPhase.ready, cart: refreshed));
+      return refreshed;
+    } on AppException catch (error) {
+      _failure(error);
+      return null;
     }
   }
 

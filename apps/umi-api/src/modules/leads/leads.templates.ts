@@ -186,6 +186,7 @@ export interface ContactTemplateData {
   name: string;
   email: string;
   company?: string;
+  phone?: string;
   need?: string;
   message?: string;
 }
@@ -216,7 +217,8 @@ export const contactInternalTemplate = (data: ContactTemplateData): string => `
         <div class="value priority-high">
           <strong>${esc(data.name)}</strong><br>
           Email: ${esc(data.email)}<br>
-          Empresa: ${esc(data.company || 'No especificada')}
+          Empresa: ${esc(data.company || 'No especificada')}<br>
+          WhatsApp: ${esc(data.phone || 'No indicado')}
         </div>
       </div>
       <div class="section">
@@ -257,18 +259,12 @@ export const contactAutoReplyTemplate = (data: ContactTemplateData): string => `
     <div class="header"><div class="logo">umi</div><p>Gracias por contactarnos</p></div>
     <div class="content">
       <p>Hola <strong>${esc(data.name)}</strong>,</p>
-      <p>Hemos recibido tu consulta y queremos agradecerte por considerar Umi para conectar tu operación.</p>
+      <p>Recibimos tu solicitud de demo para ${esc(data.company || 'tu restaurante')}.</p>
       <div class="highlight">
         <strong>¿Qué sigue ahora?</strong><br>
-        • Revisaremos tu solicitud por producto y prioridad operativa<br>
-        • Te contactaremos para entender tu flujo actual<br>
-        • Prepararemos una ruta inicial sin inflar alcance
+        Revisaremos tu solicitud y te escribiremos para preparar una demo útil para tu equipo.
       </div>
-      <p>Mientras tanto, si no lo has hecho, puedes completar el diagnóstico operativo para ubicar el primer producto a activar.</p>
-      <div style="text-align: center;">
-        <a href="https://umiconsulting.co/#diagnostico" class="cta-button">Realizar diagnóstico</a>
-      </div>
-      <p>Saludos cordiales,<br><strong>Equipo Umi</strong></p>
+      <p>Equipo Umi<br><a href="mailto:hola@umiconsulting.co">hola@umiconsulting.co</a></p>
     </div>
     <div class="footer">
       <p><strong>Umi</strong></p>

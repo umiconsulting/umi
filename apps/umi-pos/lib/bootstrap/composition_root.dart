@@ -76,6 +76,23 @@ import '../features/tables/table_state_repository.dart';
 import '../shared/approvals/manager_approval_repository.dart';
 import 'bootstrap_controller.dart';
 
+final class HardwareRelayAccess {
+  const HardwareRelayAccess({required this.canRead, required this.canExecute});
+
+  factory HardwareRelayAccess.fromPermissions(Iterable<String> permissions) {
+    final access = OperatorPermissions(permissions);
+    return HardwareRelayAccess(
+      canRead: access.allows('hardware.read'),
+      canExecute: access.allows('hardware.command.execute'),
+    );
+  }
+
+  final bool canRead;
+  final bool canExecute;
+
+  bool get isEnabled => canRead || canExecute;
+}
+
 final class AppCompositionRoot {
   AppCompositionRoot({
     required this.config,
@@ -469,6 +486,7 @@ final class AppCompositionRoot {
         repository: ApiSaleRepository(apiClient),
         cart: cart,
         telemetry: telemetry,
+        localFirstFastPathEnabled: config.localFirstFastPathEnabled,
       ),
       floorPlan: FloorPlanController(
         ApiFloorPlanRepository(apiClient),
@@ -514,9 +532,10 @@ final class AppCompositionRoot {
         repository: ApiCheckoutRepository(apiClient),
         offlineCheckout: offlineCheckout,
         connectivity: connectivity,
-        journal: offlineJournal,
         recovery: offlineRecovery,
-        pendingLocalCommands: () => cart.pendingSyncCount > 0,
+        localFirstFastPathEnabled: config.localFirstFastPathEnabled,
+        pendingLocalCommands: () => cart.hasPendingForCurrentCart,
+        preserveLocalCommands: cart.preservePendingCommands,
         refreshOfflinePolicy: () async {
           final state = entry.state;
           final tenant = state.selectedTenant;
@@ -572,7 +591,7 @@ final class AppCompositionRoot {
           // answer, the receipt screen says so (plan §8.2 F5).
           return outcome.drawerAnswered ? null : 'DRAWER_UNANSWERED';
         },
-        afterOfflineCommit: (receipt) async {
+        afterOfflineCommit: (commit) async {
           final state = entry.state;
           final merchant = state.selectedTenant;
           final location = state.selectedBranch;
@@ -584,7 +603,7 @@ final class AppCompositionRoot {
               posDevice == null) {
             return;
           }
-          await hardware.afterOfflineCheckoutCompleted(
+          await hardware.afterOfflineCashSale(
             HardwareScope(
               merchantId: merchant.id,
               locationId: location.id,
@@ -594,7 +613,7 @@ final class AppCompositionRoot {
               permissions: operator.permissions.toSet(),
               registerId: cash.activeRegisterId,
             ),
-            receipt,
+            commit,
           );
         },
       ),
@@ -856,6 +875,8 @@ final class AppCompositionRoot {
       permissions: operator.permissions.toSet(),
       registerId: cash.activeRegisterId,
     );
+    final access = HardwareRelayAccess.fromPermissions(operator.permissions);
+    if (!access.isEnabled) return;
     try {
       // THE READING IS THE EXPENSIVE PART OF THE RELAY, AND THE CLAIM IS NOT.
       //
@@ -868,11 +889,13 @@ final class AppCompositionRoot {
       // Refresh the registry and remote-command queue without putting a USB
       // status query in front of a receipt. A hardware screen asks for the
       // measured state itself; this background read carries the last measurement.
-      if (service.runtimeReadDue) {
+      if (access.canRead && service.runtimeReadDue) {
         await service.snapshot(scope, probeHealth: false);
       }
-      for (var index = 0; index < 4; index++) {
-        if (await service.executeNextRemoteCommand(scope) == null) break;
+      if (access.canExecute) {
+        for (var index = 0; index < 4; index++) {
+          if (await service.executeNextRemoteCommand(scope) == null) break;
+        }
       }
     } catch (_) {
       // The next bounded poll recovers the relay. Financial state is unchanged.

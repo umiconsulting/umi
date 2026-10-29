@@ -111,7 +111,9 @@ async function dump(label) {
     const type = control.type ? `[${control.type}]` : '';
     say(`  ${control.tag}${type} "${control.name}"${control.disabled ? ' (disabled)' : ''}`);
   }
-  await page.screenshot({ path: `${OUT}/${label.replace(/\W+/g, '-')}.png` });
+  await page
+    .screenshot({ path: `${OUT}/${label.replace(/\W+/g, '-')}.png` })
+    .catch((error) => say(`screenshot unavailable: ${error.message.split('\n')[0]}`));
   return state;
 }
 

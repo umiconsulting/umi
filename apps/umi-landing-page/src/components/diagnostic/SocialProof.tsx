@@ -6,7 +6,7 @@ const SocialProof = () => (
       Productos que puede tocar tu ruta:
     </p>
     <div className="flex flex-wrap justify-center gap-3">
-      {['ConversaFlow', 'KDS', 'Cash', 'Dashboard', 'Logs'].map((name) => (
+      {['Agente IA', 'KDS', 'Cash', 'Dashboard', 'Logs'].map((name) => (
         <div
           key={name}
           className="rounded-full border border-[var(--stroke)] bg-[#fffdf8] px-3 py-2 text-xs font-extrabold text-umi-blue-dark"

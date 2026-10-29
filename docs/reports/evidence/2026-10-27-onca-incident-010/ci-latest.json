@@ -1,0 +1,64 @@
+{
+  "checks": [
+    {
+      "bucket": "pass",
+      "link": "https://vercel.com/github",
+      "name": "Vercel Preview Comments",
+      "state": "SUCCESS"
+    },
+    {
+      "bucket": "skipping",
+      "link": "https://coderabbit.ai?utm_source=cr_app&utm_medium=github",
+      "name": "CodeRabbit",
+      "state": "SKIPPED"
+    },
+    {
+      "bucket": "pending",
+      "link": "https://github.com/umiconsulting/umi/actions/runs/40587865864/job/122484039109",
+      "name": "build the iOS target",
+      "state": "IN_PROGRESS"
+    },
+    {
+      "bucket": "pending",
+      "link": "https://github.com/umiconsulting/umi/actions/runs/40587865827/job/122484038326",
+      "name": "lint",
+      "state": "IN_PROGRESS"
+    },
+    {
+      "bucket": "pending",
+      "link": "https://github.com/umiconsulting/umi/actions/runs/40587865690/job/122484039321",
+      "name": "build-and-test",
+      "state": "IN_PROGRESS"
+    },
+    {
+      "bucket": "pass",
+      "link": "https://github.com/umiconsulting/umi/actions/runs/40587865804/job/122484038459",
+      "name": "tokens",
+      "state": "SUCCESS"
+    },
+    {
+      "bucket": "pass",
+      "link": "https://github.com/umiconsulting/umi/actions/runs/40587865690/job/122484039961",
+      "name": "gate",
+      "state": "SUCCESS"
+    },
+    {
+      "bucket": "pass",
+      "link": "https://github.com/umiconsulting/umi/actions/runs/40587865673/job/122484037936",
+      "name": "contract",
+      "state": "SUCCESS"
+    },
+    {
+      "bucket": "pass",
+      "link": "https://vercel.com/umiconsulting-devs-projects/umi-cash/DaXvT8TcBmHK9hjo6L4QrCZq4SRg",
+      "name": "Vercel \u2013 umi-cash",
+      "state": "SUCCESS"
+    },
+    {
+      "bucket": "pass",
+      "link": "https://vercel.com/umiconsulting-devs-projects/umi-dashboard/DUuLQMYjPDXhhsZbmdnf5n4KRSRd",
+      "name": "Vercel \u2013 umi-dashboard",
+      "state": "SUCCESS"
+    }
+  ]
+}

@@ -448,6 +448,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get checkoutFailed => 'Checkout could not be completed safely.';
 
   @override
+  String get checkoutCartNotReadyTitle => 'Account update pending';
+
+  @override
+  String get checkoutCartNotReadyBody =>
+      'The current account state could not be confirmed. Check the connection and Recovery Center before charging. If the terminal confirmed a payment, do not charge it again.';
+
+  @override
+  String get checkoutCartChangedTitle => 'Review this payment';
+
+  @override
+  String get checkoutCartChangedBody =>
+      'The account or applied amount changed. Check that the amounts match before continuing. If the terminal already confirmed a payment, do not charge it again.';
+
+  @override
   String get provisionalSalePendingTitle => 'Sale pending synchronization';
 
   @override
@@ -663,6 +677,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get offlineAdvancedTenderBlockedMessage =>
       'Reconnect to use manual terminal, mixed payment, tips, or discounts. The sale is preserved.';
+
+  @override
+  String get externalPaymentNotCommittedMessage =>
+      'The external payment was confirmed, but the sale did not close. Do not charge again: retry closing the account or ask for help.';
 
   @override
   String get recoveryQueryTitle => 'Check saved result';
@@ -1900,6 +1918,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get singleMethodOnlyNote =>
       'This location charges one method per sale.';
+
+  @override
+  String get tenderMismatchTitle => 'Payment amount does not match the total';
 
   @override
   String tenderShortBy(String amount) {

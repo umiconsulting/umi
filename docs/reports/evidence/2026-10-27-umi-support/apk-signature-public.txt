@@ -1,0 +1,17 @@
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: CN=Umi Support, OU=ONCA, O=UMI
+Signer #1 certificate SHA-256 digest: e8d675db1dbb7c2286bd9e319293966a358831ec334e416467d4cf68ff181504
+Signer #1 certificate SHA-1 digest: 969727e310c69708dc628889e2fef1643430db3d
+Signer #1 certificate MD5 digest: f7bf00aa75303c445672fba8b1f58f5d
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 3072
+Signer #1 public key SHA-256 digest: 7161292c9708a42db6f0a4ecd30d4f999d739955dcb7553049d6e9c8a9ce220b
+Signer #1 public key SHA-1 digest: e557c1faea71be5bd2297d6bb4824d9b5fc760b9
+Signer #1 public key MD5 digest: 719ca258807ec047e73be04606e14e39

@@ -1,0 +1,50 @@
+{
+  "verifiedAt": "2026-10-27T18:35:23.234490+00:00",
+  "canonicalApk": "/home/juan/Downloads/UmiPOS-1.0.0-production-release-build333-final.apk",
+  "build": 333,
+  "maxApkBuildInDownloads": 333,
+  "apkSha256": "9fb8b5f94ec40dfcf8e667f1090958f9d5793d3b4a6e85981eb89729a0bf3f84",
+  "certificateSha256": "14975f2c374e03b155ab363e17d4a79d4ab32b888ab381bedc3264934cb5c051",
+  "canonicalSignatureValid": true,
+  "canonicalDebuggable": false,
+  "androidBuildTools": "36.0.0",
+  "adbVersion": "1.0.41 (37.0.0-android-tools)",
+  "devices": [
+    {
+      "role": "Caja",
+      "serial": "100.64.178.95:43761",
+      "versionCode": 333,
+      "debuggable": false,
+      "apkSha256": "9fb8b5f94ec40dfcf8e667f1090958f9d5793d3b4a6e85981eb89729a0bf3f84",
+      "matchesCanonicalApk": true,
+      "certificateVerifiedByIdenticalApk": true
+    },
+    {
+      "role": "Barra",
+      "serial": "100.90.102.41:44965",
+      "versionCode": 333,
+      "debuggable": false,
+      "apkSha256": "9fb8b5f94ec40dfcf8e667f1090958f9d5793d3b4a6e85981eb89729a0bf3f84",
+      "matchesCanonicalApk": true,
+      "certificateVerifiedByIdenticalApk": true
+    },
+    {
+      "role": "Cocina",
+      "serial": "100.125.137.36:35147",
+      "versionCode": 333,
+      "debuggable": false,
+      "apkSha256": "9fb8b5f94ec40dfcf8e667f1090958f9d5793d3b4a6e85981eb89729a0bf3f84",
+      "matchesCanonicalApk": true,
+      "certificateVerifiedByIdenticalApk": true
+    },
+    {
+      "role": "Mesero",
+      "serial": "100.125.102.97:42845",
+      "versionCode": 333,
+      "debuggable": false,
+      "apkSha256": "9fb8b5f94ec40dfcf8e667f1090958f9d5793d3b4a6e85981eb89729a0bf3f84",
+      "matchesCanonicalApk": true,
+      "certificateVerifiedByIdenticalApk": true
+    }
+  ]
+}

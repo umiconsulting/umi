@@ -908,6 +908,30 @@ abstract class AppLocalizations {
   /// **'No fue posible completar el cobro de forma segura.'**
   String get checkoutFailed;
 
+  /// No description provided for @checkoutCartNotReadyTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Cuenta pendiente de actualizar'**
+  String get checkoutCartNotReadyTitle;
+
+  /// No description provided for @checkoutCartNotReadyBody.
+  ///
+  /// In es, this message translates to:
+  /// **'No pude confirmar el estado actual de la cuenta. Revisa la conexión y el Centro de recuperación antes de cobrar. Si la terminal ya confirmó un pago, no lo repitas.'**
+  String get checkoutCartNotReadyBody;
+
+  /// No description provided for @checkoutCartChangedTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Revisa el cobro'**
+  String get checkoutCartChangedTitle;
+
+  /// No description provided for @checkoutCartChangedBody.
+  ///
+  /// In es, this message translates to:
+  /// **'La cuenta o el importe aplicado cambió. Revisa que coincidan antes de continuar. Si la terminal ya confirmó un pago, no lo repitas.'**
+  String get checkoutCartChangedBody;
+
   /// No description provided for @provisionalSalePendingTitle.
   ///
   /// In es, this message translates to:
@@ -1309,6 +1333,12 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Reconecta para usar la terminal manual, el pago mixto, las propinas o los descuentos. La venta se conserva.'**
   String get offlineAdvancedTenderBlockedMessage;
+
+  /// No description provided for @externalPaymentNotCommittedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El pago externo quedó confirmado, pero la venta no se cerró. No cobres de nuevo: vuelve a intentar cerrar la cuenta o solicita ayuda.'**
+  String get externalPaymentNotCommittedMessage;
 
   /// No description provided for @recoveryQueryTitle.
   ///
@@ -3511,6 +3541,12 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Esta sucursal cobra con un solo método por venta.'**
   String get singleMethodOnlyNote;
+
+  /// No description provided for @tenderMismatchTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'El importe no coincide con el total'**
+  String get tenderMismatchTitle;
 
   /// How much of a split payment the selected methods still do not cover.
   ///

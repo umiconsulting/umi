@@ -1,0 +1,625 @@
+{
+  "at": "2026-10-27T21:10:39.277013+00:00",
+  "endpoint": "100.64.178.95:35049",
+  "action": "Cerrar",
+  "before": [
+    {
+      "text": "",
+      "content-desc": "Centro de recuperación",
+      "class": "android.view.View",
+      "bounds": "[471,163][1450,211]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.",
+      "class": "android.view.View",
+      "bounds": "[471,211][1450,240]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "En proceso",
+      "class": "android.view.View",
+      "bounds": "[471,240][1450,244]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Servidor: 86 · aceptadas: 53 · conflictos: 0 · cola: 0",
+      "class": "android.view.View",
+      "bounds": "[471,255][1450,279]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cantidad actualizada\nEnviada\n#80",
+      "class": "android.view.View",
+      "bounds": "[471,301][1450,362]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Producto agregado\nEnviada\n#81",
+      "class": "android.view.View",
+      "bounds": "[471,362][1450,454]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cantidad actualizada\nEnviada\n#82",
+      "class": "android.view.View",
+      "bounds": "[471,454][1450,547]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Enviado a cocina\nEnviada\n#83",
+      "class": "android.view.View",
+      "bounds": "[471,547][1450,639]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Enviado a cocina\nEnviada\n#84",
+      "class": "android.view.View",
+      "bounds": "[471,639][1450,731]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Producto agregado\nEnviada\n#85",
+      "class": "android.view.View",
+      "bounds": "[471,731][1450,823]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Producto agregado\nEnviada\n#86",
+      "class": "android.view.View",
+      "bounds": "[471,823][1450,915]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Sincronizando ventas pendientes…",
+      "class": "android.widget.Button",
+      "bounds": "[471,915][710,981]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Sincronizar ahora",
+      "class": "android.widget.Button",
+      "bounds": "[471,915][710,981]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cerrar",
+      "class": "android.widget.Button",
+      "bounds": "[471,981][1450,1047]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cerrar",
+      "class": "android.view.View",
+      "bounds": "[0,0][1920,1058]",
+      "clickable": "true",
+      "enabled": "true"
+    }
+  ],
+  "after": [
+    {
+      "text": "",
+      "content-desc": "umi",
+      "class": "android.view.View",
+      "bounds": "[90,77][163,127]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "ONCA",
+      "class": "android.view.View",
+      "bounds": "[275,65][1251,100]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "local confirmado · LAN sin configurar · Nube En línea",
+      "class": "android.view.View",
+      "bounds": "[1262,59][1395,106]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Iniciar pedido",
+      "class": "android.view.View",
+      "bounds": "[1409,50][1616,116]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Iniciar pedido",
+      "class": "android.widget.Button",
+      "bounds": "[1409,50][1616,116]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Más",
+      "class": "android.view.View",
+      "bounds": "[1618,50][1684,116]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Más",
+      "class": "android.widget.Button",
+      "bounds": "[1618,50][1684,116]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cuenta",
+      "class": "android.view.View",
+      "bounds": "[1684,50][1898,116]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cuenta",
+      "class": "android.widget.Button",
+      "bounds": "[1684,50][1898,116]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "ESTACIÓN",
+      "class": "android.view.View",
+      "bounds": "[90,132][163,149]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Comanda",
+      "class": "android.widget.Button",
+      "bounds": "[0,195][253,272]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cuentas",
+      "class": "android.widget.Button",
+      "bounds": "[0,278][253,355]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "KDS",
+      "class": "android.widget.Button",
+      "bounds": "[0,360][253,437]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Ventas",
+      "class": "android.widget.Button",
+      "bounds": "[0,443][253,520]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Caja",
+      "class": "android.widget.Button",
+      "bounds": "[0,525][253,602]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Ajustes",
+      "class": "android.widget.Button",
+      "bounds": "[0,608][253,685]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "La carta",
+      "class": "android.view.View",
+      "bounds": "[281,169][450,220]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Todo",
+      "class": "android.widget.Button",
+      "bounds": "[281,240][446,306]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Pan",
+      "class": "android.widget.Button",
+      "bounds": "[421,240][569,306]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Bebidas",
+      "class": "android.widget.Button",
+      "bounds": "[545,240][747,306]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Pizzas",
+      "class": "android.widget.Button",
+      "bounds": "[723,240][909,306]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Masa Madre",
+      "class": "android.widget.Button",
+      "bounds": "[884,240][1139,306]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Frecuentes",
+      "class": "android.view.View",
+      "bounds": "[281,345][363,367]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Concha  ·  MXN 45.00",
+      "class": "android.widget.Button",
+      "bounds": "[380,323][625,389]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Capuccino  ·  MXN 60.00",
+      "class": "android.widget.Button",
+      "bounds": "[636,323][908,389]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Latte  ·  MXN 80.00",
+      "class": "android.widget.Button",
+      "bounds": "[919,323][1143,389]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Americano  ·  MXN 50.00",
+      "class": "android.widget.Button",
+      "bounds": "[1154,323][1386,389]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Chocolatin, MXN 60.00",
+      "class": "android.widget.Button",
+      "bounds": "[281,406][545,681]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Chocorico, MXN 10.00",
+      "class": "android.widget.Button",
+      "bounds": "[561,406][825,681]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Concha, MXN 45.00",
+      "class": "android.widget.Button",
+      "bounds": "[842,406][1106,681]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Corico individual, MXN 7.00",
+      "class": "android.widget.Button",
+      "bounds": "[1122,406][1387,681]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Coricos pack, MXN 30.00",
+      "class": "android.widget.Button",
+      "bounds": "[281,697][545,980]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Coyota, MXN 35.00",
+      "class": "android.widget.Button",
+      "bounds": "[561,697][825,980]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Croissant, MXN 45.00",
+      "class": "android.widget.Button",
+      "bounds": "[842,697][1106,980]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Danesa, MXN 50.00",
+      "class": "android.widget.Button",
+      "bounds": "[1122,697][1387,980]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Dona de azucar, MXN 50.00",
+      "class": "android.widget.Button",
+      "bounds": "[281,997][545,1053]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Dona de cajeta, MXN 50.00",
+      "class": "android.widget.Button",
+      "bounds": "[561,997][825,1053]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Dona de chocolate, MXN 60.00",
+      "class": "android.widget.Button",
+      "bounds": "[842,997][1106,1053]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Dona Limon, MXN 60.00",
+      "class": "android.widget.Button",
+      "bounds": "[1122,997][1387,1053]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Comer aquí",
+      "class": "android.widget.Button",
+      "bounds": "[1420,161][1600,227]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Para llevar",
+      "class": "android.widget.Button",
+      "bounds": "[1608,161][1783,227]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Asignar cliente",
+      "class": "android.view.View",
+      "bounds": "[1794,161][1893,227]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Asignar cliente",
+      "class": "android.widget.Button",
+      "bounds": "[1794,161][1893,227]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cuenta 020\nPara llevar\nTotal\nMXN 100.00",
+      "class": "android.view.View",
+      "bounds": "[1420,243][1893,1053]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Opciones de cuenta",
+      "class": "android.widget.Button",
+      "bounds": "[1803,267][1869,333]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Agregar mesa",
+      "class": "android.widget.Button",
+      "bounds": "[1443,356][1649,422]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Capuccino, 1\nCapuccino\nMXN 60.00\n1\nEnviada",
+      "class": "android.view.View",
+      "bounds": "[1443,433][1869,576]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Disminuir cantidad",
+      "class": "android.widget.Button",
+      "bounds": "[1443,510][1509,576]",
+      "clickable": "false",
+      "enabled": "false"
+    },
+    {
+      "text": "",
+      "content-desc": "Aumentar cantidad",
+      "class": "android.widget.Button",
+      "bounds": "[1521,510][1587,576]",
+      "clickable": "false",
+      "enabled": "false"
+    },
+    {
+      "text": "",
+      "content-desc": "Editar producto",
+      "class": "android.widget.Button",
+      "bounds": "[1671,510][1737,576]",
+      "clickable": "false",
+      "enabled": "false"
+    },
+    {
+      "text": "",
+      "content-desc": "Repetir producto",
+      "class": "android.widget.Button",
+      "bounds": "[1737,510][1803,576]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Eliminar línea",
+      "class": "android.widget.Button",
+      "bounds": "[1803,510][1869,576]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Coricos pack, 1\nCoricos pack\nMXN 30.00\n1\nPendiente de enviar",
+      "class": "android.view.View",
+      "bounds": "[1443,576][1869,719]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Disminuir cantidad",
+      "class": "android.widget.Button",
+      "bounds": "[1443,653][1509,719]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Aumentar cantidad",
+      "class": "android.widget.Button",
+      "bounds": "[1521,653][1587,719]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Editar producto",
+      "class": "android.widget.Button",
+      "bounds": "[1671,653][1737,719]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Repetir producto",
+      "class": "android.widget.Button",
+      "bounds": "[1737,653][1803,719]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Eliminar línea",
+      "class": "android.widget.Button",
+      "bounds": "[1803,653][1869,719]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Chocorico, 1\nChocorico\nMXN 10.00\n1\nPendiente de enviar",
+      "class": "android.view.View",
+      "bounds": "[1443,719][1869,775]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Enviar a cocina",
+      "class": "android.widget.Button",
+      "bounds": "[1443,859][1651,941]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Dividir cuenta",
+      "class": "android.widget.Button",
+      "bounds": "[1662,867][1869,933]",
+      "clickable": "false",
+      "enabled": "false"
+    },
+    {
+      "text": "",
+      "content-desc": "Cobrar",
+      "class": "android.widget.Button",
+      "bounds": "[1443,952][1869,1029]",
+      "clickable": "true",
+      "enabled": "true"
+    }
+  ]
+}

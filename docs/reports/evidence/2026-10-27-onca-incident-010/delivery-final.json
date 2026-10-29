@@ -1,0 +1,10 @@
+{
+  "at": "2026-10-27T22:01:07.732979+00:00",
+  "build": "334",
+  "fleet": 4,
+  "doctorExit": 0,
+  "tests": 181,
+  "oneCash100Payment": true,
+  "receipt": "0019",
+  "handoff": "/home/juan/umi-onca-bugfix-20261024/docs/reports/2026-10-27-onca-support-handoff.md"
+}

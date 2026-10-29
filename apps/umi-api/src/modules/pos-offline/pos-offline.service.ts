@@ -575,9 +575,7 @@ export class PosOfflineService {
             break;
           }
           const snapshot = parsed.data.snapshot;
-          const trustedCart = Cart.safeParse(
-            this.normalizeSnapshotTimestamps(snapshot.cartSnapshot),
-          );
+          const trustedCart = Cart.safeParse(this.normalizeSnapshotCart(snapshot.cartSnapshot));
           /*
            * A cart opened offline has a till-side id; the server mints its own and
            * the alias only lives for the batch that created it. A checkout that
@@ -1121,6 +1119,24 @@ export class PosOfflineService {
         return [key, this.normalizeSnapshotTimestamps(entry)];
       }),
     );
+  }
+
+  /**
+   * Dart serializes absent optional cart fields as null. The cart contract
+   * accepts these fields when omitted, but rejects null for the non-nullable
+   * ones. Older offline cash commands are immutable journal entries, so shape
+   * their snapshot at replay rather than requiring the till to rewrite them.
+   */
+  private normalizeSnapshotCart(value: unknown): unknown {
+    const normalized = this.normalizeSnapshotTimestamps(value);
+    if (normalized === null || typeof normalized !== 'object' || Array.isArray(normalized)) {
+      return normalized;
+    }
+    const cart = { ...normalized } as Record<string, unknown>;
+    for (const key of ['accountOwnerActive', 'accountFolio', 'createdAt', 'lifecycleState']) {
+      if (cart[key] === null) delete cart[key];
+    }
+    return cart;
   }
 
   private isoTimestamp(value: string): string {

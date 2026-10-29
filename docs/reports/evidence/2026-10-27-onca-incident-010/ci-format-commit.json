@@ -1,0 +1,19 @@
+{
+  "commit": "4bb0a04f8dec1b8ff9ea42b0bfe9305a5ba07fcc",
+  "buildInputsIdenticalTo": "08a2ea004195d3c423d3ce74aa71e3430314f1e5",
+  "files": [
+    ".gitleaks.toml",
+    "apps/umi-api/src/modules/pos-checkout/pos-checkout.service.ts",
+    "docs/reports/2026-10-22-official-receipt-and-logo.md",
+    "docs/reports/2026-10-22-split-first-payment-one-tap.md",
+    "docs/reports/2026-10-24-onca-production-bug-001.md",
+    "docs/reports/2026-10-24-onca-production-bug-002.md",
+    "docs/reports/2026-10-24-onca-production-bug-003.md",
+    "docs/reports/2026-10-24-onca-remote-support-persistence.md",
+    "docs/reports/2026-10-26-onca-keepadb-fleet.md",
+    "docs/reports/2026-10-26-onca-production-bug-005.md",
+    "docs/reports/2026-10-26-onca-production-bug-006.md",
+    "docs/reports/2026-10-27-onca-production-bug-007.md",
+    "docs/reports/ONCA_PRODUCTION_BUG_LOG.md"
+  ]
+}

@@ -284,6 +284,18 @@ final class _CartRepo
   }
 
   @override
+  Future<Cart> create(String merchantId, CreateCartRequest request) async {
+    creations++;
+    return cart = Cart.fromJson({
+      ...cart.toJson(),
+      'id': '00000000-0000-4000-8000-0000000000c2',
+      'operatorSessionId': request.operatorSessionId,
+      'lifecycleState': 'building_cart',
+      'version': cart.version + 1,
+    });
+  }
+
+  @override
   Future<Cart> read(String merchantId, CartQuery query) async => cart;
   @override
   Future<Cart> account(
@@ -938,10 +950,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(f.cart.state.cart!.fulfillmentType, 'takeout');
       expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
-      expect(f.plan.loads, 0);
+      expect(f.plan.loads, 1);
     },
   );
-  testWidgets('mobile dine in chooses a table and continues with its account', (
+  testWidgets('mobile dine in starts tableless and keeps serving the order', (
     tester,
   ) async {
     final f = await _fixture(mobility: 'mobile');
@@ -954,16 +966,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(OrderTablePicker), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('floor-plan-element-table')));
-    await tester.pumpAndSettle();
-    expect(f.repo.tableOpens, 0);
-    await tester.tap(find.byKey(const ValueKey('confirm-table')));
-    await tester.pumpAndSettle();
-    expect(f.repo.tableOpens, 1);
-    expect(f.cart.state.cart!.tableId, 'table');
-    expect(f.cart.state.cart!.id, 'table-account');
     expect(find.byType(OrderTablePicker), findsNothing);
+    expect(f.repo.tableOpens, 0);
+    expect(f.cart.state.cart!.tableId, isNull);
+    expect(f.cart.state.cart!.fulfillmentType, 'dine_in');
     expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
   });
   testWidgets(
@@ -998,6 +1004,20 @@ void main() {
     expect(find.byType(PartialCheckoutSurface), findsNothing);
     // The checkout route is visible after the preserved account is recovered.
     expect(find.byType(CatalogSurface), findsNothing);
+  });
+  testWidgets('sending a dine-in order asks for its table last', (
+    tester,
+  ) async {
+    final f = await _fixture(lines: 1);
+    addTearDown(f.dispose);
+    await _mount(tester, f.surface);
+
+    await tester.tap(find.text('Enviar a cocina'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OrderTablePicker), findsOneWidget);
+    expect(f.cart.state.cart!.items, hasLength(1));
+    expect(f.cart.state.cart!.tableId, isNull);
   });
   testWidgets('account split check opens the one-account ledger directly', (
     tester,
@@ -1049,7 +1069,7 @@ void main() {
     expect(f.cart.state.cart!.items, hasLength(2));
   });
   testWidgets(
-    'mobile dine in creates three tables and opens the selected account',
+    'mobile dine in creates three tables when the table is requested',
     (tester) async {
       final f = await _fixture(mobility: 'mobile', emptyPlan: true);
       addTearDown(f.dispose);
@@ -1060,6 +1080,10 @@ void main() {
           matching: find.text('Comer aquí'),
         ),
       );
+      await tester.pumpAndSettle();
+      expect(find.byType(OrderTablePicker), findsNothing);
+      expect(f.cart.state.cart!.tableId, isNull);
+      await tester.tap(find.text('Agregar mesa'));
       await tester.pumpAndSettle();
       expect(find.text('Agrega tus mesas'), findsOneWidget);
       await tester.enterText(find.byKey(const ValueKey('table-count')), '3');
@@ -1078,10 +1102,9 @@ void main() {
         find.byKey(const ValueKey('floor-plan-element-created-table-2')),
       );
       await tester.pumpAndSettle();
-      expect(f.repo.tableOpens, 0);
       await tester.tap(find.byKey(const ValueKey('confirm-table')));
       await tester.pumpAndSettle();
-      expect(f.repo.tableOpens, 1);
+      expect(f.repo.assignments, 1);
       expect(f.cart.state.cart!.tableId, 'created-table-2');
       expect(find.byType(OrderTablePicker), findsNothing);
       expect(find.byType(CatalogSurface), findsOneWidget);
@@ -1155,7 +1178,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(f.repo.startAttempts, 1);
+      expect(f.repo.startAttempts, 0);
       expect(f.repo.creations, 1);
       expect(f.repo.additions, 1);
       expect(f.cart.state.cart!.fulfillmentType, 'takeout');
@@ -1163,37 +1186,46 @@ void main() {
       expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
     },
   );
-  testWidgets('mobile dine in creates an account only after a table choice', (
-    tester,
-  ) async {
-    final f = await _fixture(
-      mobility: 'mobile',
-      initialNoCart: true,
-      withProduct: true,
-    );
-    addTearDown(f.dispose);
-    await _mount(tester, f.surface);
-    expect(f.repo.creations, 0);
-    await tester.tap(find.text('Latte').first);
-    await tester.pumpAndSettle();
-    expect(f.repo.creations, 0);
-    await tester.tap(
-      find.descendant(
-        of: find.byType(PosAlertDialog),
-        matching: find.text('Comer aquí'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(f.repo.tableOpens, 0);
-    await tester.tap(find.byKey(const ValueKey('floor-plan-element-table')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('confirm-table')));
-    await tester.pumpAndSettle();
-    expect(f.repo.tableOpens, 1);
-    expect(f.repo.creations, 0);
-    expect(f.repo.additions, 1);
-    expect(f.cart.state.cart?.tableId, 'table');
-  });
+  testWidgets(
+    'mobile dine in takes the order first and asks for the table when sending it',
+    (tester) async {
+      final f = await _fixture(
+        mobility: 'mobile',
+        initialNoCart: true,
+        withProduct: true,
+      );
+      addTearDown(f.dispose);
+      await _mount(tester, f.surface);
+      expect(f.repo.creations, 0);
+      await tester.tap(find.text('Latte').first);
+      await tester.pumpAndSettle();
+      expect(f.repo.creations, 0);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(PosAlertDialog),
+          matching: find.text('Comer aquí'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(OrderTablePicker), findsNothing);
+      expect(f.repo.tableOpens, 0);
+      expect(f.repo.creations, 1);
+      expect(f.repo.additions, 1);
+      expect(f.cart.state.cart?.tableId, isNull);
+      expect(f.cart.state.cart?.fulfillmentType, 'dine_in');
+      expect(f.cart.state.cart?.items, hasLength(1));
+
+      await tester.tap(find.text('Cobrar'));
+      await tester.pumpAndSettle();
+      expect(find.byType(OrderTablePicker), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('floor-plan-element-table')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('confirm-table')));
+      await tester.pumpAndSettle();
+      expect(f.repo.assignments, 1);
+      expect(f.cart.state.cart?.tableId, 'table');
+    },
+  );
   testWidgets('fixed without a local cart starts through the order chooser', (
     tester,
   ) async {

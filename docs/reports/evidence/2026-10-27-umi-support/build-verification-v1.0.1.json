@@ -1,0 +1,40 @@
+{
+  "checked_at": "2026-10-27T20:29:10.884114+00:00",
+  "app": "Umi Support",
+  "application_id": "co.umiconsulting.umi_support",
+  "version_name": "1.0.1",
+  "version_code": 2,
+  "apk_path": "tools/umi-support-android/app/build/outputs/apk/release/app-release.apk",
+  "apk_sha256": "32e7bf83ed3d189f19c943acb613f0709070c8b2839170d6c3caf0b47a98a77d",
+  "apk_bytes": 43054,
+  "signature_verified": true,
+  "public_certificate": [
+    "Signer #1 certificate SHA-256 digest: e8d675db1dbb7c2286bd9e319293966a358831ec334e416467d4cf68ff181504"
+  ],
+  "debuggable": false,
+  "uses_permissions": [],
+  "tests": {
+    "tests": 48,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint": {
+    "debug": {
+      "issues": [],
+      "passed": true
+    },
+    "release": {
+      "issues": [],
+      "passed": true
+    }
+  },
+  "unsigned_release_guard": true,
+  "platform_signature_match_on_imin": true,
+  "installed_on_caja": false,
+  "accessibility_activated": false,
+  "reboot_tested": false,
+  "production_changes": false,
+  "physical_validation": "PENDING",
+  "pubspec_lock_sha256": "056c516695e325543f007ad2eb608ada4f4a6d2806537714f5964048c1a85f8f"
+}

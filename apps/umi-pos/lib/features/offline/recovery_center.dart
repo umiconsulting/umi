@@ -12,29 +12,6 @@ import 'offline_journal.dart';
 import 'recovery_actions.dart';
 import 'replay_engine.dart';
 
-final class OfflineHardwareRecoveryItem {
-  const OfflineHardwareRecoveryItem({
-    required this.commandId,
-    required this.commandType,
-    required this.status,
-    this.verifyPrint,
-    this.controlledReprint,
-    this.repeatDrawerOpen,
-  });
-
-  final String commandId;
-  final String commandType;
-  final String status;
-  final Future<void> Function()? verifyPrint;
-  final Future<void> Function()? controlledReprint;
-  final Future<void> Function()? repeatDrawerOpen;
-}
-
-final class OfflineHardwareRecoveryResult {
-  const OfflineHardwareRecoveryResult(this.items);
-  final List<OfflineHardwareRecoveryItem> items;
-}
-
 Future<void> showRecoveryCenter(
   BuildContext context, {
   required EncryptedOfflineJournal journal,
@@ -45,8 +22,6 @@ Future<void> showRecoveryCenter(
   required Future<void> Function() refreshSnapshots,
   required Future<void> Function() queryAmbiguousPayment,
   Future<bool> Function()? beforeContextExit,
-  Future<OfflineHardwareRecoveryResult> Function(JournalEntry entry)?
-  retryOfflineHardware,
 }) => showPosSheet<void>(
   context: context,
   isScrollControlled: true,
@@ -54,7 +29,6 @@ Future<void> showRecoveryCenter(
     journal: journal,
     recovery: recovery,
     scope: scope,
-    retryOfflineHardware: retryOfflineHardware,
     executor: AppRecoveryActionExecutor(
       recovery: recovery,
       scope: scope,
@@ -74,15 +48,12 @@ final class RecoveryCenter extends StatefulWidget {
     required this.recovery,
     required this.scope,
     required this.executor,
-    this.retryOfflineHardware,
     super.key,
   });
   final EncryptedOfflineJournal journal;
   final OfflineRecoveryController recovery;
   final ReplayScope scope;
   final RecoveryActionExecutor executor;
-  final Future<OfflineHardwareRecoveryResult> Function(JournalEntry entry)?
-  retryOfflineHardware;
 
   @override
   State<RecoveryCenter> createState() => _RecoveryCenterState();
@@ -91,7 +62,6 @@ final class RecoveryCenter extends StatefulWidget {
 final class _RecoveryCenterState extends State<RecoveryCenter> {
   OfflineJournalSnapshot? snapshot;
   SafeReplayDiagnostic? _diagnostic;
-  final Set<String> _hardwareRetries = {};
   final Set<String> _conflictRetries = {};
   final Set<String> _conflictResolutions = {};
 
@@ -201,11 +171,6 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                         itemBuilder: (context, index) {
                           final entry = entries[index];
                           final conflict = entry.failure;
-                          final provisionalId = entry.command.provisionalId;
-                          final canRetryHardware =
-                              widget.retryOfflineHardware != null &&
-                              provisionalId != null &&
-                              entry.command.commandType == 'pos.checkout.cash';
                           final canRetryConflict =
                               entry.status == JournalStatus.conflict &&
                               conflict != null &&
@@ -304,43 +269,6 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                                               child: PosSpinner(strokeWidth: 2),
                                             )
                                           : const PosIcon(PosGlyphs.sync),
-                                    ),
-                                  )
-                                else if (canRetryHardware)
-                                  Semantics(
-                                    button: true,
-                                    label:
-                                        Localizations.localeOf(
-                                              context,
-                                            ).languageCode ==
-                                            'es'
-                                        ? 'Reintentar el hardware de forma segura'
-                                        : 'Retry hardware safely',
-                                    child: PosIconButton(
-                                      tooltip:
-                                          Localizations.localeOf(
-                                                context,
-                                              ).languageCode ==
-                                              'es'
-                                          ? 'Reintentar el hardware'
-                                          : 'Retry hardware',
-                                      onPressed:
-                                          _hardwareRetries.contains(
-                                            provisionalId,
-                                          )
-                                          ? null
-                                          : () => _retryHardware(entry),
-                                      icon:
-                                          _hardwareRetries.contains(
-                                            provisionalId,
-                                          )
-                                          ? const SizedBox.square(
-                                              dimension: 20,
-                                              child: PosSpinner(strokeWidth: 2),
-                                            )
-                                          : const PosIcon(
-                                              PosGlyphs.printOutlined,
-                                            ),
                                     ),
                                   )
                                 else
@@ -523,54 +451,8 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
       authorizationInput = await _managerCredential();
       if (authorizationInput == null) return;
     }
-    final outcome = await widget.executor.execute(
-      kind,
-      authorizationInput: authorizationInput,
-    );
-    if (kind == RecoveryActionKind.viewReceipt &&
-        outcome == RecoveryActionOutcome.completed) {
-      await _showReceiptStatus();
-    }
+    await widget.executor.execute(kind, authorizationInput: authorizationInput);
     await _load();
-  }
-
-  Future<void> _retryHardware(JournalEntry entry) async {
-    final id = entry.command.provisionalId;
-    final retry = widget.retryOfflineHardware;
-    if (id == null || retry == null || _hardwareRetries.contains(id)) return;
-    setState(() => _hardwareRetries.add(id));
-    try {
-      final result = await retry(entry);
-      if (!mounted) return;
-      final unknown = result.items
-          .where((item) => item.status == 'unknown')
-          .toList();
-      if (unknown.isNotEmpty) {
-        await _showUnknownHardware(unknown);
-        return;
-      }
-      if (result.items.any((item) => item.status != 'succeeded')) {
-        final spanish = Localizations.localeOf(context).languageCode == 'es';
-        setState(
-          () => _notice = spanish
-              ? 'El hardware requiere atención.'
-              : 'The hardware needs attention.',
-        );
-        return;
-      }
-      // No completion bar: the entry leaves the recovery list, which is the
-      // list the operator is reading.
-    } catch (_) {
-      if (!mounted) return;
-      final spanish = Localizations.localeOf(context).languageCode == 'es';
-      setState(
-        () => _notice = spanish
-            ? 'El hardware requiere atención.'
-            : 'The hardware needs attention.',
-      );
-    } finally {
-      if (mounted) setState(() => _hardwareRetries.remove(id));
-    }
   }
 
   Future<void> _retryConflict(JournalEntry entry) async {
@@ -648,73 +530,6 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
     }
   }
 
-  Future<void> _showUnknownHardware(
-    List<OfflineHardwareRecoveryItem> items,
-  ) async {
-    final spanish = Localizations.localeOf(context).languageCode == 'es';
-    await showPosDialog<void>(
-      context: context,
-      builder: (dialogContext) => PosAlertDialog(
-        title: Text(
-          spanish ? 'Resultado físico desconocido' : 'Unknown physical result',
-        ),
-        content: Text(
-          spanish
-              ? 'Verifica el dispositivo antes de iniciar otra acción.'
-              : 'Verify the device before you start another action.',
-        ),
-        actions: [
-          for (final item in items) ...[
-            if (item.verifyPrint != null)
-              PosTextButton(
-                onPressed: () =>
-                    _runHardwareAction(dialogContext, item.verifyPrint!),
-                child: Text(spanish ? 'Confirmar impresión' : 'Verify print'),
-              ),
-            if (item.controlledReprint != null)
-              PosButton.tonal(
-                onPressed: () =>
-                    _runHardwareAction(dialogContext, item.controlledReprint!),
-                child: Text(spanish ? 'Imprimir una COPIA' : 'Print a COPY'),
-              ),
-            if (item.repeatDrawerOpen != null)
-              PosButton.tonal(
-                onPressed: () =>
-                    _runHardwareAction(dialogContext, item.repeatDrawerOpen!),
-                child: Text(spanish ? 'Abrir otra vez' : 'Open again'),
-              ),
-          ],
-          PosTextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(spanish ? 'Cerrar' : 'Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _runHardwareAction(
-    BuildContext dialogContext,
-    Future<void> Function() action,
-  ) async {
-    Navigator.pop(dialogContext);
-    final spanish = Localizations.localeOf(context).languageCode == 'es';
-    try {
-      await action();
-    } catch (_) {
-      if (!mounted) return;
-      setState(
-        () => _notice = spanish
-            ? 'El resultado físico sigue desconocido.'
-            : 'The physical result is still unknown.',
-      );
-      return;
-    }
-    if (!mounted) return;
-    // No completion bar, same reason as `_retryHardware`: the list is the
-    // feedback.
-  }
-
   List<RecoveryAction> _availableActions(
     RecoveryStatus status,
     List<JournalEntry> entries,
@@ -735,93 +550,11 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
         RecoveryActionKind.queryResult,
       if (widget.recovery.reconciliationId != null)
         RecoveryActionKind.acknowledgeReconciliation,
-      if (entries.any(
-        (entry) =>
-            entry.officialCommit != null ||
-            (entry.command.provisionalId != null &&
-                entry.command.commandType == 'pos.checkout.cash'),
-      ))
-        RecoveryActionKind.viewReceipt,
     };
     return [
       for (final action in RecoveryActionCatalog.all)
         if (kinds.contains(RecoveryActionCatalog.kind(action))) action,
     ];
-  }
-
-  Future<void> _showReceiptStatus() async {
-    final entries = snapshot?.entries.where(
-      (entry) =>
-          entry.command.commandType == 'pos.checkout.cash' &&
-          entry.command.provisionalId != null,
-    );
-    if (entries == null || entries.isEmpty) return;
-    final entry = entries.last;
-    final rawSnapshot = entry.command.payload['snapshot'];
-    if (rawSnapshot is! Map<String, Object?>) return;
-    final checkoutSnapshot = OfflineCheckoutSnapshot.fromJson(rawSnapshot);
-    final cart = Cart.fromJson(checkoutSnapshot.cartSnapshot);
-    final totals = TotalsConfirmation.fromJson(checkoutSnapshot.totals);
-    final total = totals.totals['grandTotal']! as Map<String, Object?>;
-    final official = entry.officialCommit == null
-        ? null
-        : OfficialCommitResult.fromJson(entry.officialCommit!);
-    await showPosDialog<void>(
-      context: context,
-      builder: (context) => PosAlertDialog(
-        title: Text(AppLocalizations.of(context).recoveryReceiptTitle),
-        content: SizedBox(
-          width: 520,
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              Text(
-                official == null
-                    ? AppLocalizations.of(context).pendingSalesSecure
-                    : AppLocalizations.of(context).officialReceiptAvailable,
-              ),
-              PosSelectableText(
-                official?.officialReceiptNumber ??
-                    entry.command.provisionalId ??
-                    '#${entry.command.deviceSequence}',
-              ),
-              const PosDivider(),
-              for (final rawLine in cart.items)
-                Builder(
-                  builder: (_) {
-                    final line = CartItem.fromJson(rawLine);
-                    return PosListRow(
-                      title: Text(line.productName),
-                      subtitle: line.variant == null
-                          ? null
-                          : Text(line.variant!['name'] as String),
-                      trailing: Text('${line.quantity}'),
-                    );
-                  },
-                ),
-              const PosDivider(),
-              Text(
-                _receiptMoney(total),
-                style: PosTheme.of(context).textTheme.titleLarge,
-                textAlign: TextAlign.end,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          PosTextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(AppLocalizations.of(context).closeAction),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _receiptMoney(Map<String, Object?> money) {
-    final currency = money['currency'] as String? ?? '';
-    final minorUnits = (money['minorUnits'] as num?)?.toInt() ?? 0;
-    return formatMinorUnits(minorUnits, currency);
   }
 
   Future<String?> _managerCredential() async {

@@ -318,6 +318,9 @@ final class LanKdsStore {
       for (final cart in carts)
         if (cart.firedOrderId != null) cart.id: cart.firedOrderId!,
     };
+    final localSources = {
+      for (final cart in carts) cart.firedOrderId ?? cart.id,
+    };
     final merged = <String, Map<String, Object?>>{
       for (final order in base)
         if (order['sourceOrderId'] case final String source) source: order,
@@ -332,8 +335,15 @@ final class LanKdsStore {
         source = official;
       }
       final server = merged[source];
-      if (server == null ||
-          (order['version'] as num? ?? 0) > (server['version'] as num? ?? 0)) {
+      if (server == null) {
+        // A local command overlay is not a copy of active work. Once a cloud
+        // refresh omits the order, another terminal has completed or cancelled
+        // it. Keep overlays only for carts this terminal fired and the cloud
+        // has not acknowledged yet; otherwise the old card survives for ever.
+        if (localSources.contains(source)) merged[source] = order;
+        continue;
+      }
+      if ((order['version'] as num? ?? 0) > (server['version'] as num? ?? 0)) {
         merged[source] = order;
       }
     }

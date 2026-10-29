@@ -42,8 +42,21 @@ final class AppException implements Exception {
       // as a conflict keeps it out of the "server" bucket that offers only a
       // retry that re-sends the same broken payload.
       'CASH_SHIFT_REQUIRED' ||
+      'CASH_POLICY_DENIED' ||
+      'INSUFFICIENT_EXPECTED_CASH' ||
+      'APPROVAL_REQUIRED' ||
+      'APPROVAL_FINGERPRINT_REQUIRED' ||
+      'APPROVAL_FINGERPRINT_MISMATCH' ||
       'REGISTER_NOT_AVAILABLE' ||
-      'REGISTER_HELD_BY_ACTIVE_TILL' => AppErrorCategory.conflict,
+      'REGISTER_HELD_BY_ACTIVE_TILL' ||
+      // A definite refusal about the account is not a transport failure. If it
+      // entered the offline lane, the cash path would hide the server's real
+      // reason and could ask the operator to charge again under a cash tender.
+      'CHECKOUT_CART_CHANGED' ||
+      'CHECKOUT_CONFIRMATION_REQUIRED' ||
+      'CHECKOUT_PARTIAL_LEDGER_CONFLICT' ||
+      'CART_VALIDATION_FAILED' ||
+      'CART_VERSION_CONFLICT' => AppErrorCategory.conflict,
       'RATE_LIMITED' || 'INTERNAL_ERROR' => AppErrorCategory.server,
       _ => AppErrorCategory.unknown,
     },

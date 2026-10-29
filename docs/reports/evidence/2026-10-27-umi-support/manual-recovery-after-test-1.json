@@ -1,0 +1,24 @@
+{
+  "restored_at": "2026-10-27T20:24:04.814542+00:00",
+  "serial": "100.64.178.95:38475",
+  "boot_count": "7",
+  "manual_network_dialog_approval_required": true,
+  "manual_endpoint_entered": false,
+  "manual_adb_connect_used": false,
+  "accessibility_selected": true,
+  "accessibility_state": [
+    "Bound services:{Service[label=Umi Support, feedbackType[FEEDBACK_GENERIC], capabilities=1, eventTypes=[TYPE_VIEW_CLICKED, TYPE_WINDOW_STATE_CHANGED, TYPE_WINDOW_CONTENT_CHANGED], notificationTimeout=100, requestA11yBtn=false]}",
+    "Enabled services:{{co.umiconsulting.umi_support/co.umiconsulting.umi_support.SupportAccessibilityService}}",
+    "Binding services:{}",
+    "Crashed services:{}]"
+  ],
+  "endpoint": {
+    "active": true,
+    "received_at": "2026-10-27T20:23:49Z",
+    "observed_at": "2026-10-27T20:23:49.603Z",
+    "reported_endpoint": "192.168.0.10:38475",
+    "source": "100.64.178.95",
+    "target": "100.64.178.95:38475",
+    "event_id": "keepadb-v2-wlan-adb-97ebf66e175443a8"
+  }
+}

@@ -44,11 +44,6 @@ enum CheckoutPhase {
   awaitingApproval,
   paymentUnknown,
   completed,
-  provisional,
-
-  /// The provisional sale was accepted on replay; the receipt on screen now
-  /// names the official sale instead of asking the operator to keep waiting.
-  provisionalSynced,
   failure,
 }
 
@@ -57,18 +52,12 @@ final class CheckoutState {
     this.phase = CheckoutPhase.idle,
     this.result,
     this.errorCode,
-    this.provisionalReceipt,
-    this.officialSaleId,
     this.failureDetails,
     this.postCommitWarning,
   });
   final CheckoutPhase phase;
   final CheckoutResult? result;
   final String? errorCode;
-  final ProvisionalReceipt? provisionalReceipt;
-
-  /// Set once the provisional sale in `provisionalReceipt` has landed.
-  final String? officialSaleId;
 
   /// A warning from the hardware that ran AFTER a completed sale — the drawer's
   /// pulse especially. The money is recorded either way; what failed is the
@@ -119,39 +108,39 @@ final class CheckoutController extends ChangeNotifier {
     required CheckoutRepository repository,
     OfflineCheckoutService? offlineCheckout,
     ConnectivityController? connectivity,
-    EncryptedOfflineJournal? journal,
     OfflineRecoveryController? recovery,
     bool Function()? pendingLocalCommands,
+    Future<bool> Function()? preserveLocalCommands,
     Future<void> Function()? refreshOfflinePolicy,
     required Telemetry telemetry,
     Future<String?> Function(CheckoutResult result)? afterCommit,
-    Future<void> Function(ProvisionalReceipt receipt)? afterOfflineCommit,
+    Future<void> Function(OfflineCashCommit commit)? afterOfflineCommit,
+    this.localFirstFastPathEnabled = false,
   }) : _repository = repository,
        _offlineCheckout = offlineCheckout,
        _connectivity = connectivity,
-       _journal = journal,
        _recovery = recovery,
        _pendingLocalCommands = pendingLocalCommands,
+       _preserveLocalCommands = preserveLocalCommands,
        _refreshOfflinePolicy = refreshOfflinePolicy,
        _telemetry = telemetry,
        _afterCommit = afterCommit,
-       _afterOfflineCommit = afterOfflineCommit {
-    _recovery?.addListener(_recoveryChanged);
-  }
+       _afterOfflineCommit = afterOfflineCommit;
 
   final CheckoutRepository _repository;
   final OfflineCheckoutService? _offlineCheckout;
   final ConnectivityController? _connectivity;
-  final EncryptedOfflineJournal? _journal;
   final OfflineRecoveryController? _recovery;
   final bool Function()? _pendingLocalCommands;
+  final Future<bool> Function()? _preserveLocalCommands;
   final Future<void> Function()? _refreshOfflinePolicy;
   final Telemetry _telemetry;
   final Future<String?> Function(CheckoutResult result)? _afterCommit;
-  final Future<void> Function(ProvisionalReceipt receipt)? _afterOfflineCommit;
+  final Future<void> Function(OfflineCashCommit commit)? _afterOfflineCommit;
+  final bool localFirstFastPathEnabled;
   CheckoutState _state = const CheckoutState();
   CheckoutState get state => _state;
-  bool get usesLocalCheckout => !_worthTryingOnline;
+  bool get usesLocalCheckout => !_worthTryingOnline || _localFastCheckout;
   List<Map<String, Object?>> get tenderDrafts => _tenderDrafts;
   Map<String, Object?>? get tipDraft => _tipDraft;
   List<Map<String, Object?>> get discountDrafts => _discountDrafts;
@@ -167,8 +156,6 @@ final class CheckoutController extends ChangeNotifier {
   bool _partialLedgerFinalization = false;
   Cart? _cart;
   OfflineAuthorityContext? _authority;
-  String _locationName = '';
-  String _operatorName = '';
   int? _cashReceivedMinorUnits;
 
   /// What this location may offer in a tender, read once when the sheet opens.
@@ -301,8 +288,6 @@ final class CheckoutController extends ChangeNotifier {
     _cashShiftId = cashShiftId;
     _cart = cart;
     _authority = authority;
-    _locationName = locationName;
-    _operatorName = operatorName;
     _cashReceivedMinorUnits = cashReceivedMinorUnits;
     _tenderDrafts = List.unmodifiable(tenderDrafts);
     _tipDraft = tipDraft == null ? null : Map.unmodifiable(tipDraft);
@@ -312,9 +297,16 @@ final class CheckoutController extends ChangeNotifier {
     _commitCommandId = _uuid();
     _commitIdempotencyKey = _uuid();
     _customerValueFingerprintCommandId ??= _uuid();
+    if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+      debugPrint(
+        '[umipos] checkout preview fast=$_localFastCheckout '
+        'tenders=${_tenderDrafts.length} method=$_paymentMethod '
+        'tip=${_tipDraft != null} discounts=${_discountDrafts.length}',
+      );
+    }
     _set(const CheckoutState(phase: CheckoutPhase.repricing));
     _event('checkout_opened');
-    if (!_worthTryingOnline) {
+    if (!_worthTryingOnline || _localFastCheckout) {
       if (cart == null || authority == null) {
         _set(
           const CheckoutState(
@@ -324,9 +316,9 @@ final class CheckoutController extends ChangeNotifier {
         );
         return;
       }
-      final cached = _confirmationCache['${cart.id}:${cart.version}'];
+      final cached = _confirmationCache[_confirmationCacheKey(cart)];
       final confirmation = cached ?? _localConfirmation(cart);
-      _confirmationCache['${cart.id}:${cart.version}'] = confirmation;
+      _confirmationCache[_confirmationCacheKey(cart)] = confirmation;
       _set(
         CheckoutState(
           phase: CheckoutPhase.confirmationRequired,
@@ -632,6 +624,22 @@ final class CheckoutController extends ChangeNotifier {
   Future<void> confirm() async {
     final fingerprint = _state.result?.confirmation['fingerprint'] as String?;
     if (fingerprint == null) return;
+    if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+      debugPrint(
+        '[umipos] checkout confirm fast=$_shouldCommitLocally '
+        'online=$_worthTryingOnline fingerprint=${fingerprint.substring(0, 8)}',
+      );
+    }
+    if (_shouldCommitLocally() && _isSimpleCashTender && _cashShiftId == null) {
+      _set(
+        CheckoutState(
+          phase: CheckoutPhase.failure,
+          result: _state.result,
+          errorCode: 'CASH_SHIFT_REQUIRED',
+        ),
+      );
+      return;
+    }
     if (!_worthTryingOnline) {
       await _submitOffline(fingerprint);
       return;
@@ -835,8 +843,6 @@ final class CheckoutController extends ChangeNotifier {
     _partialLedgerFinalization = false;
     _cart = null;
     _authority = null;
-    _locationName = '';
-    _operatorName = '';
     _cashReceivedMinorUnits = null;
     _tenderDrafts = const [];
     _tipDraft = null;
@@ -894,12 +900,29 @@ final class CheckoutController extends ChangeNotifier {
     }
   }
 
-  Future<void> _submit(String? fingerprint) async {
+  Future<void> _submit(
+    String? fingerprint, {
+    bool retryIdempotencyConflict = true,
+  }) async {
     if (_merchantId == null ||
         _locationId == null ||
         _operatorSessionId == null ||
         _cartId == null ||
         _cartVersion == null) {
+      return;
+    }
+    // A local cash sale must never continue through the online partial-payment
+    // path without a drawer. That path records the cash, redisplays Cobrar on
+    // the same total, and asks the operator for a second tap. Stop before money
+    // unless Cash Center has produced this terminal's shift.
+    if (_shouldCommitLocally() && _isSimpleCashTender && _cashShiftId == null) {
+      _set(
+        CheckoutState(
+          phase: CheckoutPhase.failure,
+          result: _state.result,
+          errorCode: 'CASH_SHIFT_REQUIRED',
+        ),
+      );
       return;
     }
     // When the till already knows the API is unreachable, committing locally is
@@ -911,7 +934,7 @@ final class CheckoutController extends ChangeNotifier {
     if (_shouldCommitLocally()) {
       if (fingerprint == null && _cart != null) {
         final confirmation = _localConfirmation(_cart!);
-        _confirmationCache['${_cart!.id}:${_cart!.version}'] = confirmation;
+        _confirmationCache[_confirmationCacheKey(_cart!)] = confirmation;
         _event('totals_confirmed_offline');
         _set(
           CheckoutState(
@@ -922,11 +945,25 @@ final class CheckoutController extends ChangeNotifier {
         return;
       }
       if (fingerprint != null) {
-        await _submitOffline(fingerprint);
-        return;
+        final storedLocally = await _submitOffline(
+          fingerprint,
+          fallbackOnline: localFirstFastPathEnabled && _worthTryingOnline,
+        );
+        if (storedLocally ||
+            !localFirstFastPathEnabled ||
+            !_worthTryingOnline) {
+          return;
+        }
       }
     }
     try {
+      if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+        debugPrint(
+          '[umipos] checkout request fingerprint=${fingerprint == null ? "preview" : fingerprint.substring(0, 8)} '
+          'command=${_commitCommandId ?? "preview"} '
+          'idempotency=${_commitIdempotencyKey ?? "preview"}',
+        );
+      }
       final result = await _repository.checkout(
         _merchantId!,
         CheckoutCommand(
@@ -983,7 +1020,7 @@ final class CheckoutController extends ChangeNotifier {
         ),
       );
       if (phase == CheckoutPhase.confirmationRequired && _cart != null) {
-        _confirmationCache['${_cart!.id}:${_cart!.version}'] = result;
+        _confirmationCache[_confirmationCacheKey(_cart!)] = result;
       }
       if (phase == CheckoutPhase.completed) {
         _event('payment_completed');
@@ -999,11 +1036,40 @@ final class CheckoutController extends ChangeNotifier {
           'code=${error.code} fallback=${_canFallbackOffline(error)}',
         );
       }
+      if (error.code == 'IDEMPOTENCY_CONFLICT') {
+        await recover(
+          merchantId: _merchantId!,
+          locationId: _locationId!,
+          operatorSessionId: _operatorSessionId!,
+          cartId: _cartId!,
+          cartVersion: _cartVersion!,
+        );
+        if (_state.phase == CheckoutPhase.completed ||
+            _state.phase == CheckoutPhase.paymentUnknown) {
+          return;
+        }
+        _commitCommandId = _uuid();
+        _commitIdempotencyKey = _uuid();
+        if (retryIdempotencyConflict) {
+          await _submit(fingerprint, retryIdempotencyConflict: false);
+          return;
+        }
+        final priorResult = _state.result;
+        _set(
+          CheckoutState(
+            phase: CheckoutPhase.failure,
+            result: priorResult,
+            errorCode: error.code,
+            failureDetails: error.details,
+          ),
+        );
+        return;
+      }
       if (_canFallbackOffline(error)) {
         _connectivity?.networkDown();
         if (fingerprint == null && _cart != null) {
           final confirmation = _localConfirmation(_cart!);
-          _confirmationCache['${_cart!.id}:${_cart!.version}'] = confirmation;
+          _confirmationCache[_confirmationCacheKey(_cart!)] = confirmation;
           _set(
             CheckoutState(
               phase: CheckoutPhase.confirmationRequired,
@@ -1021,6 +1087,21 @@ final class CheckoutController extends ChangeNotifier {
     } catch (error) {
       _unexpected(error);
     }
+  }
+
+  // Optimistic edits can change lines and totals before the API assigns a version.
+  String _confirmationCacheKey(Cart cart) {
+    final fingerprint = sha256.convert(
+      utf8.encode(
+        jsonEncode({
+          'cartId': cart.id,
+          'cartVersion': cart.version,
+          'items': cart.items,
+          'totals': cart.totals,
+        }),
+      ),
+    );
+    return fingerprint.toString();
   }
 
   CheckoutResult _localConfirmation(Cart cart) {
@@ -1070,10 +1151,10 @@ final class CheckoutController extends ChangeNotifier {
       _offlineCheckout != null &&
       _cart != null &&
       _authority != null &&
+      _isSimpleCashTender &&
       (error.category == AppErrorCategory.transport ||
           error.category == AppErrorCategory.timeout ||
-          error.category == AppErrorCategory.server ||
-          error.category == AppErrorCategory.unknown);
+          error.category == AppErrorCategory.server);
 
   /// The offline evidence is strong enough to skip the round trip.
   ///
@@ -1087,6 +1168,21 @@ final class CheckoutController extends ChangeNotifier {
       _offlineCheckout != null &&
       _cart != null &&
       _authority != null;
+
+  bool get _localFastCheckout =>
+      localFirstFastPathEnabled &&
+      !_worthTryingOnline &&
+      _offlineCheckout != null &&
+      _isSimpleCashTender;
+
+  bool get _isSimpleCashTender =>
+      _paymentMethod == 'cash' &&
+      _tenderDrafts.length == 1 &&
+      _tenderDrafts.single['type'] == 'cash' &&
+      _customerValueSelection == null &&
+      _tipDraft == null &&
+      _discountDrafts.isEmpty &&
+      _approvalIds.isEmpty;
 
   void _runPostCommit(CheckoutResult result) {
     final callback = _afterCommit;
@@ -1106,7 +1202,6 @@ final class CheckoutController extends ChangeNotifier {
             phase: current.phase,
             result: current.result,
             errorCode: current.errorCode,
-            provisionalReceipt: current.provisionalReceipt,
             failureDetails: current.failureDetails,
             postCommitWarning: warning,
           ),
@@ -1117,7 +1212,10 @@ final class CheckoutController extends ChangeNotifier {
     }());
   }
 
-  Future<void> _submitOffline(String fingerprint) async {
+  Future<bool> _submitOffline(
+    String fingerprint, {
+    bool fallbackOnline = false,
+  }) async {
     final offlineCheckout = _offlineCheckout;
     final cart = _cart;
     final authority = _authority;
@@ -1126,7 +1224,7 @@ final class CheckoutController extends ChangeNotifier {
         cart == null ||
         authority == null ||
         raw == null) {
-      return;
+      return false;
     }
     final unsupportedTender =
         _tenderDrafts.length != 1 ||
@@ -1144,14 +1242,16 @@ final class CheckoutController extends ChangeNotifier {
           'shift=${_cashShiftId != null}',
         );
       }
-      _set(
-        CheckoutState(
-          phase: CheckoutPhase.failure,
-          result: _state.result,
-          errorCode: 'OFFLINE_ADVANCED_TENDER_BLOCKED',
-        ),
-      );
-      return;
+      if (!fallbackOnline) {
+        _set(
+          CheckoutState(
+            phase: CheckoutPhase.failure,
+            result: _state.result,
+            errorCode: 'OFFLINE_ADVANCED_TENDER_BLOCKED',
+          ),
+        );
+      }
+      return false;
     }
     final totals = TotalsConfirmation.fromJson(raw);
     final grandTotal = totals.totals['grandTotal']! as Map<String, Object?>;
@@ -1159,14 +1259,25 @@ final class CheckoutController extends ChangeNotifier {
     final snapshotAt = DateTime.parse(
       totals.confirmedAt ?? cart.updatedAt,
     ).toUtc();
+    final preserved = await _preserveLocalCommands?.call() ?? true;
+    if (!preserved) {
+      _set(
+        CheckoutState(
+          phase: CheckoutPhase.failure,
+          result: _state.result,
+          errorCode: 'OFFLINE_SYNC_PENDING',
+        ),
+      );
+      return true;
+    }
     _set(CheckoutState(phase: CheckoutPhase.processing, result: _state.result));
     try {
       final commandId = _uuid();
-      final receipt = await offlineCheckout.checkout(
+      final commit = await offlineCheckout.checkout(
         OfflineCheckoutRequest(
           commandId: commandId,
           idempotencyKey: _uuid(),
-          provisionalSaleId: _uuid(),
+          localCommitId: _uuid(),
           authority: authority,
           checkoutCommand: CheckoutCommand(
             commandId: commandId,
@@ -1202,8 +1313,6 @@ final class CheckoutController extends ChangeNotifier {
           taxSnapshotAt: snapshotAt,
           amountReceivedMinorUnits: _cashReceivedMinorUnits ?? amount,
           businessDate: TotalsPreview.fromJson(totals.totals).businessDate,
-          locationName: _locationName,
-          operatorName: _operatorName,
         ),
         facts: OfflineCheckoutFacts(
           amountMinorUnits: amount,
@@ -1212,28 +1321,79 @@ final class CheckoutController extends ChangeNotifier {
           taxSnapshotAt: snapshotAt,
           connectivity: _connectivity?.state ?? PosConnectivity.unknown,
           paymentMethod: _paymentMethod,
+          localCommitWhileOnline:
+              localFirstFastPathEnabled && _worthTryingOnline,
         ),
         now: DateTime.now().toUtc(),
       );
+      final currency = grandTotal['currency'] as String? ?? 'MXN';
+      final discounts =
+          totals.totals['discounts'] as Map<String, Object?>? ??
+          const <String, Object?>{};
+      final summary = PaymentSummary(
+        checkoutId: cart.id,
+        state: 'completed',
+        tenders: _tenderDrafts,
+        amountDue: grandTotal,
+        appliedAmount: grandTotal,
+        remainingBalance: {'currency': currency, 'minorUnits': 0},
+        change: {
+          'currency': currency,
+          'minorUnits': (_cashReceivedMinorUnits ?? amount) - amount,
+        },
+        partialPaymentState: 'completed',
+        tip: null,
+        discounts: discounts,
+      );
       _set(
         CheckoutState(
-          phase: CheckoutPhase.provisional,
-          result: _state.result,
-          provisionalReceipt: receipt,
+          phase: CheckoutPhase.completed,
+          result: CheckoutResult(
+            status: 'completed',
+            confirmation: raw,
+            payment: null,
+            payments: _tenderDrafts,
+            reservation: null,
+            sale: null,
+            receipt: null,
+            failure: null,
+            paymentSummary: summary.toJson(),
+            recoveryState: 'pending_sync',
+            receiptDelivery: _receiptDelivery,
+          ),
         ),
       );
       _event('offline_checkout_journaled');
+      final recovery = _recovery;
+      if (recovery != null) {
+        unawaited(
+          recovery.recover(
+            ReplayScope(
+              deviceId: authority.deviceId,
+              merchantId: authority.merchantId,
+              locationId: authority.locationId,
+              operatorSessionId: authority.operatorSessionId,
+              credentialVersion: authority.credentialVersion,
+            ),
+          ),
+        );
+      }
       final callback = _afterOfflineCommit;
       if (callback != null) {
         unawaited(
-          callback(receipt).catchError((Object _) {
+          callback(commit).catchError((Object _) {
             _event('offline_hardware_recovery_required');
           }),
         );
       }
+      return true;
     } on OfflineJournalException catch (error) {
       if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
         debugPrint('[umipos] offline checkout blocked=${error.category}');
+      }
+      if (fallbackOnline && error.category != 'cash_received_insufficient') {
+        _event('offline_checkout_fallback_online', {'code': error.category});
+        return false;
       }
       _set(
         CheckoutState(
@@ -1242,6 +1402,7 @@ final class CheckoutController extends ChangeNotifier {
           errorCode: error.category,
         ),
       );
+      return false;
     }
   }
 
@@ -1252,13 +1413,21 @@ final class CheckoutController extends ChangeNotifier {
         'code=${error.code}',
       );
     }
-    _event('checkout_failed');
+    _event('checkout_failed', {'code': error.code});
+    final externalPaymentConfirmed = _tenderDrafts.any(
+      (tender) =>
+          tender['type'] != 'cash' && tender['status'] == 'confirmed_success',
+    );
     _set(
       CheckoutState(
         phase: CheckoutPhase.failure,
         result: _state.result,
-        errorCode: error.code,
-        failureDetails: error.details,
+        errorCode: externalPaymentConfirmed
+            ? 'EXTERNAL_PAYMENT_NOT_COMMITTED'
+            : error.code,
+        failureDetails: externalPaymentConfirmed
+            ? {...?error.details, 'causeCode': error.code}
+            : error.details,
       ),
     );
   }
@@ -1279,7 +1448,7 @@ final class CheckoutController extends ChangeNotifier {
     if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
       debugPrint('[umipos] checkout unexpected error=$error');
     }
-    _event('checkout_failed');
+    _event('checkout_failed', {'type': error.runtimeType.toString()});
     _set(
       CheckoutState(
         phase: CheckoutPhase.failure,
@@ -1302,8 +1471,8 @@ final class CheckoutController extends ChangeNotifier {
     await _submit(fingerprint);
   }
 
-  void _event(String name) =>
-      _telemetry.event(ClientEvent(name: name, values: const {}));
+  void _event(String name, [Map<String, Object?> values = const {}]) =>
+      _telemetry.event(ClientEvent(name: name, values: values));
 
   /// Whether the charge should be ATTEMPTED over the network.
   ///
@@ -1342,58 +1511,6 @@ final class CheckoutController extends ChangeNotifier {
   void _set(CheckoutState value) {
     _state = value;
     notifyListeners();
-  }
-
-  /// Follow the provisional sale until the journal says it landed.
-  ///
-  /// The receipt on screen used to say "pending synchronisation" for the rest
-  /// of the shift, because nothing told it otherwise: replay happens in another
-  /// controller, and the surface is a snapshot of the state at commit time. The
-  /// operator is left holding a slip that may already be an official sale — the
-  /// exact kind of doubt that makes staff re-check work they have already done.
-  Future<void> _recoveryChanged() async {
-    final recovery = _recovery;
-    final journal = _journal;
-    if (recovery == null || journal == null) return;
-    if (_state.phase != CheckoutPhase.provisional) return;
-    final phase = recovery.status.phase;
-    if (phase != RecoveryPhase.completed &&
-        phase != RecoveryPhase.readyToReplay) {
-      return;
-    }
-    final provisionalId = _state.provisionalReceipt?.provisionalSaleId;
-    if (provisionalId == null) return;
-    try {
-      final snapshot = await journal.load();
-      final entry = snapshot.entries
-          .where(
-            (candidate) =>
-                candidate.command.provisionalId == provisionalId &&
-                (candidate.status == JournalStatus.accepted ||
-                    candidate.status == JournalStatus.duplicate),
-          )
-          .toList();
-      if (entry.isEmpty) return;
-      final officialId = entry.first.officialId;
-      if (officialId == null) return;
-      if (_state.phase != CheckoutPhase.provisional) return;
-      _set(
-        CheckoutState(
-          phase: CheckoutPhase.provisionalSynced,
-          result: _state.result,
-          provisionalReceipt: _state.provisionalReceipt,
-          officialSaleId: officialId,
-        ),
-      );
-    } catch (_) {
-      // An unreadable journal is the recovery centre's to report.
-    }
-  }
-
-  @override
-  void dispose() {
-    _recovery?.removeListener(_recoveryChanged);
-    super.dispose();
   }
 
   /// Ask what this location may offer, before anything is charged.

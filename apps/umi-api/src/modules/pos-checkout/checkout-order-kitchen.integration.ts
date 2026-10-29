@@ -181,6 +181,18 @@ describe.skipIf(!dsn)('checkout order and kitchen on a disposable populated copy
           null,
         );
         expect(result.sale.orderId).toBe(row.fired_order_id);
+        const releasedTable = await client.query(
+          `SELECT state,seated_at,visit_id
+             FROM merchant.table_state
+            WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+              AND table_id=(SELECT table_id FROM merchant.pos_cart WHERE id=$3::uuid)`,
+          [row.merchant_id, row.location_id, row.id],
+        );
+        expect(releasedTable.rows[0]).toMatchObject({
+          state: 'dirty',
+          seated_at: null,
+          visit_id: null,
+        });
         const items = await client.query(
           'SELECT id,voided_at,variant_name,course_number FROM merchant.order_item WHERE order_id=$1',
           [row.fired_order_id],

@@ -1182,6 +1182,14 @@ void main() {
         locale: const Locale('es'),
         screenStationId: '00000000-0000-4000-8000-0000000000e2',
         screenStationName: 'Plancha',
+        kitchenStations: const [
+          KitchenStation(
+            id: '00000000-0000-4000-8000-0000000000e2',
+            key: 'plancha',
+            name: 'Plancha',
+            sortOrder: 1,
+          ),
+        ],
         orders: [
           order(
             reference: 'Cuenta 019',
@@ -1215,6 +1223,14 @@ void main() {
         locale: const Locale('es'),
         screenStationId: '00000000-0000-4000-8000-0000000000e2',
         screenStationName: 'Plancha',
+        kitchenStations: const [
+          KitchenStation(
+            id: '00000000-0000-4000-8000-0000000000e2',
+            key: 'plancha',
+            name: 'Plancha',
+            sortOrder: 1,
+          ),
+        ],
         orders: [
           order(
             reference: 'Cuenta 019',
@@ -1232,6 +1248,38 @@ void main() {
       expect(find.text('Capuccino'), findsOneWidget);
       await harness.dispose(tester);
     });
+
+    testWidgets(
+      'a saved station removed from the kitchen opens on the current board',
+      (tester) async {
+        final harness = await pumpBoard(
+          tester,
+          locale: const Locale('es'),
+          screenStationId: '00000000-0000-4000-8000-0000000000ff',
+          screenStationName: 'Barra anterior',
+          kitchenStations: const [
+            KitchenStation(
+              id: 'barra',
+              key: 'barra',
+              name: 'Barra',
+              sortOrder: 0,
+            ),
+          ],
+          orders: [
+            order(
+              reference: 'Cuenta 021',
+              station: 'barra',
+              stationName: 'Barra',
+              items: [itemJson(itemLatte, 'Capuccino')],
+            ),
+          ],
+        );
+
+        expect(find.text('Capuccino'), findsOneWidget);
+        expect(find.text('Barra anterior'), findsNothing);
+        await harness.dispose(tester);
+      },
+    );
 
     testWidgets('tapping one line bumps that line, not the ticket', (
       tester,

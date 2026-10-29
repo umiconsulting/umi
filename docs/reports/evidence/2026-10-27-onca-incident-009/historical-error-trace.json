@@ -1,0 +1,371 @@
+{
+  "incident": "009",
+  "business_date": "2026-10-27",
+  "account": "017",
+  "cart_id": "bf2b7d4b-3f6d-4217-a8ee-162c76a63613",
+  "operator_clarification": "El aviso apareció al confirmar la transferencia.",
+  "window": {
+    "since": "2026-10-27T19:18:00Z",
+    "until": "2026-10-27T19:24:00Z",
+    "local_timezone": "America/Mazatlan"
+  },
+  "read_only": true,
+  "api_log_lines_scanned": 515,
+  "api_events": [
+    {
+      "timestamp": "2026-10-27T19:18:28.787Z",
+      "severity": "info",
+      "method": "GET",
+      "status": 200,
+      "ms": 382,
+      "requestId": "55637b3d-a46c-413f-b20b-82723e945d37",
+      "correlationId": "c3ef7c5b-a31f-42ba-b70c-881a3d46a285",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/checkout/policy",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:18:29.121Z",
+      "severity": "info",
+      "method": "GET",
+      "status": 200,
+      "ms": 523,
+      "requestId": "e8f098bf-ebf0-43cc-84f6-8ee052f39fd0",
+      "correlationId": "e147b924-a280-411c-9934-68a56194144c",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/checkout/policy",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:18:41.132Z",
+      "severity": "info",
+      "method": "GET",
+      "status": 200,
+      "ms": 794,
+      "requestId": "6a591a98-c592-4882-af0f-94c72fbd54f4",
+      "correlationId": "ea5eaee1-1f91-43bf-8966-61042d163586",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/cart/open-accounts",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:20:07.668Z",
+      "severity": "info",
+      "method": "GET",
+      "status": 200,
+      "ms": 348,
+      "requestId": "ed26af46-100a-4256-b11f-8b91a4405086",
+      "correlationId": "90ef6ec3-9d20-4d35-8b1a-6be1f203717a",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/checkout/policy",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:22:15.109Z",
+      "severity": "info",
+      "method": "GET",
+      "status": 200,
+      "ms": 811,
+      "requestId": "fce42db0-71dc-4ea8-b11a-f292c68e9996",
+      "correlationId": "564f2bc2-d639-4558-b68b-dc8ee541ac80",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/cart/open-accounts",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:22:49.946Z",
+      "severity": "warn",
+      "category": "AllExceptionsFilter",
+      "url": "",
+      "message": "409 request_refused POST /api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/cart/suspend correlationId=57787df8-c4ec-48cb-8aa4-7f8505e488dd merchant=dbfb6dd1-bf05-42cc-8f60-2035c1b6647b location=2394679a-cb46-4176-b36b-1d257e47a58a code=CART_VALIDATION_FAILED detail=code=CART_VALIDATION_FAILED"
+    },
+    {
+      "timestamp": "2026-10-27T19:22:50.966Z",
+      "severity": "warn",
+      "category": "AllExceptionsFilter",
+      "url": "",
+      "message": "404 request_refused GET /api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/cart/accounts/067bb51a-79c6-4702-9289-7a33ce316320 correlationId=3eccc168-0080-4b19-b23d-471099ab60df merchant=dbfb6dd1-bf05-42cc-8f60-2035c1b6647b location=2394679a-cb46-4176-b36b-1d257e47a58a code=CART_NOT_FOUND detail=code=CART_NOT_FOUND"
+    },
+    {
+      "timestamp": "2026-10-27T19:22:53.610Z",
+      "severity": "warn",
+      "category": "AllExceptionsFilter",
+      "url": "",
+      "message": "409 request_refused POST /api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/cart/suspend correlationId=9ccc9052-6a84-4bf1-9c34-1d7f25a6bb76 merchant=dbfb6dd1-bf05-42cc-8f60-2035c1b6647b location=2394679a-cb46-4176-b36b-1d257e47a58a code=CART_VALIDATION_FAILED detail=code=CART_VALIDATION_FAILED"
+    },
+    {
+      "timestamp": "2026-10-27T19:22:58.640Z",
+      "severity": "info",
+      "method": "GET",
+      "status": 200,
+      "ms": 789,
+      "requestId": "28e53218-27df-4641-9ff1-75a52c9869a4",
+      "correlationId": "b355da64-a0c0-4eff-9333-95a4ad1b47a1",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/cart/open-accounts",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:00.444Z",
+      "severity": "info",
+      "method": "POST",
+      "status": 201,
+      "ms": 694,
+      "requestId": "3b65ed66-b944-4374-ba36-32176781ee09",
+      "correlationId": "959b6f77-984f-4649-b35e-03ffb07b0fe4",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/cart/accounts/bf2b7d4b-3f6d-4217-a8ee-162c76a63613/resume",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:01.276Z",
+      "severity": "warn",
+      "category": "AllExceptionsFilter",
+      "url": "",
+      "message": "404 request_refused GET /api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/kitchen/orders/d09f3d44-76b9-4155-8841-0dac0cc0cd16 correlationId=cd74aead-7989-4d48-b573-061fe8bef2f1 merchant=dbfb6dd1-bf05-42cc-8f60-2035c1b6647b location=2394679a-cb46-4176-b36b-1d257e47a58a code=KITCHEN_ORDER_NOT_FOUND detail=code=KITCHEN_ORDER_NOT_FOUND"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:05.978Z",
+      "severity": "info",
+      "method": "GET",
+      "status": 200,
+      "ms": 368,
+      "requestId": "e169f849-a757-405f-803f-5d281834bbea",
+      "correlationId": "f9d3b7a0-2960-428f-b660-ea234d788550",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/checkout/policy",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:06.023Z",
+      "severity": "info",
+      "method": "GET",
+      "status": 200,
+      "ms": 412,
+      "requestId": "3d200e14-4717-4cd1-9169-d16f56d9e74e",
+      "correlationId": "3a351409-0a87-442e-b146-c276893f16ae",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/cart/accounts/bf2b7d4b-3f6d-4217-a8ee-162c76a63613",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:06.445Z",
+      "severity": "warn",
+      "category": "AllExceptionsFilter",
+      "url": "",
+      "message": "404 request_refused GET /api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/kitchen/orders/d09f3d44-76b9-4155-8841-0dac0cc0cd16 correlationId=6fbba7ca-6d6b-4609-9468-f22d4d51ed47 merchant=dbfb6dd1-bf05-42cc-8f60-2035c1b6647b location=2394679a-cb46-4176-b36b-1d257e47a58a code=KITCHEN_ORDER_NOT_FOUND detail=code=KITCHEN_ORDER_NOT_FOUND"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:06.630Z",
+      "severity": "warn",
+      "category": "AllExceptionsFilter",
+      "url": "",
+      "message": "404 request_refused GET /api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/checkout/carts/bf2b7d4b-3f6d-4217-a8ee-162c76a63613 correlationId=827cdc11-4d1e-4f6a-8780-9295978680d9 merchant=dbfb6dd1-bf05-42cc-8f60-2035c1b6647b location=2394679a-cb46-4176-b36b-1d257e47a58a code=RESOURCE_NOT_FOUND detail=code=RESOURCE_NOT_FOUND"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:09.397Z",
+      "severity": "info",
+      "method": "GET",
+      "status": 200,
+      "ms": 621,
+      "requestId": "5486de18-3816-4102-a6e2-755fcbd940dd",
+      "correlationId": "52d4a3ee-6e6c-4795-953a-52d03f112a92",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/checkout/carts/bf2b7d4b-3f6d-4217-a8ee-162c76a63613/partial-payments",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:09.477Z",
+      "severity": "info",
+      "method": "GET",
+      "status": 200,
+      "ms": 428,
+      "requestId": "cb809b7b-4d45-4dee-89b8-f8be26a50f03",
+      "correlationId": "f9afd9c0-95c0-4a12-a606-6539017b8056",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/cart/accounts/bf2b7d4b-3f6d-4217-a8ee-162c76a63613",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:11.266Z",
+      "severity": "warn",
+      "category": "AllExceptionsFilter",
+      "url": "",
+      "message": "404 request_refused GET /api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/kitchen/orders/d09f3d44-76b9-4155-8841-0dac0cc0cd16 correlationId=839a82c3-e4db-4c21-9052-7ad7de5c4852 merchant=dbfb6dd1-bf05-42cc-8f60-2035c1b6647b location=2394679a-cb46-4176-b36b-1d257e47a58a code=KITCHEN_ORDER_NOT_FOUND detail=code=KITCHEN_ORDER_NOT_FOUND"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:12.157Z",
+      "severity": "info",
+      "method": "POST",
+      "status": 201,
+      "ms": 645,
+      "requestId": "c1c5995f-c214-45c1-b8e1-a165b2a04757",
+      "correlationId": "9c0be12f-7070-4d2d-9f6a-22005e4c153e",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/checkout",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:14.622Z",
+      "severity": "info",
+      "method": "POST",
+      "status": 201,
+      "ms": 2139,
+      "requestId": "6112a432-bd8e-42d7-bd7e-40d3fffc8eac",
+      "correlationId": "f73fe413-e49f-47a7-8832-9a1d6772eabc",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/checkout",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:16.243Z",
+      "severity": "warn",
+      "category": "AllExceptionsFilter",
+      "url": "",
+      "message": "404 request_refused GET /api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/kitchen/orders/d09f3d44-76b9-4155-8841-0dac0cc0cd16 correlationId=6a23898d-82dc-42f3-aeab-379fc9c18d08 merchant=dbfb6dd1-bf05-42cc-8f60-2035c1b6647b location=2394679a-cb46-4176-b36b-1d257e47a58a code=KITCHEN_ORDER_NOT_FOUND detail=code=KITCHEN_ORDER_NOT_FOUND"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:17.963Z",
+      "severity": "warn",
+      "category": "AllExceptionsFilter",
+      "url": "",
+      "message": "403 request_refused POST /api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/hardware/print-jobs/f29f606c-5ddf-56d8-8831-cb7efdc6dfc0/reprint correlationId=9165265f-2e0e-4c78-adb3-4057c4d12d68 merchant=dbfb6dd1-bf05-42cc-8f60-2035c1b6647b location=2394679a-cb46-4176-b36b-1d257e47a58a code=PERMISSION_DENIED detail=code=PERMISSION_DENIED"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:24.471Z",
+      "severity": "info",
+      "method": "GET",
+      "status": 200,
+      "ms": 731,
+      "requestId": "edc5950e-39e1-4295-b50e-3aac61b711f1",
+      "correlationId": "d8cace7e-8bca-4113-80f1-ad6b407e84c8",
+      "url": "/api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/cart/open-accounts",
+      "message": "request"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:31.603Z",
+      "severity": "warn",
+      "category": "AllExceptionsFilter",
+      "url": "",
+      "message": "401 request_refused GET /api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/kitchen/board correlationId=a3616be4-08ad-4069-b3a2-7caf9e5c200f merchant=none location=none code=AUTHENTICATION_REQUIRED detail=message=invalid_token"
+    },
+    {
+      "timestamp": "2026-10-27T19:23:33.774Z",
+      "severity": "warn",
+      "category": "AllExceptionsFilter",
+      "url": "",
+      "message": "401 request_refused GET /api/v1/pos/merchants/dbfb6dd1-bf05-42cc-8f60-2035c1b6647b/kitchen/board/watch correlationId=fc3ed292-6dec-4502-9d31-657297bc42b0 merchant=none location=none code=AUTHENTICATION_REQUIRED detail=message=invalid_token"
+    }
+  ],
+  "commands": [
+    {
+      "command_id": "c9cb8e85-3819-4eaf-b1c6-afbb24b6c1d7",
+      "command_type": "cart.suspended",
+      "status": "failed",
+      "failure_code": "CART_VALIDATION_FAILED",
+      "retryable": false,
+      "correlation_id": "57787df8-c4ec-48cb-8aa4-7f8505e488dd",
+      "started_at": "2026-10-27T19:22:49.481Z",
+      "completed_at": "2026-10-27T19:22:49.481Z",
+      "result_status": null,
+      "recovery_state": null,
+      "result_failure_code": null,
+      "failure_class": "conflict",
+      "sale_id": null,
+      "payment_id": null,
+      "payment_status": null,
+      "receipt_ref": null,
+      "cart_version": null,
+      "tenders": null
+    },
+    {
+      "command_id": "5f1bec29-2be8-45ad-b1aa-84b1b3c7ec9a",
+      "command_type": "cart.suspended",
+      "status": "failed",
+      "failure_code": "CART_VALIDATION_FAILED",
+      "retryable": false,
+      "correlation_id": "9ccc9052-6a84-4bf1-9c34-1d7f25a6bb76",
+      "started_at": "2026-10-27T19:22:53.159Z",
+      "completed_at": "2026-10-27T19:22:53.159Z",
+      "result_status": null,
+      "recovery_state": null,
+      "result_failure_code": null,
+      "failure_class": "conflict",
+      "sale_id": null,
+      "payment_id": null,
+      "payment_status": null,
+      "receipt_ref": null,
+      "cart_version": null,
+      "tenders": null
+    },
+    {
+      "command_id": "3a3dacc3-2727-4b59-a1a0-e335a86a29e7",
+      "command_type": "pos.checkout",
+      "status": "succeeded",
+      "failure_code": null,
+      "retryable": false,
+      "correlation_id": "9c0be12f-7070-4d2d-9f6a-22005e4c153e",
+      "started_at": "2026-10-27T19:23:11.703Z",
+      "completed_at": "2026-10-27T19:23:11.703Z",
+      "result_status": "confirmation_required",
+      "recovery_state": "none",
+      "result_failure_code": "CHECKOUT_CONFIRMATION_REQUIRED",
+      "failure_class": null,
+      "sale_id": null,
+      "payment_id": null,
+      "payment_status": null,
+      "receipt_ref": null,
+      "cart_version": "11",
+      "tenders": [
+        {
+          "type": "bank_transfer",
+          "status": "confirmed_success",
+          "applied": {
+            "currency": "MXN",
+            "minorUnits": 36000
+          }
+        }
+      ]
+    },
+    {
+      "command_id": "6727e5c9-4fcd-46e6-be59-e90f036e550a",
+      "command_type": "pos.checkout",
+      "status": "succeeded",
+      "failure_code": null,
+      "retryable": false,
+      "correlation_id": "f73fe413-e49f-47a7-8832-9a1d6772eabc",
+      "started_at": "2026-10-27T19:23:12.675Z",
+      "completed_at": "2026-10-27T19:23:12.675Z",
+      "result_status": "completed",
+      "recovery_state": "none",
+      "result_failure_code": null,
+      "failure_class": null,
+      "sale_id": "696a562b-f6e4-4403-8582-210b4216ae7f",
+      "payment_id": "8f33bf4d-aa65-4c0a-b4eb-9b1f7a1a990f",
+      "payment_status": "succeeded",
+      "receipt_ref": "0015",
+      "cart_version": "11",
+      "tenders": [
+        {
+          "type": "bank_transfer",
+          "status": "confirmed_success",
+          "applied": {
+            "currency": "MXN",
+            "minorUnits": 36000
+          }
+        }
+      ]
+    }
+  ],
+  "checkout_draft": [
+    {
+      "id": "b64455da-657c-4d04-ad64-1947b8d7cfb4",
+      "cart_id": "bf2b7d4b-3f6d-4217-a8ee-162c76a63613",
+      "state": "completed",
+      "version": 3,
+      "recovery_state": "none",
+      "created_at": "2026-10-27T19:23:11.703Z",
+      "updated_at": "2026-10-27T19:23:12.675Z",
+      "result_status": "completed",
+      "failure_code": null
+    }
+  ],
+  "conclusion": {
+    "payment_completed": true,
+    "exact_initial_error_identified": false,
+    "cause_confirmed": false,
+    "checkout_server_refusal_in_window": false,
+    "preview_confirmation_required_is_expected": true,
+    "preceding_cart_suspension_refusals_not_attributed_to_account017": true,
+    "reprint_refusal_happened_after_payment": true,
+    "client_evidence_gap": "La captura anterior de logcat no conserva el aviso. El código revisado usa NoopTelemetryExporter y limita debugPrint a UMIPOS_TAP_LATENCY_PROBE."
+  },
+  "captured_at": "2026-10-27T19:41:52.485276+00:00"
+}

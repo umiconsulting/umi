@@ -1,0 +1,185 @@
+{
+  "at": "2026-10-27T21:20:39.680294+00:00",
+  "endpoint": "100.64.178.95:35049",
+  "action": "Centro de recuperación",
+  "before": [
+    {
+      "text": "",
+      "content-desc": "Suspender venta",
+      "class": "android.widget.Button",
+      "bounds": "[1586,131][1902,197]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cancelar venta",
+      "class": "android.widget.Button",
+      "bounds": "[1586,197][1902,263]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Centro de clientes",
+      "class": "android.widget.Button",
+      "bounds": "[1586,263][1902,329]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Inventario",
+      "class": "android.widget.Button",
+      "bounds": "[1586,329][1902,395]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Hardware",
+      "class": "android.widget.Button",
+      "bounds": "[1586,395][1902,461]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Centro de recuperación",
+      "class": "android.widget.Button",
+      "bounds": "[1586,461][1902,527]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cerrar opciones",
+      "class": "android.view.View",
+      "bounds": "[0,0][1920,1058]",
+      "clickable": "true",
+      "enabled": "true"
+    }
+  ],
+  "after": [
+    {
+      "text": "",
+      "content-desc": "Centro de recuperación",
+      "class": "android.view.View",
+      "bounds": "[471,163][1450,211]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.",
+      "class": "android.view.View",
+      "bounds": "[471,211][1450,240]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "En proceso",
+      "class": "android.view.View",
+      "bounds": "[471,240][1450,244]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Servidor: 86 · aceptadas: 53 · conflictos: 0 · cola: 0",
+      "class": "android.view.View",
+      "bounds": "[471,255][1450,279]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Venta en efectivo · MXN 50.00\nEnviada · Recibo oficial disponible\n#1",
+      "class": "android.view.View",
+      "bounds": "[471,301][1450,394]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Venta en efectivo · MXN 50.00\nEnviada · Recibo oficial disponible\n#2",
+      "class": "android.view.View",
+      "bounds": "[471,394][1450,486]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Venta en efectivo · MXN 50.00\nEnviada · Recibo oficial disponible\n#3",
+      "class": "android.view.View",
+      "bounds": "[471,486][1450,578]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Venta en efectivo · MXN 50.00\nEnviada · Recibo oficial disponible\n#4",
+      "class": "android.view.View",
+      "bounds": "[471,578][1450,670]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Venta en efectivo · MXN 50.00\nEnviada · Recibo oficial disponible\n#5",
+      "class": "android.view.View",
+      "bounds": "[471,670][1450,762]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Venta en efectivo · MXN 60.00\nEnviada · Recibo oficial disponible\n#6",
+      "class": "android.view.View",
+      "bounds": "[471,762][1450,854]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Enviado a cocina\nEnviada\n#7",
+      "class": "android.view.View",
+      "bounds": "[471,854][1450,915]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Sincronizando ventas pendientes…",
+      "class": "android.widget.Button",
+      "bounds": "[471,915][710,981]",
+      "clickable": "false",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Sincronizar ahora",
+      "class": "android.widget.Button",
+      "bounds": "[471,915][710,981]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cerrar",
+      "class": "android.widget.Button",
+      "bounds": "[471,981][1450,1047]",
+      "clickable": "true",
+      "enabled": "true"
+    },
+    {
+      "text": "",
+      "content-desc": "Cerrar",
+      "class": "android.view.View",
+      "bounds": "[0,0][1920,1058]",
+      "clickable": "true",
+      "enabled": "true"
+    }
+  ]
+}

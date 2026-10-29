@@ -16,6 +16,28 @@ compatible antes de instalar el APK.
 
 ## Firma
 
+La distribución de ONCA usa una llave RSA 4096 creada el 27 de octubre de 2026.
+La llave privada está fuera del repositorio:
+
+```text
+/home/juan/.local/share/umi-pos-signing/umi-pos-release.jks
+```
+
+La contraseña está en Secret Service con el servicio
+`umipos-android-release` y la cuenta `juan`. El script
+`scripts/build-umipos-android-release.sh` carga esa contraseña. No escribas la
+contraseña en el repositorio ni en el historial del shell.
+
+La huella SHA-256 del certificado es:
+
+```text
+14:97:5F:2C:37:4E:03:B1:55:AB:36:3E:17:D4:A7:9D:4A:B3:2B:88:8A:B3:81:BE:DC:32:64:93:4C:B5:C0:51
+```
+
+Consulta
+[`2026-10-27-onca-production-bug-007.md`](../reports/2026-10-27-onca-production-bug-007.md)
+para la rotación desde la llave anterior.
+
 Configura estas variables en la terminal que compila. Guarda el archivo de llave
 fuera del repositorio y respáldalo en un lugar seguro:
 
@@ -58,6 +80,7 @@ flutter build apk --release --flavor production --target-platform android-arm64 
   --dart-define=UMIPOS_RELEASE_BUILD_TIMESTAMP="$release_timestamp" \
   --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1 \
   --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled \
+  --dart-define=UMIPOS_LOCAL_FIRST_FAST_PATH=true \
   --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=false \
   --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=false
 ```

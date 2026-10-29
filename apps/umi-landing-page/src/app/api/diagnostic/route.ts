@@ -222,7 +222,7 @@ function calculateDiagnostic(responses: Record<string, string | number>): Diagno
   } else {
     level = 'Inicial';
     recommendations = [
-      'Activar ConversaFlow como entrada operativa',
+      'Activar el Agente IA como entrada operativa',
       'Estructurar el contrato mínimo de pedido y cliente',
       'Crear la primera vista de seguimiento',
     ];

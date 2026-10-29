@@ -83,7 +83,7 @@ export const day0UrgencyTemplate = (data: EmailTemplateData): string => {
 
     <div class="success-box">
       <h4 style="margin-top: 0; color: #065f46;">Siguiente conversación</h4>
-      <p>Podemos revisar el flujo actual, confirmar el cuello de botella y decidir si conviene empezar por ConversaFlow, KDS, Cash, Dashboard o Logs.</p>
+      <p>Podemos revisar el flujo actual, confirmar el cuello de botella y decidir si conviene empezar por Agente IA, KDS, Cash, Dashboard o Logs.</p>
     </div>
 
     <div style="text-align: center;">
@@ -109,7 +109,7 @@ export const day2PressureTemplate = (data: EmailTemplateData): string => {
       <p><strong>Punto a cuidar:</strong> cuando pedidos, cocina y cliente viven en herramientas separadas, cada día se acumulan excepciones que luego nadie puede auditar.</p>
     </div>
 
-    <p>Si quieres avanzar, responde este correo con el producto que más te urge: ConversaFlow, KDS, Cash, Dashboard o Logs.</p>
+    <p>Si quieres avanzar, responde este correo con el producto que más te urge: Agente IA, KDS, Cash, Dashboard o Logs.</p>
 
     <p>Equipo Umi</p>
   `;

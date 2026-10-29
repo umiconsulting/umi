@@ -49,9 +49,7 @@ const SHOTS = arg('--shots', null);
  * remain comparable.
  */
 const MIN_TARGET = Number(arg('--control-min', '44'));
-const SURFACES = (arg('--surfaces') || 'Comanda,Caja,Ventas,Mesas,Cocina,Pedidos,Ajustes').split(
-  ',',
-);
+const SURFACES = (arg('--surfaces') || 'Comanda,Cuentas,KDS,Ventas,Caja,Ajustes').split(',');
 
 const serial = (() => {
   const explicit = arg('--serial');
@@ -228,13 +226,13 @@ async function main() {
       '',
       `Sign-in: ${report.signIn ? (report.signIn.landed ? 'PIN accepted' : 'PIN did NOT land') : 'skipped'}`,
       '',
-      '| Surface | Pressable | Under 44px | Unnamed |',
+      `| Surface | Pressable | Under ${MIN_TARGET}px | Unnamed |`,
       '| --- | --- | --- | --- |',
       ...report.surfaces.map(
         (s) => `| ${s.surface} | ${s.pressable} | ${s.undersized.length} | ${s.unnamed} |`,
       ),
       '',
-      '## Controls under 44 px',
+      `## Controls under ${MIN_TARGET} px`,
       '',
     ];
     const small = report.surfaces.flatMap((s) => s.undersized.map((n) => ({ s: s.surface, n })));

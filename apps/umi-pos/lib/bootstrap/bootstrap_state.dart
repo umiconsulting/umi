@@ -13,6 +13,7 @@ final class BootstrapState {
     this.phase, {
     this.correlationId,
     this.diagnosticCategory,
+    this.diagnosticCode,
   });
 
   const BootstrapState.initializing() : this(BootstrapPhase.initializing);
@@ -20,6 +21,7 @@ final class BootstrapState {
   final BootstrapPhase phase;
   final String? correlationId;
   final String? diagnosticCategory;
+  final String? diagnosticCode;
 
   bool get canRetry =>
       phase == BootstrapPhase.recoverableFailure ||

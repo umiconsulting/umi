@@ -1,0 +1,22 @@
+{
+  "version": "8.30.1",
+  "historyExit": 0,
+  "historyFindings": 0,
+  "checks": [
+    {
+      "case": "exact_public_tag",
+      "exit": 0,
+      "expected": 0
+    },
+    {
+      "case": "different_suffix",
+      "exit": 1,
+      "expected": 1
+    },
+    {
+      "case": "unrelated_test_token",
+      "exit": 1,
+      "expected": 1
+    }
+  ]
+}

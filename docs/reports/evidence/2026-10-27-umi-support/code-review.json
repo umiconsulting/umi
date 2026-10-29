@@ -1,0 +1,11 @@
+{
+  "status": "approved_as_test_candidate",
+  "scope": "Static read-only review; no hardware actions",
+  "important_findings_closed": [
+    "literal full-message matching",
+    "network fields must be transparently interpolated",
+    "failed consent writes close authorization and prompt accessibility removal",
+    "duplicate requests preserve prior outcome"
+  ],
+  "physical_validation": "PENDING"
+}
