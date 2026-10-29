@@ -1559,6 +1559,18 @@ class AppLocalizationsEs extends AppLocalizations {
   String get kitchenBoardTitle => 'KDS';
 
   @override
+  String get kitchenFulfillmentDineIn => 'Para comer aquí';
+
+  @override
+  String get kitchenFulfillmentTakeout => 'Para llevar';
+
+  @override
+  String get kitchenFulfillmentDelivery => 'A domicilio';
+
+  @override
+  String get kitchenFulfillmentUnknown => 'Tipo sin especificar';
+
+  @override
   String get kitchenStationAll => 'Todos';
 
   @override

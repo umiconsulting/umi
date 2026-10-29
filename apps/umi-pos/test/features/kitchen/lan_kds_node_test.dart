@@ -283,6 +283,7 @@ void main() {
     final tickets = await store.snapshot(_merchant, _location);
     expect(tickets, hasLength(1));
     expect(tickets.single['publicReference'], 'Mesa 3');
+    expect(tickets.single['fulfillmentType'], 'dine_in');
     expect(
       (tickets.single['items'] as List<Object?>).single,
       containsPair('productName', 'Cappuccino'),
@@ -296,6 +297,15 @@ void main() {
       ),
       {'00000000-0000-4000-8000-000000000021': 0},
     );
+    local.firedCarts = [
+      Cart.fromJson({
+        ...local.firedCarts.single.toJson(),
+        'fulfillmentType': 'takeout',
+        'version': 3,
+      }),
+    ];
+    final takeout = await store.snapshot(_merchant, _location);
+    expect(takeout.single['fulfillmentType'], 'takeout');
     final started = await store.applyCommand(
       _merchant,
       _location,
@@ -314,10 +324,20 @@ void main() {
     final afterStart = await store.snapshot(_merchant, _location);
     expect(afterStart, hasLength(1));
     expect(afterStart.single['status'], 'in_preparation');
+    expect(afterStart.single['fulfillmentType'], 'takeout');
     expect(
       KitchenOrderProjection.fromJson(afterStart.single).status,
       'in_preparation',
     );
+    local.firedCarts = [
+      Cart.fromJson({
+        ...local.firedCarts.single.toJson(),
+        'fulfillmentType': 'dine_in',
+      }),
+    ];
+    final changedAfterStart = await store.snapshot(_merchant, _location);
+    expect(changedAfterStart.single['fulfillmentType'], 'dine_in');
+    expect(changedAfterStart.single['status'], 'in_preparation');
   });
 
   test(
@@ -408,6 +428,99 @@ void main() {
     expect(tickets.first['sourceOrderId'], local.firedCarts.single.id);
     expect(tickets.first['source'], 'pos');
   });
+
+  test(
+    'pending fulfillment changes a cached ticket after preparation',
+    () async {
+      final local = _MemoryLocal()..firedCarts = [_cartForTicket('dine_in')];
+      final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+      final store = LanKdsStore(local, journal: journal);
+      await store.saveCloudBoard(_merchant, _location, [
+        {..._ticketMap(), 'fulfillmentType': 'dine_in', 'priority': 'high'},
+      ]);
+      await store.applyCommand(_merchant, _location, _startPreparation());
+      await _queueFulfillment(journal, 'takeout');
+      final ticket = (await store.snapshot(_merchant, _location)).single;
+      expect(ticket['fulfillmentType'], 'takeout');
+      expect(ticket['status'], 'in_preparation');
+      expect(ticket['priority'], 'high');
+      expect(ticket['version'], 2);
+    },
+  );
+
+  test(
+    'a later table selection replaces an older pending takeout choice',
+    () async {
+      final local = _MemoryLocal()..firedCarts = [_cartForTicket('takeout')];
+      final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+      final store = LanKdsStore(local, journal: journal);
+      await store.saveCloudBoard(_merchant, _location, [
+        {..._ticketMap(), 'fulfillmentType': 'takeout'},
+      ]);
+      await _queueFulfillment(journal, 'takeout');
+      await journal.append(
+        commandId: '00000000-0000-4000-8000-000000000061',
+        deviceId: _host,
+        credentialVersion: 1,
+        merchantId: _merchant,
+        locationId: _location,
+        operatorSessionId: _session,
+        idempotencyKey: '00000000-0000-4000-8000-000000000062',
+        commandType: 'pos.cart.table.set',
+        payload: {
+          'cartId': _cartForTicket('takeout').id,
+          'tableId': '00000000-0000-4000-8000-000000000063',
+        },
+      );
+      final ticket = (await store.snapshot(_merchant, _location)).single;
+      expect(ticket['fulfillmentType'], 'dine_in');
+    },
+  );
+
+  test(
+    'official fulfillment wins over a stale cart and preparation overlay',
+    () async {
+      final local = _MemoryLocal()..firedCarts = [_cartForTicket('dine_in')];
+      final store = LanKdsStore(local);
+      await store.saveCloudBoard(_merchant, _location, [
+        {..._ticketMap(), 'fulfillmentType': 'dine_in', 'priority': 'high'},
+      ]);
+      await store.applyCommand(_merchant, _location, _startPreparation());
+      await store.saveCloudBoard(_merchant, _location, [
+        {..._ticketMap(), 'fulfillmentType': 'takeout', 'priority': 'high'},
+      ]);
+      final ticket = (await store.snapshot(_merchant, _location)).single;
+      expect(ticket['fulfillmentType'], 'takeout');
+      expect(ticket['status'], 'in_preparation');
+      expect(ticket['priority'], 'high');
+    },
+  );
+
+  test(
+    'a settled fulfillment command cannot replace the official type',
+    () async {
+      final local = _MemoryLocal()..firedCarts = [_cartForTicket('takeout')];
+      final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+      final store = LanKdsStore(local, journal: journal);
+      await store.saveCloudBoard(_merchant, _location, [
+        {..._ticketMap(), 'fulfillmentType': 'dine_in'},
+      ]);
+      await _queueFulfillment(journal, 'takeout');
+      await journal.apply(
+        ReplayResult(
+          commandId: _command,
+          deviceSequence: 1,
+          status: 'accepted',
+          officialId: null,
+          officialCommit: null,
+          serverConflictReference: null,
+          failure: null,
+        ),
+      );
+      final ticket = (await store.snapshot(_merchant, _location)).single;
+      expect(ticket['fulfillmentType'], 'dine_in');
+    },
+  );
 
   test('the hub advances its own replay cursor for a cook command', () async {
     final local = _MemoryLocal();
@@ -985,6 +1098,50 @@ Map<String, String> _headers({String credential = _credential}) => {
   'x-umi-location-id': _location,
   'x-umi-client-time': DateTime.now().toUtc().toIso8601String(),
 };
+
+Cart _cartForTicket(String fulfillmentType) => Cart(
+  id: '00000000-0000-4000-8000-000000000060',
+  merchantId: _merchant,
+  locationId: _location,
+  operatorSessionId: _session,
+  status: 'draft',
+  version: 1,
+  firedOrderId: '00000000-0000-4000-8000-000000000012',
+  fulfillmentType: fulfillmentType,
+  items: const [],
+  totals: const {'businessDate': '2026-10-17'},
+  checkoutEnabled: false,
+  checkoutMessageCode: 'CHECKOUT_GATE_NOT_AVAILABLE',
+  updatedAt: '2026-10-17T18:00:00.000Z',
+);
+
+Future<void> _queueFulfillment(
+  EncryptedOfflineJournal journal,
+  String type,
+) async {
+  await journal.append(
+    commandId: _command,
+    deviceId: _host,
+    credentialVersion: 1,
+    merchantId: _merchant,
+    locationId: _location,
+    operatorSessionId: _session,
+    idempotencyKey: _idempotency,
+    commandType: 'pos.cart.fulfillment.set',
+    payload: {'cartId': _cartForTicket(type).id, 'fulfillmentType': type},
+  );
+}
+
+KitchenCommandRequest _startPreparation() => const KitchenCommandRequest(
+  action: 'command',
+  commandId: '00000000-0000-4000-8000-000000000064',
+  idempotencyKey: '00000000-0000-4000-8000-000000000065',
+  correlationId: _correlation,
+  expectedVersion: 1,
+  kitchenOrderId: _ticket,
+  commandType: 'start_preparation',
+  itemIds: [_item],
+);
 
 Map<String, Object?> _ticketMap() => {
   'id': _ticket,

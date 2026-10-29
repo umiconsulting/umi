@@ -394,7 +394,7 @@ final class AppCompositionRoot {
       telemetry: telemetry,
     );
     final cloudKitchen = ApiKitchenBoardRepository(apiClient);
-    final lanStore = LanKdsStore(localDatabase);
+    final lanStore = LanKdsStore(localDatabase, journal: offlineJournal);
     final lanNode = config.lanNodeEnabled && config.apiBaseUri != null
         ? LanKdsNode(
             local: localDatabase,
