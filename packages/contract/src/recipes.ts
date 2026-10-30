@@ -244,8 +244,8 @@ export const InventoryAuthoringItem = z
     negativeStockPolicy: InventoryNegativeStockPolicy,
     lowStockThreshold: ItemScaleQuantity.nullable(),
     /**
-     * What the kitchen wants on hand. The prep list subtracts the on-hand and the
-     * forecast usage from this number to decide what to make (§8.4).
+     * What the kitchen wants on hand. The prep list adds forecast usage and
+     * subtracts available stock to calculate the quantity to prepare.
      */
     parQuantity: ItemScaleQuantity.nullable(),
     shelfLifeDays: z.number().int().min(0).max(3650).nullable(),

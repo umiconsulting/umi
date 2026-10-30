@@ -104,7 +104,7 @@ export class InventoryAuthoringController {
     return this.authoring.explosion(access, recipeId, query);
   }
 
-  /** What the kitchen must make today: par minus on-hand minus forecast usage. */
+  /** What the kitchen must make today: par plus forecast usage minus available stock. */
   @Get('prep-list')
   prepList(
     @Merchant() access: MerchantAccess,

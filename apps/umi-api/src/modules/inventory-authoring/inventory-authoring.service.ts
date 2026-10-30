@@ -357,7 +357,7 @@ export class InventoryAuthoringService {
       // the quantity to make, so it is clamped onto the contract's non-negative shape.
       const onHand = BigInt(Math.max(0, observed.onHand.value));
       const par = BigInt(candidate.parQuantity);
-      const shortfall = par - onHand - forecastUsage;
+      const shortfall = par + forecastUsage - onHand;
       const row: PrepListItem = {
         inventoryItemId: candidate.inventoryItemId,
         publicReference: candidate.publicReference,

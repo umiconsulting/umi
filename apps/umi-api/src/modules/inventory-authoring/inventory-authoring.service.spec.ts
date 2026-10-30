@@ -11,6 +11,7 @@ import {
   InventoryRecipeQuery,
   InventoryRecipeTargetQuery,
   InventoryRecipeTargetList,
+  PrepListQuery,
 } from '@umi/contract';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import type { PersistedDashboardAdministrativeCommandContext } from '../administrative-commands/administrative-command-context.service';
@@ -174,6 +175,47 @@ function serviceFixture(
 }
 
 describe('inventory authoring service', () => {
+  it.each([
+    [0, 7],
+    [4, 11],
+  ])('adds forecast %i to the preparation objective', async (forecastUsage, expected) => {
+    const repository = {
+      prepCandidates: async () => [
+        {
+          inventoryItemId: id(6),
+          publicReference: 'PREP',
+          displayName: 'Prep',
+          baseUnit: 'unit',
+          quantityScale: 0,
+          parQuantity: '10',
+          recipeShelfLifeDays: 1,
+          itemShelfLifeDays: null,
+        },
+      ],
+    };
+    const costing = {
+      lowStock: async () => ({
+        locationId: id(5),
+        from: '2026-10-30',
+        to: '2026-10-30',
+        items: [
+          {
+            inventoryItemId: id(6),
+            onHand: { value: 3 },
+            dailyRateQuantity: { value: forecastUsage },
+          },
+        ],
+      }),
+    };
+    const service = new InventoryAuthoringService(
+      repository as never,
+      {} as never,
+      costing as never,
+    );
+    const result = await service.prepList(access, PrepListQuery.parse({}));
+    expect(result.items[0].prepQuantity).toEqual({ value: expected, scale: 0, unit: 'unit' });
+  });
+
   it('creates the item under the id the command named, and appends its audit row', async () => {
     const { service, repository, audits } = serviceFixture();
     const dto = InventoryAuthoringItemCreateRequest.parse({
