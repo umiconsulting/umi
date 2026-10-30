@@ -63,6 +63,14 @@ jobs:
           dart@sha256:13140e26d84f4fda57cea31942222112aeb2eec10e5e6874c1c0f70beed189ab
           dart analyze --no-fatal-warnings lib/umi_contract.dart
 
+      - name: Generated Dart optional field behavior
+        run: >-
+          docker run --rm
+          -v "$PWD/packages/contract:/contract:ro"
+          -w /contract
+          dart@sha256:13140e26d84f4fda57cea31942222112aeb2eec10e5e6874c1c0f70beed189ab
+          dart test/dart/optional_nullable_test.dart
+
       - name: Build (tsup dual CJS+ESM+dts)
         run: pnpm --filter @umi/contract build
 

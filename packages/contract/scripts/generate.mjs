@@ -199,28 +199,48 @@ function dartClass(name, schema) {
     const type = dartType(value);
     return required.has(key) || type.endsWith('?') ? type : `${type.replace(/\?$/, '')}?`;
   };
+  // Optional nullable fields need three states: absent, null, and a value.
+  const tracksPresence = (key, value) => !required.has(key) && nullable(value);
   const fields = properties
     .map(([key, value]) => `  final ${fieldType(key, value)} ${key};`)
     .join('\n');
-  const parameters = properties
-    .map(([key]) => `    ${required.has(key) ? 'required ' : ''}this.${key},`)
+  const presenceFields = properties
+    .filter(([key, value]) => tracksPresence(key, value))
+    .map(([key]) => `  final bool _has_${key};`)
     .join('\n');
+  const parameters = properties
+    .map(([key, value]) =>
+      tracksPresence(key, value)
+        ? `    Object? ${key} = _umiAbsent,`
+        : `    ${required.has(key) ? 'required ' : ''}this.${key},`,
+    )
+    .join('\n');
+  const initializers = properties
+    .filter(([key, value]) => tracksPresence(key, value))
+    .flatMap(([key, value]) => [
+      `${key} = identical(${key}, _umiAbsent) ? null : ${key}${fieldType(key, value) === 'Object?' ? '' : ` as ${fieldType(key, value)}`}`,
+      `_has_${key} = !identical(${key}, _umiAbsent)`,
+    ]);
   const decode = properties
     .map(([key, value]) => {
       const input =
         required.has(key) || nullable(value) ? value : { anyOf: [value, { type: 'null' }] };
-      return `      ${key}: ${dartDecode(input, `json[${JSON.stringify(key)}]`)},`;
+      const decoded = dartDecode(input, `json[${JSON.stringify(key)}]`);
+      return `      ${key}: ${tracksPresence(key, value) ? `json.containsKey(${JSON.stringify(key)}) ? (${decoded}) : _umiAbsent` : decoded},`;
     })
     .join('\n');
   const encode = properties
-    .map(([key, value]) => `      ${JSON.stringify(key)}: ${dartEncode(value, key)},`)
+    .map(
+      ([key, value]) =>
+        `      ${tracksPresence(key, value) ? `if (_has_${key}) ` : ''}${JSON.stringify(key)}: ${dartEncode(value, key)},`,
+    )
     .join('\n');
   return `final class ${name} {
-${fields}
+${fields}${presenceFields ? `\n${presenceFields}` : ''}
 
   const ${name}({
 ${parameters}
-  });
+  })${initializers.length ? ` : ${initializers.join(',\n       ')}` : ''};
 
   factory ${name}.fromJson(Map<String, Object?> json) => ${name}(
 ${decode}
@@ -273,6 +293,8 @@ const dartOutput =
   // documentation-only release look like a breaking API change.
   `const int apiMajorVersion = ${JSON.stringify(API_MAJOR_VERSION)};\n` +
   `const String contractContentHash = ${JSON.stringify(contentHash)};\n\n` +
+  `// A sentinel preserves omitted keys separately from explicit null.\n` +
+  `const _umiAbsent = Object();\n\n` +
   `${dartRoutes}\n\n${dartModels}\n`;
 
 const outputs = {

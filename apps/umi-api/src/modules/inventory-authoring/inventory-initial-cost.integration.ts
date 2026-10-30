@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { MetricsService } from '../../shared/operations/metrics.service';
 import { createHash, randomUUID } from 'node:crypto';
 import type { ConfigService } from '@nestjs/config';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   InventoryAuthoringItemQuery,
+  InventoryAuthoringItemUpdateRequest,
   InventoryRecipeQuery,
   type CreatePurchaseOrderRequest,
 } from '@umi/contract';
@@ -844,5 +847,54 @@ describe('initial inventory cost through administrative commands', () => {
       (await scoped(() => authoring.recipes(access, InventoryRecipeQuery.parse({ productId }))))
         .recipes[0].costMinor,
     ).toBe(0);
+  });
+  it('preserves Dart payload presence through the real administrative command', async () => {
+    const fixtures = JSON.parse(
+      readFileSync(
+        resolve(
+          __dirname,
+          '../../../../../packages/contract/test/fixtures/initial-cost-dart-updates.json',
+        ),
+        'utf8',
+      ),
+    ) as Record<string, Record<string, unknown>>;
+    const id = randomUUID();
+    await send('inventory.item.create', {
+      targetAggregateId: id,
+      parameters: {
+        publicReference: `DART-${id}`,
+        displayName: 'Dart initial cost',
+        itemType: 'ingredient',
+        baseUnit: 'kilogram',
+        quantityScale: 2,
+        trackingPolicy: 'tracked',
+        negativeStockPolicy: 'block',
+        initialUnitCostMinor: 10000,
+      },
+    });
+    let version = 1;
+    for (const [name, fixture] of Object.entries(fixtures)) {
+      const payload = InventoryAuthoringItemUpdateRequest.parse({
+        ...fixture,
+        commandId: randomUUID(),
+        idempotencyKey: randomUUID(),
+        inventoryItemId: id,
+        expectedVersion: version,
+      });
+      const { commandId, idempotencyKey, inventoryItemId, expectedVersion, ...parameters } =
+        payload;
+      expect(Object.hasOwn(parameters, 'initialUnitCostMinor')).toBe(name !== 'omitted');
+      const result = (await send('inventory.item.update', {
+        commandId,
+        idempotencyKey,
+        targetAggregateId: inventoryItemId,
+        targetVersion: expectedVersion,
+        parameters,
+      })) as { item: { version: number; initialUnitCostMinor: number | null } };
+      expect(result.item.initialUnitCostMinor).toBe(
+        name === 'omitted' ? 10000 : fixture.initialUnitCostMinor,
+      );
+      version = result.item.version;
+    }
   });
 });
