@@ -245,6 +245,9 @@ jobs:
       - name: Apply sale inventory approval proof
         run: psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f supabase/migrations/20261030001000_inventory_sale_approval.sql
 
+      - name: Apply inventory initial cost migration
+        run: psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f supabase/migrations/20261030010000_inventory_initial_cost.sql
+
       - name: Schema instruments (preflight · check-values · parity · carry · stamps · seals · logout · login · creds)
         working-directory: apps/umi-api
         env:
@@ -346,6 +349,8 @@ jobs:
 
           psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f supabase/migrations/20261030001000_inventory_sale_approval.sql
           psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f supabase/migrations/20261030001000_inventory_sale_approval.sql
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f supabase/migrations/20261030010000_inventory_initial_cost.sql
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f supabase/migrations/20261030010000_inventory_initial_cost.sql
 
           # A guarded re-apply REPLACES every policy and LOSES none.
           #

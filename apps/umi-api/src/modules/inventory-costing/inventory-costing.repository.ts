@@ -40,6 +40,7 @@ export type ReceiptCountRow = {
 export type ReceiptLocationRow = { locationId: string; locationName: string };
 
 export type ItemRow = {
+  initialUnitCostMinor: string | null;
   inventoryItemId: string;
   publicReference: string;
   displayName: string;
@@ -274,6 +275,7 @@ export class InventoryCostingRepository {
         `SELECT id::text AS "inventoryItemId", public_reference AS "publicReference",
                 display_name AS "displayName", base_unit AS "baseUnit",
                 quantity_scale AS "quantityScale",
+                initial_unit_cost_minor::text AS "initialUnitCostMinor",
                 low_stock_threshold::text AS "lowStockThreshold", active
            FROM merchant.inventory_item
           WHERE merchant_id = $1::uuid
@@ -343,25 +345,16 @@ export class InventoryCostingRepository {
              FROM chosen c
             WHERE c.mapping_type = 'direct'
            UNION ALL
-           -- A RECIPE: the same expression pos-checkout.repository.ts resolves a sold
-           -- line with, with the cart line quantity fixed at one plate and the modifier
-           -- term fixed at one — because this is the BASE recipe. A modifier's extra
-           -- portion is real consumption and it shows up in the consumed columns from
-           -- the ledger, not here.
-           SELECT c.mapping_id, rc.inventory_item_id,
+           -- Price the raw leaves. An initial amount on a prep must not replace its recipe.
+           SELECT c.mapping_id, e.inventory_item_id,
                   'recipe_component'::text,
-                  (rc.quantity * rc.conversion_numerator *
-                   power(10::numeric, r.yield_scale + i.quantity_scale)),
-                  (r.yield_quantity::numeric * rc.conversion_denominator *
-                   power(10::numeric, rc.quantity_scale))
+                  e.numerator * power(10::numeric, i.quantity_scale),
+                  e.denominator
              FROM chosen c
-             JOIN merchant.inventory_recipe r
-               ON r.id = c.recipe_id AND r.merchant_id = c.merchant_id AND r.active
-             JOIN merchant.inventory_recipe_component rc
-               ON rc.recipe_id = r.id AND rc.merchant_id = r.merchant_id
+             CROSS JOIN LATERAL merchant.explode_inventory_recipe(c.merchant_id, c.recipe_id) e
              JOIN merchant.inventory_item i
-               ON i.id = rc.inventory_item_id AND i.merchant_id = rc.merchant_id
-            WHERE c.mapping_type IN ('recipe', 'bundle') AND rc.modifier_id IS NULL
+               ON i.id = e.inventory_item_id AND i.merchant_id = c.merchant_id
+            WHERE c.mapping_type IN ('recipe', 'bundle') AND NOT e.has_recipe
          )
          SELECT e.mapping_id::text AS "mappingId",
                 e.item_id::text AS "inventoryItemId",

@@ -91,6 +91,7 @@ const item = {
   negativeStockPolicy: 'block' as const,
   lowStockThreshold: null,
   parQuantity: null,
+  initialUnitCostMinor: null,
   shelfLifeDays: null,
   active: true,
   version: 1,

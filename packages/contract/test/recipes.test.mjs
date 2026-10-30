@@ -226,3 +226,38 @@ test('recipe target prices retain unavailable prices as null and accept exact sa
     assert.equal(InventoryRecipeTarget.safeParse({ ...target, priceMinor }).success, false);
   }
 });
+
+test('initial item costs accept null and safe nonnegative minor units', async () => {
+  const { InventoryAuthoringItemUpdateRequest, CostBasisKind } = await import('../dist/index.js');
+  const create = {
+    ...command,
+    publicReference: 'INITIAL',
+    displayName: 'Harina',
+    itemType: 'ingredient',
+    baseUnit: 'kilogram',
+    quantityScale: 2,
+    trackingPolicy: 'tracked',
+    negativeStockPolicy: 'block',
+  };
+  const update = { ...command, inventoryItemId: uuid('9'), expectedVersion: 1 };
+  for (const initialUnitCostMinor of [null, 0, 10000, Number.MAX_SAFE_INTEGER]) {
+    assert.ok(
+      InventoryAuthoringItemCreateRequest.safeParse({ ...create, initialUnitCostMinor }).success,
+    );
+    assert.ok(
+      InventoryAuthoringItemUpdateRequest.safeParse({ ...update, initialUnitCostMinor }).success,
+    );
+  }
+  assert.equal(InventoryAuthoringItemUpdateRequest.parse(update).initialUnitCostMinor, undefined);
+  for (const initialUnitCostMinor of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, '10000']) {
+    assert.equal(
+      InventoryAuthoringItemCreateRequest.safeParse({ ...create, initialUnitCostMinor }).success,
+      false,
+    );
+    assert.equal(
+      InventoryAuthoringItemUpdateRequest.safeParse({ ...update, initialUnitCostMinor }).success,
+      false,
+    );
+  }
+  assert.ok(CostBasisKind.safeParse('manual_initial').success);
+});

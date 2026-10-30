@@ -212,18 +212,7 @@ export const InventoryAuthoringItemQuery = z
     cursor: z.coerce.string().min(1).max(512).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     includeArchived: z.coerce.boolean().default(false),
-    /**
-     * Items no receipt has ever priced. FALSE BY DEFAULT, the same default the costing
-     * read takes. An authoring console that wants a freshly created ingredient in the
-     * list must ASK for it, because an ingredient has no receipt until the first
-     * delivery arrives.
-     *
-     * THE ASYMMETRY IS DELIBERATE AND IT IS A TRAP WORTH NAMING. The query model
-     * coerces booleans, so the string `false` is TRUE (`Boolean('false')`). Only the
-     * default can express "no", which is why the default is the narrow one: a caller
-     * that wants the wider list sends `true` explicitly, and a caller that wants the
-     * narrow list sends nothing at all.
-     */
+    /** Include items with neither received purchases nor an initial amount. */
     includeItemsWithoutCost: z.coerce.boolean().default(false),
   })
   .strict();
@@ -260,6 +249,7 @@ export const InventoryAuthoringItem = z
      */
     parQuantity: ItemScaleQuantity.nullable(),
     shelfLifeDays: z.number().int().min(0).max(3650).nullable(),
+    initialUnitCostMinor: MinorUnits.nullable(),
     active: z.boolean(),
     version: z.number().int().positive(),
     allergens: z.array(InventoryAllergen).max(100),
@@ -292,6 +282,7 @@ export const InventoryAuthoringItemCreateRequest = z
     lowStockThreshold: ItemScaleQuantity.nullable().default(null),
     shelfLifeDays: z.number().int().min(0).max(3650).nullable().default(null),
     parQuantity: ItemScaleQuantity.nullable().default(null),
+    initialUnitCostMinor: MinorUnits.nullable().optional(),
   })
   .strict();
 export type InventoryAuthoringItemCreateRequest = z.infer<
@@ -311,6 +302,7 @@ export const InventoryAuthoringItemUpdateRequest = z
     lowStockThreshold: ItemScaleQuantity.nullable().optional(),
     shelfLifeDays: z.number().int().min(0).max(3650).nullable().optional(),
     parQuantity: ItemScaleQuantity.nullable().optional(),
+    initialUnitCostMinor: MinorUnits.nullable().optional(),
     trackingPolicy: InventoryTrackingPolicy.optional(),
     negativeStockPolicy: InventoryNegativeStockPolicy.optional(),
     expectedVersion: z.number().int().positive(),
@@ -388,7 +380,7 @@ export const InventoryRecipeComponent = z
     conversionDenominator: z.number().int().min(1).max(9007199254740991).safe(),
     roundingPolicy: InventoryRoundingPolicy,
     required: z.boolean(),
-    /** Null when the item has no receipt: zero would be a lie (see costing). */
+    /** Null when neither received purchases nor an initial amount supplies a cost. */
     unitCostMinor: MinorUnits.nullable(),
     lineCostMinor: MinorUnits.nullable(),
   })
