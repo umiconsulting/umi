@@ -60,6 +60,10 @@ class _InventoryFake implements InventoryRepository {
   Completer<InventoryHistoryResult>? historyResponse;
   InventoryAdjustment? adjustment;
   bool countCancelled = false;
+  InventoryCountResult? activeCountOverride;
+  bool refuseReconciliation = false;
+  InventoryReconciliation? reconciledCount;
+  String? recoveredCommandId;
   CancelInventoryCountRequest? cancelledCount;
   CreateInventoryCountRequest? createdCount;
   SubmitInventoryCountRequest? submittedCount;
@@ -203,12 +207,17 @@ class _InventoryFake implements InventoryRepository {
                 ]
               : const [],
           activeCount: withActiveCount && !countCancelled
-              ? _countResult(
-                  merchantId: merchantId,
-                  locationId: query.locationId,
-                  inventoryLocationId: '00000000-0000-4000-8000-000000000004',
-                ).toJson()
-              : null,
+              ? (activeCountOverride ??
+                        _countResult(
+                          merchantId: merchantId,
+                          locationId: query.locationId,
+                          inventoryLocationId:
+                              '00000000-0000-4000-8000-000000000004',
+                        ))
+                    .toJson()
+              : countCancelled
+              ? null
+              : activeCountOverride?.toJson(),
           page: const {'limit': 100, 'hasMore': false, 'nextCursor': null},
         );
 
@@ -284,21 +293,30 @@ class _InventoryFake implements InventoryRepository {
     String merchantId,
     String commandId,
     InventoryRecoveryQuery query,
-  ) async => InventoryRecoveryResult(
-    commandId: commandId,
-    state: recoverCreateCount || recoverSubmitCount || recoverReconcileCount
-        ? 'recovered'
-        : 'query_required',
-    result: recoverCreateCount || recoverSubmitCount || recoverReconcileCount
-        ? _countResult(
-            merchantId: merchantId,
-            locationId: query.locationId,
-            inventoryLocationId: '00000000-0000-4000-8000-000000000004',
-            recovered: true,
-          ).toJson()
-        : null,
-    conflict: null,
-  );
+  ) async {
+    recoveredCommandId = commandId;
+    final result = _countResult(
+      merchantId: merchantId,
+      locationId: query.locationId,
+      inventoryLocationId: '00000000-0000-4000-8000-000000000004',
+      recovered: true,
+    );
+    return InventoryRecoveryResult(
+      commandId: commandId,
+      state: recoverCreateCount || recoverSubmitCount || recoverReconcileCount
+          ? 'recovered'
+          : 'query_required',
+      result: recoverCreateCount || recoverSubmitCount || recoverReconcileCount
+          ? {
+              ...result.toJson(),
+              if (recoverReconcileCount)
+                'count': {...result.count, 'status': 'committed', 'version': 3},
+            }
+          : null,
+      conflict: null,
+    );
+  }
+
   @override
   Future<InventoryCountResult> createCount(
     String merchantId,
@@ -420,6 +438,18 @@ class _InventoryFake implements InventoryRepository {
     String merchantId,
     InventoryReconciliation command,
   ) {
+    reconciledCount = command;
+    if (refuseReconciliation) {
+      throw AppException(
+        category: AppErrorCategory.conflict,
+        code: 'APPROVAL_REQUIRED',
+        recoverable: true,
+        fieldErrors: {
+          'approvalPermission': const ['inventory.count.approve'],
+          'approvalFingerprint': [List.filled(64, 'b').join()],
+        },
+      );
+    }
     if (recoverReconcileCount) {
       throw const AppException(
         category: AppErrorCategory.transport,
@@ -491,9 +521,25 @@ Map<String, Object?> _historyEntry(int sequence) => {
   'occurredAt': '2026-08-05T10:00:00.000Z',
 };
 
+InventoryCountResult _remoteCount(Map<String, Object?> changes) {
+  final initial = _countResult(
+    merchantId: scope.merchantId,
+    locationId: scope.locationId,
+    inventoryLocationId: '00000000-0000-4000-8000-000000000004',
+  );
+  return InventoryCountResult(
+    count: {...initial.count, ...changes},
+    variances: initial.variances,
+    entries: initial.entries,
+    recovered: false,
+    correlationId: 'remote-count',
+  );
+}
+
 Widget _app(
   Iterable<String> permissions, {
   _InventoryFake? fake,
+  InventoryController? controller,
   double textScale = 1,
 }) => PosApp(
   theme: UmiTheme.light(),
@@ -511,7 +557,7 @@ Widget _app(
     GlobalWidgetsLocalizations.delegate,
   ],
   home: InventorySurface(
-    controller: InventoryController(fake ?? _InventoryFake()),
+    controller: controller ?? InventoryController(fake ?? _InventoryFake()),
     scope: InventoryScope(
       merchantId: scope.merchantId,
       locationId: scope.locationId,
@@ -525,6 +571,251 @@ Widget _app(
 );
 
 void main() {
+  test('refresh clears a remotely cancelled or committed count', () async {
+    final fake = _InventoryFake(withActiveCount: true);
+    final controller = InventoryController(fake);
+    await controller.load(scope);
+    expect(controller.state.count?.count['status'], 'counting');
+
+    // Both terminal transitions remove the count from the active overview.
+    fake.countCancelled = true;
+    await controller.load(scope);
+
+    expect(controller.state.count, isNull);
+    await controller.startCount(scope);
+    expect(controller.state.count?.count['status'], 'counting');
+  });
+
+  test('refresh adopts the remote version before count cancellation', () async {
+    final fake = _InventoryFake(withActiveCount: true);
+    final controller = InventoryController(fake);
+    await controller.load(scope);
+    fake.activeCountOverride = _remoteCount({
+      'version': 2,
+      'status': 'reconciliation_required',
+    });
+
+    await controller.load(scope);
+
+    expect(controller.state.count?.count['version'], 2);
+    expect(controller.state.count?.count['status'], 'reconciliation_required');
+    await controller.cancelCount(scope);
+    expect(fake.cancelledCount?.expectedVersion, 2);
+    expect(controller.state.count, isNull);
+  });
+
+  test('refresh adopts a replacement count', () async {
+    final fake = _InventoryFake(withActiveCount: true);
+    final controller = InventoryController(fake);
+    await controller.load(scope);
+    fake.activeCountOverride = _remoteCount({
+      'id': '00000000-0000-4000-8000-000000000007',
+    });
+
+    await controller.load(scope);
+
+    expect(
+      controller.state.count?.count['id'],
+      '00000000-0000-4000-8000-000000000007',
+    );
+  });
+
+  test('refresh preserves approval for an unchanged count', () async {
+    final fake = _InventoryFake(withActiveCount: true)
+      ..activeCountOverride = _remoteCount({
+        'version': 2,
+        'status': 'reconciliation_required',
+      })
+      ..refuseReconciliation = true;
+    final controller = InventoryController(fake);
+    await controller.load(scope);
+    await controller.reconcileCount(scope, const {});
+    final pending = controller.state.pendingReconciliation;
+    expect(pending, isNotNull);
+
+    await controller.load(scope);
+
+    expect(controller.state.pendingReconciliation, same(pending));
+    expect(controller.state.approvalPermission, 'inventory.count.approve');
+    expect(controller.state.approvalFingerprint, List.filled(64, 'b').join());
+    await controller.approveReconciliation(scope, 'count-approval');
+    expect(fake.reconciledCount?.approvalId, 'count-approval');
+    expect(fake.reconciledCount?.commandId, pending!.commandId);
+  });
+
+  for (final change in <String, Map<String, Object?>?>{
+    'disappears': null,
+    'is replaced': {'id': '00000000-0000-4000-8000-000000000007'},
+    'advances version': {'version': 3},
+    'advances attempt': {'attempt': 2},
+    'changes snapshot': {'snapshotLedgerSequence': 2},
+    'changes status': {'status': 'counting'},
+  }.entries) {
+    test(
+      'refresh clears obsolete approval when a count ${change.key}',
+      () async {
+        final fake = _InventoryFake(withActiveCount: true)
+          ..activeCountOverride = _remoteCount({
+            'version': 2,
+            'status': 'reconciliation_required',
+          })
+          ..refuseReconciliation = true;
+        final controller = InventoryController(fake);
+        await controller.load(scope);
+        await controller.reconcileCount(scope, const {});
+        final command = fake.reconciledCount;
+        expect(controller.state.pendingReconciliation, isNotNull);
+        expect(controller.state.approvalFingerprint, isNotNull);
+        if (change.value == null) {
+          fake.countCancelled = true;
+        } else {
+          fake.activeCountOverride = _remoteCount({
+            'version': 2,
+            'status': 'reconciliation_required',
+            ...change.value!,
+          });
+        }
+
+        await controller.load(scope);
+
+        expect(controller.state.pendingReconciliation, isNull);
+        expect(controller.state.approvalPermission, isNull);
+        expect(controller.state.approvalFingerprint, isNull);
+        await controller.approveReconciliation(scope, 'obsolete-approval');
+        expect(fake.reconciledCount, same(command));
+      },
+    );
+  }
+
+  test('count replacement preserves an unrelated operation approval', () async {
+    final fake = _InventoryFake(
+      withActiveCount: true,
+      withRestock: true,
+      refuseRestockOnce: true,
+    );
+    final controller = InventoryController(fake);
+    await controller.load(scope);
+    await controller.resolveRestock(
+      scope,
+      controller.state.overview!.restockReviews.single,
+      const {'00000000-0000-4000-8000-000000000013': 'restocked'},
+    );
+    final pending = controller.state.pendingOperation;
+    expect(pending, isNotNull);
+    fake.activeCountOverride = _remoteCount({
+      'id': '00000000-0000-4000-8000-000000000007',
+    });
+
+    await controller.load(scope);
+
+    expect(controller.state.pendingOperation, same(pending));
+    expect(controller.state.approvalPermission, 'inventory.restock.approve');
+    expect(controller.state.approvalFingerprint, List.filled(64, 'a').join());
+    await controller.approvePendingOperation(scope, 'restock-approval');
+    expect(fake.restockCommand?.approvalId, 'restock-approval');
+    expect(controller.state.pendingOperation, isNull);
+  });
+
+  testWidgets('count replacement clears quantities and validation drafts', (
+    tester,
+  ) async {
+    final fake = _InventoryFake(withActiveCount: true);
+    final controller = InventoryController(fake);
+    await tester.pumpWidget(
+      _app(const [
+        'inventory.read',
+        'inventory.count.submit',
+      ], controller: controller),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(PosField), '25');
+    await controller.load(scope);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<PosField>(find.byType(PosField)).controller!.text,
+      '25',
+    );
+
+    fake.activeCountOverride = _remoteCount({
+      'id': '00000000-0000-4000-8000-000000000007',
+    });
+    await controller.load(scope);
+    await tester.pumpAndSettle();
+    expect(tester.widget<PosField>(find.byType(PosField)).controller!.text, '');
+    await tester.ensureVisible(find.text('Enviar conteo'));
+    await tester.tap(find.text('Enviar conteo'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Registra una cantidad válida, incluido cero.'),
+      findsOneWidget,
+    );
+
+    fake.activeCountOverride = _remoteCount({
+      'id': '00000000-0000-4000-8000-000000000007',
+      'attempt': 2,
+    });
+    await controller.load(scope);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Registra una cantidad válida, incluido cero.'),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+  });
+
+  testWidgets('count replacement clears variance reason drafts', (
+    tester,
+  ) async {
+    final fake = _InventoryFake(withActiveCount: true);
+    final controller = InventoryController(fake);
+    await controller.load(scope);
+    await controller.submitCount(scope, const {
+      '00000000-0000-4000-8000-000000000005': 0,
+    });
+    fake.activeCountOverride = controller.state.count;
+    await tester.pumpWidget(
+      _app(const [
+        'inventory.read',
+        'inventory.count.reconcile',
+      ], controller: controller),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Selecciona el motivo'));
+    await tester.tap(find.text('Selecciona el motivo'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Error de conteo').last);
+    await tester.pumpAndSettle();
+    final reconcile = find.widgetWithText(
+      PosButton,
+      'Solicitar reconciliación',
+    );
+    expect(tester.widget<PosButton>(reconcile).onPressed, isNotNull);
+    await controller.load(scope);
+    await tester.pumpAndSettle();
+    expect(tester.widget<PosButton>(reconcile).onPressed, isNotNull);
+    expect(find.text('Error de conteo'), findsOneWidget);
+
+    final previous = fake.activeCountOverride!;
+    fake.activeCountOverride = InventoryCountResult(
+      count: {...previous.count, 'id': '00000000-0000-4000-8000-000000000007'},
+      variances: previous.variances,
+      entries: previous.entries,
+      recovered: false,
+      correlationId: 'replacement-variance-count',
+    );
+    await controller.load(scope);
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<PosButton>(reconcile).onPressed, isNull);
+    expect(find.text('Selecciona el motivo'), findsOneWidget);
+    expect(find.text('Error de conteo'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+  });
+
   for (final paginated in [false, true]) {
     test(
       'An old history response cannot restore permission paginated=$paginated',
@@ -881,9 +1172,8 @@ void main() {
   });
 
   test('Count reconciliation recovers the original response', () async {
-    final controller = InventoryController(
-      _InventoryFake(recoverReconcileCount: true),
-    );
+    final fake = _InventoryFake(recoverReconcileCount: true);
+    final controller = InventoryController(fake);
     await controller.load(scope);
     await controller.startCount(scope);
     await controller.submitCount(scope, {
@@ -895,7 +1185,8 @@ void main() {
     });
 
     expect(controller.state.errorCode, isNull);
-    expect(controller.state.count?.recovered, isTrue);
+    expect(fake.recoveredCommandId, fake.reconciledCount!.commandId);
+    expect(controller.state.count, isNull);
   });
 
   testWidgets('Viewer sees balances and no inventory mutation action', (

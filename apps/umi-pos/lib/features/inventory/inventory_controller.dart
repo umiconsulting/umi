@@ -101,25 +101,36 @@ final class InventoryController extends ChangeNotifier {
       }
       if (generation != _loadGeneration) return;
       final previousCount = _state.count;
-      final terminalCount = const [
-        'cancelled',
-        'committed',
-      ].contains(previousCount?.count['status']);
+      final count = overview.activeCount == null
+          ? null
+          : InventoryCountResult.fromJson(overview.activeCount!);
+      final countChanged = const [
+        'id',
+        'version',
+        'attempt',
+        'snapshotLedgerSequence',
+        'status',
+      ].any((field) => previousCount?.count[field] != count?.count[field]);
+      final clearReconciliation =
+          _state.pendingReconciliation != null &&
+          (count == null || countChanged);
+      final clearApproval =
+          clearReconciliation && _state.pendingOperation == null;
       _set(
         InventoryUiState(
           overview: overview,
           history: history,
           errorCode: historyError,
-          count:
-              (terminalCount ? null : previousCount) ??
-              (overview.activeCount == null
-                  ? null
-                  : InventoryCountResult.fromJson(overview.activeCount!)),
-          pendingReconciliation: _state.pendingReconciliation,
+          count: count,
+          pendingReconciliation: clearReconciliation
+              ? null
+              : _state.pendingReconciliation,
           pendingOperation: _state.pendingOperation,
           production: _state.production,
-          approvalPermission: _state.approvalPermission,
-          approvalFingerprint: _state.approvalFingerprint,
+          approvalPermission: clearApproval ? null : _state.approvalPermission,
+          approvalFingerprint: clearApproval
+              ? null
+              : _state.approvalFingerprint,
         ),
       );
     } on AppException catch (error) {

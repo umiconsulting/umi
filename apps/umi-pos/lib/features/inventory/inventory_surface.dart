@@ -60,6 +60,7 @@ final class InventorySurface extends StatefulWidget {
 final class _InventorySurfaceState extends State<InventorySurface> {
   final Map<String, TextEditingController> _countInputs = {};
   final Map<String, String> _varianceReasons = {};
+  (Object?, Object?)? _countIdentity;
   bool _countInvalid = false;
 
   List<Map<String, Object?>> get _countItems {
@@ -129,7 +130,19 @@ final class _InventorySurfaceState extends State<InventorySurface> {
   }
 
   void _changed() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final count = widget.controller.state.count?.count;
+    final identity = count == null ? null : (count['id'], count['attempt']);
+    setState(() {
+      if (_countIdentity != identity) {
+        for (final input in _countInputs.values) {
+          input.clear();
+        }
+        _varianceReasons.clear();
+        _countInvalid = false;
+        _countIdentity = identity;
+      }
+    });
   }
 
   String _copy(String es, String en) =>
@@ -448,6 +461,11 @@ final class _InventorySurfaceState extends State<InventorySurface> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: PosSelectFormField<String>(
+                  key: ValueKey((
+                    count['id'],
+                    count['attempt'],
+                    variance['inventoryItemId'],
+                  )),
                   initialValue:
                       _varianceReasons[variance['inventoryItemId']! as String],
                   decoration: PosFieldDecoration(
