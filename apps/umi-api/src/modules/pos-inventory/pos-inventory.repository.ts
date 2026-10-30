@@ -125,6 +125,20 @@ interface ProductionInput {
 const hasPermission = (authorization: InventoryAuthorization, permission: string) =>
   authorization.permissions.includes('*') || authorization.permissions.includes(permission);
 
+// Project the function result once, with the names consumed by ledger().
+const APPENDED_LEDGER_COLUMNS = `id::text,merchant_id::text AS "merchantId",location_id::text AS "locationId",
+  inventory_location_id::text AS "inventoryLocationId",inventory_item_id::text AS "inventoryItemId",sequence::text,
+  entry_type AS "entryType",quantity::text,quantity_scale AS "quantityScale",unit,
+  effect_on_hand::text AS "effectOnHand",effect_reserved::text AS "effectReserved",
+  effect_committed::text AS "effectCommitted",effect_damaged::text AS "effectDamaged",
+  effect_quarantine::text AS "effectQuarantine",effect_waste::text AS "effectWaste",
+  effect_in_transit::text AS "effectInTransit",command_id::text AS "commandId",
+  source_aggregate_type AS "sourceType",source_aggregate_id::text AS "sourceId",
+  sale_id::text AS "saleId",sale_line_id::text AS "saleLineId",refund_id::text AS "refundId",
+  count_id::text AS "countId",operator_id::text AS "operatorId",device_id::text AS "deviceId",
+  credential_version AS "credentialVersion",business_date::text AS "businessDate",
+  correlation_id AS "correlationId",occurred_at::text AS "occurredAt"`;
+
 @Injectable()
 export class PosInventoryRepository {
   constructor(private readonly pg: PgService) {}
@@ -830,9 +844,9 @@ export class PosInventoryRepository {
       );
     }
     const { rows } = await client.query<LedgerRow>(
-      `SELECT (merchant.append_stock_ledger(
+      `SELECT ${APPENDED_LEDGER_COLUMNS} FROM merchant.append_stock_ledger(
         $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7::uuid,$8::uuid,$9,$10,$11::uuid,
-        $12::uuid,$13::uuid,$14,$15::date,$16,null,null,null,null,$17::jsonb)).*`,
+        $12::uuid,$13::uuid,$14,$15::date,$16,null,null,null,null,$17::jsonb)`,
       [
         merchantId,
         dto.locationId,
@@ -1027,10 +1041,10 @@ export class PosInventoryRepository {
             ? 'inspection_queued'
             : 'refund_not_restocked';
       const row = await client.query<LedgerRow>(
-        `SELECT (merchant.append_stock_ledger(
+        `SELECT ${APPENDED_LEDGER_COLUMNS} FROM merchant.append_stock_ledger(
           $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7::uuid,$8::uuid,$9,
           'refund_restock',$10::uuid,$11::uuid,$12::uuid,$13,$14::date,$15,
-          $16::uuid,$17::uuid,$10::uuid,null,$18::jsonb)).*`,
+          $16::uuid,$17::uuid,$10::uuid,null,$18::jsonb)`,
         [
           merchantId,
           dto.locationId,
@@ -1697,10 +1711,10 @@ export class PosInventoryRepository {
     },
   ): Promise<LedgerRow> {
     const { rows } = await client.query<LedgerRow>(
-      `SELECT (merchant.append_stock_ledger(
+      `SELECT ${APPENDED_LEDGER_COLUMNS} FROM merchant.append_stock_ledger(
         $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7::uuid,$8::uuid,$9,
         'production_batch',$10::uuid,$11::uuid,$12::uuid,$13,$14::date,$15,
-        null,null,null,null,$16::jsonb,$17::uuid)).*`,
+        null,null,null,null,$16::jsonb,$17::uuid)`,
       [
         merchantId,
         dto.locationId,
@@ -1880,7 +1894,7 @@ export class PosInventoryRepository {
       credentialVersion: row.credentialVersion,
       businessDate: row.businessDate,
       correlationId: row.correlationId,
-      occurredAt: row.occurredAt,
+      occurredAt: new Date(row.occurredAt).toISOString(),
     };
   }
 
@@ -1931,6 +1945,7 @@ export class PosInventoryRepository {
       waste: Number(row.waste),
       inTransit: Number(row.inTransit),
       ledgerSequence: Number(row.ledgerSequence),
+      calculatedAt: new Date(row.calculatedAt).toISOString(),
       version: Number(row.version),
       unit: row.unit as never,
     }));

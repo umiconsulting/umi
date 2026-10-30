@@ -6,6 +6,7 @@ import type { z } from 'zod';
 import {
   InventoryAllergenList,
   InventoryAllergenQuery,
+  InventoryMutationResult,
   InventoryAuthoringItemList,
   InventoryAuthoringItemQuery,
   InventoryRecipeExplosion,
@@ -177,6 +178,8 @@ const access: MerchantAccess = {
     'inventory.recipe.manage',
     // The kitchen's own key (migration 76, plan §11 phase 3).
     'inventory.production.produce',
+    'inventory.adjust.decrease',
+    'inventory.adjust.increase',
   ],
 };
 
@@ -1671,5 +1674,49 @@ describe('inventory authoring · items, conversions and allergens', () => {
     // AN UNKNOWN LOT is a not-found rather than an empty set of sales.
     const unknown = await refusal(() => scoped(() => authoring.recall(access, fixtureId(0xfe))));
     expect(unknown).toMatchObject({ status: 404, code: 'RESOURCE_NOT_FOUND' });
+  });
+
+  it('ajusta hasta cero sin ejecutar el movimiento más de una vez', async () => {
+    const itemId = randomUUID();
+    await createItem(itemId, {
+      publicReference: `AJUSTE-${RUN}`, displayName: 'Ajuste decimal',
+      itemType: 'ingredient', baseUnit: 'kilogram', quantityScale: 2,
+    });
+    await receive({ inventoryItemId: itemId,
+      quantity: { value: 325, scale: 2, unit: 'kilogram' }, unitCostMinor: 0 });
+    await pg.query(`INSERT INTO merchant.inventory_policy
+      (merchant_id,location_id,inventory_location_id,version,fingerprint,adjustment_approval_threshold)
+      VALUES ($1,$2,$3,'adjustment-harness',$4,1000000)`,
+      [MERCHANT, LOCATION, STOCK_ROOM, 'a'.repeat(64)]);
+
+    for (const [quantity, expected] of [[200, 125], [125, 0]]) {
+      const balance = await pg.query<{ version: string }>(
+        `SELECT version FROM merchant.stock_balance WHERE inventory_location_id=$1 AND inventory_item_id=$2`,
+        [STOCK_ROOM, itemId]);
+      const commandId = randomUUID();
+      const input = {
+        targetAggregateId: itemId, commandId, idempotencyKey: randomUUID(),
+        parameters: {
+          inventoryLocationId: STOCK_ROOM, expectedVersion: Number(balance.rows[0].version),
+          policyFingerprint: 'a'.repeat(64), businessDate: '2026-10-29',
+          direction: 'decrease', quantity: { value: quantity, scale: 2, unit: 'kilogram' },
+          reason: 'count_correction',
+        },
+      };
+      const response = await send('inventory.adjustment', input).catch((error) => {
+        throw new Error(JSON.stringify(error.getResponse?.() ?? error));
+      });
+      const result = InventoryMutationResult.parse(response);
+      expect(result.balances[0]).toMatchObject({ onHand: expected, scale: 2, unit: 'kilogram' });
+      expect(result.entries).toHaveLength(1);
+      expect(result.entries[0].quantity.value).toBe(quantity);
+      await send('inventory.adjustment', input);
+      const actual = await pg.query<{ on_hand: string; entries: string }>(
+        `SELECT b.on_hand::text,
+          (SELECT count(*)::text FROM merchant.stock_ledger_entry e WHERE e.command_id=$3) AS entries
+         FROM merchant.stock_balance b WHERE b.inventory_location_id=$1 AND b.inventory_item_id=$2`,
+        [STOCK_ROOM, itemId, commandId]);
+      expect(actual.rows[0]).toEqual({ on_hand: String(expected), entries: '1' });
+    }
   });
 });
