@@ -8290,6 +8290,10 @@ msgstr "Open a receipt to see the sale: its items, taxes and payment method. The
 #~ msgstr "The previous recipe stays in the history."
 
 #: src/screens/recipe-workspace.jsx
+#~ msgid "No se pudo guardar la receta."
+#~ msgstr "Could not save the recipe."
+
+#: src/screens/recipe-workspace.jsx
 msgid "Sub-receta"
 msgstr "Sub-recipe"
 
@@ -8407,10 +8411,6 @@ msgstr "The inventory setup changed. Save again to check its current state."
 #: src/screens/recipe-workspace.jsx
 msgid "Este producto o variante ya tiene una receta activa. Cierra este borrador y edita esa receta."
 msgstr "This product or variant already has an active recipe. Close this draft and edit that recipe."
-
-#: src/screens/recipe-workspace.jsx
-msgid "No se pudo guardar la receta."
-msgstr "Could not save the recipe."
 
 #: src/screens/recipe-workspace.jsx
 msgid "Editar receta"
@@ -8571,6 +8571,14 @@ msgstr "This recipe will replace that setup for future sales."
 #: src/screens/recipe-workspace.jsx
 msgid "Usar esta receta"
 msgstr "Use this recipe"
+
+#: src/screens/recipe-workspace.jsx
+msgid "No pudimos confirmar el guardado. Reintenta para consultar el resultado sin cambiar la receta."
+msgstr "We could not confirm the save. Retry to check the result without changing the recipe."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Reintentar guardado"
+msgstr "Retry save"
 
 #: src/screens/recipe-workspace.jsx
 msgid "Al retirar esta receta, las próximas ventas necesitarán otra configuración válida de inventario."

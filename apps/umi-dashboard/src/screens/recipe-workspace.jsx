@@ -583,6 +583,7 @@ function RecipeEditor({
   const [confirmRetire, setConfirmRetire] = useState(false);
   const [replacement, setReplacement] = useState(null);
   const [saveError, setSaveError] = useState(null);
+  const [unresolvedSave, setUnresolvedSave] = useState(null);
 
   const explosion = useInventoryRecipeExplosion(editing ? recipeId : null, 0);
   const itemsById = useMemo(() => new Map((items || []).map((item) => [item.id, item])), [items]);
@@ -727,16 +728,26 @@ function RecipeEditor({
   }
 
   async function submitSave(request, token) {
+    const submitted = structuredClone({
+      ...request,
+      parameters: { ...request.parameters, ...(token ? { replaceSalesMapping: token } : {}) },
+    });
+    setUnresolvedSave(submitted);
     setReplacement(null);
     setSaveError(null);
     try {
-      const response = await command.execute(request.operation, recipeId, {
-        targetVersion: request.targetVersion,
-        parameters: { ...request.parameters, ...(token ? { replaceSalesMapping: token } : {}) },
+      const response = await command.execute(submitted.operation, recipeId, {
+        targetVersion: submitted.targetVersion,
+        parameters: submitted.parameters,
       });
+      setUnresolvedSave(null);
       await onSaved(response?.result?.recipe || null);
     } catch (failure) {
-      const confirmation = recipeReplacementConfirmation(failure, request);
+      // The shared command hook retains identity for network and 5xx failures.
+      // Keep the same payload until that command has a definite outcome.
+      if (!failure?.status || failure.status >= 500) return;
+      setUnresolvedSave(null);
+      const confirmation = recipeReplacementConfirmation(failure, submitted);
       if (confirmation?.replacement) {
         setReplacement(confirmation);
       } else if (confirmation) {
@@ -745,11 +756,11 @@ function RecipeEditor({
         );
       } else {
         const payload = failure?.details?.error || failure?.details;
-        setSaveError(
-          payload?.details?.reason === 'ACTIVE_RECIPE_EXISTS'
-            ? t`Este producto o variante ya tiene una receta activa. Cierra este borrador y edita esa receta.`
-            : failure?.message || t`No se pudo guardar la receta.`,
-        );
+        if (payload?.details?.reason === 'ACTIVE_RECIPE_EXISTS') {
+          setSaveError(
+            t`Este producto o variante ya tiene una receta activa. Cierra este borrador y edita esa receta.`,
+          );
+        }
       }
     }
   }
@@ -789,13 +800,19 @@ function RecipeEditor({
           <h3 style={{ margin: 0 }}>
             {editing ? <Trans>Editar receta</Trans> : <Trans>Nueva receta</Trans>}
           </h3>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
+          <button
+            className="btn-icon"
+            type="button"
+            onClick={onClose}
+            aria-label={t`Cerrar`}
+            disabled={command.pending || Boolean(unresolvedSave)}
+          >
             <I.X size={16} />
           </button>
         </div>
 
         <fieldset
-          disabled={command.pending || Boolean(replacement)}
+          disabled={command.pending || Boolean(replacement) || Boolean(unresolvedSave)}
           style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 16, minWidth: 0 }}
         >
           {/* ── The target ─────────────────────────────────────────────────────── */}
@@ -1271,6 +1288,23 @@ function RecipeEditor({
             </div>
           </div>
         ) : null}
+        {unresolvedSave && !command.pending ? (
+          <div role="alert" style={{ display: 'grid', gap: 8 }}>
+            <p style={{ margin: 0 }}>
+              <Trans>
+                No pudimos confirmar el guardado. Reintenta para consultar el resultado sin cambiar
+                la receta.
+              </Trans>
+            </p>
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() => submitSave(unresolvedSave)}
+            >
+              <Trans>Reintentar guardado</Trans>
+            </button>
+          </div>
+        ) : null}
         {saveError ? (
           <p role="alert" style={{ color: 'var(--danger)' }}>
             {saveError}
@@ -1286,7 +1320,7 @@ function RecipeEditor({
         ) : null}
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {!replacement ? (
+          {!replacement && !unresolvedSave ? (
             <button
               className="btn btn-primary"
               type="button"
@@ -1307,7 +1341,7 @@ function RecipeEditor({
                 <button
                   className="btn btn-secondary"
                   type="button"
-                  disabled={command.pending}
+                  disabled={command.pending || Boolean(unresolvedSave)}
                   onClick={retire}
                 >
                   <Trans>Confirmar retirada</Trans>
@@ -1315,6 +1349,7 @@ function RecipeEditor({
                 <button
                   className="btn btn-secondary"
                   type="button"
+                  disabled={command.pending || Boolean(unresolvedSave)}
                   onClick={() => setConfirmRetire(false)}
                 >
                   <Trans>Cancelar</Trans>
@@ -1324,7 +1359,7 @@ function RecipeEditor({
               <button
                 className="btn btn-secondary"
                 type="button"
-                disabled={command.pending || Boolean(replacement)}
+                disabled={command.pending || Boolean(replacement) || Boolean(unresolvedSave)}
                 onClick={() => setConfirmRetire(true)}
               >
                 <Trans>Retirar</Trans>
