@@ -615,6 +615,88 @@ describe('inventory count recovery with real PostgreSQL', () => {
     );
     expect(InventoryCountResult.parse(result).count.status).toBe('cancelled');
   });
+  it('refuses provenance changes and noncancel updates under a valid cancellation context', async () => {
+    const initial = await start();
+    const other = fixtureId(21),
+      session = fixtureId(22);
+    const secondUser = { ...user, id: other, sessionId: session };
+    const contexts = new AdministrativeCommandContextService(
+      new AdministrativeCommandRepository(pg),
+    );
+    const attempts = [
+      {
+        set: "administrative_command_id=$2::uuid,status='committed'",
+        message: 'INVENTORY_COUNT_PROVENANCE_IMMUTABLE',
+      },
+      {
+        set: "administrative_command_id=$2::uuid,status='cancelled',version=version+1",
+        message: 'INVENTORY_COUNT_PROVENANCE_IMMUTABLE',
+      },
+      {
+        set: "status='cancelled',version=version+1,submitted_at=clock_timestamp()",
+        message: 'INVENTORY_COUNT_CANCEL_TRANSITION_INVALID',
+      },
+      {
+        set: "status='committed',version=version+1",
+        message: 'INVENTORY_COUNT_CANCEL_TRANSITION_INVALID',
+      },
+    ];
+    for (const attempt of attempts) {
+      const context = await contexts.create(
+        secondUser,
+        { ...access, membershipId: fixtureId(23) },
+        {
+          operation: 'inventory.count.cancel',
+          locationId: LOCATION,
+          targetAggregateId: initial.count.id,
+          targetVersion: initial.count.version,
+          commandId: randomUUID(),
+          idempotencyKey: randomUUID(),
+          approvalId: null,
+          parameters: {},
+        },
+      );
+      await expect(
+        contexts.execute(context, async (current) =>
+          pg.runWithMerchant(
+            MERCHANT,
+            other,
+            async (client) => {
+              await client.query(
+                `SELECT set_config('app.inventory_count_cancel_command_id',$1,true)`,
+                [current.commandRecordId],
+              );
+              expect(
+                (
+                  await client.query<{ allowed: boolean }>(
+                    `SELECT merchant.inventory_count_cancel_authorized($1,$2,$3) AS allowed`,
+                    [initial.count.id, MERCHANT, LOCATION],
+                  )
+                ).rows[0].allowed,
+              ).toBe(true);
+              const parameters = attempt.set.includes('$2')
+                ? [initial.count.id, current.commandRecordId]
+                : [initial.count.id];
+              await client.query(
+                `UPDATE merchant.inventory_count SET ${attempt.set} WHERE id=$1`,
+                parameters,
+              );
+            },
+            LOCATION,
+          ),
+        ),
+      ).rejects.toMatchObject({ code: '23514', message: attempt.message });
+    }
+    expect(
+      (
+        await pg.query<{ status: string; version: number }>(
+          `SELECT status,version FROM merchant.inventory_count WHERE id=$1`,
+          [initial.count.id],
+        )
+      ).rows[0],
+    ).toEqual({ status: 'counting', version: initial.count.version });
+    await cancel(initial.count);
+  });
   it('refuses cancellation without count creation permission', async () => {
     const initial = await start();
     await expect(
@@ -651,7 +733,7 @@ describe('inventory count recovery with real PostgreSQL', () => {
     expect(failed.reason).toMatchObject({ response: { code: 'STALE_INVENTORY_COUNT' } });
     expect(await balances()).toEqual(before);
   });
-  it('locks every item before sequence validation and refuses a concurrent change to a zero-variance item', async () => {
+  it('refuses a busy zero-variance item promptly and rejects the stale count after its movement', async () => {
     const before = await balances();
     const submitted = await submit((await start()).count, [before[0] - 1, before[1]]);
     let unlock!: () => void;
@@ -680,9 +762,14 @@ describe('inventory count recovery with real PostgreSQL', () => {
     );
     await ready;
     let settled = false;
-    const pending = reconcile(submitted.count).finally(() => {
-      settled = true;
-    });
+    const pending = reconcile(submitted.count)
+      .then(
+        () => ({ error: null }),
+        (error) => ({ error }),
+      )
+      .finally(() => {
+        settled = true;
+      });
     // Observe the database wait before the holder commits. This is a concurrency barrier.
     let waits = false;
     try {
@@ -697,15 +784,124 @@ describe('inventory count recovery with real PostgreSQL', () => {
         if (settled) break;
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
-      expect(waits).toBe(true);
-      expect(settled).toBe(false);
+      if (!settled && !waits) throw new Error('The count did not reach the lock barrier.');
     } finally {
       unlock();
     }
     await holder;
-    await expect(pending).rejects.toMatchObject({ response: { code: 'STALE_INVENTORY_COUNT' } });
+    expect((await pending).error).toMatchObject({
+      response: { code: 'INVENTORY_COUNT_BUSY', retryable: true },
+    });
+    await expect(reconcile(submitted.count)).rejects.toMatchObject({
+      response: { code: 'STALE_INVENTORY_COUNT' },
+    });
     expect(await balances()).toEqual([before[0], before[1] - 1]);
     await cancel(submitted.count);
+  });
+
+  it('refuses reverse purchase-line contention without a deadlock or count correction', async () => {
+    const before = await balances();
+    const submitted = await submit((await start()).count, [before[0] - 1, before[1]]);
+    let release!: () => void, ready!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    let writerPid = 0;
+    const writer = pg
+      .runWithMerchant(
+        MERCHANT,
+        USER,
+        async (client) => {
+          await client.query(`SET LOCAL lock_timeout='3s'`);
+          writerPid = (await client.query<{ pid: number }>(`SELECT pg_backend_pid() AS pid`))
+            .rows[0].pid;
+          const post = (item: string) =>
+            client.query(
+              `SELECT merchant.append_stock_ledger($1::uuid,$2::uuid,$3::uuid,$4::uuid,'purchase_ordered',1,$5::uuid,$5::uuid,repeat('e',64),'purchase_order',$6::uuid,$7::uuid,null,null,current_date,'reverse-purchase-count')`,
+              [MERCHANT, LOCATION, STOCK_ROOM, item, randomUUID(), fixtureId(94), USER],
+            );
+          await post(ITEM2);
+          ready();
+          await gate;
+          await post(ITEM);
+        },
+        LOCATION,
+      )
+      .then(
+        () => ({ error: null }),
+        (error) => ({ error }),
+      );
+    await started;
+    let settled = false;
+    const pending = reconcile(submitted.count)
+      .then(
+        () => ({ error: null }),
+        (error) => ({ error }),
+      )
+      .finally(() => {
+        settled = true;
+      });
+    try {
+      for (let i = 0; i < 100 && !settled; i++) {
+        const waiting = await pg.query<{ waiting: boolean }>(
+          `SELECT exists(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))) AS waiting`,
+          [writerPid],
+        );
+        if (waiting.rows[0].waiting) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    } finally {
+      release();
+    }
+    const [countResult, writeResult] = await Promise.all([pending, writer]);
+    expect(countResult.error).toMatchObject({
+      response: { code: 'INVENTORY_COUNT_BUSY', retryable: true },
+    });
+    expect(writeResult.error).toBeNull();
+    expect(await balances()).toEqual(before);
+    await expect(reconcile(submitted.count)).rejects.toMatchObject({
+      response: { code: 'STALE_INVENTORY_COUNT' },
+    });
+    await cancel(submitted.count);
+  });
+
+  it('refuses an occupied balance advisory lock and permits an unchanged retry', async () => {
+    const before = await balances();
+    const count = await submit((await start()).count, before);
+    let release!: () => void, ready!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    const holder = pg.runWithMerchant(
+      MERCHANT,
+      USER,
+      async (client) => {
+        await client.query(
+          `SELECT pg_advisory_xact_lock(hashtextextended(concat_ws(':',$1::text,$2::text,$3::text,$4::text),0))`,
+          [MERCHANT, LOCATION, STOCK_ROOM, ITEM2],
+        );
+        ready();
+        await gate;
+      },
+      LOCATION,
+    );
+    await started;
+    try {
+      await expect(reconcile(count.count)).rejects.toMatchObject({
+        response: { code: 'INVENTORY_COUNT_BUSY', retryable: true },
+      });
+    } finally {
+      release();
+    }
+    await holder;
+    expect(InventoryCountResult.parse(await reconcile(count.count)).count.status).toBe('committed');
+    expect(await balances()).toEqual(before);
   });
 
   it('requires an authenticated cancel context even for the original count operator', async () => {
@@ -775,5 +971,91 @@ describe('inventory count recovery with real PostgreSQL', () => {
       ['inventory.read', 'inventory.count.create'],
     ]);
     expect(InventoryCountResult.parse(await work()).count.status).toBe('cancelled');
+  });
+  it('fences a first balance insert for a count whose restored scope has no balance row', async () => {
+    const source = await start();
+    await cancel(source.count);
+    const item = fixtureId(95);
+    await pg.query(
+      `INSERT INTO merchant.inventory_item(id,merchant_id,public_reference,display_name,item_type,base_unit,quantity_scale) VALUES($1,$2,$3,'Restored count item','ingredient','unit',0)`,
+      [item, MERCHANT, item],
+    );
+    const inserted = await pg.query<{ id: string }>(
+      `INSERT INTO merchant.inventory_count(merchant_id,location_id,inventory_location_id,public_reference,count_scope,status,blind,snapshot_ledger_sequence,snapshot_item_sequences,item_scope,operator_id,operator_session_id,device_id,administrative_command_id,command_id,command_fingerprint)
+      SELECT merchant_id,location_id,inventory_location_id,$2,'selected_items','counting',blind,0,jsonb_build_object($3::text,0),array[$3::uuid],operator_id,operator_session_id,device_id,administrative_command_id,$4,command_fingerprint FROM merchant.inventory_count WHERE id=$1 RETURNING id`,
+      [source.count.id, `IC-NOBALANCE-${RUN}`, item, randomUUID()],
+    );
+    const restored = {
+      ...source.count,
+      id: inserted.rows[0].id,
+      status: 'counting' as const,
+      version: 1,
+      snapshotLedgerSequence: 0,
+    };
+    let release!: () => void, ready!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    const writer = pg.runWithMerchant(
+      MERCHANT,
+      USER,
+      async (client) => {
+        await client.query(
+          `SELECT merchant.append_stock_ledger($1::uuid,$2::uuid,$3::uuid,$4::uuid,'opening_balance',1,$5::uuid,$5::uuid,repeat('f',64),'count_restore',$4::uuid,$6::uuid,null,null,current_date,'first-balance-count')`,
+          [MERCHANT, LOCATION, STOCK_ROOM, item, randomUUID(), USER],
+        );
+        ready();
+        await gate;
+      },
+      LOCATION,
+    );
+    await started;
+    const input = {
+      ...params,
+      countId: restored.id,
+      attempt: 1,
+      snapshotLedgerSequence: 0,
+      lines: [{ inventoryItemId: item, counted: { value: 0, scale: 0, unit: 'unit' }, note: null }],
+    };
+    let settled = false;
+    const submitRestored = () => send('inventory.count.submit', restored.id, input);
+    const pending = submitRestored()
+      .then(
+        () => ({ error: null }),
+        (error) => ({ error }),
+      )
+      .finally(() => {
+        settled = true;
+      });
+    try {
+      for (let i = 0; i < 100 && !settled; i++) {
+        const waiting = await pg.query<{ waiting: boolean }>(
+          `SELECT exists(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND cardinality(pg_blocking_pids(pid))>0) AS waiting`,
+        );
+        if (waiting.rows[0].waiting) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    } finally {
+      release();
+    }
+    await writer;
+    expect((await pending).error).toMatchObject({
+      response: { code: 'INVENTORY_COUNT_BUSY', retryable: true },
+    });
+    await expect(submitRestored()).rejects.toMatchObject({
+      response: { code: 'STALE_INVENTORY_COUNT' },
+    });
+    expect(
+      (
+        await pg.query<{ quantity: string }>(
+          `SELECT on_hand::text AS quantity FROM merchant.stock_balance WHERE inventory_item_id=$1 AND inventory_location_id=$2`,
+          [item, STOCK_ROOM],
+        )
+      ).rows[0].quantity,
+    ).toBe('1');
+    await cancel(restored);
   });
 });

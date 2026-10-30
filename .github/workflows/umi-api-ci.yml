@@ -239,6 +239,9 @@ jobs:
             psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" "${psql_flags[@]}" -f "$f"
           done
 
+      - name: Apply count recovery policies
+        run: psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f supabase/migrations/20261030000000_inventory_count_recovery.sql
+
       - name: Schema instruments (preflight · check-values · parity · carry · stamps · seals · logout · login · creds)
         working-directory: apps/umi-api
         env:
@@ -333,6 +336,10 @@ jobs:
             psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" "${psql_flags[@]}" -f "$f"
             psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" "${psql_flags[@]}" -f "$f"
           done
+
+          # Count recovery replaces the inventory count policy after the base RLS pass.
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f supabase/migrations/20261030000000_inventory_count_recovery.sql
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f supabase/migrations/20261030000000_inventory_count_recovery.sql
 
           # A guarded re-apply REPLACES every policy and LOSES none.
           #

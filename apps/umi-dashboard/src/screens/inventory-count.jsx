@@ -519,7 +519,11 @@ export default function InventoryCount({ locationId, onClose, onDone }) {
       onDone?.();
       onClose?.();
     } catch (cause) {
-      setError(cause?.message || t`No se pudo enviar el conteo.`);
+      setError(
+        cause?.code === 'INVENTORY_COUNT_BUSY'
+          ? t`El inventario está ocupado. Intenta enviar el conteo de nuevo.`
+          : cause?.message || t`No se pudo enviar el conteo.`,
+      );
     } finally {
       setBusy(false);
     }

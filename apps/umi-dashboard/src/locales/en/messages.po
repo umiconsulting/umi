@@ -9618,3 +9618,7 @@ msgstr "Confirm cancellation"
 #: src/screens/inventory-count.jsx
 msgid "No se pudo cancelar el conteo."
 msgstr "The count could not be cancelled."
+
+#: src/screens/inventory-count.jsx
+msgid "El inventario está ocupado. Intenta enviar el conteo de nuevo."
+msgstr "Inventory is busy. Try to submit the count again."

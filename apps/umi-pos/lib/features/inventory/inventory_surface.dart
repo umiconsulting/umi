@@ -1097,6 +1097,10 @@ final class _InventorySurfaceState extends State<InventorySurface> {
   };
 
   String _error(String code) => switch (code) {
+    'INVENTORY_COUNT_BUSY' => _copy(
+      'El inventario está ocupado. Intenta enviar el conteo de nuevo.',
+      'Inventory is busy. Try to submit the count again.',
+    ),
     'APPROVAL_REQUIRED' => _copy(
       'Esta operación requiere una aprobación vinculada.',
       'This operation requires a bound approval.',

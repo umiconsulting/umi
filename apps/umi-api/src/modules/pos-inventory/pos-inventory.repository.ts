@@ -1232,26 +1232,34 @@ export class PosInventoryRepository {
     inventoryLocationId: string,
     itemIds: string[],
   ) {
-    // Match mutation order: item, advisory lock, then balance. Lock the full scope before any sequence read.
+    // NOWAIT avoids writer-order dependencies. Item UPDATE locks fence every ledger writer, including first inserts.
+    const busy = () => new ConflictException({ code: 'INVENTORY_COUNT_BUSY', retryable: true });
     const sorted = [...itemIds].sort();
-    await client.query(
-      `SELECT id FROM merchant.inventory_item WHERE merchant_id=$1::uuid
-      AND id=ANY($2::uuid[]) ORDER BY id FOR UPDATE`,
-      [merchantId, sorted],
-    );
-    for (const itemId of sorted) {
+    try {
       await client.query(
-        `SELECT pg_advisory_xact_lock(hashtextextended(
-        concat_ws(':',$1::text,$2::text,$3::text,$4::text),0))`,
-        [merchantId, locationId, inventoryLocationId, itemId],
+        `SELECT id FROM merchant.inventory_item WHERE merchant_id=$1::uuid
+          AND id=ANY($2::uuid[]) ORDER BY id FOR UPDATE NOWAIT`,
+        [merchantId, sorted],
       );
+      for (const itemId of sorted) {
+        const lock = await client.query<{ locked: boolean }>(
+          `SELECT pg_try_advisory_xact_lock(hashtextextended(
+            concat_ws(':',$1::text,$2::text,$3::text,$4::text),0)) AS locked`,
+          [merchantId, locationId, inventoryLocationId, itemId],
+        );
+        if (lock.rows[0]?.locked !== true) throw busy();
+      }
+      await client.query(
+        `SELECT inventory_item_id FROM merchant.stock_balance
+          WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND inventory_location_id=$3::uuid
+            AND inventory_item_id=ANY($4::uuid[]) ORDER BY inventory_item_id`,
+        [merchantId, locationId, inventoryLocationId, sorted],
+      );
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '55P03')
+        throw busy();
+      throw error;
     }
-    await client.query(
-      `SELECT inventory_item_id FROM merchant.stock_balance
-      WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND inventory_location_id=$3::uuid
-        AND inventory_item_id=ANY($4::uuid[]) ORDER BY inventory_item_id`,
-      [merchantId, locationId, inventoryLocationId, sorted],
-    );
   }
 
   async submitCount(
