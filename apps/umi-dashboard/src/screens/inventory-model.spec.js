@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  adjustmentBalance,
+  adjustmentDelta,
   activeConversionFor,
   conversionDivides,
   conversionRatio,
@@ -403,5 +405,99 @@ describe('the urgency order', () => {
     ];
     const sorted = sortByUrgency(items, 'loc1', COSTED(['a', 'b']));
     expect(sorted.map((row) => row.id)).toEqual(['c', 'a', 'b']);
+  });
+});
+
+describe('ajuste con cantidades internas y lectura actual', () => {
+  const overview = {
+    items: [{ id: 'item', scale: 2, baseUnit: 'kilogram' }],
+    locations: [{ id: 'store', locationId: 'local', active: true }],
+    balances: [{ inventoryItemId: 'item', inventoryLocationId: 'store', onHand: 250, version: 7 }],
+  };
+
+  it('lee la cantidad y la versión del overview actual', () => {
+    expect(adjustmentBalance(overview, 'item', 'local')).toEqual({
+      inventoryLocationId: 'store',
+      value: 250,
+      text: '2.5',
+      scale: 2,
+      unit: 'kilogram',
+      version: 7,
+    });
+  });
+
+  it.each([
+    ['3.25', 'increase', 75],
+    ['1.25', 'decrease', 125],
+    ['0', 'decrease', 250],
+    ['3,25', 'increase', 75],
+    ['2.50', 'increase', 0],
+  ])('calcula %s sin mezclar unidades', (text, direction, value) => {
+    expect(adjustmentDelta(text, adjustmentBalance(overview, 'item', 'local'))).toEqual({
+      direction,
+      quantity: { value, scale: 2, unit: 'kilogram' },
+      expectedVersion: 7,
+    });
+  });
+
+  it.each(['', '-1', '3.251', '90071992547409.92', '1e2', 'NaN', '3,2.5'])(
+    'rechaza la cantidad inválida %s',
+    (text) => {
+      expect(adjustmentDelta(text, adjustmentBalance(overview, 'item', 'local'))).toBeNull();
+    },
+  );
+
+  it('conserva cada entero cerca del límite seguro', () => {
+    expect(
+      adjustmentDelta('90071992547409.91', adjustmentBalance(overview, 'item', 'local')),
+    ).toMatchObject({ quantity: { value: 9007199254740741 } });
+  });
+
+  it('rechaza una diferencia fuera del rango seguro', () => {
+    const balance = { value: -1, scale: 0, unit: 'unit', version: 2 };
+    expect(adjustmentDelta('9007199254740991', balance)).toBeNull();
+  });
+
+  it('conserva la ausencia de una lectura hasta que llega el overview', () => {
+    expect(adjustmentBalance(null, 'item', 'local')).toBeNull();
+    expect(adjustmentDelta('1', null)).toBeNull();
+  });
+
+  it('inicia en cero un artículo sin balance en esta ubicación', () => {
+    expect(adjustmentBalance({ ...overview, balances: [] }, 'item', 'local')).toEqual({
+      inventoryLocationId: 'store',
+      value: 0,
+      text: '0',
+      scale: 2,
+      unit: 'kilogram',
+      version: 1,
+    });
+  });
+
+  it('usa el almacén que el servidor leyó sin sumar otras áreas', () => {
+    expect(
+      adjustmentBalance(
+        {
+          ...overview,
+          locations: [...overview.locations, { id: 'other', locationId: 'local', active: true }],
+        },
+        'item',
+        'local',
+      ),
+    ).toMatchObject({ inventoryLocationId: 'store', value: 250, version: 7 });
+  });
+
+  it('no elige un almacén ambiguo cuando falta el balance', () => {
+    expect(
+      adjustmentBalance(
+        {
+          ...overview,
+          balances: [],
+          locations: [...overview.locations, { id: 'other', locationId: 'local', active: true }],
+        },
+        'item',
+        'local',
+      ),
+    ).toBeNull();
   });
 });

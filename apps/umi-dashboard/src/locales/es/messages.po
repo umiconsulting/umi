@@ -3884,6 +3884,10 @@ msgstr "PIN del aprobador, si la política lo pide"
 msgid "PIN del aprobador"
 msgstr "PIN del aprobador"
 
+#: src/screens/inventory-adjust.jsx
+msgid "Guardar ajuste"
+msgstr "Guardar ajuste"
+
 #: src/screens/inventory-copy.js
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
@@ -8244,7 +8248,7 @@ msgstr "Quitar el componente {0}"
 msgid "Elige un artículo de tu inventario."
 msgstr "Elige un artículo de tu inventario."
 
-#. placeholder {0}: item.quantityScale > 0 ? ` (${item.quantityScale} decimales).` : ' (sin decimales).'
+#. placeholder {0}: scale > 0 ? ` (${scale} decimales).` : ' (sin decimales).'
 #: src/screens/recipe-workspace.jsx
 msgid "La cantidad no cabe en la escala del artículo{0}"
 msgstr "La cantidad no cabe en la escala del artículo{0}"

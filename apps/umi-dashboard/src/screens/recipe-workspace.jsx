@@ -17,6 +17,7 @@ import { formatMoney, formatNumber } from '@/lib/format.js';
 import { formatScaled } from './inventory-model.js';
 import {
   recipeCostPreview,
+  recipeComponentFromDraft,
   recipeToDraft,
   scaledQuantityText,
   subRecipeCostByItemId,
@@ -569,8 +570,8 @@ function RecipeEditor({
   );
   const [lines, setLines] = useState(() =>
     draft.components.map((component, index) => ({
+      ...component,
       key: component.key || `line-${index}`,
-      inventoryItemId: component.inventoryItemId,
       quantityText: component.quantity
         ? formatScaled(component.quantity.value, component.quantity.scale)
         : '',
@@ -638,15 +639,8 @@ function RecipeEditor({
 
   const previewLines = lines.map((line) => {
     const item = itemsById.get(line.inventoryItemId) || null;
-    const scaled = item ? scaledQuantityText(line.quantityText, item.quantityScale) : null;
-    return {
-      inventoryItemId: line.inventoryItemId,
-      item,
-      quantity:
-        item && scaled !== null
-          ? { value: Number(scaled), scale: item.quantityScale, unit: item.baseUnit }
-          : null,
-    };
+    const component = recipeComponentFromDraft(line, item);
+    return { ...component, item, quantity: component?.quantity ?? null };
   });
 
   const preview = recipeCostPreview({
@@ -703,16 +697,9 @@ function RecipeEditor({
   }
 
   async function save() {
-    const components = previewLines
-      .filter((line) => line.quantity !== null)
-      .map((line) => ({
-        inventoryItemId: line.inventoryItemId,
-        quantity: line.quantity,
-        conversionNumerator: 1,
-        conversionDenominator: 1,
-        roundingPolicy: 'exact',
-        required: true,
-      }));
+    const components = lines
+      .map((line) => recipeComponentFromDraft(line, itemsById.get(line.inventoryItemId)))
+      .filter(Boolean);
     const parameters = {
       yieldQuantity: draftYield,
       ...(shelfLifeDays === '' ? {} : { shelfLifeDays: Number(shelfLifeDays.trim()) }),
@@ -981,9 +968,8 @@ function RecipeEditor({
             <div style={{ display: 'grid' }}>
               {lines.map((line, index) => {
                 const item = itemsById.get(line.inventoryItemId) || null;
-                const scaled = item
-                  ? scaledQuantityText(line.quantityText, item.quantityScale)
-                  : null;
+                const component = recipeComponentFromDraft(line, item);
+                const scale = line.quantity?.scale ?? item?.quantityScale;
                 const basis = item ? costBasisById.get(item.id) : null;
                 const hint = item ? subRecipeHint(item.id, recipes) : null;
                 return (
@@ -1004,7 +990,14 @@ function RecipeEditor({
                         <Select
                           value={line.inventoryItemId}
                           onChange={(event) =>
-                            updateLine(line.key, { inventoryItemId: event.target.value })
+                            updateLine(line.key, {
+                              inventoryItemId: event.target.value,
+                              quantity: null,
+                              conversionNumerator: 1,
+                              conversionDenominator: 1,
+                              roundingPolicy: 'exact',
+                              required: true,
+                            })
                           }
                         >
                           <option value="">{t`Elige un artículo`}</option>
@@ -1031,7 +1024,7 @@ function RecipeEditor({
                         />
                       </label>
                       <span className="muted" style={{ fontSize: 12, paddingBottom: 10 }}>
-                        {item ? unitOf(item.baseUnit) : '·'}
+                        {item ? unitOf(line.quantity?.unit ?? item.baseUnit) : '·'}
                       </span>
                       <button
                         className="btn-icon"
@@ -1048,13 +1041,11 @@ function RecipeEditor({
                       </p>
                     ) : (
                       <>
-                        {scaled === null ? (
+                        {component === null ? (
                           <p style={{ margin: 0, fontSize: 11.5, color: 'var(--danger)' }}>
                             <Trans>
                               La cantidad no cabe en la escala del artículo
-                              {item.quantityScale > 0
-                                ? ` (${item.quantityScale} decimales).`
-                                : ' (sin decimales).'}
+                              {scale > 0 ? ` (${scale} decimales).` : ' (sin decimales).'}
                             </Trans>
                           </p>
                         ) : null}

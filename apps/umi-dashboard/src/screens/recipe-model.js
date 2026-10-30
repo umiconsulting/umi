@@ -339,3 +339,19 @@ export function recipeToDraft(recipe) {
     })),
   };
 }
+
+/** Conserva la unidad, la escala y la conversión de un componente existente. */
+export function recipeComponentFromDraft(line, item) {
+  if (!item) return null;
+  const scale = line.quantity?.scale ?? item.quantityScale;
+  const value = scaledQuantityText(line.quantityText, scale);
+  if (value === null) return null;
+  return {
+    inventoryItemId: line.inventoryItemId,
+    quantity: { value: Number(value), scale, unit: line.quantity?.unit ?? item.baseUnit },
+    conversionNumerator: line.conversionNumerator ?? 1,
+    conversionDenominator: line.conversionDenominator ?? 1,
+    roundingPolicy: line.roundingPolicy ?? 'exact',
+    required: line.required !== false,
+  };
+}

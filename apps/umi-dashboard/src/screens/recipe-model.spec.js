@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   componentBaseQuantity,
+  recipeComponentFromDraft,
   recipeCostPreview,
   recipeMargin,
   recipeToDraft,
@@ -330,4 +331,73 @@ describe('a stored recipe as an editor draft', () => {
       components: [],
     });
   });
+});
+
+describe('edición de componentes convertidos', () => {
+  const item = { id: 'flour', quantityScale: 0, baseUnit: 'gram' };
+  const component = {
+    id: 'line',
+    inventoryItemId: 'flour',
+    quantity: { value: 125, scale: 2, unit: 'kilogram' },
+    conversionNumerator: 1000,
+    conversionDenominator: 1,
+    roundingPolicy: 'exact',
+    required: false,
+  };
+
+  it('guarda sin cambios la cantidad física y la conversión de la receta', () => {
+    const [draft] = recipeToDraft({ components: [component] }).components;
+    const saved = recipeComponentFromDraft({ ...draft, quantityText: '1.25' }, item);
+    expect(saved).toEqual({
+      inventoryItemId: 'flour',
+      quantity: { value: 125, scale: 2, unit: 'kilogram' },
+      conversionNumerator: 1000,
+      conversionDenominator: 1,
+      roundingPolicy: 'exact',
+      required: false,
+    });
+    expect(componentBaseQuantity(saved, ONE_PORTION, 0)).toEqual({ state: 'exact', value: 1250n });
+  });
+
+  it('edita la cantidad en la unidad guardada', () => {
+    expect(recipeComponentFromDraft({ ...component, quantityText: '2.5' }, item)).toMatchObject({
+      quantity: { value: 250, scale: 2, unit: 'kilogram' },
+      conversionNumerator: 1000,
+    });
+  });
+
+  it('conserva un factor racional y una política de redondeo existentes', () => {
+    expect(
+      recipeComponentFromDraft(
+        {
+          ...component,
+          quantityText: '1',
+          conversionNumerator: 5,
+          conversionDenominator: 2,
+          roundingPolicy: 'ceil',
+        },
+        item,
+      ),
+    ).toMatchObject({ conversionNumerator: 5, conversionDenominator: 2, roundingPolicy: 'ceil' });
+  });
+
+  it('crea un componente nuevo en la unidad del artículo', () => {
+    expect(
+      recipeComponentFromDraft({ inventoryItemId: 'flour', quantityText: '250' }, item),
+    ).toEqual({
+      inventoryItemId: 'flour',
+      quantity: { value: 250, scale: 0, unit: 'gram' },
+      conversionNumerator: 1,
+      conversionDenominator: 1,
+      roundingPolicy: 'exact',
+      required: true,
+    });
+  });
+
+  it.each(['1.251', '0', '90071992547409.92'])(
+    'rechaza %s en la escala guardada',
+    (quantityText) => {
+      expect(recipeComponentFromDraft({ ...component, quantityText }, item)).toBeNull();
+    },
+  );
 });
