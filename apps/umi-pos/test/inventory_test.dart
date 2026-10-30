@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -55,6 +57,7 @@ class _InventoryFake implements InventoryRepository {
   final bool refuseCreateCount;
   final AppException? historyError;
   final AppException? overviewError;
+  Completer<InventoryHistoryResult>? historyResponse;
   InventoryAdjustment? adjustment;
   bool countCancelled = false;
   CancelInventoryCountRequest? cancelledCount;
@@ -215,6 +218,7 @@ class _InventoryFake implements InventoryRepository {
     InventoryQuery query,
   ) async {
     historyCalls += 1;
+    if (historyResponse != null) return historyResponse!.future;
     if (historyError != null) throw historyError!;
     if (!paginatedHistory) {
       return InventoryHistoryResult(
@@ -521,6 +525,38 @@ Widget _app(
 );
 
 void main() {
+  for (final paginated in [false, true]) {
+    test(
+      'An old history response cannot restore permission paginated=$paginated',
+      () async {
+        final fake = _InventoryFake(paginatedHistory: true);
+        final controller = InventoryController(fake);
+        if (paginated) await controller.load(scope);
+        fake.historyResponse = Completer<InventoryHistoryResult>();
+        final oldLoad = paginated
+            ? controller.loadMoreHistory(scope)
+            : controller.load(scope);
+        await Future<void>.delayed(Duration.zero);
+        await controller.load(
+          InventoryScope(
+            merchantId: scope.merchantId,
+            locationId: scope.locationId,
+            operatorSessionId: scope.operatorSessionId,
+          ),
+        );
+        fake.historyResponse!.complete(
+          InventoryHistoryResult(
+            entries: [_historyEntry(9)],
+            page: const {'hasMore': false},
+          ),
+        );
+        await oldLoad;
+        expect(controller.state.history, isNull);
+        expect(controller.state.overview?.items, isNotEmpty);
+        expect(controller.state.errorCode, isNull);
+      },
+    );
+  }
   testWidgets(
     'an authorized operator can cancel an active count before a fresh count',
     (tester) async {

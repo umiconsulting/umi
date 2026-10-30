@@ -65,8 +65,10 @@ final class InventoryController extends ChangeNotifier {
   final InventoryRepository _repository;
   InventoryUiState _state = const InventoryUiState();
   InventoryUiState get state => _state;
+  int _loadGeneration = 0;
 
   Future<void> load(InventoryScope scope) async {
+    final generation = ++_loadGeneration;
     _set(
       InventoryUiState(
         busy: true,
@@ -87,6 +89,7 @@ final class InventoryController extends ChangeNotifier {
         limit: 100,
       );
       final overview = await _loadCompleteOverview(scope, query);
+      if (generation != _loadGeneration) return;
       InventoryHistoryResult? history;
       String? historyError;
       if (scope.canReadHistory) {
@@ -96,6 +99,7 @@ final class InventoryController extends ChangeNotifier {
           historyError = error.code;
         }
       }
+      if (generation != _loadGeneration) return;
       final previousCount = _state.count;
       final terminalCount = const [
         'cancelled',
@@ -119,6 +123,7 @@ final class InventoryController extends ChangeNotifier {
         ),
       );
     } on AppException catch (error) {
+      if (generation != _loadGeneration) return;
       _set(
         InventoryUiState(
           overview: _state.overview,
@@ -217,6 +222,7 @@ final class InventoryController extends ChangeNotifier {
     final current = _state.history;
     final cursor = current?.page['nextCursor'] as String?;
     if (current == null || cursor == null || _state.busy) return;
+    final generation = _loadGeneration;
     _set(
       InventoryUiState(
         busy: true,
@@ -235,6 +241,7 @@ final class InventoryController extends ChangeNotifier {
           limit: 100,
         ),
       );
+      if (generation != _loadGeneration) return;
       _set(
         InventoryUiState(
           overview: _state.overview,
@@ -246,6 +253,7 @@ final class InventoryController extends ChangeNotifier {
         ),
       );
     } on AppException catch (error) {
+      if (generation != _loadGeneration) return;
       _set(
         InventoryUiState(
           overview: _state.overview,
