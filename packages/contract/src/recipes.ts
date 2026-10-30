@@ -466,7 +466,7 @@ export const InventoryRecipeTarget = z
     productActive: z.boolean(),
     variantId: Uuid.nullable(),
     variantName: z.string().min(1).max(240).nullable(),
-    priceMinor: MinorUnits,
+    priceMinor: MinorUnits.nullable(),
   })
   .strict();
 export type InventoryRecipeTarget = z.infer<typeof InventoryRecipeTarget>;
@@ -481,7 +481,7 @@ export const InventoryRecipeTargetList = z
 export type InventoryRecipeTargetList = z.infer<typeof InventoryRecipeTargetList>;
 
 /**
- * A new recipe, at version 1. The target is exactly one of a product, a variant or
+ * A new recipe uses the next version for its target. The target is a product, a variant or
  * an inventory item, which is the database's own check (plan D2). A component list
  * of fewer than one line would be a recipe that consumes nothing, so it is refused
  * here rather than discovered at checkout.

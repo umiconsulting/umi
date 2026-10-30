@@ -12,6 +12,7 @@ import {
   InventoryRecipeExplosion,
   InventoryRecipeList,
   InventoryRecipeQuery,
+  InventoryRecipeTargetList,
   InventoryUnitConversionList,
   LotRecall,
   PrepList,
@@ -1674,7 +1675,11 @@ describe('inventory authoring · items, conversions and allergens', () => {
     expect(
       await scoped(() => new PosCatalogRepository(pg).administrativeDetail(MERCHANT, productId)),
     ).toMatchObject({ inventoryMappingType: null });
-    const targets: Array<{ productId: string; variantId: string | null; priceMinor: number }> = [];
+    const targets: Array<{
+      productId: string;
+      variantId: string | null;
+      priceMinor: number | null;
+    }> = [];
     let cursor: string | undefined;
     do {
       const page = await scoped(() => authoring.recipeTargets(access, { limit: 2, cursor }));
@@ -1716,6 +1721,53 @@ describe('inventory authoring · items, conversions and allergens', () => {
       ),
     ).toMatchObject({ status: 400, code: 'VALIDATION_FAILED' });
   });
+
+  it.each([
+    { name: 'zero', base: '2500', delta: '-2500', expected: 0, expectedBase: 2500 },
+    {
+      name: 'MAX_SAFE',
+      base: '9007199254740990',
+      delta: '1',
+      expected: Number.MAX_SAFE_INTEGER,
+      expectedBase: 9007199254740990,
+    },
+    {
+      name: 'MAX_SAFE plus two',
+      base: '9007199254740991',
+      delta: '2',
+      expected: null,
+      expectedBase: 9007199254740991,
+    },
+    { name: 'negative sum', base: '2500', delta: '-3000', expected: null, expectedBase: 2500 },
+    { name: 'positive adjustment', base: '2500', delta: '500', expected: 3000, expectedBase: 2500 },
+    {
+      name: 'legacy bigint overflow',
+      base: '9223372036854775807',
+      delta: '9223372036854775807',
+      expected: null,
+      expectedBase: null,
+    },
+  ])(
+    'represents exact target prices for $name',
+    async ({ base, delta, expected, expectedBase }) => {
+      const productId = await newProduct();
+      const variantId = randomUUID();
+      await pg.query('UPDATE merchant.product SET price=$2::bigint WHERE id=$1', [productId, base]);
+      await pg.query(
+        `INSERT INTO merchant.product_variant(id,merchant_id,product_id,name,price_delta,active)
+      VALUES($1,$2,$3,'Precio límite',$4::bigint,true)`,
+        [variantId, MERCHANT, productId, delta],
+      );
+      const page = await scoped(() => authoring.recipeTargets(access, { limit: 100 }));
+      expect(
+        page.targets.find((row) => row.productId === productId && row.variantId === variantId),
+      ).toMatchObject({ productId, variantId, priceMinor: expected });
+      expect(
+        page.targets.find((row) => row.productId === productId && row.variantId === null),
+      ).toMatchObject({ productId, variantId: null, priceMinor: expectedBase });
+      expect(InventoryRecipeTargetList.safeParse(page).success).toBe(true);
+    },
+  );
 
   it('rolls back recipe writes for a foreign product or a variant of another product', async () => {
     const productId = await newProduct();

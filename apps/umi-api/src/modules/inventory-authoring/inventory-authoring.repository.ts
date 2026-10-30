@@ -725,7 +725,7 @@ export class InventoryAuthoringRepository {
                  '0'::text AS target_id
             FROM merchant.product p WHERE p.merchant_id=$1::uuid AND p.active
           UNION ALL
-          SELECT p.id,p.name,p.active,v.id,v.name,p.price+v.price_delta,v.id::text
+          SELECT p.id,p.name,p.active,v.id,v.name,p.price::numeric+v.price_delta::numeric,v.id::text
             FROM merchant.product p JOIN merchant.product_variant v
               ON v.merchant_id=p.merchant_id AND v.product_id=p.id AND v.active
            WHERE p.merchant_id=$1::uuid AND p.active
@@ -737,9 +737,16 @@ export class InventoryAuthoringRepository {
         [merchantId, cursor?.productId ?? null, cursor?.targetId ?? null, query.limit + 1],
       );
       return {
-        rows: result.rows
-          .slice(0, query.limit)
-          .map((row) => ({ ...row, priceMinor: Number(row.priceMinor) })),
+        rows: result.rows.slice(0, query.limit).map((row) => {
+          const exactPrice = BigInt(row.priceMinor);
+          return {
+            ...row,
+            priceMinor:
+              exactPrice >= 0n && exactPrice <= BigInt(Number.MAX_SAFE_INTEGER)
+                ? Number(exactPrice)
+                : null,
+          };
+        }),
         hasMore: result.rows.length > query.limit,
       };
     });

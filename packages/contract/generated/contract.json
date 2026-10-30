@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "4be86757d1e83bd08da3ae222d3c5b029fae5a151160822d775aac4539facebb",
+  "contentHash": "8b0590414aa86049aefcad7072510722fa2db7fb26d7932961ab3824c91b776d",
   "contractVersion": "2.48.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -52075,9 +52075,16 @@
       "additionalProperties": false,
       "properties": {
         "priceMinor": {
-          "maximum": 9007199254740991,
-          "minimum": -9007199254740991,
-          "type": "integer"
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "productActive": {
           "type": "boolean"
@@ -52175,9 +52182,16 @@
             "additionalProperties": false,
             "properties": {
               "priceMinor": {
-                "maximum": 9007199254740991,
-                "minimum": -9007199254740991,
-                "type": "integer"
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "productActive": {
                 "type": "boolean"

@@ -34,6 +34,8 @@ Una confirmación obsoleta devuelve conflicto y conserva todos los datos anterio
 Crear sobre una receta activa devuelve `INVENTORY_RECIPE_TARGET_INVALID`, con `details.reason=ACTIVE_RECIPE_EXISTS` y `details.recipeId`.
 El contrato agrega una consulta paginada `GET /api/merchants/:merchantId/recipe-targets` en el módulo existente.
 La consulta usa la autorización de lectura de recetas y el aislamiento por negocio.
+El precio del producto más el ajuste de variante se calcula de forma exacta.
+Si el resultado es negativo o supera el entero seguro, `priceMinor` es `null`; el selector conserva el producto sin calcular su margen.
 
 ## Límites
 

@@ -206,3 +206,23 @@ test('recipe target query and response describe base products and variants', asy
     }).success,
   );
 });
+
+test('recipe target prices retain unavailable prices as null and accept exact safe boundaries', async () => {
+  const { InventoryRecipeTarget } = await import('../dist/index.js');
+  const target = {
+    productId: uuid('3'),
+    productName: 'Café',
+    productActive: true,
+    variantId: uuid('4'),
+    variantName: 'Grande',
+  };
+  for (const priceMinor of [null, 0, Number.MAX_SAFE_INTEGER, 3000]) {
+    assert.ok(
+      InventoryRecipeTarget.safeParse({ ...target, priceMinor }).success,
+      `price ${priceMinor}`,
+    );
+  }
+  for (const priceMinor of [-500, Number.MAX_SAFE_INTEGER + 2]) {
+    assert.equal(InventoryRecipeTarget.safeParse({ ...target, priceMinor }).success, false);
+  }
+});
