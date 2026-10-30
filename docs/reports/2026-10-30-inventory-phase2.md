@@ -1,6 +1,6 @@
 # Inventory phase 2: recipe sales and confirmed return restock
 
-Date: 2026-10-30. All checks used a disposable local PostgreSQL database.
+Date: 2026-10-30. Backend integration checks used disposable local PostgreSQL databases.
 Phase 1 PR #232 merged externally. The phase 2 PR must stay open for approval.
 
 ## Result
@@ -61,7 +61,7 @@ The local verification playbook supplied the verification rules.
 
 The integration runner emits the existing Vite CJS API deprecation warning.
 Review fix I1 first failed with `NEGATIVE_STOCK_APPROVAL_REQUIRED`, then passed after the SQL proof binding changed.
-The controller owns the separate fresh-schema verification run.
+The separate schema suite passed 342 tests, with two existing skips, after the corrected migration was applied twice.
 
 Affected integration command, with the disposable database environment supplied separately:
 
@@ -81,10 +81,56 @@ CI applies the new migration before the schema suite and repeats it twice after 
 
 ## Limits
 
-These checks exercise real backend services and PostgreSQL. They do not prove native POS or dashboard interactions.
+The backend checks exercise real services and PostgreSQL. They do not prove native POS interactions.
+Dashboard interaction evidence is recorded below.
 Refund money compensation and physical restock are separate operations. Recipe components require explicit approved disposition.
 The reservation regression covers active, unexpired reservations. It does not cover recreation after release or expiry.
 The tests do not repair reservations that already contain duplicate historical mappings.
 The migration preserves the ledger's existing guards; this suite does not test every forged grant combination.
-The controller owns fresh-schema verification, complete build and unit gates, and final review.
-No production migration, deployment, push, merge, or notification occurred in this task.
+Final branch review is separate from these execution results.
+Production migration and merge require the normal PR approval.
+A hosted dashboard preview can use a shared API, so it does not prove this branch’s backend.
+
+## Dashboard acceptance
+
+Visible Chromium used a separate local dashboard on port 4033 and API on port 4032.
+Real controls covered a previously unmapped variant, recipe create/update, conflict cancellation and confirmation, and a price-only product edit.
+Persisted reads confirmed recipe version 2, the updated quantity, and a retained recipe mapping after the price edit.
+Retirement notice and cancellation worked. Desktop and mobile confirmation controls remained reachable without horizontal overflow.
+The form uses plain ingredient wording and preserves the draft when a mapping replacement is cancelled.
+
+Three committed browser regressions cover identical retry after an ambiguous failure, stale-version reload, and Spanish permission errors.
+They run the real UI and command hook with intercepted error responses.
+A separate real-API run discarded a successful HTTP 201 response, then retried through the UI.
+The retry sent the same command identity and body, recovered the same recipe ID, and left one active recipe.
+
+Local artifacts:
+
+- `/private/tmp/umi-inventory-phase2-task2-acceptance.json`.
+- `/private/tmp/umi-inventory-phase2-task2-fix1-regressions.json`.
+- `/private/tmp/umi-inventory-phase2-task2-conflict-mobile.png`.
+- `/private/tmp/umi-inventory-phase2-task2-response-loss.png`.
+- `/private/tmp/umi-inventory-phase2-browser.cjs`.
+
+Committed browser tests: `apps/umi-dashboard/e2e/recipe-sales-recovery.pw.js`.
+Full-page reload can discard the in-memory pending request. The shared command hook persists its identity only.
+This inherited cross-reload recovery limit remains; the editor prevents dismissal while a save outcome is uncertain.
+
+## Whole-branch checks
+
+- `PR_BASE_REF=origin/main pnpm check:pr`: passed. The lint baseline remains 68 warnings, with no new category.
+- Affected build, lint, and tests ran with `--concurrency=1`: eight tasks passed.
+- API unit tests: 2,118 passed, 29 existing skips. Dashboard: 427 passed. Contract: 102 passed.
+- API and contract type checks passed. Generated TypeScript and Dart checks passed after the contract change.
+- Full schema integration: 33 files passed, 342 tests passed, two existing skips.
+- SQL preflight: zero unresolved statements; 15 statements remain outside that instrument's coverage.
+- The migration passed repeated application on populated fixtures and on the separate schema target.
+
+The first schema run omitted the local administrative connection. Three unrelated reward/cash fixture checks failed.
+Adding `DATABASE_URL_ADMIN` to the external test runner corrected that environment issue; no product code changed.
+The final approval correction changes SQL and its integration regression. Focused, affected, and full schema checks passed afterward.
+Existing Vite CJS, bundle-size, and expected test-fixture diagnostics remain known output noise.
+
+The PR targets `main`. Phase 1 merged externally as `5ac984e5668970f3990b486f7bb690046c0b39a7`.
+That commit's tree matches this branch's original base, `d508bb1684b37f1de7730ac56e034380afafb03a`.
+Manual initial costs and the new-item negative-stock default are separate changes.
