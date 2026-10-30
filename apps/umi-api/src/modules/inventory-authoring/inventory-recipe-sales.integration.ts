@@ -837,4 +837,157 @@ describe('authored recipes through checkout and confirmed return restock', () =>
     ]);
     expect(await balance(f.itemId)).toEqual({ on_hand: 50, reserved: 0, available: 50 });
   });
+
+  it('uses current checkout approval after a tender changes without replacing reservation provenance', async () => {
+    const f = await fixture(100, 'manager_override');
+    const prepared = await prepare(f.productId);
+    const originalFingerprint = prepared.dto.totalsFingerprint!;
+    const originalApproval = await approve(
+      'inventory.negative_stock.override',
+      originalFingerprint,
+    );
+    const reservationCommand = randomUUID();
+    const authorization = await scoped(() =>
+      checkoutRepo.authorize(USER, SESSION, DEVICE, MERCHANT, LOCATION, OPERATOR),
+    );
+    if (!authorization) throw new Error('The till has no checkout authorization.');
+    const reservation = await scoped(() =>
+      pg.runWithMerchant(
+        MERCHANT,
+        USER,
+        async (client) => {
+          const cart = await checkoutRepo.lockCart(
+            client,
+            MERCHANT,
+            LOCATION,
+            OPERATOR,
+            prepared.cart.id,
+            prepared.cart.version,
+            authorization.operatorName,
+          );
+          if (!cart) throw new Error('The fixture cart cannot be locked.');
+          const consumed = await checkoutRepo.consumeApprovals(client, [originalApproval], {
+            sessionId: SESSION,
+            merchantId: MERCHANT,
+            locationId: LOCATION,
+            permissions: ['inventory.negative_stock.override'],
+            fingerprint: originalFingerprint,
+            commandId: reservationCommand,
+          });
+          expect(consumed.approved).toBe(true);
+          return checkoutRepo.reserve(
+            client,
+            cart,
+            cart.lines,
+            authorization,
+            reservationCommand,
+            randomUUID(),
+            originalFingerprint,
+            randomUUID(),
+            originalApproval,
+          );
+        },
+        LOCATION,
+      ),
+    );
+    expect(await balance(f.itemId)).toEqual({ on_hand: 100, reserved: 125, available: -25 });
+
+    const changedTender = {
+      ...prepared.dto,
+      tenderDrafts: prepared.dto.tenderDrafts.map((tender) => ({ ...tender, id: randomUUID() })),
+    };
+    const preview = await scoped(() =>
+      checkout.checkout(till, MERCHANT, {
+        ...changedTender,
+        commandId: randomUUID(),
+        idempotencyKey: randomUUID(),
+        totalsFingerprint: null,
+      }),
+    );
+    expect(preview.status).toBe('confirmation_required');
+    if (preview.status !== 'confirmation_required')
+      throw new Error('The changed tender has no confirmation.');
+    const currentFingerprint = preview.confirmation.fingerprint;
+    expect(currentFingerprint).not.toBe(originalFingerprint);
+    expect(preview.confirmation.cartVersion).toBe(prepared.cart.version);
+    const currentApproval = await approve('inventory.negative_stock.override', currentFingerprint);
+    const current = {
+      ...changedTender,
+      totalsFingerprint: currentFingerprint,
+      approvalIds: [currentApproval],
+      commandId: randomUUID(),
+      idempotencyKey: randomUUID(),
+    };
+    const completed = await sale(current);
+    expect(await commit(current)).toEqual(completed);
+    expect(await balance(f.itemId)).toEqual({ on_hand: -25, reserved: 0, available: -25 });
+    expect(
+      (
+        await pg.query(
+          `SELECT command_id::text,command_fingerprint,status
+      FROM merchant.inventory_reservation WHERE id=$1`,
+          [reservation.id],
+        )
+      ).rows,
+    ).toEqual([
+      {
+        command_id: reservationCommand,
+        command_fingerprint: originalFingerprint,
+        status: 'committed',
+      },
+    ]);
+    expect(
+      (
+        await pg.query(
+          `SELECT mapping_id::text,recipe_id::text,recipe_version,required_quantity::integer
+      FROM merchant.inventory_reservation_line WHERE reservation_id=$1`,
+          [reservation.id],
+        )
+      ).rows,
+    ).toEqual([
+      {
+        mapping_id: f.mapping.id,
+        recipe_id: f.recipeId,
+        recipe_version: 1,
+        required_quantity: 125,
+      },
+    ]);
+    expect((await ledger(f.itemId, 'reservation_created')).map((row) => row.quantity)).toEqual([
+      125,
+    ]);
+    expect(await ledger(f.itemId, 'sale_committed')).toEqual([
+      expect.objectContaining({
+        quantity: 125,
+        public_data: {
+          mappingId: f.mapping.id,
+          mappingVersion: 1,
+          recipeId: f.recipeId,
+          recipeVersion: 1,
+          negativeStockApprovalId: currentApproval,
+        },
+      }),
+    ]);
+    expect(
+      (
+        await pg.query(
+          `SELECT command_id::text,command_fingerprint
+      FROM merchant.stock_ledger_entry WHERE inventory_item_id=$1 AND entry_type='sale_committed'`,
+          [f.itemId],
+        )
+      ).rows,
+    ).toEqual([
+      {
+        command_id: current.commandId,
+        command_fingerprint: currentFingerprint,
+      },
+    ]);
+    expect(
+      (
+        await pg.query(
+          `SELECT consumed_by_command_id::text FROM runtime.elevation_grant WHERE id=$1`,
+          [currentApproval],
+        )
+      ).rows,
+    ).toEqual([{ consumed_by_command_id: current.commandId }]);
+  });
 });
