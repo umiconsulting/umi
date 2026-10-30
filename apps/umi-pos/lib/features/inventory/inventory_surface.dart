@@ -24,6 +24,7 @@ Future<void> showInventoryCenter(
     merchantId: merchant.id,
     locationId: location.id,
     operatorSessionId: operator.id,
+    canReadHistory: OperatorPermissions(operator.permissions).allows('inventory.history.read'),
   );
   await Navigator.of(context).push<void>(
     PosPageRoute(
@@ -136,8 +137,10 @@ final class _InventorySurfaceState extends State<InventorySurface> {
   Widget build(BuildContext context) {
     final state = widget.controller.state;
     final overview = state.overview;
-    final historyCount = state.history?.entries.length ?? 0;
-    final hasMoreHistory = state.history?.page['hasMore'] == true;
+    final canReadHistory = widget.scope.canReadHistory &&
+        widget.permissions.allows('inventory.history.read');
+    final historyCount = canReadHistory ? state.history?.entries.length ?? 0 : 0;
+    final hasMoreHistory = canReadHistory && state.history?.page['hasMore'] == true;
     final blindCountActive =
         state.count?.count['status'] == 'counting' &&
         state.count?.count['blind'] == true;
@@ -277,7 +280,7 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                             itemCount:
                                 overview.items.length +
                                 historyCount +
-                                1 +
+                                (canReadHistory ? 1 : 0) +
                                 (hasMoreHistory ? 1 : 0),
                             itemBuilder: (context, index) {
                               if (index < overview.items.length) {

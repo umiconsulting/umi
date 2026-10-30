@@ -11,10 +11,12 @@ final class InventoryScope {
     required this.merchantId,
     required this.locationId,
     required this.operatorSessionId,
+    this.canReadHistory = false,
   });
   final String merchantId;
   final String locationId;
   final String operatorSessionId;
+  final bool canReadHistory;
 }
 
 typedef InventoryCommandSeed = ({
@@ -69,7 +71,7 @@ final class InventoryController extends ChangeNotifier {
       InventoryUiState(
         busy: true,
         overview: _state.overview,
-        history: _state.history,
+        history: scope.canReadHistory ? _state.history : null,
         count: _state.count,
         pendingReconciliation: _state.pendingReconciliation,
         pendingOperation: _state.pendingOperation,
@@ -84,17 +86,27 @@ final class InventoryController extends ChangeNotifier {
         operatorSessionId: scope.operatorSessionId,
         limit: 100,
       );
-      final results = await Future.wait([
-        _loadCompleteOverview(scope, query),
-        _repository.history(scope.merchantId, query),
-      ]);
-      final overview = results[0] as InventoryOverview;
+      final overview = await _loadCompleteOverview(scope, query);
+      InventoryHistoryResult? history;
+      String? historyError;
+      if (scope.canReadHistory) {
+        try {
+          history = await _repository.history(scope.merchantId, query);
+        } on AppException catch (error) {
+          historyError = error.code;
+        }
+      }
+      final previousCount = _state.count;
+      final terminalCount = const ['cancelled', 'committed'].contains(
+        previousCount?.count['status'],
+      );
       _set(
         InventoryUiState(
           overview: overview,
-          history: results[1] as InventoryHistoryResult,
+          history: history,
+          errorCode: historyError,
           count:
-              _state.count ??
+              (terminalCount ? null : previousCount) ??
               (overview.activeCount == null
                   ? null
                   : InventoryCountResult.fromJson(overview.activeCount!)),
@@ -109,7 +121,7 @@ final class InventoryController extends ChangeNotifier {
       _set(
         InventoryUiState(
           overview: _state.overview,
-          history: _state.history,
+          history: scope.canReadHistory ? _state.history : null,
           count: _state.count,
           pendingReconciliation: _state.pendingReconciliation,
           pendingOperation: _state.pendingOperation,
@@ -200,6 +212,7 @@ final class InventoryController extends ChangeNotifier {
   }
 
   Future<void> loadMoreHistory(InventoryScope scope) async {
+    if (!scope.canReadHistory) return;
     final current = _state.history;
     final cursor = current?.page['nextCursor'] as String?;
     if (current == null || cursor == null || _state.busy) return;

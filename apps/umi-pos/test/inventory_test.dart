@@ -17,6 +17,7 @@ const scope = InventoryScope(
   merchantId: '00000000-0000-4000-8000-000000000001',
   locationId: '00000000-0000-4000-8000-000000000002',
   operatorSessionId: '00000000-0000-4000-8000-000000000003',
+  canReadHistory: true,
 );
 
 class _InventoryFake implements InventoryRepository {
@@ -31,6 +32,8 @@ class _InventoryFake implements InventoryRepository {
     this.withOutsideCountItems = false,
     this.refuseRestockOnce = false,
     this.refuseCreateCount = false,
+    this.historyError,
+    this.overviewError,
   });
 
   final bool withRestock;
@@ -50,6 +53,8 @@ class _InventoryFake implements InventoryRepository {
   /// Refuses the count the way the contract does when the body does not match
   /// it: 400 `VALIDATION_FAILED`, not recoverable, nothing to retry blindly.
   final bool refuseCreateCount;
+  final AppException? historyError;
+  final AppException? overviewError;
   InventoryAdjustment? adjustment;
   CreateInventoryCountRequest? createdCount;
   SubmitInventoryCountRequest? submittedCount;
@@ -79,7 +84,7 @@ class _InventoryFake implements InventoryRepository {
   Future<InventoryOverview> overview(
     String merchantId,
     InventoryQuery query,
-  ) async => InventoryOverview(
+  ) async => overviewError != null ? throw overviewError! : InventoryOverview(
     policy: {
       'version': 'pilot-3e',
       'fingerprint': List.filled(64, 'a').join(),
@@ -200,6 +205,7 @@ class _InventoryFake implements InventoryRepository {
     InventoryQuery query,
   ) async {
     historyCalls += 1;
+    if (historyError != null) throw historyError!;
     if (!paginatedHistory) {
       return InventoryHistoryResult(
         entries: const [],
@@ -470,12 +476,65 @@ Widget _app(
   ],
   home: InventorySurface(
     controller: InventoryController(fake ?? _InventoryFake()),
-    scope: scope,
+    scope: InventoryScope(
+      merchantId: scope.merchantId,
+      locationId: scope.locationId,
+      operatorSessionId: scope.operatorSessionId,
+      canReadHistory: OperatorPermissions(permissions).allows('inventory.history.read'),
+    ),
     permissions: OperatorPermissions(permissions),
   ),
 );
 
 void main() {
+  testWidgets('Inventory read does not request restricted history', (tester) async {
+    final fake = _InventoryFake(historyError: const AppException(
+      code: 'PERMISSION_DENIED', category: AppErrorCategory.permission, recoverable: false,
+    ));
+    await tester.pumpWidget(_app(const ['inventory.read'], fake: fake));
+    await tester.pumpAndSettle();
+    expect(find.text('Café en grano'), findsOneWidget);
+    expect(find.text('Historial inmutable'), findsNothing);
+    expect(fake.historyCalls, 0);
+  });
+
+  test('History failure preserves inventory and exposes the error', () async {
+    final fake = _InventoryFake(historyError: const AppException(
+      code: 'NETWORK_UNAVAILABLE', category: AppErrorCategory.transport, recoverable: true,
+    ));
+    final controller = InventoryController(fake);
+    await controller.load(scope);
+    expect(controller.state.overview?.items, isNotEmpty);
+    expect(controller.state.history, isNull);
+    expect(controller.state.errorCode, 'NETWORK_UNAVAILABLE');
+  });
+
+  test('Overview failure remains a visible read error', () async {
+    final controller = InventoryController(_InventoryFake(overviewError: const AppException(
+      code: 'PERMISSION_REVOKED', category: AppErrorCategory.permission, recoverable: false,
+    )));
+    await controller.load(scope);
+    expect(controller.state.overview, isNull);
+    expect(controller.state.errorCode, 'PERMISSION_REVOKED');
+  });
+
+  test('History is cleared when its permission is absent on refresh', () async {
+    final fake = _InventoryFake(paginatedHistory: true);
+    final controller = InventoryController(fake);
+    await controller.load(scope);
+    expect(controller.state.history?.entries, isNotEmpty);
+    final readOnlyScope = InventoryScope(
+      merchantId: scope.merchantId,
+      locationId: scope.locationId,
+      operatorSessionId: scope.operatorSessionId,
+    );
+    await controller.load(readOnlyScope);
+    await controller.loadMoreHistory(readOnlyScope);
+    expect(controller.state.overview?.items, isNotEmpty);
+    expect(controller.state.history, isNull);
+    expect(fake.historyCalls, 1);
+  });
+
   testWidgets('blind count requests only active items in its own warehouse', (
     tester,
   ) async {
