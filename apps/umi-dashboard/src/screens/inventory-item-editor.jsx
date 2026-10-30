@@ -9,6 +9,7 @@ import {
   ITEM_ERROR_COPY,
   ITEM_TYPE_LABEL,
   ITEM_TYPE_ORDER,
+  NEGATIVE_HINT,
   NEGATIVE_LABEL,
   NEGATIVE_ORDER,
   ROUNDING_LABEL,
@@ -28,6 +29,7 @@ import {
 import {
   initialCostDraft,
   initialCostParameters,
+  itemNegativeStockPolicy,
   itemQuantityDraft,
   itemQuantityParameters,
 } from './inventory-item-editor-model.js';
@@ -559,8 +561,8 @@ export function ItemEditor({
   const [baseUnit, setBaseUnit] = useState(item?.baseUnit || 'unit');
   const [quantityScale, setQuantityScale] = useState(String(item?.quantityScale ?? 0));
   const [trackingPolicy, setTrackingPolicy] = useState(item?.trackingPolicy || 'tracked');
-  const [negativeStockPolicy, setNegativeStockPolicy] = useState(
-    item?.negativeStockPolicy || 'block',
+  const [negativeStockPolicy, setNegativeStockPolicy] = useState(() =>
+    itemNegativeStockPolicy(item),
   );
   const [lowStockThreshold, setLowStockThreshold] = useState(
     () => itemQuantityDraft(item).lowStockThreshold,
@@ -760,6 +762,11 @@ export function ItemEditor({
                 </option>
               ))}
             </Select>
+            {NEGATIVE_HINT[negativeStockPolicy] && (
+              <span className="muted" style={{ fontSize: 11.5 }}>
+                {i18n._(NEGATIVE_HINT[negativeStockPolicy])}
+              </span>
+            )}
           </label>
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
             <Trans>Cantidad mínima</Trans>

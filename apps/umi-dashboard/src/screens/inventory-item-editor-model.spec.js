@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  itemNegativeStockPolicy,
   itemQuantityDraft,
   itemQuantityParameters,
   parseInitialCost,
@@ -96,5 +97,23 @@ describe('initial cost in exact centavos', () => {
       initialUnitCostMinor: 12000,
     });
     expect(initialCostParameters('1.001', { initialUnitCostMinor: 10025 })).toBeNull();
+  });
+});
+
+describe('negative stock policy when the editor opens', () => {
+  it('starts only a new item with permission for a negative balance', () => {
+    expect(itemNegativeStockPolicy(null)).toBe('allow_and_flag');
+    expect(itemNegativeStockPolicy(undefined)).toBe('allow_and_flag');
+  });
+
+  it.each(['block', 'manager_override', 'allow_and_flag', 'backorder', 'not_applicable'])(
+    'preserves an existing explicit %s policy on unrelated edits',
+    (negativeStockPolicy) => {
+      expect(itemNegativeStockPolicy({ negativeStockPolicy })).toBe(negativeStockPolicy);
+    },
+  );
+
+  it('keeps the previous fallback for an existing item without a saved policy', () => {
+    expect(itemNegativeStockPolicy({})).toBe('block');
   });
 });
