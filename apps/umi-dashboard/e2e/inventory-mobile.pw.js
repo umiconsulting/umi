@@ -10,6 +10,7 @@ test('inventory editor is reachable from mobile list and detail', async () => {
   const base = process.env.UMI_MOBILE_BASE || 'http://127.0.0.1:4063';
   const browser = await chromium.connectOverCDP(
     process.env.UMI_INVENTORY_CDP || 'http://127.0.0.1:9225',
+    { noDefaults: true },
   );
   const context = await browser.newContext({
     viewport: { width: 390, height: 800 },

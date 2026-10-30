@@ -10,6 +10,22 @@ export async function verifyInventoryMobile({ page, fixture, expect, evidenceDir
   const search = page.getByRole('textbox', { name: 'Buscar artículo', exact: true });
   const dialog = () => page.getByRole('dialog', { name: /^(Nuevo|Editar) artículo$/ });
   const results = [];
+  await createButton.click();
+  const nameField = dialog().getByLabel('Nombre', { exact: true });
+  await nameField.fill('Borrador');
+  for (const shortcut of ['Control+k', 'Meta+k']) {
+    await page.keyboard.press(shortcut);
+    await expect(page.getByRole('dialog', { name: 'Comandos', exact: true })).toHaveCount(0);
+    await expect(nameField).toBeFocused();
+  }
+  await page.keyboard.press('Escape');
+  await expect(dialog()).not.toBeVisible();
+  await page.keyboard.press('Control+k');
+  const palette = page.getByRole('dialog', { name: 'Comandos', exact: true });
+  await expect(palette).toBeVisible();
+  await palette.getByRole('textbox', { name: 'Escribe un comando o un artículo' }).fill('Contar');
+  await page.keyboard.press('Escape');
+  await expect(palette).not.toBeVisible();
   for (const width of [390, 320, 720, 1440, 390]) {
     await page.setViewportSize({ width, height: 800 });
     await createButton.scrollIntoViewIfNeeded();

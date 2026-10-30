@@ -11,6 +11,7 @@ View filters keep their own horizontal scroll area.
 The detail panel used a portal outside the isolated main content. The editor stayed inside that content, behind the panel.
 The editor now uses a portal in the same document layer, above the detail panel.
 Cancel returns to the existing detail without a write.
+While the editor is open, Ctrl/Cmd+K preserves its focus. It does not open a command search behind the form.
 
 ## Evidence
 
@@ -24,6 +25,11 @@ Cancel returns to the existing detail without a write.
 - The dashboard baseline passed 452 tests before the correction.
 - The final dashboard suite passed all 452 tests. Build and lint passed with 68 existing warnings.
 - The committed Playwright test passed in 4.8 seconds. `check:pr` passed with no applied migration changes.
+- Review found the global command shortcut could focus a hidden search behind the editor portal.
+- The new browser assertion reproduced that failure before the shortcut guard was added.
+- After the guard, the complete browser test passed in 4.9 seconds. Both Ctrl+K and Cmd+K preserve editor focus.
+- The command search still opens after the editor closes. Escape closes the visible layer in one step.
+- The final affected build, lint, and 452 tests passed after this correction.
 
 The reusable test is `apps/umi-dashboard/e2e/inventory-mobile.pw.js`.
 It requires `UMI_MOBILE_FIXTURE`, a local owner fixture with existing inventory, and Chromium through CDP.

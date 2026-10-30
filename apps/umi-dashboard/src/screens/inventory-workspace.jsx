@@ -277,7 +277,7 @@ export default function InventoryWorkspace() {
         (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        setPaletteOpen(true);
+        if (!editor) setPaletteOpen(true);
         return;
       }
       /**
