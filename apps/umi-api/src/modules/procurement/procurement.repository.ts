@@ -181,9 +181,10 @@ function normalizeQuantity(
   } catch (error) {
     if (!(error instanceof RangeError)) throw error;
     throw new ConflictException({
-      code: error.message === 'INVENTORY_CONVERSION_NOT_EXACT'
-        ? 'INVENTORY_QUANTITY_NOT_EXACT'
-        : error.message,
+      code:
+        error.message === 'INVENTORY_CONVERSION_NOT_EXACT'
+          ? 'INVENTORY_QUANTITY_NOT_EXACT'
+          : error.message,
     });
   }
 }
