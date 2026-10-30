@@ -91,6 +91,7 @@ export const ADMINISTRATIVE_COMMAND_POLICIES: readonly AdministrativeCommandPoli
     true,
   ),
   policy('inventory.count.create', DASHBOARD_AND_POS, 'inventory.count.create'),
+  policy('inventory.count.cancel', DASHBOARD_AND_POS, 'inventory.count.create'),
   policy('inventory.count.submit', DASHBOARD_AND_POS, 'inventory.count.submit'),
   policy(
     'inventory.count.reconcile',

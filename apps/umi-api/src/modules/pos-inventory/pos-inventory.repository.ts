@@ -16,6 +16,7 @@ import type {
   SubmitInventoryCountRequest,
   WasteRecord,
   DamageRecord,
+  CancelInventoryCountRequest,
   CreateInventoryCountRequest,
 } from '@umi/contract';
 import type { z } from 'zod';
@@ -484,24 +485,10 @@ export class PosInventoryRepository {
           `SELECT id::text FROM merchant.inventory_count
             WHERE merchant_id=$1::uuid AND location_id=$2::uuid
               AND inventory_location_id=$3::uuid
-              AND (
-                operator_session_id=$4::uuid
-                OR (administrative_command_id IS NOT NULL AND EXISTS (
-                  SELECT 1 FROM merchant.administrative_command ac
-                   WHERE ac.id=inventory_count.administrative_command_id
-                     AND ac.actor_user_id=$5::uuid
-                ))
-              )
               AND status IN ('draft','counting','submitted','variance_calculated',
                 'reconciliation_required','approved')
             ORDER BY created_at DESC,id DESC LIMIT 1`,
-          [
-            merchantId,
-            query.locationId,
-            policy.inventoryLocationId,
-            query.operatorSessionId,
-            userId,
-          ],
+          [merchantId, query.locationId, query.inventoryLocationId ?? policy.inventoryLocationId],
         );
         const activeCount = activeCountRow.rows[0]
           ? await this.countResult(
@@ -1195,8 +1182,9 @@ export class PosInventoryRepository {
         blind: true,
         snapshotLedgerSequence: Number(rows[0].snapshot),
         attempt: 1,
+        version: 1,
         lines: [],
-        createdAt: rows[0].createdAt,
+        createdAt: new Date(rows[0].createdAt).toISOString(),
         submittedAt: null,
       },
       variances: [],
@@ -1204,6 +1192,66 @@ export class PosInventoryRepository {
       recovered: false,
       correlationId,
     };
+  }
+
+  async cancelCount(
+    client: PoolClient,
+    merchantId: string,
+    authorization: InventoryAuthorization,
+    dto: CancelInventoryCountRequest,
+    correlationId: string,
+  ): Promise<InventoryCountResult> {
+    await client.query(
+      `SELECT set_config('app.inventory_count_cancel_command_id',$1,true),
+      set_config('app.inventory_count_cancel_session_id',$2,true)`,
+      [authorization.administrativeCommandId ?? '', authorization.operatorSessionId ?? ''],
+    );
+    const cancelled = await client.query(
+      `UPDATE merchant.inventory_count SET status='cancelled',version=version+1
+        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+          AND inventory_location_id=$4::uuid AND version=$5 AND attempt=$6
+          AND status IN ('draft','counting','submitted','variance_calculated',
+            'reconciliation_required','approved') RETURNING id`,
+      [
+        dto.countId,
+        merchantId,
+        dto.locationId,
+        dto.inventoryLocationId,
+        dto.expectedVersion,
+        dto.attempt,
+      ],
+    );
+    if (cancelled.rowCount !== 1) throw new ConflictException({ code: 'STALE_INVENTORY_COUNT' });
+    return this.countResult(client, merchantId, dto.locationId, dto.countId, correlationId);
+  }
+
+  private async lockCountBalances(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    inventoryLocationId: string,
+    itemIds: string[],
+  ) {
+    // Match mutation order: item, advisory lock, then balance. Lock the full scope before any sequence read.
+    const sorted = [...itemIds].sort();
+    await client.query(
+      `SELECT id FROM merchant.inventory_item WHERE merchant_id=$1::uuid
+      AND id=ANY($2::uuid[]) ORDER BY id FOR UPDATE`,
+      [merchantId, sorted],
+    );
+    for (const itemId of sorted) {
+      await client.query(
+        `SELECT pg_advisory_xact_lock(hashtextextended(
+        concat_ws(':',$1::text,$2::text,$3::text,$4::text),0))`,
+        [merchantId, locationId, inventoryLocationId, itemId],
+      );
+    }
+    await client.query(
+      `SELECT inventory_item_id FROM merchant.stock_balance
+      WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND inventory_location_id=$3::uuid
+        AND inventory_item_id=ANY($4::uuid[]) ORDER BY inventory_item_id`,
+      [merchantId, locationId, inventoryLocationId, sorted],
+    );
   }
 
   async submitCount(
@@ -1227,9 +1275,17 @@ export class PosInventoryRepository {
               snapshot_item_sequences AS "snapshotItemSequences"
          FROM merchant.inventory_count
         WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+          AND inventory_location_id=$6::uuid
           AND status='counting' AND attempt=$4 AND snapshot_ledger_sequence=$5
         FOR UPDATE`,
-      [dto.countId, merchantId, dto.locationId, dto.attempt, dto.snapshotLedgerSequence],
+      [
+        dto.countId,
+        merchantId,
+        dto.locationId,
+        dto.attempt,
+        dto.snapshotLedgerSequence,
+        dto.inventoryLocationId,
+      ],
     );
     if (!count.rows[0]) throw new ConflictException({ code: 'STALE_INVENTORY_COUNT' });
     const submittedItems = [...new Set(dto.lines.map((line) => line.inventoryItemId))].sort();
@@ -1239,6 +1295,13 @@ export class PosInventoryRepository {
     ) {
       throw new ConflictException({ code: 'INVENTORY_COUNT_SCOPE_MISMATCH' });
     }
+    await this.lockCountBalances(
+      client,
+      merchantId,
+      dto.locationId,
+      count.rows[0].inventoryLocationId,
+      count.rows[0].itemScope,
+    );
     for (const line of dto.lines) {
       const countedQuantity = await this.normalizeQuantity(
         client,
@@ -1304,11 +1367,26 @@ export class PosInventoryRepository {
          JOIN merchant.inventory_policy p ON p.merchant_id=c.merchant_id
           AND p.location_id=c.location_id AND p.inventory_location_id=c.inventory_location_id
         WHERE c.id=$1::uuid AND c.merchant_id=$2::uuid AND c.location_id=$3::uuid
+          AND c.inventory_location_id=$6::uuid
           AND c.status='reconciliation_required' AND c.attempt=$4
           AND c.snapshot_ledger_sequence=$5 FOR UPDATE OF c`,
-      [dto.countId, merchantId, dto.locationId, dto.countAttempt, dto.snapshotLedgerSequence],
+      [
+        dto.countId,
+        merchantId,
+        dto.locationId,
+        dto.countAttempt,
+        dto.snapshotLedgerSequence,
+        dto.inventoryLocationId,
+      ],
     );
     if (!count.rows[0]) throw new ConflictException({ code: 'STALE_INVENTORY_COUNT' });
+    await this.lockCountBalances(
+      client,
+      merchantId,
+      dto.locationId,
+      count.rows[0].inventoryLocationId,
+      Object.keys(count.rows[0].snapshotItemSequences),
+    );
     const stale = await client.query<{ stale: boolean }>(
       `SELECT exists(
          SELECT 1 FROM jsonb_each_text($2::jsonb) snapshot(item_id,sequence)
@@ -1966,12 +2044,13 @@ export class PosInventoryRepository {
       blind: boolean;
       snapshot: string;
       attempt: number;
+      version: number;
       createdAt: string;
       submittedAt: string | null;
       tolerance: string;
     }>(
       `SELECT c.id::text,c.inventory_location_id::text AS "inventoryLocationId",c.status,
-              c.count_scope AS scope,c.blind,c.snapshot_ledger_sequence::text AS snapshot,c.attempt,
+              c.count_scope AS scope,c.blind,c.snapshot_ledger_sequence::text AS snapshot,c.attempt,c.version,
               c.created_at::text AS "createdAt",c.submitted_at::text AS "submittedAt",
               p.count_variance_tolerance::text AS tolerance
          FROM merchant.inventory_count c
@@ -2028,13 +2107,14 @@ export class PosInventoryRepository {
         blind: row.blind,
         snapshotLedgerSequence: Number(row.snapshot),
         attempt: row.attempt,
+        version: row.version,
         lines: lines.rows.map((line) => ({
           inventoryItemId: line.inventoryItemId,
           counted: { value: Number(line.counted), scale: line.scale, unit: line.unit as never },
           note: line.note,
         })),
-        createdAt: row.createdAt,
-        submittedAt: row.submittedAt,
+        createdAt: new Date(row.createdAt).toISOString(),
+        submittedAt: row.submittedAt ? new Date(row.submittedAt).toISOString() : null,
       },
       variances: lines.rows.map((line) => ({
         inventoryItemId: line.inventoryItemId,

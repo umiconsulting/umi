@@ -97,9 +97,10 @@ final class InventoryController extends ChangeNotifier {
         }
       }
       final previousCount = _state.count;
-      final terminalCount = const ['cancelled', 'committed'].contains(
-        previousCount?.count['status'],
-      );
+      final terminalCount = const [
+        'cancelled',
+        'committed',
+      ].contains(previousCount?.count['status']);
       _set(
         InventoryUiState(
           overview: overview,
@@ -507,6 +508,55 @@ final class InventoryController extends ChangeNotifier {
     }
   }
 
+  Future<void> cancelCount(InventoryScope scope) async {
+    final overview = _state.overview;
+    final current = _state.count;
+    if (overview == null || current == null) return;
+    final count = current.count;
+    final command = CancelInventoryCountRequest(
+      locationId: scope.locationId,
+      inventoryLocationId: count['inventoryLocationId']! as String,
+      operatorSessionId: scope.operatorSessionId,
+      commandId: _uuid(),
+      idempotencyKey: _uuid(),
+      expectedVersion: (count['version']! as num).toInt(),
+      policyFingerprint: overview.policy['fingerprint']! as String,
+      businessDate: _businessDate(),
+      countId: count['id']! as String,
+      attempt: (count['attempt']! as num).toInt(),
+    );
+    _set(
+      InventoryUiState(
+        busy: true,
+        overview: overview,
+        history: _state.history,
+        count: current,
+      ),
+    );
+    try {
+      await _repository.cancelCount(scope.merchantId, command);
+      _set(InventoryUiState(overview: overview, history: _state.history));
+      await load(scope);
+    } on AppException catch (error) {
+      final recovered = error.recoverable
+          ? await _recoverCount(scope, command.commandId)
+          : null;
+      if (recovered?.count['status'] == 'cancelled') {
+        _set(InventoryUiState(overview: overview, history: _state.history));
+        await load(scope);
+        return;
+      }
+      _set(
+        InventoryUiState(
+          overview: overview,
+          history: _state.history,
+          count: current,
+          errorCode: error.code,
+        ),
+      );
+    }
+  }
+
   Future<void> submitCount(
     InventoryScope scope,
     Map<String, int> quantities,
@@ -908,7 +958,9 @@ final class InventoryController extends ChangeNotifier {
       operatorSessionId: scope.operatorSessionId,
       commandId: _uuid(),
       idempotencyKey: _uuid(),
-      expectedVersion: balance == null ? 1 : (balance['version']! as num).toInt(),
+      expectedVersion: balance == null
+          ? 1
+          : (balance['version']! as num).toInt(),
       policyFingerprint: overview.policy['fingerprint']! as String,
       approvalId: approvalId,
       approvalFingerprint: approvalFingerprint,

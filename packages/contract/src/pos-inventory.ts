@@ -663,6 +663,7 @@ export const InventoryCount = z
     blind: z.boolean(),
     snapshotLedgerSequence: z.number().int().min(0),
     attempt: z.number().int().positive(),
+    version: z.number().int().positive(),
     lines: z.array(InventoryCountLine).max(1000),
     createdAt: IsoTimestamp,
     submittedAt: IsoTimestamp.nullable(),
@@ -673,6 +674,13 @@ export const CreateInventoryCountRequest = z
     ...commandShape,
     scope: z.enum(['full_location', 'selected_items', 'cycle_count']),
     itemIds: z.array(Uuid).max(1000).default([]),
+  })
+  .strict();
+export const CancelInventoryCountRequest = z
+  .object({
+    ...commandShape,
+    countId: Uuid,
+    attempt: z.number().int().positive(),
   })
   .strict();
 export const SubmitInventoryCountRequest = z
@@ -800,6 +808,7 @@ export type AvailabilityResult = z.infer<typeof AvailabilityResult>;
 export type InventoryHistoryResult = z.infer<typeof InventoryHistoryResult>;
 export type InventoryCountResult = z.infer<typeof InventoryCountResult>;
 export type CreateInventoryCountRequest = z.infer<typeof CreateInventoryCountRequest>;
+export type CancelInventoryCountRequest = z.infer<typeof CancelInventoryCountRequest>;
 export type SubmitInventoryCountRequest = z.infer<typeof SubmitInventoryCountRequest>;
 
 export const posInventoryModels = {
@@ -853,6 +862,7 @@ export const posInventoryModels = {
   InventoryCountLine,
   InventoryCount,
   CreateInventoryCountRequest,
+  CancelInventoryCountRequest,
   SubmitInventoryCountRequest,
   InventoryVariance,
   InventoryReconciliation,

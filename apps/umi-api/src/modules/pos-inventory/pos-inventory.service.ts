@@ -7,6 +7,7 @@ import {
 import { ProductionRecord, ProductionResult } from '@umi/contract';
 import type {
   AvailabilityQuery,
+  CancelInventoryCountRequest,
   CreateInventoryCountRequest,
   DamageRecord,
   InventoryAdjustment,
@@ -327,6 +328,52 @@ export class PosInventoryService {
     );
   }
 
+  async cancelCount(
+    user: AuthUser,
+    merchantId: string,
+    countId: string,
+    dto: CancelInventoryCountRequest,
+  ) {
+    this.assertCount(countId, dto.countId);
+    const authorization = await this.authorize(user, merchantId, dto, 'inventory.count.create');
+    return this.cancelCountAuthorized(merchantId, dto, authorization);
+  }
+
+  private cancelCountAuthorized(
+    merchantId: string,
+    dto: CancelInventoryCountRequest,
+    authorization: Exclude<Awaited<ReturnType<PosInventoryRepository['authorize']>>, null>,
+  ) {
+    return this.unwrap(
+      this.integrity.execute(
+        {
+          merchantId,
+          locationId: dto.locationId,
+          commandId: dto.commandId,
+          idempotencyKey: dto.idempotencyKey,
+          commandType: 'pos.inventory.count.cancel',
+          payload: dto,
+        },
+        async (context) => {
+          const result = await this.repo.cancelCount(
+            context.client,
+            merchantId,
+            authorization,
+            dto,
+            context.correlationId,
+          );
+          await context.appendAudit({
+            eventType: 'inventory.count_cancelled',
+            entityType: 'inventory_count',
+            entityId: dto.countId,
+            outcome: 'success',
+          });
+          return { ok: true, value: result };
+        },
+      ),
+    );
+  }
+
   async submitCount(
     user: AuthUser,
     merchantId: string,
@@ -499,6 +546,7 @@ export class PosInventoryService {
       | WasteRecord
       | DamageRecord
       | QuarantineRecord
+      | CancelInventoryCountRequest
       | CreateInventoryCountRequest
       | SubmitInventoryCountRequest
       | InventoryReconciliation
@@ -522,6 +570,13 @@ export class PosInventoryService {
       return this.createCountAuthorized(
         access.merchantId,
         dto as CreateInventoryCountRequest,
+        authorization,
+      );
+    }
+    if (operation === 'inventory.count.cancel') {
+      return this.cancelCountAuthorized(
+        access.merchantId,
+        dto as CancelInventoryCountRequest,
         authorization,
       );
     }
@@ -651,6 +706,7 @@ function inventoryPermission(
     | WasteRecord
     | DamageRecord
     | QuarantineRecord
+    | CancelInventoryCountRequest
     | CreateInventoryCountRequest
     | SubmitInventoryCountRequest
     | InventoryReconciliation
@@ -668,7 +724,8 @@ function inventoryPermission(
       ? 'inventory.quarantine.enter'
       : 'inventory.quarantine.release';
   }
-  if (operation === 'inventory.count.create') return 'inventory.count.create';
+  if (operation === 'inventory.count.create' || operation === 'inventory.count.cancel')
+    return 'inventory.count.create';
   if (operation === 'inventory.count.submit') return 'inventory.count.submit';
   if (operation === 'inventory.production.produce') return 'inventory.production.produce';
   return 'inventory.count.reconcile';

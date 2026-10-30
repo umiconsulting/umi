@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "95f2ac7fef8eef0abeab453e5f5f004477da0398685a2272fa8aadaa75f4cd12",
-  "contractVersion": "2.46.0",
+  "contentHash": "b5b57edfb1c039c736fd232886408173a2b9b9eb5f598744487b061cb0a1143e",
+  "contractVersion": "2.47.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -3807,6 +3807,88 @@
         "expectedShiftVersion",
         "expectedLedgerSequence",
         "reasonCode"
+      ],
+      "type": "object"
+    },
+    "CancelInventoryCountRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalFingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approvalId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "attempt": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "businessDate": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "countId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expectedVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "inventoryLocationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "policyFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "inventoryLocationId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "expectedVersion",
+        "policyFingerprint",
+        "businessDate",
+        "countId",
+        "attempt"
       ],
       "type": "object"
     },
@@ -30865,6 +30947,7 @@
             "inventory.damage",
             "inventory.quarantine",
             "inventory.count.create",
+            "inventory.count.cancel",
             "inventory.count.submit",
             "inventory.count.reconcile",
             "inventory.recovery",
@@ -30964,6 +31047,7 @@
         "inventory.damage",
         "inventory.quarantine",
         "inventory.count.create",
+        "inventory.count.cancel",
         "inventory.count.submit",
         "inventory.count.reconcile",
         "inventory.recovery",
@@ -46136,6 +46220,10 @@
               "type": "null"
             }
           ]
+        },
+        "version": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
         }
       },
       "required": [
@@ -46148,6 +46236,7 @@
         "blind",
         "snapshotLedgerSequence",
         "attempt",
+        "version",
         "lines",
         "createdAt",
         "submittedAt"
@@ -46351,6 +46440,10 @@
                   "type": "null"
                 }
               ]
+            },
+            "version": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
             }
           },
           "required": [
@@ -46363,6 +46456,7 @@
             "blind",
             "snapshotLedgerSequence",
             "attempt",
+            "version",
             "lines",
             "createdAt",
             "submittedAt"
@@ -48195,6 +48289,10 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "version": {
+                      "exclusiveMinimum": 0,
+                      "type": "integer"
                     }
                   },
                   "required": [
@@ -48207,6 +48305,7 @@
                     "blind",
                     "snapshotLedgerSequence",
                     "attempt",
+                    "version",
                     "lines",
                     "createdAt",
                     "submittedAt"
@@ -52820,6 +52919,10 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "version": {
+                          "exclusiveMinimum": 0,
+                          "type": "integer"
                         }
                       },
                       "required": [
@@ -52832,6 +52935,7 @@
                         "blind",
                         "snapshotLedgerSequence",
                         "attempt",
+                        "version",
                         "lines",
                         "createdAt",
                         "submittedAt"
@@ -108253,6 +108357,22 @@
       "permission": "inventory.count.create",
       "pin": false,
       "request": "CreateInventoryCountRequest",
+      "response": "InventoryCountResult"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/inventory/counts/:countId/cancel": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "inventory.count.create",
+      "pin": false,
+      "request": "CancelInventoryCountRequest",
       "response": "InventoryCountResult"
     },
     "POST /api/v1/pos/merchants/:merchantId/inventory/counts/:countId/reconcile": {

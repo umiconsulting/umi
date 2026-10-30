@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { ZodTypeAny } from 'zod';
 import {
   ExceptionCommandRecoveryQuery,
+  CancelInventoryCountRequest,
   CreateInventoryCountRequest,
   DamageRecord,
   GiftCardIssuanceRequest,
@@ -497,6 +498,15 @@ export class AdministrativeCommandExecutionService {
               request,
               CreateInventoryCountRequest,
               {},
+            );
+          case 'inventory.count.cancel':
+            return this.executeInventory(
+              user,
+              access,
+              persisted ?? context,
+              request,
+              CancelInventoryCountRequest,
+              { countId: request.targetAggregateId },
             );
           case 'inventory.count.submit':
             return this.executeInventory(

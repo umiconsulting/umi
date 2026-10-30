@@ -9598,3 +9598,23 @@ msgstr "retry"
 #: src/shell.jsx
 msgid "Secciones"
 msgstr "Sections"
+
+#: src/screens/inventory-count.jsx
+msgid "Hay un conteo activo. Si cambió el inventario, cancélalo e inicia otro conteo."
+msgstr "An active count exists. If inventory changed, cancel it and start another count."
+
+#: src/screens/inventory-count.jsx
+msgid "El historial se conserva. Debes registrar de nuevo las cantidades."
+msgstr "History stays available. You must enter the quantities again."
+
+#: src/screens/inventory-count.jsx
+msgid "Cancelar conteo activo y volver a contar"
+msgstr "Cancel active count and recount"
+
+#: src/screens/inventory-count.jsx
+msgid "Confirmar cancelación"
+msgstr "Confirm cancellation"
+
+#: src/screens/inventory-count.jsx
+msgid "No se pudo cancelar el conteo."
+msgstr "The count could not be cancelled."
