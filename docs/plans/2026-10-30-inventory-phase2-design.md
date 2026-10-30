@@ -71,3 +71,10 @@ Probar una venta completa por el servicio de checkout y su devolución después 
 Comprobar reintentos, cantidades exactas, prioridad de variantes y ventas con inventario insuficiente.
 Comprobar selección, guardado, cancelación del reemplazo y edición de precio mediante clics en Chromium.
 Ejecutar las verificaciones locales del PR y revisar sus resultados de CI sin integrar el PR.
+
+## Hallazgos de la prueba completa
+
+La prueba detectó que una reserva podía acumular la receta anterior y la nueva. Se conservará únicamente la receta capturada.
+También detectó que una venta con autorización para saldo negativo perdía esa autorización al confirmar el inventario.
+La corrección usará una migración nueva de la función de confirmación. Conservará los controles del permiso y la relación con el comando.
+La devolución registra una intención de reposición. La reposición explícita y autorizada debe usar las cantidades de la venta original.

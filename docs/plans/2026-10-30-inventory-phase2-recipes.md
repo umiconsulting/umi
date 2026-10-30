@@ -19,7 +19,7 @@
 - Use plain Spanish in UI copy. Verify changed workflows with real Chromium clicks.
 - Use local PostgreSQL at 127.0.0.1:55435, database `umi_inventory_phase2`.
 - Run contract builds, lint and type checks sequentially.
-- Do not modify pre-cutover SQL. No schema migration is planned.
+- Do not modify applied pre-cutover SQL. The proven checkout approval defect uses one forward migration, `supabase/migrations/20261030001000_inventory_sale_approval.sql`.
 
 ### Task 1: Recipe mapping lifecycle and recipe target read
 
@@ -105,6 +105,8 @@ parameters.replaceSalesMapping = {
 - Add `apps/umi-api/src/modules/inventory-authoring/inventory-recipe-sales.integration.ts`.
 - Modify `apps/umi-api/package.json` to include the suite in `test:integration:schema`.
 - Modify only the recipe/checkout/return paths when the new integration proves a defect within this phase.
+- Add `supabase/migrations/20261030001000_inventory_sale_approval.sql` to preserve the consumed negative-stock approval through sale ledger commit.
+- Modify `.github/workflows/umi-api-ci.yml` to apply that migration in the existing fresh and populated checks, including the second application. Add focused migration checks.
 - Add `docs/reports/2026-10-30-inventory-phase2.md` after validation.
 
 **Interfaces:**
@@ -119,7 +121,8 @@ Refunding the original two-portion sale with `restockDecision: 'restock'` restor
 Assert deltas and historical recipe/mapping IDs. Keep each additional scenario independent from earlier test order.
 
 - [ ] Write a complete sale regression using a product created before its recipe. Create its recipe through the command, sell it through checkout, and assert exact ingredient consumption.
-- [ ] Verify checkout replay does not append consumption twice. Verify insufficient stock uses the configured block/approval rules.
+- [ ] Verify checkout replay does not append consumption twice. Verify insufficient stock uses the configured block/approval rules. Also prove `allow_and_flag` permits a negative balance without duplicate consumption.
+- [ ] Fix the proven approved checkout failure with the canonical SQL function in an additive migration. Carry the consumed grant bound to the command, merchant, location and permission. Keep ledger authorization checks intact. Apply the migration twice on local test data.
 - [ ] Change the recipe; sell again and verify the new quantities. Return the earlier sale and verify reversal of its original quantities, including replay.
 - [ ] Test a variant-specific recipe and a variant which inherits the product recipe. Test retirement with and without a fallback. Confirm no silent zero consumption.
 - [ ] Test a reservation that exists before a recipe edit. Preserve its captured mapping and recipe identity; report and fix any reproducible stale-reservation defect within this flow.
