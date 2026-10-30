@@ -113,6 +113,11 @@ parameters.replaceSalesMapping = {
 - Use the real `PosCheckoutService` and return service with real PostgreSQL. Existing `pos-offline.integration.ts` demonstrates checkout construction and cash sale fixtures.
 - Read ledger entries and balances as the acceptance evidence. Do not seed a committed sale to substitute for checkout.
 
+**Quantity example:** Use an ingredient in kilograms with scale 2. A recipe uses value 125 per one portion.
+Selling two portions consumes value 250. Change the recipe to value 200 per portion; a later sale uses that new amount.
+Refunding the original two-portion sale with `restockDecision: 'restock'` restores value 250, regardless of the current recipe.
+Assert deltas and historical recipe/mapping IDs. Keep each additional scenario independent from earlier test order.
+
 - [ ] Write a complete sale regression using a product created before its recipe. Create its recipe through the command, sell it through checkout, and assert exact ingredient consumption.
 - [ ] Verify checkout replay does not append consumption twice. Verify insufficient stock uses the configured block/approval rules.
 - [ ] Change the recipe; sell again and verify the new quantities. Return the earlier sale and verify reversal of its original quantities, including replay.
