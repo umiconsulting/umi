@@ -659,7 +659,19 @@ export class PosCheckoutRepository {
     };
   }
 
+  private async lockInventoryProducts(client: PoolClient, cart: CheckoutCart): Promise<void> {
+    // The caller locks the cart first. Product order is stable across overlapping carts.
+    // Shared locks keep approval and capture consistent with exclusive mapping writers.
+    await client.query(
+      `SELECT id FROM merchant.product
+        WHERE merchant_id=$1::uuid AND id=ANY($2::uuid[])
+        ORDER BY id FOR SHARE`,
+      [cart.merchantId, [...new Set(cart.lines.map((line) => line.productId))]],
+    );
+  }
+
   async negativeStockApprovalRequired(client: PoolClient, cart: CheckoutCart): Promise<boolean> {
+    await this.lockInventoryProducts(client, cart);
     const result = await client.query<{ required: boolean }>(
       `WITH captured_reservation AS (
          SELECT id FROM merchant.inventory_reservation
@@ -785,6 +797,7 @@ export class PosCheckoutRepository {
     correlationId: string,
     negativeStockApprovalId: string | null,
   ): Promise<InventoryReservation> {
+    await this.lockInventoryProducts(client, cart);
     await client.query(`SELECT merchant.expire_inventory_reservations($1::uuid,$2::uuid)`, [
       cart.merchantId,
       cart.locationId,

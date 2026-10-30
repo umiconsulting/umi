@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { ConfigService } from '@nestjs/config';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InventoryQuery, RestockCommand, type CheckoutCommand } from '@umi/contract';
 import type { AppConfig } from '../../shared/config/config.schema';
 import { PgService } from '../../shared/database/pg.service';
@@ -764,6 +764,128 @@ describe('authored recipes through checkout and confirmed return restock', () =>
     });
     expect(await balance(f.itemId)).toEqual({ on_hand: 1000, reserved: 0, available: 1000 });
     expect(await ledger(f.itemId, 'sale_committed')).toHaveLength(0);
+  });
+
+  it('consumes captured ingredients once when retirement starts after mapping coverage', async () => {
+    const f = await fixture();
+    const prepared = await prepare(f.productId);
+    let resumeCheckout!: () => void;
+    const checkoutBarrier = new Promise<void>((resolve) => {
+      resumeCheckout = resolve;
+    });
+    let coverageReached!: () => void;
+    const coverageBarrier = new Promise<void>((resolve) => {
+      coverageReached = resolve;
+    });
+    let checkoutPid = 0;
+    const reserve = checkoutRepo.reserve.bind(checkoutRepo);
+    // Pause after the real coverage query. All service and SQL effects stay real.
+    const interceptor = vi.spyOn(checkoutRepo, 'reserve').mockImplementation((client, ...args) => {
+      const controlled = new Proxy(client, {
+        get(target, key, receiver) {
+          if (key !== 'query') return Reflect.get(target, key, receiver);
+          return async (sql: string, params?: unknown[]) => {
+            const result = await target.query(sql, params);
+            if (sql.includes('SELECT count(*)::integer AS mapped')) {
+              checkoutPid = (await target.query<{ pid: number }>('SELECT pg_backend_pid() AS pid'))
+                .rows[0].pid;
+              coverageReached();
+              await checkoutBarrier;
+            }
+            return result;
+          };
+        },
+      });
+      return reserve(controlled, ...args);
+    });
+    const checkoutOutcome = commit(prepared.dto).then(
+      (result) => ({ result, error: null }),
+      (error: unknown) => ({ result: null, error }),
+    );
+    let retirement: Promise<unknown> | undefined;
+    let retirementFinished = false;
+    let retirementBlocked = false;
+    try {
+      await Promise.race([
+        coverageBarrier,
+        checkoutOutcome.then(() => {
+          throw new Error('Checkout stopped before the coverage barrier.');
+        }),
+      ]);
+      // A second reader can hold the same product while checkout remains paused.
+      await scoped(() =>
+        pg.runWithMerchant(
+          MERCHANT,
+          USER,
+          async (client) => {
+            await client.query('SELECT id FROM merchant.product WHERE id=$1 FOR SHARE NOWAIT', [
+              f.productId,
+            ]);
+          },
+          LOCATION,
+        ),
+      );
+      retirement = send('inventory.recipe.retire', f.recipeId, {}, 1).then((result) => {
+        retirementFinished = true;
+        return result;
+      });
+      // Observe a durable database wait or a committed retirement. No timing race
+      // chooses the schedule: checkout remains at its coverage barrier throughout.
+      await vi.waitFor(
+        async () => {
+          retirementBlocked = (
+            await pg.query<{ waiting: boolean }>(
+              `SELECT EXISTS (
+          SELECT 1 FROM pg_stat_activity WHERE datname=current_database()
+            AND $1=ANY(pg_blocking_pids(pid))
+        ) AS waiting`,
+              [checkoutPid],
+            )
+          ).rows[0].waiting;
+          expect(retirementFinished || retirementBlocked).toBe(true);
+        },
+        { timeout: 5000, interval: 10 },
+      );
+      resumeCheckout();
+      const outcome = await checkoutOutcome;
+      if (outcome.error) {
+        throw outcome.error instanceof Error
+          ? outcome.error
+          : new Error('Checkout failed.', { cause: outcome.error });
+      }
+      expect(outcome.result?.status).toBe('completed');
+      await retirement;
+      expect(await ledger(f.itemId, 'sale_committed')).toEqual([
+        expect.objectContaining({
+          quantity: 125,
+          sale_line_id: prepared.cart.items[0].id,
+          public_data: {
+            mappingId: f.mapping.id,
+            mappingVersion: 1,
+            recipeId: f.recipeId,
+            recipeVersion: 1,
+          },
+        }),
+      ]);
+      expect(retirementBlocked).toBe(true);
+      expect(await commit(prepared.dto)).toEqual(outcome.result);
+      expect((await ledger(f.itemId, 'sale_committed')).map((row) => row.quantity)).toEqual([125]);
+      expect(await balance(f.itemId)).toEqual({ on_hand: 875, reserved: 0, available: 875 });
+      expect(
+        (
+          await pg.query(
+            `SELECT s.id FROM merchant.pos_committed_sale s
+        WHERE s.cart_id=$1 AND NOT EXISTS (SELECT 1 FROM merchant.stock_ledger_entry e
+          WHERE e.sale_id=s.id AND e.entry_type='sale_committed')`,
+            [prepared.cart.id],
+          )
+        ).rows,
+      ).toEqual([]);
+    } finally {
+      resumeCheckout();
+      await Promise.allSettled([checkoutOutcome, ...(retirement ? [retirement] : [])]);
+      interceptor.mockRestore();
+    }
   });
 
   it('preserves the captured recipe without counting its reserved stock twice for approval', async () => {
