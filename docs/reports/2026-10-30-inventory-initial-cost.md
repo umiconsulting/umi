@@ -45,3 +45,15 @@ Los costos históricos diarios mantienen su criterio previo de costo actual. Las
 Herramientas: Node 22.23.3, pnpm 10.29.3, Vitest 2.1.9, Playwright 1.62.1, Vite 5.4.21 y Lingui 6.6.0. Se usaron las herramientas existentes del repositorio y el procedimiento de `docs/development/LOCAL_VERIFICATION_PLAYBOOK.md`.
 
 El build conserva el aviso previo de paquetes mayores de 500 kB. Las pruebas de sesión emiten sus mensajes esperados de fallos simulados. La publicación y la aprobación del PR quedan pendientes del controlador.
+
+## Corrección final: artículos archivados
+
+El panel muestra `Costo no disponible` cuando el artículo está archivado. Explica que la fuente no está disponible y conserva el costo inicial con la etiqueta `Costo inicial guardado`, incluido cero.
+
+La regresión real falló antes del cambio y pasó después. Archivó mediante el editor un artículo con dos compras y costo inicial de 120.00/kg. La API conservó 12000 centavos. Otro artículo archivado conservó cero. Ambos quedaron fuera de la lectura existente de fuentes, como establece la API.
+
+El panel ya no presenta `Sin costo` ni ofrece `Agregar costo` para esos artículos. La corrección conserva las consultas y los cálculos existentes.
+
+La regresión enfocada pasó en 1.2 segundos. La suite del dashboard conservó sus 445 pruebas correctas. Lingui y build pasaron; lint mantuvo cero errores y 68 avisos previos.
+
+Se inspeccionaron las capturas del [artículo con compras](evidence/2026-10-30-inventory-initial-cost/initial-cost-archived-purchases.png) y del [costo inicial cero](evidence/2026-10-30-inventory-initial-cost/initial-cost-archived-zero.png).

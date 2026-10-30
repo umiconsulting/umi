@@ -278,7 +278,24 @@ export default function InventoryItemPanel({
             <Trans>Costo</Trans>
           </span>
         </div>
-        {costBasisError ? (
+        {item.active === false ? (
+          <>
+            <p style={{ margin: 0, fontSize: 13.5 }}>
+              <Trans>Costo no disponible</Trans>
+            </p>
+            <p className="muted">
+              <Trans>El artículo está archivado. La fuente del costo no está disponible.</Trans>
+            </p>
+            {item.initialUnitCostMinor != null ? (
+              <p className="muted">
+                <Trans>
+                  Costo inicial guardado: {formatMoney(item.initialUnitCostMinor, currency)}{' '}
+                  {currency} / {unit}.
+                </Trans>
+              </p>
+            ) : null}
+          </>
+        ) : costBasisError ? (
           <p role="alert" className="muted">
             <Trans>No se pudo leer la base del costo.</Trans>
           </p>

@@ -5227,17 +5227,25 @@ msgid "No hay conversiones. El artículo se cuenta en su unidad base."
 msgstr "There are no conversions. The item counts in its base unit."
 
 #: src/screens/inventory-item-panel.jsx
+msgid "Costo no disponible"
+msgstr "Cost unavailable"
+
+#: src/screens/inventory-item-panel.jsx
+msgid "El artículo está archivado. La fuente del costo no está disponible."
+msgstr "The item is archived. Its cost source is unavailable."
+
+#. placeholder {0}: formatMoney(item.initialUnitCostMinor, currency)
+#: src/screens/inventory-item-panel.jsx
+msgid "Costo inicial guardado: {0} {currency} / {unit}."
+msgstr "Saved initial cost: {0} {currency} / {unit}."
+
+#: src/screens/inventory-item-panel.jsx
 msgid "Cargando el costo…"
 msgstr "Loading the cost…"
 
 #: src/screens/inventory-item-panel.jsx
 msgid "Agrega un costo inicial o registra una compra."
 msgstr "Add an initial cost or record a purchase."
-
-#. placeholder {0}: formatMoney(item.initialUnitCostMinor, currency)
-#: src/screens/inventory-item-panel.jsx
-msgid "Costo inicial guardado: {0} {currency} / {unit}."
-msgstr "Saved initial cost: {0} {currency} / {unit}."
 
 #: src/screens/inventory-item-panel.jsx
 #: src/screens/inventory-workspace.jsx
