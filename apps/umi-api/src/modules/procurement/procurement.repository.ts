@@ -17,6 +17,7 @@ import type {
 import type { PoolClient } from 'pg';
 import { randomBytes } from 'node:crypto';
 import { PgService } from '../../shared/database/pg.service';
+import { convertInventoryQuantity } from '../pos-inventory/inventory-domain';
 import type { ParsedCfdiInvoice } from './cfdi-parser';
 import {
   extendedLineTotalMinor,
@@ -162,6 +163,30 @@ const int = (value: string | number): number => {
   if (!Number.isSafeInteger(parsed)) throw new RangeError('PROCUREMENT_VALUE_OUT_OF_RANGE');
   return parsed;
 };
+
+/** Use the item's scale before a quantity reaches the stock ledger. */
+function normalizeQuantity(
+  quantity: { value: number; scale: number; unit: string },
+  unit: string,
+  scale: number,
+) {
+  if (quantity.unit !== unit)
+    throw new ConflictException({ code: 'INVENTORY_UNIT_CONVERSION_REQUIRED' });
+  try {
+    return {
+      value: convertInventoryQuantity(quantity.value, quantity.scale, 1, 1, scale),
+      scale,
+      unit,
+    };
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    throw new ConflictException({
+      code: error.message === 'INVENTORY_CONVERSION_NOT_EXACT'
+        ? 'INVENTORY_QUANTITY_NOT_EXACT'
+        : error.message,
+    });
+  }
+}
 
 function orderLine(row: LineRow): PurchaseOrderLine {
   const ordered = int(row.ordered_quantity);
@@ -422,12 +447,12 @@ export class ProcurementRepository {
     // Every item has to belong to this merchant and still be tracked, or the line
     // would order stock that no balance row can ever hold.
     const itemIds = dto.lines.map((line) => line.inventoryItemId);
-    const items = await client.query<{ id: string }>(
-      `SELECT id::text AS id FROM merchant.inventory_item
+    const items = await client.query<{ id: string; base_unit: string; quantity_scale: number }>(
+      `SELECT id::text AS id,base_unit,quantity_scale FROM merchant.inventory_item
         WHERE merchant_id=$1::uuid AND id=ANY($2::uuid[]) AND active`,
       [merchantId, itemIds],
     );
-    const known = new Set(items.rows.map((row) => row.id));
+    const known = new Map(items.rows.map((row) => [row.id, row]));
     const missing = itemIds.filter((id) => !known.has(id));
     if (missing.length > 0)
       throw new NotFoundException({
@@ -436,9 +461,12 @@ export class ProcurementRepository {
       });
 
     const lines = dto.lines.map((line, index) => {
+      const item = known.get(line.inventoryItemId);
+      if (!item) throw new NotFoundException({ code: 'INVENTORY_ITEM_ARCHIVED' });
+      const quantity = normalizeQuantity(line.quantity, item.base_unit, item.quantity_scale);
       const check = lineTotalWithinRounding({
-        value: line.quantity.value,
-        scale: line.quantity.scale,
+        value: quantity.value,
+        scale: quantity.scale,
         unitCostMinor: line.unitCostMinor,
         lineTotalMinor: line.lineTotalMinor,
       });
@@ -450,7 +478,7 @@ export class ProcurementRepository {
             expectedMinorUnits: [String(check.expectedMinor)],
           },
         });
-      return { ...line, lineNumber: index + 1 };
+      return { ...line, quantity, lineNumber: index + 1 };
     });
     const orderedTotal = lines.reduce((total, line) => total + line.lineTotalMinor, 0);
 
@@ -831,13 +859,26 @@ export class ProcurementRepository {
       });
 
     const known = await this.orderLinesForPosting(client, merchantId, dto.purchaseOrderId);
+    const byId = new Map(known.map((line) => [line.id, line]));
+    const lines = dto.lines.map((line) => {
+      const onOrder = byId.get(line.purchaseOrderLineId);
+      if (!onOrder)
+        throw new ConflictException({
+          code: 'PURCHASE_ORDER_LINE_NOT_FOUND',
+          fieldErrors: { purchaseOrderLineId: [line.purchaseOrderLineId] },
+        });
+      return {
+        ...line,
+        quantity: normalizeQuantity(line.quantity, onOrder.unit, onOrder.quantity_scale),
+      };
+    });
     const over = overReceivedLine(
       known.map((line) => ({
         id: line.id,
         orderedQuantity: int(line.ordered_quantity),
         receivedQuantity: int(line.received_quantity),
       })),
-      dto.lines.map((line) => ({
+      lines.map((line) => ({
         purchaseOrderLineId: line.purchaseOrderLineId,
         quantity: line.quantity.value,
       })),
@@ -853,7 +894,7 @@ export class ProcurementRepository {
         details: { outstanding: over.outstanding, requested: over.requested },
       });
     }
-    for (const line of dto.lines) {
+    for (const line of lines) {
       const check = lineTotalWithinRounding({
         value: line.quantity.value,
         scale: line.quantity.scale,
@@ -886,15 +927,13 @@ export class ProcurementRepository {
         fingerprint,
         userId,
         correlationId,
-        receiptTotalMinor(dto.lines.map((line) => ({ lineTotalMinor: line.lineTotalMinor }))),
+        receiptTotalMinor(lines.map((line) => ({ lineTotalMinor: line.lineTotalMinor }))),
         dto.note,
       ],
     );
     const receiptId = receipt.rows[0].id;
     const businessDate = receipt.rows[0].business_date;
-    const byId = new Map(known.map((line) => [line.id, line]));
-
-    for (const line of dto.lines) {
+    for (const line of lines) {
       const onOrder = byId.get(line.purchaseOrderLineId);
       // Unreachable: `overReceivedLine` refused an unknown line above. Kept as a
       // hard failure rather than a `!` so a future edit cannot silently skip a line.
@@ -1118,15 +1157,25 @@ export class ProcurementRepository {
       received_quantity: string;
       quantity_scale: number;
       unit: string;
+      item_unit: string;
+      item_scale: number;
     }>(
-      `SELECT id::text AS id,inventory_item_id::text AS inventory_item_id,
-              ordered_quantity::text AS ordered_quantity,
-              received_quantity::text AS received_quantity,quantity_scale,unit
-         FROM merchant.purchase_order_line
-        WHERE merchant_id=$1::uuid AND purchase_order_id=$2::uuid
-        ORDER BY line_number FOR UPDATE`,
+      `SELECT l.id::text AS id,l.inventory_item_id::text AS inventory_item_id,
+              l.ordered_quantity::text AS ordered_quantity,
+              l.received_quantity::text AS received_quantity,l.quantity_scale,l.unit,
+              i.base_unit AS item_unit,i.quantity_scale AS item_scale
+         FROM merchant.purchase_order_line l
+         JOIN merchant.inventory_item i ON i.merchant_id=l.merchant_id AND i.id=l.inventory_item_id
+        WHERE l.merchant_id=$1::uuid AND l.purchase_order_id=$2::uuid
+        ORDER BY l.line_number FOR UPDATE OF l`,
       [merchantId, purchaseOrderId],
     );
+    for (const line of result.rows) {
+      if (line.unit !== line.item_unit)
+        throw new ConflictException({ code: 'INVENTORY_UNIT_CONVERSION_REQUIRED' });
+      if (line.quantity_scale !== line.item_scale)
+        throw new ConflictException({ code: 'INVENTORY_QUANTITY_SCALE_MISMATCH' });
+    }
     return result.rows;
   }
 
