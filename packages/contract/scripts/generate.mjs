@@ -201,6 +201,13 @@ function dartClass(name, schema) {
   };
   // Optional nullable fields need three states: absent, null, and a value.
   const tracksPresence = (key, value) => !required.has(key) && nullable(value);
+  const collectionType = (value) => /^(?:Map|List)</.test(dartType(value));
+  const presenceSentinel = (value) =>
+    dartType(value).startsWith('Map<')
+      ? '_umiAbsentMap'
+      : dartType(value).startsWith('List<')
+        ? '_umiAbsentList'
+        : '_umiAbsent';
   const fields = properties
     .map(([key, value]) => `  final ${fieldType(key, value)} ${key};`)
     .join('\n');
@@ -211,22 +218,22 @@ function dartClass(name, schema) {
   const parameters = properties
     .map(([key, value]) =>
       tracksPresence(key, value)
-        ? `    Object? ${key} = _umiAbsent,`
+        ? `    ${collectionType(value) ? fieldType(key, value) : 'Object?'} ${key} = ${presenceSentinel(value)},`
         : `    ${required.has(key) ? 'required ' : ''}this.${key},`,
     )
     .join('\n');
   const initializers = properties
     .filter(([key, value]) => tracksPresence(key, value))
     .flatMap(([key, value]) => [
-      `${key} = identical(${key}, _umiAbsent) ? null : ${key}${fieldType(key, value) === 'Object?' ? '' : ` as ${fieldType(key, value)}`}`,
-      `_has_${key} = !identical(${key}, _umiAbsent)`,
+      `${key} = identical(${key}, ${presenceSentinel(value)}) ? null : ${key}${collectionType(value) || fieldType(key, value) === 'Object?' ? '' : ` as ${fieldType(key, value)}`}`,
+      `_has_${key} = !identical(${key}, ${presenceSentinel(value)})`,
     ]);
   const decode = properties
     .map(([key, value]) => {
       const input =
         required.has(key) || nullable(value) ? value : { anyOf: [value, { type: 'null' }] };
       const decoded = dartDecode(input, `json[${JSON.stringify(key)}]`);
-      return `      ${key}: ${tracksPresence(key, value) ? `json.containsKey(${JSON.stringify(key)}) ? (${decoded}) : _umiAbsent` : decoded},`;
+      return `      ${key}: ${tracksPresence(key, value) ? `json.containsKey(${JSON.stringify(key)}) ? (${decoded}) : ${presenceSentinel(value)}` : decoded},`;
     })
     .join('\n');
   const encode = properties
@@ -251,6 +258,30 @@ ${encode}
   };
 }`;
 }
+
+// Typed sentinels preserve Dart's context for map and list literals.
+const dartPresenceSupport = (models) =>
+  (/\b_umiAbsent\b/.test(models) ? 'const _umiAbsent = Object();\n' : '') +
+  (models.includes('_umiAbsentMap')
+    ? `
+final class _UmiAbsentMap implements Map<String, Object?> {
+  const _UmiAbsentMap();
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw StateError('Absent map');
+}
+const _umiAbsentMap = _UmiAbsentMap();
+`
+    : '') +
+  (models.includes('_umiAbsentList')
+    ? `
+final class _UmiAbsentList implements List<Never> {
+  const _UmiAbsentList();
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw StateError('Absent list');
+}
+const _umiAbsentList = _UmiAbsentList();
+`
+    : '');
 
 const dartModels = Object.entries(definitions)
   .map(([name, schema]) => dartClass(name, schema))
@@ -294,14 +325,30 @@ const dartOutput =
   `const int apiMajorVersion = ${JSON.stringify(API_MAJOR_VERSION)};\n` +
   `const String contractContentHash = ${JSON.stringify(contentHash)};\n\n` +
   `// A sentinel preserves omitted keys separately from explicit null.\n` +
-  `const _umiAbsent = Object();\n\n` +
+  `${dartPresenceSupport(dartModels)}\n` +
   `${dartRoutes}\n\n${dartModels}\n`;
+
+// Test-only schemas cover nullable collections, including list shapes absent from the catalog.
+const dartCollectionFixture = dartClass('OptionalCollectionFixture', {
+  type: 'object',
+  properties: {
+    configuration: { anyOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] },
+    values: { anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'null' }] },
+    rows: {
+      anyOf: [
+        { type: 'array', items: { type: 'object', additionalProperties: true } },
+        { type: 'null' },
+      ],
+    },
+  },
+});
 
 const outputs = {
   'contract.json': artifact,
   'contract.sha256': `${artifactHash}  contract.json\n`,
   'typescript/umi_contract.ts': tsOutput,
   'dart/lib/umi_contract.dart': dartOutput,
+  'dart/test/optional_collection_fixture.dart': `// Generated test fixture. Do not edit.\n${dartPresenceSupport(dartCollectionFixture)}\n${dartCollectionFixture}\n`,
   'dart/pubspec.yaml':
     'name: umi_contract\\ndescription: Generated UMI API contract models.\\nversion: 1.0.0\\nenvironment:\\n  sdk: \">=3.4.0 <4.0.0\"\\n',
 };

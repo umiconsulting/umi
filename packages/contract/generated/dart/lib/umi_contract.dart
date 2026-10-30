@@ -6,6 +6,13 @@ const String contractContentHash = "9a18dcb8a1dada437cdbb0be61e85eefe6fdd5f9ab06
 // A sentinel preserves omitted keys separately from explicit null.
 const _umiAbsent = Object();
 
+final class _UmiAbsentMap implements Map<String, Object?> {
+  const _UmiAbsentMap();
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw StateError('Absent map');
+}
+const _umiAbsentMap = _UmiAbsentMap();
+
 /// Every path the POS client may call. Generated from ROUTE_TABLE; never hand-edited.
 abstract final class UmiRoutes {
   static const deviceEnrollmentComplete = '/api/v1/devices/enrollment/complete';
@@ -3494,19 +3501,19 @@ final class CheckoutCommand {
     Object? totalsFingerprint = _umiAbsent,
     required this.idempotencyKey,
     this.tenderDrafts,
-    Object? tipDraft = _umiAbsent,
+    Map<String, Object?>? tipDraft = _umiAbsentMap,
     this.discountDrafts,
     this.approvalIds,
     this.receiptDelivery,
-    Object? customerValue = _umiAbsent,
+    Map<String, Object?>? customerValue = _umiAbsentMap,
   }) : cashShiftId = identical(cashShiftId, _umiAbsent) ? null : cashShiftId as String?,
        _has_cashShiftId = !identical(cashShiftId, _umiAbsent),
        totalsFingerprint = identical(totalsFingerprint, _umiAbsent) ? null : totalsFingerprint as String?,
        _has_totalsFingerprint = !identical(totalsFingerprint, _umiAbsent),
-       tipDraft = identical(tipDraft, _umiAbsent) ? null : tipDraft as Map<String, Object?>?,
-       _has_tipDraft = !identical(tipDraft, _umiAbsent),
-       customerValue = identical(customerValue, _umiAbsent) ? null : customerValue as Map<String, Object?>?,
-       _has_customerValue = !identical(customerValue, _umiAbsent);
+       tipDraft = identical(tipDraft, _umiAbsentMap) ? null : tipDraft,
+       _has_tipDraft = !identical(tipDraft, _umiAbsentMap),
+       customerValue = identical(customerValue, _umiAbsentMap) ? null : customerValue,
+       _has_customerValue = !identical(customerValue, _umiAbsentMap);
 
   factory CheckoutCommand.fromJson(Map<String, Object?> json) => CheckoutCommand(
       commandId: json["commandId"] == null ? null : json["commandId"] as String,
@@ -3520,11 +3527,11 @@ final class CheckoutCommand {
       totalsFingerprint: json.containsKey("totalsFingerprint") ? (json["totalsFingerprint"] == null ? null : json["totalsFingerprint"] as String) : _umiAbsent,
       idempotencyKey: json["idempotencyKey"] as String,
       tenderDrafts: json["tenderDrafts"] == null ? null : (json["tenderDrafts"] as List<Object?>).cast<Map<String, Object?>>(),
-      tipDraft: json.containsKey("tipDraft") ? (json["tipDraft"] == null ? null : json["tipDraft"] as Map<String, Object?>) : _umiAbsent,
+      tipDraft: json.containsKey("tipDraft") ? (json["tipDraft"] == null ? null : json["tipDraft"] as Map<String, Object?>) : _umiAbsentMap,
       discountDrafts: json["discountDrafts"] == null ? null : (json["discountDrafts"] as List<Object?>).cast<Map<String, Object?>>(),
       approvalIds: json["approvalIds"] == null ? null : (json["approvalIds"] as List<Object?>).cast<String>(),
       receiptDelivery: json["receiptDelivery"] == null ? null : json["receiptDelivery"] as Map<String, Object?>,
-      customerValue: json.containsKey("customerValue") ? (json["customerValue"] == null ? null : json["customerValue"] as Map<String, Object?>) : _umiAbsent,
+      customerValue: json.containsKey("customerValue") ? (json["customerValue"] == null ? null : json["customerValue"] as Map<String, Object?>) : _umiAbsentMap,
   );
 
   Map<String, Object?> toJson() => {
@@ -3875,17 +3882,17 @@ final class CheckoutResult {
     required this.sale,
     required this.receipt,
     required this.failure,
-    Object? paymentSummary = _umiAbsent,
+    Map<String, Object?>? paymentSummary = _umiAbsentMap,
     this.recoveryState,
     this.receiptDelivery,
-    Object? policy = _umiAbsent,
-    Object? customerValue = _umiAbsent,
-  }) : paymentSummary = identical(paymentSummary, _umiAbsent) ? null : paymentSummary as Map<String, Object?>?,
-       _has_paymentSummary = !identical(paymentSummary, _umiAbsent),
-       policy = identical(policy, _umiAbsent) ? null : policy as Map<String, Object?>?,
-       _has_policy = !identical(policy, _umiAbsent),
-       customerValue = identical(customerValue, _umiAbsent) ? null : customerValue as Map<String, Object?>?,
-       _has_customerValue = !identical(customerValue, _umiAbsent);
+    Map<String, Object?>? policy = _umiAbsentMap,
+    Map<String, Object?>? customerValue = _umiAbsentMap,
+  }) : paymentSummary = identical(paymentSummary, _umiAbsentMap) ? null : paymentSummary,
+       _has_paymentSummary = !identical(paymentSummary, _umiAbsentMap),
+       policy = identical(policy, _umiAbsentMap) ? null : policy,
+       _has_policy = !identical(policy, _umiAbsentMap),
+       customerValue = identical(customerValue, _umiAbsentMap) ? null : customerValue,
+       _has_customerValue = !identical(customerValue, _umiAbsentMap);
 
   factory CheckoutResult.fromJson(Map<String, Object?> json) => CheckoutResult(
       status: json["status"] as String,
@@ -3896,11 +3903,11 @@ final class CheckoutResult {
       sale: json["sale"] == null ? null : json["sale"] as Map<String, Object?>,
       receipt: json["receipt"] == null ? null : json["receipt"] as Map<String, Object?>,
       failure: json["failure"] == null ? null : json["failure"] as Map<String, Object?>,
-      paymentSummary: json.containsKey("paymentSummary") ? (json["paymentSummary"] == null ? null : json["paymentSummary"] as Map<String, Object?>) : _umiAbsent,
+      paymentSummary: json.containsKey("paymentSummary") ? (json["paymentSummary"] == null ? null : json["paymentSummary"] as Map<String, Object?>) : _umiAbsentMap,
       recoveryState: json["recoveryState"] == null ? null : json["recoveryState"] as String,
       receiptDelivery: json["receiptDelivery"] == null ? null : json["receiptDelivery"] as Map<String, Object?>,
-      policy: json.containsKey("policy") ? (json["policy"] == null ? null : json["policy"] as Map<String, Object?>) : _umiAbsent,
-      customerValue: json.containsKey("customerValue") ? (json["customerValue"] == null ? null : json["customerValue"] as Map<String, Object?>) : _umiAbsent,
+      policy: json.containsKey("policy") ? (json["policy"] == null ? null : json["policy"] as Map<String, Object?>) : _umiAbsentMap,
+      customerValue: json.containsKey("customerValue") ? (json["customerValue"] == null ? null : json["customerValue"] as Map<String, Object?>) : _umiAbsentMap,
   );
 
   Map<String, Object?> toJson() => {
@@ -5248,18 +5255,18 @@ final class CustomerHistoryPage {
   const CustomerHistoryPage({
     required this.nextCursor,
     required this.entries,
-    Object? loyaltyAccount = _umiAbsent,
-    Object? pointsBalance = _umiAbsent,
-  }) : loyaltyAccount = identical(loyaltyAccount, _umiAbsent) ? null : loyaltyAccount as Map<String, Object?>?,
-       _has_loyaltyAccount = !identical(loyaltyAccount, _umiAbsent),
-       pointsBalance = identical(pointsBalance, _umiAbsent) ? null : pointsBalance as Map<String, Object?>?,
-       _has_pointsBalance = !identical(pointsBalance, _umiAbsent);
+    Map<String, Object?>? loyaltyAccount = _umiAbsentMap,
+    Map<String, Object?>? pointsBalance = _umiAbsentMap,
+  }) : loyaltyAccount = identical(loyaltyAccount, _umiAbsentMap) ? null : loyaltyAccount,
+       _has_loyaltyAccount = !identical(loyaltyAccount, _umiAbsentMap),
+       pointsBalance = identical(pointsBalance, _umiAbsentMap) ? null : pointsBalance,
+       _has_pointsBalance = !identical(pointsBalance, _umiAbsentMap);
 
   factory CustomerHistoryPage.fromJson(Map<String, Object?> json) => CustomerHistoryPage(
       nextCursor: json["nextCursor"] == null ? null : json["nextCursor"] as String,
       entries: (json["entries"] as List<Object?>).cast<Map<String, Object?>>(),
-      loyaltyAccount: json.containsKey("loyaltyAccount") ? (json["loyaltyAccount"] == null ? null : json["loyaltyAccount"] as Map<String, Object?>) : _umiAbsent,
-      pointsBalance: json.containsKey("pointsBalance") ? (json["pointsBalance"] == null ? null : json["pointsBalance"] as Map<String, Object?>) : _umiAbsent,
+      loyaltyAccount: json.containsKey("loyaltyAccount") ? (json["loyaltyAccount"] == null ? null : json["loyaltyAccount"] as Map<String, Object?>) : _umiAbsentMap,
+      pointsBalance: json.containsKey("pointsBalance") ? (json["pointsBalance"] == null ? null : json["pointsBalance"] as Map<String, Object?>) : _umiAbsentMap,
   );
 
   Map<String, Object?> toJson() => {
@@ -6175,9 +6182,9 @@ final class DashboardOperationItem {
     required this.currency,
     required this.version,
     required this.correlationId,
-    Object? facts = _umiAbsent,
-  }) : facts = identical(facts, _umiAbsent) ? null : facts as Map<String, Object?>?,
-       _has_facts = !identical(facts, _umiAbsent);
+    Map<String, Object?>? facts = _umiAbsentMap,
+  }) : facts = identical(facts, _umiAbsentMap) ? null : facts,
+       _has_facts = !identical(facts, _umiAbsentMap);
 
   factory DashboardOperationItem.fromJson(Map<String, Object?> json) => DashboardOperationItem(
       id: json["id"] as String,
@@ -6191,7 +6198,7 @@ final class DashboardOperationItem {
       currency: json["currency"] == null ? null : json["currency"] as String,
       version: json["version"] == null ? null : (json["version"] as num).toInt(),
       correlationId: json["correlationId"] == null ? null : json["correlationId"] as String,
-      facts: json.containsKey("facts") ? (json["facts"] == null ? null : json["facts"] as Map<String, Object?>) : _umiAbsent,
+      facts: json.containsKey("facts") ? (json["facts"] == null ? null : json["facts"] as Map<String, Object?>) : _umiAbsentMap,
   );
 
   Map<String, Object?> toJson() => {
@@ -8598,16 +8605,16 @@ final class HardwareCommandRequest {
     required this.sourceAggregateId,
     required this.expectedConfigurationVersion,
     required this.payloadFingerprint,
-    Object? drawer = _umiAbsent,
-    Object? display = _umiAbsent,
-    Object? printPayload = _umiAbsent,
+    Map<String, Object?>? drawer = _umiAbsentMap,
+    Map<String, Object?>? display = _umiAbsentMap,
+    Map<String, Object?>? printPayload = _umiAbsentMap,
     Object? copy = _umiAbsent,
-  }) : drawer = identical(drawer, _umiAbsent) ? null : drawer as Map<String, Object?>?,
-       _has_drawer = !identical(drawer, _umiAbsent),
-       display = identical(display, _umiAbsent) ? null : display as Map<String, Object?>?,
-       _has_display = !identical(display, _umiAbsent),
-       printPayload = identical(printPayload, _umiAbsent) ? null : printPayload as Map<String, Object?>?,
-       _has_printPayload = !identical(printPayload, _umiAbsent),
+  }) : drawer = identical(drawer, _umiAbsentMap) ? null : drawer,
+       _has_drawer = !identical(drawer, _umiAbsentMap),
+       display = identical(display, _umiAbsentMap) ? null : display,
+       _has_display = !identical(display, _umiAbsentMap),
+       printPayload = identical(printPayload, _umiAbsentMap) ? null : printPayload,
+       _has_printPayload = !identical(printPayload, _umiAbsentMap),
        copy = identical(copy, _umiAbsent) ? null : copy as bool?,
        _has_copy = !identical(copy, _umiAbsent);
 
@@ -8623,9 +8630,9 @@ final class HardwareCommandRequest {
       sourceAggregateId: json["sourceAggregateId"] as String,
       expectedConfigurationVersion: (json["expectedConfigurationVersion"] as num).toInt(),
       payloadFingerprint: json["payloadFingerprint"] as String,
-      drawer: json.containsKey("drawer") ? (json["drawer"] == null ? null : json["drawer"] as Map<String, Object?>) : _umiAbsent,
-      display: json.containsKey("display") ? (json["display"] == null ? null : json["display"] as Map<String, Object?>) : _umiAbsent,
-      printPayload: json.containsKey("printPayload") ? (json["printPayload"] == null ? null : json["printPayload"] as Map<String, Object?>) : _umiAbsent,
+      drawer: json.containsKey("drawer") ? (json["drawer"] == null ? null : json["drawer"] as Map<String, Object?>) : _umiAbsentMap,
+      display: json.containsKey("display") ? (json["display"] == null ? null : json["display"] as Map<String, Object?>) : _umiAbsentMap,
+      printPayload: json.containsKey("printPayload") ? (json["printPayload"] == null ? null : json["printPayload"] as Map<String, Object?>) : _umiAbsentMap,
       copy: json.containsKey("copy") ? (json["copy"] == null ? null : json["copy"] as bool) : _umiAbsent,
   );
 
@@ -9003,20 +9010,20 @@ final class HardwareDispatchPayload {
   final bool _has_printPayload;
 
   const HardwareDispatchPayload({
-    Object? drawer = _umiAbsent,
-    Object? display = _umiAbsent,
-    Object? printPayload = _umiAbsent,
-  }) : drawer = identical(drawer, _umiAbsent) ? null : drawer as Map<String, Object?>?,
-       _has_drawer = !identical(drawer, _umiAbsent),
-       display = identical(display, _umiAbsent) ? null : display as Map<String, Object?>?,
-       _has_display = !identical(display, _umiAbsent),
-       printPayload = identical(printPayload, _umiAbsent) ? null : printPayload as Map<String, Object?>?,
-       _has_printPayload = !identical(printPayload, _umiAbsent);
+    Map<String, Object?>? drawer = _umiAbsentMap,
+    Map<String, Object?>? display = _umiAbsentMap,
+    Map<String, Object?>? printPayload = _umiAbsentMap,
+  }) : drawer = identical(drawer, _umiAbsentMap) ? null : drawer,
+       _has_drawer = !identical(drawer, _umiAbsentMap),
+       display = identical(display, _umiAbsentMap) ? null : display,
+       _has_display = !identical(display, _umiAbsentMap),
+       printPayload = identical(printPayload, _umiAbsentMap) ? null : printPayload,
+       _has_printPayload = !identical(printPayload, _umiAbsentMap);
 
   factory HardwareDispatchPayload.fromJson(Map<String, Object?> json) => HardwareDispatchPayload(
-      drawer: json.containsKey("drawer") ? (json["drawer"] == null ? null : json["drawer"] as Map<String, Object?>) : _umiAbsent,
-      display: json.containsKey("display") ? (json["display"] == null ? null : json["display"] as Map<String, Object?>) : _umiAbsent,
-      printPayload: json.containsKey("printPayload") ? (json["printPayload"] == null ? null : json["printPayload"] as Map<String, Object?>) : _umiAbsent,
+      drawer: json.containsKey("drawer") ? (json["drawer"] == null ? null : json["drawer"] as Map<String, Object?>) : _umiAbsentMap,
+      display: json.containsKey("display") ? (json["display"] == null ? null : json["display"] as Map<String, Object?>) : _umiAbsentMap,
+      printPayload: json.containsKey("printPayload") ? (json["printPayload"] == null ? null : json["printPayload"] as Map<String, Object?>) : _umiAbsentMap,
   );
 
   Map<String, Object?> toJson() => {
@@ -24842,13 +24849,13 @@ final class TenderDraft {
     required this.id,
     required this.type,
     required this.amount,
-    Object? amountReceived = _umiAbsent,
+    Map<String, Object?>? amountReceived = _umiAbsentMap,
     this.tipAmount,
     this.status,
     Object? correlationId = _umiAbsent,
     Object? authorizationId = _umiAbsent,
-  }) : amountReceived = identical(amountReceived, _umiAbsent) ? null : amountReceived as Map<String, Object?>?,
-       _has_amountReceived = !identical(amountReceived, _umiAbsent),
+  }) : amountReceived = identical(amountReceived, _umiAbsentMap) ? null : amountReceived,
+       _has_amountReceived = !identical(amountReceived, _umiAbsentMap),
        correlationId = identical(correlationId, _umiAbsent) ? null : correlationId as String?,
        _has_correlationId = !identical(correlationId, _umiAbsent),
        authorizationId = identical(authorizationId, _umiAbsent) ? null : authorizationId as String?,
@@ -24858,7 +24865,7 @@ final class TenderDraft {
       id: json["id"] as String,
       type: json["type"] as String,
       amount: json["amount"] as Map<String, Object?>,
-      amountReceived: json.containsKey("amountReceived") ? (json["amountReceived"] == null ? null : json["amountReceived"] as Map<String, Object?>) : _umiAbsent,
+      amountReceived: json.containsKey("amountReceived") ? (json["amountReceived"] == null ? null : json["amountReceived"] as Map<String, Object?>) : _umiAbsentMap,
       tipAmount: json["tipAmount"] == null ? null : json["tipAmount"] as Map<String, Object?>,
       status: json["status"] == null ? null : json["status"] as String,
       correlationId: json.containsKey("correlationId") ? (json["correlationId"] == null ? null : json["correlationId"] as String) : _umiAbsent,
@@ -25555,10 +25562,10 @@ final class UpdateHardwareRequest {
     required this.commandId,
     required this.idempotencyKey,
     required this.enabled,
-    Object? connectionConfiguration = _umiAbsent,
+    Map<String, Object?>? connectionConfiguration = _umiAbsentMap,
     required this.expectedVersion,
-  }) : connectionConfiguration = identical(connectionConfiguration, _umiAbsent) ? null : connectionConfiguration as Map<String, Object?>?,
-       _has_connectionConfiguration = !identical(connectionConfiguration, _umiAbsent);
+  }) : connectionConfiguration = identical(connectionConfiguration, _umiAbsentMap) ? null : connectionConfiguration,
+       _has_connectionConfiguration = !identical(connectionConfiguration, _umiAbsentMap);
 
   factory UpdateHardwareRequest.fromJson(Map<String, Object?> json) => UpdateHardwareRequest(
       locationId: json["locationId"] as String,
@@ -25566,7 +25573,7 @@ final class UpdateHardwareRequest {
       commandId: json["commandId"] as String,
       idempotencyKey: json["idempotencyKey"] as String,
       enabled: json["enabled"] as bool,
-      connectionConfiguration: json.containsKey("connectionConfiguration") ? (json["connectionConfiguration"] == null ? null : json["connectionConfiguration"] as Map<String, Object?>) : _umiAbsent,
+      connectionConfiguration: json.containsKey("connectionConfiguration") ? (json["connectionConfiguration"] == null ? null : json["connectionConfiguration"] as Map<String, Object?>) : _umiAbsentMap,
       expectedVersion: (json["expectedVersion"] as num).toInt(),
   );
 

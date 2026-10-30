@@ -20,5 +20,5 @@ for (const [name, payload] of Object.entries(payloads)) {
   assert.equal(parsed.initialUnitCostMinor, payload.initialUnitCostMinor);
 }
 console.log(
-  'Dart constructors and decoder round trips passed; all four payloads passed the server contract.',
+  'Dart scalar and collection constructors and round trips passed; all four payloads passed the server contract.',
 );
