@@ -1026,9 +1026,19 @@ void main() {
       find.text('Registra una cantidad válida, incluido cero.'),
       findsOneWidget,
     );
+    await tester.tap(find.byType(PosField).first);
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(PosField).first, '1.25');
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<PosField>(find.byType(PosField).first).controller!.text,
+      '1.25',
+    );
+    await tester.ensureVisible(find.text('Enviar conteo'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Enviar conteo'));
     await tester.pumpAndSettle();
+    expect(fake.submittedCount, isNotNull);
     expect(fake.submittedCount!.lines.first['counted'], {
       'value': 1250,
       'scale': 3,
