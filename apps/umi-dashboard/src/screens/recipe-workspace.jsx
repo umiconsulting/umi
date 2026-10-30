@@ -529,7 +529,7 @@ function ExplosionPanel({ state, unitOf }) {
       </div>
       <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
         {i18n._(
-          msg`La explosión baja cada sub-receta hasta el insumo. Un insumo sin recepción no tiene precio, y por eso no se muestra un cero.`,
+          msg`El desglose muestra los ingredientes de cada receta. Un ingrediente sin compras registradas aún no tiene precio.`,
         )}
       </p>
     </section>

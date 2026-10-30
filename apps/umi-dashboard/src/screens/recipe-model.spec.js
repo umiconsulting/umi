@@ -264,6 +264,13 @@ describe('the sub-recipe', () => {
 });
 
 describe('the quantity the operator types', () => {
+  it('permits zero only when an optional inventory quantity requests it', () => {
+    expect(scaledQuantityText('0', 2, { allowZero: true })).toBe(0n);
+    expect(scaledQuantityText('0.00', 2, { allowZero: true })).toBe(0n);
+    expect(scaledQuantityText('0.000', 2, { allowZero: true })).toBeNull();
+    expect(scaledQuantityText('-1', 2, { allowZero: true })).toBeNull();
+    expect(scaledQuantityText('0', 2)).toBeNull();
+  });
   it('reads the text at the item scale', () => {
     expect(scaledQuantityText('250', 0)).toBe(250n);
     expect(scaledQuantityText('12.5', 2)).toBe(1250n);

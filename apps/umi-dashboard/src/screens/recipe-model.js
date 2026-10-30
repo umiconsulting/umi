@@ -298,14 +298,14 @@ export function subRecipeCostByItemId(recipes, itemsById) {
  * rather than rounded: the operator can see the refusal, and the server stores
  * exactly what the screen showed.
  */
-export function scaledQuantityText(text, scale) {
+export function scaledQuantityText(text, scale, { allowZero = false } = {}) {
   const digits = scaleOf(scale);
   const trimmed = String(text == null ? '' : text).trim();
   if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
   const [whole, fraction = ''] = trimmed.split('.');
   if (fraction.length > digits) return null;
   const value = BigInt(whole) * pow10(digits) + BigInt(fraction.padEnd(digits, '0') || '0');
-  if (value <= 0n || value > MAX_SAFE) return null;
+  if ((!allowZero && value === 0n) || value > MAX_SAFE) return null;
   return value;
 }
 
