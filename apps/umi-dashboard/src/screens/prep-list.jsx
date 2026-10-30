@@ -227,7 +227,9 @@ export default function PrepListWorkspace() {
         </p>
       ) : rows.length === 0 ? (
         <p className="muted">
-          <Trans>Define en Inventario la cantidad que quieres tener lista para cada artículo.</Trans>
+          <Trans>
+            Define en Inventario la cantidad que quieres tener lista para cada artículo.
+          </Trans>
         </p>
       ) : (
         <div style={{ overflowX: 'auto' }}>

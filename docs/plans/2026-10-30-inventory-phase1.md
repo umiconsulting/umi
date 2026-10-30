@@ -64,6 +64,16 @@ Propietario: repositorio y pruebas de `procurement`.
 - Actualizar contra la rama de destino si cambia durante el trabajo.
 - Entregar el PR y el resumen de validación. La integración requiere una decisión posterior.
 
+### 6. Textos y formulario de artículos
+
+El usuario solicita términos sencillos y muestra campos y botones desalineados durante la prueba local.
+
+- Sustituir «Par» y explicaciones sobre la API o la escala interna por lenguaje cotidiano.
+- Mostrar y capturar la cantidad mínima y la cantidad objetivo en la unidad del artículo, con conversión exacta al contrato.
+- Presentar las conversiones como equivalencias entre cantidades y unidades.
+- Alinear los controles y evitar solapamientos en escritorio y móvil.
+- Verificar guardado, reapertura y cantidades existentes con clics reales.
+
 ## Criterio de cierre
 
 Las regresiones reproducidas pasan con la corrección. Las pruebas existentes de los módulos afectados permanecen verdes.
@@ -109,3 +119,22 @@ Estas solicitudes se registran durante la implementación de la fase 1. Su imple
 - Validar tamaño y contenido del archivo, acceso por negocio, duplicados y auditoría.
 
 Fuentes locales: `SupplierInvoiceUploadRequest`, `ProcurementService.uploadSupplierInvoice` y `invoice-inbox.jsx`.
+
+### Flujo de captura de costo observado durante la revisión
+
+El botón que decía «Poner costo» abre `/inventory/costos` sin conservar el artículo seleccionado.
+La fase 1 cambia su nombre a «Ver costos» para describir la acción real.
+Esa pantalla muestra costos y márgenes. El costo actual procede de recepciones de compra.
+Se propone conectar la acción con una recepción que ya tenga el artículo seleccionado y regresar a la lista al guardar.
+Esta mejora queda pendiente para el flujo de compras; no se implementa en la fase 1.
+
+### Preparar directamente desde una receta
+
+La pestaña Preparación del dashboard muestra sugerencias y permite imprimir etiquetas. No registra una preparación.
+El POS y el backend ya registran preparaciones de artículos con receta: descuentan ingredientes y suman el artículo producido.
+Agregar una acción «Preparar» en el dashboard requiere elegir la cantidad, revisar ingredientes y confirmar el movimiento.
+La acción debe estar disponible aunque el artículo no tenga una cantidad objetivo.
+
+Antes de ampliar las sugerencias, revisar su cálculo con una prueba de demanda creciente.
+Actualmente `prepList` usa `par - onHand - forecastUsage`, lo que reduce la cantidad sugerida cuando aumenta el consumo previsto.
+Este cálculo básico también debe distinguirse del futuro pronóstico según los días de compra del negocio.
