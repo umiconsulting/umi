@@ -22,6 +22,18 @@ El panel y el reporte distinguen `Costo inicial`, `Calculado con compras` y `Sin
 
 Se inspeccionaron las capturas de escritorio y móvil. El campo conserva su unidad y moneda. Guardar y Cancelar son accesibles con desplazamiento. El diálogo no presenta desbordamiento horizontal.
 
+El controlador ejecutó `check:pr` contra `origin/feat/inventory-phase2-recipes`. Pasaron las comprobaciones y las ocho tareas de compilación, lint y pruebas afectadas. La API pasó 2120 pruebas, con 29 exclusiones previas. Pasaron los tipos de API y contrato.
+
+La migración conservó 94 artículos existentes con costo inicial vacío y 76 saldos sin cambios. Se verificó una instalación desde cero y la aplicación repetida sobre datos de prueba.
+
+## Compatibilidad y límites
+
+El SDK de Dart distingue ahora un campo omitido de un valor nulo explícito. Así, editar otro dato conserva el costo. Las pruebas ejecutables verifican conservar, borrar, cero y un importe positivo contra el contrato y comandos reales.
+
+La corrección del generador afecta 189 campos opcionales que admiten nulo, en 88 clases. Los campos conservan sus tipos. Los parámetros escalares usan `Object?` y validan el tipo al construir el objeto. Los parámetros de colecciones conservan sus tipos, incluidos literales vacíos y constructores constantes. Pasaron 104 pruebas de contrato, el análisis de Dart y la comprobación de generación.
+
+Los costos históricos diarios mantienen su criterio previo de costo actual. Las versiones guardadas de recetas conservan sus importes. Las pruebas locales verifican el backend y el dashboard; no prueban la interacción del POS nativo. La consulta previa de SQL conserva 15 sentencias fuera de su cobertura.
+
 ## Evidencia
 
 - [Formulario de escritorio](evidence/2026-10-30-inventory-initial-cost/initial-cost-create-desktop.png).
