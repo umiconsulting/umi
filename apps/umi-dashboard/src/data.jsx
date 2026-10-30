@@ -2405,38 +2405,31 @@ export function useInventoryRecipeExplosion(recipeId, refresh) {
   );
 }
 
-// The target picker's list: what a recipe can be built for, with the menu price the
-// margin is measured against.
-//
-// ⚠️ THE MENU READ IS THE PLATE READ, AND THAT IS DELIBERATE. It is the only
-// session-authenticated read that names a PRODUCT, a VARIANT and their price in one
-// answer, and it is gated on `merchant.manage` rather than on `catalog.read`. The
-// operations catalogue read is the alternative, and it needs a permission this tab
-// does not require. Its limit is the read's own 200-plate cap.
-//
-// ⚠️ A KNOWN LIMIT. A variant appears when the catalogue already maps that variant.
-// The console has no variant-catalogue read today, so a variant with no mapping
-// cannot be chosen. A product-level target is always offered, because
-// `includeUnmapped=true` lists every active product.
-const EMPTY_RECIPE_TARGETS = { targets: [], truncated: false };
+// Load every page so variants without a prior sales mapping remain selectable.
+const EMPTY_RECIPE_TARGETS = { targets: [] };
+
+// eslint-disable-next-line react-refresh/only-export-components
+export async function fetchRecipeTargets(merchantId) {
+  const targets = [];
+  const cursors = new Set();
+  let cursor = null;
+  for (let page = 0; page < 1000; page += 1) {
+    const query = new URLSearchParams({ limit: '100' });
+    if (cursor) query.set('cursor', cursor);
+    const response = await _apiFetch(`${routes.inventory.recipeTargets(merchantId)}?${query}`);
+    targets.push(...(response?.targets || []));
+    if (!response?.page?.hasMore) return { targets };
+    cursor = response.page.nextCursor;
+    if (!cursor || cursors.has(cursor)) break;
+    cursors.add(cursor);
+  }
+  throw new Error(t`No se pudieron cargar todos los productos. Vuelve a intentar.`);
+}
 
 async function _loadRecipeTargets(ctx) {
   const merchantId = _merchantId(ctx);
   if (!merchantId || !_canManageInventory(ctx)) return EMPTY_RECIPE_TARGETS;
-  const response = await _apiFetch(
-    _merchantPath(ctx, '/inventory-costing/plates?includeUnmapped=true&limit=200'),
-  );
-  return {
-    targets: ((response && response.plates) || []).map((plate) => ({
-      productId: plate.productId,
-      productName: plate.productName,
-      productActive: plate.productActive,
-      variantId: plate.variantId || null,
-      variantName: plate.variantName || null,
-      priceMinor: plate.priceMinor,
-    })),
-    truncated: Boolean(response && response.truncated),
-  };
+  return fetchRecipeTargets(merchantId);
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

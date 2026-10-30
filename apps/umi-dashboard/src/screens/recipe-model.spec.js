@@ -4,6 +4,7 @@ import {
   recipeComponentFromDraft,
   recipeCostPreview,
   recipeMargin,
+  recipeReplacementConfirmation,
   recipeToDraft,
   scaledQuantityText,
   subRecipeCostByItemId,
@@ -407,4 +408,64 @@ describe('edición de componentes convertidos', () => {
       expect(recipeComponentFromDraft({ ...component, quantityText }, item)).toBeNull();
     },
   );
+});
+
+describe('sales replacement confirmation', () => {
+  it('binds the exact mapping and a copy of the draft to a conflict', () => {
+    const request = {
+      operation: 'inventory.recipe.create',
+      parameters: { components: [{ quantity: { value: 2 } }] },
+    };
+    const confirmation = recipeReplacementConfirmation(
+      {
+        code: 'INVENTORY_RECIPE_MAPPING_CONFLICT',
+        details: {
+          error: { details: { mappingId: 'mapping-a', mappingVersion: 4, mappingType: 'direct' } },
+        },
+      },
+      request,
+    );
+    request.parameters.components[0].quantity.value = 9;
+    expect(confirmation).toEqual({
+      request: {
+        operation: 'inventory.recipe.create',
+        parameters: { components: [{ quantity: { value: 2 } }] },
+      },
+      replacement: { mappingId: 'mapping-a', expectedVersion: 4 },
+      mappingType: 'direct',
+    });
+  });
+  it('requires a fresh confirmation for each changed mapping', () => {
+    const first = recipeReplacementConfirmation(
+      {
+        code: 'INVENTORY_RECIPE_MAPPING_CONFLICT',
+        details: { details: { mappingId: 'mapping-a', mappingVersion: 1, mappingType: 'direct' } },
+      },
+      {},
+    );
+    const second = recipeReplacementConfirmation(
+      {
+        code: 'INVENTORY_RECIPE_MAPPING_CONFLICT',
+        details: {
+          details: { mappingId: 'mapping-a', mappingVersion: 2, mappingType: 'non_stock' },
+        },
+      },
+      {},
+    );
+    expect(first.replacement.expectedVersion).toBe(1);
+    expect(second.replacement.expectedVersion).toBe(2);
+    expect(second.mappingType).toBe('non_stock');
+  });
+  it('does not produce a replacement token when the mapping disappeared', () => {
+    expect(
+      recipeReplacementConfirmation(
+        {
+          code: 'INVENTORY_RECIPE_MAPPING_CONFLICT',
+          details: { details: { mappingId: null, mappingVersion: null, mappingType: null } },
+        },
+        {},
+      ).replacement,
+    ).toBeNull();
+    expect(recipeReplacementConfirmation({ code: 'SERVICE_UNAVAILABLE' }, {})).toBeNull();
+  });
 });
