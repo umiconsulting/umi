@@ -37,6 +37,7 @@ La respuesta incluye una huella de la receta y sus ingredientes, calculada por e
 La confirmación compara esa huella contra el plan que va a registrar. Incluye cambios de subrecetas que afecten los ingredientes.
 La huella no autoriza operaciones ni sustituye los permisos o el aislamiento por negocio.
 Se agregan campos opcionales al contrato, sin editar migraciones aplicadas ni cambiar el generador de SDK.
+Los campos nuevos admiten nulo y lo tratan como omisión, para conservar la serialización de los clientes Dart anteriores.
 
 ## Validación
 

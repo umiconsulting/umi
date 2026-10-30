@@ -51,10 +51,11 @@ parameters: {
   recipeFingerprint: string; // server fingerprint of the reviewed plan
 }
 // Existing produce operation accepts two new OPTIONAL fields:
-plannedQuantity?: PositiveScaledQuantity;
-recipeFingerprint?: string;
+plannedQuantity?: PositiveScaledQuantity | null;
+recipeFingerprint?: string | null;
 // The new dashboard sends quantity === plannedQuantity and the preview fingerprint.
 // Existing clients omit both and retain recipe-yield/actual-yield semantics.
+// Null has the same meaning as omission for Dart SDK compatibility.
 ```
 
 Use existing `ProductionRecord` parsing and command enrichment where possible. Do not create a second public write route.
@@ -63,7 +64,8 @@ Preview must reject a foreign or inactive stock location rather than merely echo
 Use the same normalized inputs and fingerprint function for preview and commit. Include the root recipe ID/version, planned output, and exact leaf ingredients.
 The fingerprint must detect nested-recipe changes that alter consumption. Do not use receipt costs as an authorization token.
 Read the commit plan under the existing transaction and recipe/item locks; the stock entries must use that same plan.
-An absent fingerprint preserves old clients. A supplied stale fingerprint returns `INVENTORY_PREPARATION_CHANGED` with no writes.
+An absent or null fingerprint preserves old clients. A supplied stale fingerprint returns `INVENTORY_PREPARATION_CHANGED` with no writes.
+An absent or null plannedQuantity uses the recipe yield. Test Dart round-trips and API null/omission behavior without changing the generator.
 An explicit planned quantity below the actual quantity returns `INVENTORY_PRODUCTION_QUANTITY_INVALID` with no writes.
 The new UI sends equal planned/actual quantities. Preserve existing shortfall semantics for callers without the new plan.
 Reject a retired or missing recipe, archived output, non-exact quantities, invalid precision, and invalid units before stock writes.
