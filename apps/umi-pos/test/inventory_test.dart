@@ -56,6 +56,8 @@ class _InventoryFake implements InventoryRepository {
   final AppException? historyError;
   final AppException? overviewError;
   InventoryAdjustment? adjustment;
+  bool countCancelled = false;
+  CancelInventoryCountRequest? cancelledCount;
   CreateInventoryCountRequest? createdCount;
   SubmitInventoryCountRequest? submittedCount;
   int historyCalls = 0;
@@ -84,120 +86,128 @@ class _InventoryFake implements InventoryRepository {
   Future<InventoryOverview> overview(
     String merchantId,
     InventoryQuery query,
-  ) async => overviewError != null ? throw overviewError! : InventoryOverview(
-    policy: {
-      'version': 'pilot-3e',
-      'fingerprint': List.filled(64, 'a').join(),
-      'offlineMutationsAllowed': false,
-    },
-    locations: [
-      {
-        'id': '00000000-0000-4000-8000-000000000004',
-        'displayName': 'Almacén principal',
-        'version': 1,
-      },
-    ],
-    items: [
-      {
-        'id': '00000000-0000-4000-8000-000000000005',
-        'displayName': 'Café en grano',
-        'publicReference': 'CAFE-01',
-        'baseUnit': 'gram',
-        'scale': quantityScale,
-        'active': true,
-        'version': 1,
-      },
-      if (withOutsideCountItems)
-        for (final entry in [
-          (
-            '00000000-0000-4000-8000-000000000040',
-            'Sin saldo en el almacén',
-            true,
-          ),
-          ('00000000-0000-4000-8000-000000000041', 'Artículo archivado', false),
-          (
-            '00000000-0000-4000-8000-000000000042',
-            'Saldo de otro almacén',
-            true,
-          ),
-        ])
-          {
-            'id': entry.$1,
-            'displayName': entry.$2,
-            'publicReference': entry.$1,
-            'baseUnit': 'gram',
-            'scale': quantityScale,
-            'active': entry.$3,
-            'version': 1,
+  ) async => overviewError != null
+      ? throw overviewError!
+      : InventoryOverview(
+          policy: {
+            'version': 'pilot-3e',
+            'fingerprint': List.filled(64, 'a').join(),
+            'offlineMutationsAllowed': false,
           },
-    ],
-    balances: [
-      {
-        'inventoryItemId': '00000000-0000-4000-8000-000000000005',
-        'inventoryLocationId': '00000000-0000-4000-8000-000000000004',
-        'onHand': 1000,
-        'reserved': 100,
-        'available': 900,
-        'version': 1,
-      },
-      if (withOutsideCountItems)
-        for (final entry in [
-          (
-            '00000000-0000-4000-8000-000000000041',
-            '00000000-0000-4000-8000-000000000004',
-          ),
-          (
-            '00000000-0000-4000-8000-000000000042',
-            '00000000-0000-4000-8000-000000000043',
-          ),
-        ])
-          {
-            'inventoryItemId': entry.$1,
-            'inventoryLocationId': entry.$2,
-            'onHand': 10,
-            'reserved': 0,
-            'available': 10,
-            'version': 1,
-          },
-    ],
-    restockReviews: withRestock
-        ? [
+          locations: [
             {
-              'restockIntentId': '00000000-0000-4000-8000-000000000010',
-              'exceptionId': '00000000-0000-4000-8000-000000000011',
-              'saleLineId': '00000000-0000-4000-8000-000000000012',
-              'decision': 'unknown_until_inventory_review',
-              'quantity': 1,
+              'id': '00000000-0000-4000-8000-000000000004',
+              'displayName': 'Almacén principal',
               'version': 1,
-              'status': 'review_required',
-              'components': [
-                {
-                  'inventoryItemId': '00000000-0000-4000-8000-000000000013',
-                  'displayName': 'Botella retornable',
-                  'publicReference': 'BOT-RET',
-                  'maximum': {'value': 1, 'scale': 0, 'unit': 'unit'},
-                  'recipeEffect': false,
-                },
-                {
-                  'inventoryItemId': '00000000-0000-4000-8000-000000000014',
-                  'displayName': 'Café en grano',
-                  'publicReference': 'CAFE-GRA',
-                  'maximum': {'value': 10, 'scale': 0, 'unit': 'gram'},
-                  'recipeEffect': true,
-                },
-              ],
             },
-          ]
-        : const [],
-    activeCount: withActiveCount
-        ? _countResult(
-            merchantId: merchantId,
-            locationId: query.locationId,
-            inventoryLocationId: '00000000-0000-4000-8000-000000000004',
-          ).toJson()
-        : null,
-    page: const {'limit': 100, 'hasMore': false, 'nextCursor': null},
-  );
+          ],
+          items: [
+            {
+              'id': '00000000-0000-4000-8000-000000000005',
+              'displayName': 'Café en grano',
+              'publicReference': 'CAFE-01',
+              'baseUnit': 'gram',
+              'scale': quantityScale,
+              'active': true,
+              'version': 1,
+            },
+            if (withOutsideCountItems)
+              for (final entry in [
+                (
+                  '00000000-0000-4000-8000-000000000040',
+                  'Sin saldo en el almacén',
+                  true,
+                ),
+                (
+                  '00000000-0000-4000-8000-000000000041',
+                  'Artículo archivado',
+                  false,
+                ),
+                (
+                  '00000000-0000-4000-8000-000000000042',
+                  'Saldo de otro almacén',
+                  true,
+                ),
+              ])
+                {
+                  'id': entry.$1,
+                  'displayName': entry.$2,
+                  'publicReference': entry.$1,
+                  'baseUnit': 'gram',
+                  'scale': quantityScale,
+                  'active': entry.$3,
+                  'version': 1,
+                },
+          ],
+          balances: [
+            {
+              'inventoryItemId': '00000000-0000-4000-8000-000000000005',
+              'inventoryLocationId': '00000000-0000-4000-8000-000000000004',
+              'onHand': 1000,
+              'reserved': 100,
+              'available': 900,
+              'version': 1,
+            },
+            if (withOutsideCountItems)
+              for (final entry in [
+                (
+                  '00000000-0000-4000-8000-000000000041',
+                  '00000000-0000-4000-8000-000000000004',
+                ),
+                (
+                  '00000000-0000-4000-8000-000000000042',
+                  '00000000-0000-4000-8000-000000000043',
+                ),
+              ])
+                {
+                  'inventoryItemId': entry.$1,
+                  'inventoryLocationId': entry.$2,
+                  'onHand': 10,
+                  'reserved': 0,
+                  'available': 10,
+                  'version': 1,
+                },
+          ],
+          restockReviews: withRestock
+              ? [
+                  {
+                    'restockIntentId': '00000000-0000-4000-8000-000000000010',
+                    'exceptionId': '00000000-0000-4000-8000-000000000011',
+                    'saleLineId': '00000000-0000-4000-8000-000000000012',
+                    'decision': 'unknown_until_inventory_review',
+                    'quantity': 1,
+                    'version': 1,
+                    'status': 'review_required',
+                    'components': [
+                      {
+                        'inventoryItemId':
+                            '00000000-0000-4000-8000-000000000013',
+                        'displayName': 'Botella retornable',
+                        'publicReference': 'BOT-RET',
+                        'maximum': {'value': 1, 'scale': 0, 'unit': 'unit'},
+                        'recipeEffect': false,
+                      },
+                      {
+                        'inventoryItemId':
+                            '00000000-0000-4000-8000-000000000014',
+                        'displayName': 'Café en grano',
+                        'publicReference': 'CAFE-GRA',
+                        'maximum': {'value': 10, 'scale': 0, 'unit': 'gram'},
+                        'recipeEffect': true,
+                      },
+                    ],
+                  },
+                ]
+              : const [],
+          activeCount: withActiveCount && !countCancelled
+              ? _countResult(
+                  merchantId: merchantId,
+                  locationId: query.locationId,
+                  inventoryLocationId: '00000000-0000-4000-8000-000000000004',
+                ).toJson()
+              : null,
+          page: const {'limit': 100, 'hasMore': false, 'nextCursor': null},
+        );
 
   @override
   Future<InventoryHistoryResult> history(
@@ -333,6 +343,27 @@ class _InventoryFake implements InventoryRepository {
     ProductionRecord command,
   ) => throw UnimplementedError();
   @override
+  Future<InventoryCountResult> cancelCount(
+    String merchantId,
+    CancelInventoryCountRequest command,
+  ) async {
+    cancelledCount = command;
+    countCancelled = true;
+    final initial = _countResult(
+      merchantId: merchantId,
+      locationId: command.locationId,
+      inventoryLocationId: command.inventoryLocationId,
+    );
+    return InventoryCountResult(
+      count: {...initial.count, 'status': 'cancelled', 'version': 2},
+      variances: const [],
+      entries: const [],
+      recovered: false,
+      correlationId: 'cancel-test',
+    );
+  }
+
+  @override
   Future<InventoryCountResult> submitCount(
     String merchantId,
     SubmitInventoryCountRequest command,
@@ -412,6 +443,7 @@ InventoryCountResult _countResult({
     'blind': true,
     'snapshotLedgerSequence': 1,
     'attempt': 1,
+    'version': 1,
     'lines': <Object?>[],
     'createdAt': '2026-08-05T10:00:00.000Z',
     'submittedAt': null,
@@ -480,17 +512,48 @@ Widget _app(
       merchantId: scope.merchantId,
       locationId: scope.locationId,
       operatorSessionId: scope.operatorSessionId,
-      canReadHistory: OperatorPermissions(permissions).allows('inventory.history.read'),
+      canReadHistory: OperatorPermissions(
+        permissions,
+      ).allows('inventory.history.read'),
     ),
     permissions: OperatorPermissions(permissions),
   ),
 );
 
 void main() {
-  testWidgets('Inventory read does not request restricted history', (tester) async {
-    final fake = _InventoryFake(historyError: const AppException(
-      code: 'PERMISSION_DENIED', category: AppErrorCategory.permission, recoverable: false,
-    ));
+  testWidgets(
+    'an authorized operator can cancel an active count before a fresh count',
+    (tester) async {
+      final fake = _InventoryFake(withActiveCount: true);
+      await tester.pumpWidget(
+        _app(const ['inventory.read', 'inventory.count.create'], fake: fake),
+      );
+      await tester.pumpAndSettle();
+      final cancel = find.text('Cancelar conteo activo');
+      expect(cancel, findsOneWidget);
+      await tester.ensureVisible(cancel);
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar y volver a contar'));
+      await tester.pumpAndSettle();
+      expect(fake.cancelledCount!.expectedVersion, 1);
+      expect(fake.cancelledCount!.attempt, 1);
+      expect(find.text('Conteo ciego activo'), findsNothing);
+      expect(find.text('Iniciar conteo ciego'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('Inventory read does not request restricted history', (
+    tester,
+  ) async {
+    final fake = _InventoryFake(
+      historyError: const AppException(
+        code: 'PERMISSION_DENIED',
+        category: AppErrorCategory.permission,
+        recoverable: false,
+      ),
+    );
     await tester.pumpWidget(_app(const ['inventory.read'], fake: fake));
     await tester.pumpAndSettle();
     expect(find.text('Café en grano'), findsOneWidget);
@@ -499,9 +562,13 @@ void main() {
   });
 
   test('History failure preserves inventory and exposes the error', () async {
-    final fake = _InventoryFake(historyError: const AppException(
-      code: 'NETWORK_UNAVAILABLE', category: AppErrorCategory.transport, recoverable: true,
-    ));
+    final fake = _InventoryFake(
+      historyError: const AppException(
+        code: 'NETWORK_UNAVAILABLE',
+        category: AppErrorCategory.transport,
+        recoverable: true,
+      ),
+    );
     final controller = InventoryController(fake);
     await controller.load(scope);
     expect(controller.state.overview?.items, isNotEmpty);
@@ -510,9 +577,15 @@ void main() {
   });
 
   test('Overview failure remains a visible read error', () async {
-    final controller = InventoryController(_InventoryFake(overviewError: const AppException(
-      code: 'PERMISSION_REVOKED', category: AppErrorCategory.permission, recoverable: false,
-    )));
+    final controller = InventoryController(
+      _InventoryFake(
+        overviewError: const AppException(
+          code: 'PERMISSION_REVOKED',
+          category: AppErrorCategory.permission,
+          recoverable: false,
+        ),
+      ),
+    );
     await controller.load(scope);
     expect(controller.state.overview, isNull);
     expect(controller.state.errorCode, 'PERMISSION_REVOKED');
@@ -548,6 +621,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(PosField), findsOneWidget);
+    expect(find.text('Cancelar conteo activo'), findsNothing);
     expect(find.text('Sin saldo en el almacén'), findsNothing);
     expect(find.text('Artículo archivado'), findsNothing);
     expect(find.text('Saldo de otro almacén'), findsNothing);
@@ -907,7 +981,8 @@ void main() {
 
       await controller.resolveRestock(scope, review, {
         for (final component
-            in (review['components']! as List<Object?>).cast<Map<String, Object?>>())
+            in (review['components']! as List<Object?>)
+                .cast<Map<String, Object?>>())
           component['inventoryItemId']! as String: 'restocked',
       });
       expect(fake.restockCalls, 1);
@@ -921,13 +996,21 @@ void main() {
       expect(
         controller.state.pendingOperation,
         isNotNull,
-        reason: 'a refresh must not forget the command that is waiting for approval',
+        reason:
+            'a refresh must not forget the command that is waiting for approval',
       );
 
       await controller.approvePendingOperation(scope, 'approval-1');
-      expect(fake.restockCalls, 2, reason: 'the approval must re-send the command');
+      expect(
+        fake.restockCalls,
+        2,
+        reason: 'the approval must re-send the command',
+      );
       expect(fake.restockCommand!.approvalId, 'approval-1');
-      expect(fake.restockCommand!.approvalFingerprint, List.filled(64, 'a').join());
+      expect(
+        fake.restockCommand!.approvalFingerprint,
+        List.filled(64, 'a').join(),
+      );
     },
   );
 
@@ -943,7 +1026,11 @@ void main() {
 
     await controller.startCount(scope);
 
-    expect(fake.createdCount, isNotNull, reason: 'the count reached the server');
+    expect(
+      fake.createdCount,
+      isNotNull,
+      reason: 'the count reached the server',
+    );
     expect(fake.createdCount!.itemIds, isNotNull);
     expect(fake.createdCount!.itemIds, isEmpty);
     expect(fake.createdCount!.toJson()['itemIds'], isNotNull);
