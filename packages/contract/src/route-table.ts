@@ -3476,6 +3476,16 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     permission: 'inventory.count.create',
   }),
   posMerchantRoute({
+    id: 'pos.inventoryCountCancel',
+    method: 'POST',
+    suffix: '/inventory/counts/:countId/cancel',
+    params: ['countId'],
+    dart: 'posInventoryCountCancel',
+    request: 'CancelInventoryCountRequest',
+    response: 'InventoryCountResult',
+    permission: 'inventory.count.create',
+  }),
+  posMerchantRoute({
     id: 'pos.inventoryCountSubmit',
     method: 'POST',
     suffix: '/inventory/counts/:countId/submit',

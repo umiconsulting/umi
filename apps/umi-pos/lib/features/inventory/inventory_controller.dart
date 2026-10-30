@@ -11,10 +11,12 @@ final class InventoryScope {
     required this.merchantId,
     required this.locationId,
     required this.operatorSessionId,
+    this.canReadHistory = false,
   });
   final String merchantId;
   final String locationId;
   final String operatorSessionId;
+  final bool canReadHistory;
 }
 
 typedef InventoryCommandSeed = ({
@@ -63,13 +65,15 @@ final class InventoryController extends ChangeNotifier {
   final InventoryRepository _repository;
   InventoryUiState _state = const InventoryUiState();
   InventoryUiState get state => _state;
+  int _loadGeneration = 0;
 
   Future<void> load(InventoryScope scope) async {
+    final generation = ++_loadGeneration;
     _set(
       InventoryUiState(
         busy: true,
         overview: _state.overview,
-        history: _state.history,
+        history: scope.canReadHistory ? _state.history : null,
         count: _state.count,
         pendingReconciliation: _state.pendingReconciliation,
         pendingOperation: _state.pendingOperation,
@@ -84,32 +88,57 @@ final class InventoryController extends ChangeNotifier {
         operatorSessionId: scope.operatorSessionId,
         limit: 100,
       );
-      final results = await Future.wait([
-        _loadCompleteOverview(scope, query),
-        _repository.history(scope.merchantId, query),
-      ]);
-      final overview = results[0] as InventoryOverview;
+      final overview = await _loadCompleteOverview(scope, query);
+      if (generation != _loadGeneration) return;
+      InventoryHistoryResult? history;
+      String? historyError;
+      if (scope.canReadHistory) {
+        try {
+          history = await _repository.history(scope.merchantId, query);
+        } on AppException catch (error) {
+          historyError = error.code;
+        }
+      }
+      if (generation != _loadGeneration) return;
+      final previousCount = _state.count;
+      final count = overview.activeCount == null
+          ? null
+          : InventoryCountResult.fromJson(overview.activeCount!);
+      final countChanged = const [
+        'id',
+        'version',
+        'attempt',
+        'snapshotLedgerSequence',
+        'status',
+      ].any((field) => previousCount?.count[field] != count?.count[field]);
+      final clearReconciliation =
+          _state.pendingReconciliation != null &&
+          (count == null || countChanged);
+      final clearApproval =
+          clearReconciliation && _state.pendingOperation == null;
       _set(
         InventoryUiState(
           overview: overview,
-          history: results[1] as InventoryHistoryResult,
-          count:
-              _state.count ??
-              (overview.activeCount == null
-                  ? null
-                  : InventoryCountResult.fromJson(overview.activeCount!)),
-          pendingReconciliation: _state.pendingReconciliation,
+          history: history,
+          errorCode: historyError,
+          count: count,
+          pendingReconciliation: clearReconciliation
+              ? null
+              : _state.pendingReconciliation,
           pendingOperation: _state.pendingOperation,
           production: _state.production,
-          approvalPermission: _state.approvalPermission,
-          approvalFingerprint: _state.approvalFingerprint,
+          approvalPermission: clearApproval ? null : _state.approvalPermission,
+          approvalFingerprint: clearApproval
+              ? null
+              : _state.approvalFingerprint,
         ),
       );
     } on AppException catch (error) {
+      if (generation != _loadGeneration) return;
       _set(
         InventoryUiState(
           overview: _state.overview,
-          history: _state.history,
+          history: scope.canReadHistory ? _state.history : null,
           count: _state.count,
           pendingReconciliation: _state.pendingReconciliation,
           pendingOperation: _state.pendingOperation,
@@ -200,9 +229,11 @@ final class InventoryController extends ChangeNotifier {
   }
 
   Future<void> loadMoreHistory(InventoryScope scope) async {
+    if (!scope.canReadHistory) return;
     final current = _state.history;
     final cursor = current?.page['nextCursor'] as String?;
     if (current == null || cursor == null || _state.busy) return;
+    final generation = _loadGeneration;
     _set(
       InventoryUiState(
         busy: true,
@@ -221,6 +252,7 @@ final class InventoryController extends ChangeNotifier {
           limit: 100,
         ),
       );
+      if (generation != _loadGeneration) return;
       _set(
         InventoryUiState(
           overview: _state.overview,
@@ -232,6 +264,7 @@ final class InventoryController extends ChangeNotifier {
         ),
       );
     } on AppException catch (error) {
+      if (generation != _loadGeneration) return;
       _set(
         InventoryUiState(
           overview: _state.overview,
@@ -489,6 +522,55 @@ final class InventoryController extends ChangeNotifier {
           history: _state.history,
           count: recovered ?? _state.count,
           errorCode: recovered == null ? error.code : null,
+        ),
+      );
+    }
+  }
+
+  Future<void> cancelCount(InventoryScope scope) async {
+    final overview = _state.overview;
+    final current = _state.count;
+    if (overview == null || current == null) return;
+    final count = current.count;
+    final command = CancelInventoryCountRequest(
+      locationId: scope.locationId,
+      inventoryLocationId: count['inventoryLocationId']! as String,
+      operatorSessionId: scope.operatorSessionId,
+      commandId: _uuid(),
+      idempotencyKey: _uuid(),
+      expectedVersion: (count['version']! as num).toInt(),
+      policyFingerprint: overview.policy['fingerprint']! as String,
+      businessDate: _businessDate(),
+      countId: count['id']! as String,
+      attempt: (count['attempt']! as num).toInt(),
+    );
+    _set(
+      InventoryUiState(
+        busy: true,
+        overview: overview,
+        history: _state.history,
+        count: current,
+      ),
+    );
+    try {
+      await _repository.cancelCount(scope.merchantId, command);
+      _set(InventoryUiState(overview: overview, history: _state.history));
+      await load(scope);
+    } on AppException catch (error) {
+      final recovered = error.recoverable
+          ? await _recoverCount(scope, command.commandId)
+          : null;
+      if (recovered?.count['status'] == 'cancelled') {
+        _set(InventoryUiState(overview: overview, history: _state.history));
+        await load(scope);
+        return;
+      }
+      _set(
+        InventoryUiState(
+          overview: overview,
+          history: _state.history,
+          count: current,
+          errorCode: error.code,
         ),
       );
     }
@@ -895,7 +977,9 @@ final class InventoryController extends ChangeNotifier {
       operatorSessionId: scope.operatorSessionId,
       commandId: _uuid(),
       idempotencyKey: _uuid(),
-      expectedVersion: balance == null ? 1 : (balance['version']! as num).toInt(),
+      expectedVersion: balance == null
+          ? 1
+          : (balance['version']! as num).toInt(),
       policyFingerprint: overview.policy['fingerprint']! as String,
       approvalId: approvalId,
       approvalFingerprint: approvalFingerprint,

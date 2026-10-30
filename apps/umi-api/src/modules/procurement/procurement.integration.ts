@@ -538,6 +538,148 @@ describe('purchasing · send, receive, cancel, and the stock they move', () => {
     await pg.onModuleDestroy();
   });
 
+  it('normaliza escalas antes de reservar, recibir parcialmente y cancelar el pendiente', async () => {
+    const before = await balance(ITEM_CAFE_PARTIAL);
+    const { purchaseOrder: draft } = await createOrder([
+      {
+        inventoryItemId: ITEM_CAFE_PARTIAL,
+        supplierSku: null,
+        description: null,
+        quantity: { value: 5, scale: 0, unit: 'kilogram' },
+        unitCostMinor: 10000,
+        lineTotalMinor: 50000,
+      },
+    ]);
+    expect(draft.lines[0].orderedQuantity).toEqual({ value: 5000, scale: 3, unit: 'kilogram' });
+    const { purchaseOrder: sent } = await send(draft.id, draft.version);
+    const receiptInput = {
+      idempotencyKey: randomUUID(),
+      purchaseOrderId: sent.id,
+      expectedVersion: sent.version,
+      lines: [
+        {
+          purchaseOrderLineId: sent.lines[0].id,
+          quantity: { value: 25, scale: 1, unit: 'kilogram' as const },
+          actualUnitCostMinor: 10000,
+          lineTotalMinor: 25000,
+        },
+      ],
+    };
+    const { purchaseOrder: receipt } = await receive(receiptInput);
+    expect(receipt.status).toBe('partially_received');
+    expect(receipt.lines[0].receivedQuantity).toBe(2500);
+    expect(receipt.receivedTotalMinor).toBe(25000);
+    const partial = await balance(ITEM_CAFE_PARTIAL);
+    expect(partial.onHand - before.onHand).toBe(2500);
+    expect(partial.inTransit - before.inTransit).toBe(2500);
+    const { purchaseOrder: replay } = await receive(receiptInput);
+    expect(replay.receipts).toHaveLength(1);
+    expect(await balance(ITEM_CAFE_PARTIAL)).toEqual(partial);
+    await cancel(receipt.id, receipt.version);
+    const cancelled = await balance(ITEM_CAFE_PARTIAL);
+    expect(cancelled.onHand - before.onHand).toBe(2500);
+    expect(cancelled.inTransit).toBe(before.inTransit);
+  });
+
+  it.each([
+    {
+      quantity: { value: 5, scale: 0, unit: 'liter' as const },
+      code: 'INVENTORY_UNIT_CONVERSION_REQUIRED',
+    },
+    {
+      quantity: { value: 15001, scale: 4, unit: 'kilogram' as const },
+      code: 'INVENTORY_QUANTITY_NOT_EXACT',
+    },
+    {
+      quantity: { value: Number.MAX_SAFE_INTEGER, scale: 0, unit: 'kilogram' as const },
+      code: 'INVENTORY_QUANTITY_OUT_OF_RANGE',
+    },
+  ])('rechaza una cantidad de compra incompatible: $code', async ({ quantity, code }) => {
+    const error = await refusal(() =>
+      createOrder([
+        {
+          inventoryItemId: ITEM_CAFE_GUARD,
+          supplierSku: null,
+          description: null,
+          quantity,
+          unitCostMinor: 0,
+          lineTotalMinor: 0,
+        },
+      ]),
+    );
+    expect(error.code).toBe(code);
+  });
+
+  it.each([
+    {
+      quantity: { value: 6, scale: 0, unit: 'kilogram' as const },
+      code: 'PURCHASE_ORDER_OVER_RECEIPT',
+    },
+    {
+      quantity: { value: 1, scale: 0, unit: 'liter' as const },
+      code: 'INVENTORY_UNIT_CONVERSION_REQUIRED',
+    },
+    {
+      quantity: { value: 15001, scale: 4, unit: 'kilogram' as const },
+      code: 'INVENTORY_QUANTITY_NOT_EXACT',
+    },
+  ])(
+    'rechaza una recepción incompatible sin cambiar existencias: $code',
+    async ({ quantity, code }) => {
+      const { purchaseOrder: draft } = await createOrder([
+        {
+          inventoryItemId: ITEM_CAFE_GUARD,
+          supplierSku: null,
+          description: null,
+          quantity: { value: 5000, scale: 3, unit: 'kilogram' },
+          unitCostMinor: 0,
+          lineTotalMinor: 0,
+        },
+      ]);
+      const { purchaseOrder: sent } = await send(draft.id, draft.version);
+      const before = await balance(ITEM_CAFE_GUARD);
+      const error = await refusal(() =>
+        receive({
+          purchaseOrderId: sent.id,
+          expectedVersion: sent.version,
+          lines: [
+            {
+              purchaseOrderLineId: sent.lines[0].id,
+              quantity,
+              actualUnitCostMinor: 0,
+              lineTotalMinor: 0,
+            },
+          ],
+        }),
+      );
+      expect(error.code).toBe(code);
+      expect(await balance(ITEM_CAFE_GUARD)).toEqual(before);
+      expect((await receiptsFor(sent.id)).rows).toEqual([]);
+    },
+  );
+
+  it('rechaza una orden antigua cuya escala no coincide con el artículo antes de registrar tránsito', async () => {
+    const { purchaseOrder } = await createOrder([
+      {
+        inventoryItemId: ITEM_CAFE_GUARD,
+        supplierSku: null,
+        description: null,
+        quantity: { value: 5000, scale: 3, unit: 'kilogram' },
+        unitCostMinor: 0,
+        lineTotalMinor: 0,
+      },
+    ]);
+    await pg.query(
+      `UPDATE merchant.purchase_order_line SET ordered_quantity=5,quantity_scale=0
+      WHERE id=$1::uuid`,
+      [purchaseOrder.lines[0].id],
+    );
+    const before = await balance(ITEM_CAFE_GUARD);
+    const error = await refusal(() => send(purchaseOrder.id, purchaseOrder.version));
+    expect(error.code).toBe('INVENTORY_QUANTITY_SCALE_MISMATCH');
+    expect(await balance(ITEM_CAFE_GUARD)).toEqual(before);
+  });
+
   it('raises an order, sends it, and puts exactly the ordered quantity in transit', async () => {
     const before = await balance(ITEM_CAFE);
     const { purchaseOrder } = await createOrder([

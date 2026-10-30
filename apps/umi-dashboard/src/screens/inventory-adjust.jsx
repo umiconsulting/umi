@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { Select } from '@/components/select.jsx';
 import { useAdministrativeCommand } from '@/lib/administrative-command.jsx';
-import { onHandDisplay } from './inventory-model.js';
+import { adjustmentBalance, adjustmentDelta } from './inventory-model.js';
 import { UNIT_LABEL } from './inventory-copy.js';
 
 /**
@@ -34,11 +34,11 @@ const REASONS = ['count_correction', 'expired', 'damaged', 'spillage', 'theft'];
 export default function InventoryAdjustSheet({ item, locationId, onClose, onDone }) {
   const { t, i18n } = useLingui();
   const command = useAdministrativeCommand();
-  const unit = UNIT_LABEL[item.baseUnit] ? i18n._(UNIT_LABEL[item.baseUnit]) : item.baseUnit;
-  const current = onHandDisplay(item, locationId);
+  const execute = command.execute;
+  const overviewRequest = useRef(null);
 
   const [overview, setOverview] = useState(null);
-  const [amount, setAmount] = useState(current.text || '');
+  const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('count_correction');
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
@@ -52,12 +52,29 @@ export default function InventoryAdjustSheet({ item, locationId, onClose, onDone
    */
   useEffect(() => {
     let alive = true;
-    command
-      .execute('inventory.overview', item.id, {
-        parameters: { inventoryLocationId: locationId, itemId: item.id, limit: 100 },
-      })
+    // StrictMode repite el efecto. Ambas ejecuciones comparten una sola lectura.
+    if (
+      overviewRequest.current?.itemId !== item.id ||
+      overviewRequest.current?.locationId !== locationId ||
+      overviewRequest.current?.execute !== execute
+    ) {
+      overviewRequest.current = {
+        itemId: item.id,
+        locationId,
+        execute,
+        promise: execute('inventory.overview', item.id, {
+          parameters: { itemId: item.id, limit: 100 },
+        }),
+      };
+    }
+    overviewRequest.current.promise
       .then((response) => {
-        if (alive) setOverview(response.result);
+        if (alive) {
+          const balance = adjustmentBalance(response.result, item.id, locationId);
+          setOverview(response.result);
+          setAmount(balance?.text ?? '');
+          if (!balance) setMessage(t`No se pudo leer la existencia.`);
+        }
       })
       .catch((error) => {
         if (alive) setMessage(error?.message || t`No se pudo leer la existencia.`);
@@ -65,41 +82,31 @@ export default function InventoryAdjustSheet({ item, locationId, onClose, onDone
     return () => {
       alive = false;
     };
-  }, [command, item.id, locationId, t]);
+  }, [execute, item.id, locationId, t]);
 
-  const parsed = Number(amount);
-  const valid = amount !== '' && Number.isFinite(parsed) && parsed >= 0;
-  const changed = current.text == null || String(parsed) !== String(Number(current.text));
+  const current = adjustmentBalance(overview, item.id, locationId);
+  const delta = adjustmentDelta(amount, current);
+  const valid = delta !== null;
+  const changed = valid && delta.quantity.value > 0;
+  const baseUnit = current?.unit ?? item.baseUnit;
+  const unit = UNIT_LABEL[baseUnit] ? i18n._(UNIT_LABEL[baseUnit]) : baseUnit;
 
   async function submit() {
     if (!overview || !valid || !changed) return;
     setBusy(true);
     setMessage('');
     try {
-      const balance = (overview.balances || []).find(
-        (row) => row.inventoryLocationId === locationId && row.inventoryItemId === item.id,
-      );
-      const itemRow = (overview.items || []).find((row) => row.id === item.id) || {
-        scale: item.quantityScale,
-        baseUnit: item.baseUnit,
-      };
       const common = {
-        inventoryLocationId: locationId,
-        expectedVersion: balance?.version ?? 1,
+        inventoryLocationId: current.inventoryLocationId,
+        expectedVersion: delta.expectedVersion,
         policyFingerprint: overview.policy.fingerprint,
         approvalFingerprint: null,
         businessDate: new Date().toISOString().slice(0, 10),
       };
-      const target = { value: parsed, scale: itemRow.scale, unit: itemRow.baseUnit };
-      // The command records a delta, not an absolute. The delta is the difference
-      // between what the person counted and what the system held.
-      const held = Number(current.value ?? 0);
-      const delta = parsed - held;
-      const direction = delta >= 0 ? 'increase' : 'decrease';
       const body = {
         ...common,
-        direction,
-        quantity: { ...target, value: Math.abs(delta) },
+        direction: delta.direction,
+        quantity: delta.quantity,
         reason,
         note: note.trim() || null,
       };
@@ -172,7 +179,7 @@ export default function InventoryAdjustSheet({ item, locationId, onClose, onDone
             <dt>
               <Trans>Existencia actual</Trans>
             </dt>
-            <dd>{current.state === 'empty' ? t`sin registro` : `${current.text} ${unit}`}</dd>
+            <dd>{current ? `${current.text} ${unit}` : t`sin registro`}</dd>
           </dl>
 
           <label className="field">
@@ -184,6 +191,7 @@ export default function InventoryAdjustSheet({ item, locationId, onClose, onDone
                 className="input inv-num"
                 style={{ flex: 1 }}
                 inputMode="decimal"
+                disabled={!current}
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
                 aria-label={t`Nueva existencia contada`}
@@ -249,7 +257,7 @@ export default function InventoryAdjustSheet({ item, locationId, onClose, onDone
             disabled={busy || !valid || !changed || !overview}
             onClick={submit}
           >
-            <Trans>Ajustar existencia</Trans>
+            <Trans>Guardar ajuste</Trans>
           </button>
         </div>
       </section>

@@ -3884,6 +3884,15 @@ msgstr "PIN del aprobador, si la política lo pide"
 msgid "PIN del aprobador"
 msgstr "PIN del aprobador"
 
+#: src/screens/inventory-adjust.jsx
+msgid "Guardar ajuste"
+msgstr "Guardar ajuste"
+
+#: src/screens/inventory-copy.js
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Las unidades no se dividen exactamente a esta escala. Elige redondear hacia abajo, hacia arriba o al más cercano."
+#~ msgstr "Las unidades no se dividen exactamente a esta escala. Elige redondear hacia abajo, hacia arriba o al más cercano."
+
 #: src/screens/inventory-copy.js
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
@@ -4057,16 +4066,13 @@ msgid "No tienes permiso para administrar el inventario."
 msgstr "No tienes permiso para administrar el inventario."
 
 #: src/screens/inventory-copy.js
-#: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
-#: src/screens/recipe-workspace.jsx
-msgid "Revisa los datos. La API no aceptó la operación."
-msgstr "Revisa los datos. La API no aceptó la operación."
+msgid "Revisa los datos antes de guardar."
+msgstr "Revisa los datos antes de guardar."
 
 #: src/screens/inventory-copy.js
-#: src/screens/inventory-item-editor.jsx
-msgid "Las unidades no se dividen exactamente a esta escala. Elige redondear hacia abajo, hacia arriba o al más cercano."
-msgstr "Las unidades no se dividen exactamente a esta escala. Elige redondear hacia abajo, hacia arriba o al más cercano."
+msgid "El resultado necesita más decimales de los permitidos. Elige redondear hacia abajo, hacia arriba o al más cercano."
+msgstr "El resultado necesita más decimales de los permitidos. Elige redondear hacia abajo, hacia arriba o al más cercano."
 
 #: src/screens/inventory-copy.js
 msgid "La etiqueta ya no existe. Actualiza la lista."
@@ -4589,6 +4595,10 @@ msgid "No se pudo leer el inventario."
 msgstr "No se pudo leer el inventario."
 
 #: src/screens/inventory-count.jsx
+msgid "No se pudo cancelar el conteo."
+msgstr "No se pudo cancelar el conteo."
+
+#: src/screens/inventory-count.jsx
 msgid "Las áreas elegidas no tienen artículos con existencia."
 msgstr "Las áreas elegidas no tienen artículos con existencia."
 
@@ -4599,6 +4609,10 @@ msgstr "No se pudo leer la existencia del sistema."
 #: src/screens/inventory-count.jsx
 msgid "El área ya no está disponible."
 msgstr "El área ya no está disponible."
+
+#: src/screens/inventory-count.jsx
+msgid "El inventario está ocupado. Intenta enviar el conteo de nuevo."
+msgstr "El inventario está ocupado. Intenta enviar el conteo de nuevo."
 
 #: src/screens/inventory-count.jsx
 msgid "No se pudo enviar el conteo."
@@ -4617,6 +4631,26 @@ msgstr "Contar stock"
 #: src/screens/inventory-count.jsx
 msgid "Pasos del conteo"
 msgstr "Pasos del conteo"
+
+#: src/screens/inventory-count.jsx
+msgid "Hay un conteo activo. Si cambió el inventario, cancélalo e inicia otro conteo."
+msgstr "Hay un conteo activo. Si cambió el inventario, cancélalo e inicia otro conteo."
+
+#: src/screens/inventory-count.jsx
+msgid "El historial se conserva. Debes registrar de nuevo las cantidades."
+msgstr "El historial se conserva. Debes registrar de nuevo las cantidades."
+
+#: src/screens/inventory-count.jsx
+msgid "Volver"
+msgstr "Volver"
+
+#: src/screens/inventory-count.jsx
+msgid "Confirmar cancelación"
+msgstr "Confirmar cancelación"
+
+#: src/screens/inventory-count.jsx
+msgid "Cancelar conteo activo y volver a contar"
+msgstr "Cancelar conteo activo y volver a contar"
 
 #: src/screens/inventory-count.jsx
 msgid "El conteo cubre los primeros 100 artículos de la lista."
@@ -4725,6 +4759,92 @@ msgid "Aplicar filtros"
 msgstr "Aplicar filtros"
 
 #: src/screens/inventory-item-editor.jsx
+#~ msgid "Convierte la unidad de compra a la unidad base del artículo. Un gramo a kilogramo se escribe 1 y 1000, con escala 3."
+#~ msgstr "Convierte la unidad de compra a la unidad base del artículo. Un gramo a kilogramo se escribe 1 y 1000, con escala 3."
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Numerador"
+#~ msgstr "Numerador"
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Denominador"
+#~ msgstr "Denominador"
+
+#. placeholder {0}: item.quantityScale
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Escala del artículo: {0} decimales."
+#~ msgstr "Escala del artículo: {0} decimales."
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Escribe el numerador y el denominador como enteros positivos."
+#~ msgstr "Escribe el numerador y el denominador como enteros positivos."
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "La conversión da unidades completas a esta escala."
+#~ msgstr "La conversión da unidades completas a esta escala."
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Elige una política de redondeo para guardar."
+#~ msgstr "Elige una política de redondeo para guardar."
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "El set completo se guarda. Si quitas todas, el artículo queda sin alérgenos."
+#~ msgstr "El set completo se guarda. Si quitas todas, el artículo queda sin alérgenos."
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "La API rechaza una referencia repetida."
+#~ msgstr "La API rechaza una referencia repetida."
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Umbral de stock bajo"
+#~ msgstr "Umbral de stock bajo"
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Sin umbral"
+#~ msgstr "Sin umbral"
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "En la escala del artículo. 0 se guarda como un umbral real."
+#~ msgstr "En la escala del artículo. 0 se guarda como un umbral real."
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Par de preparación"
+#~ msgstr "Par de preparación"
+
+#: src/screens/inventory-item-editor.jsx
+#: src/screens/prep-list.jsx
+#~ msgid "Sin par"
+#~ msgstr "Sin par"
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "En la escala del artículo. La lista de preparación lo resta."
+#~ msgstr "En la escala del artículo. La lista de preparación lo resta."
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "La vida útil y el umbral se guardan en la escala del artículo."
+#~ msgstr "La vida útil y el umbral se guardan en la escala del artículo."
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Unidad origen"
+#~ msgstr "Unidad origen"
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Unidad destino"
+#~ msgstr "Unidad destino"
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Decimales de cantidad"
+#~ msgstr "Decimales de cantidad"
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Política de inventario"
+#~ msgstr "Política de inventario"
+
+#: src/screens/inventory-item-editor.jsx
+#~ msgid "Existencia negativa"
+#~ msgstr "Existencia negativa"
+
+#: src/screens/inventory-item-editor.jsx
 msgid "No puedes administrar el inventario."
 msgstr "No puedes administrar el inventario."
 
@@ -4783,8 +4903,8 @@ msgid "Conversiones de unidad"
 msgstr "Conversiones de unidad"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "Convierte la unidad de compra a la unidad base del artículo. Un gramo a kilogramo se escribe 1 y 1000, con escala 3."
-msgstr "Convierte la unidad de compra a la unidad base del artículo. Un gramo a kilogramo se escribe 1 y 1000, con escala 3."
+msgid "Escribe dos cantidades equivalentes. Por ejemplo: 1000 g = 1 kg. Usa números enteros mayores que cero."
+msgstr "Escribe dos cantidades equivalentes. Por ejemplo: 1000 g = 1 kg. Usa números enteros mayores que cero."
 
 #: src/screens/inventory-item-editor.jsx
 msgid "Sin conversiones."
@@ -4797,45 +4917,45 @@ msgid "Editar la conversión de {0} a {1}"
 msgstr "Editar la conversión de {0} a {1}"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "Unidad origen"
-msgstr "Unidad origen"
+msgid "Cantidad de compra"
+msgstr "Cantidad de compra"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "Unidad destino"
-msgstr "Unidad destino"
+msgid "Unidad de compra"
+msgstr "Unidad de compra"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "Numerador"
-msgstr "Numerador"
+msgid "Equivale a"
+msgstr "Equivale a"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "Denominador"
-msgstr "Denominador"
+msgid "Unidad de inventario"
+msgstr "Unidad de inventario"
 
 #: src/screens/inventory-item-editor.jsx
 msgid "Redondeo"
 msgstr "Redondeo"
 
-#. placeholder {0}: item.quantityScale
 #: src/screens/inventory-item-editor.jsx
-msgid "Escala del artículo: {0} decimales."
-msgstr "Escala del artículo: {0} decimales."
+msgid "Escribe dos cantidades enteras mayores que cero."
+msgstr "Escribe dos cantidades enteras mayores que cero."
 
 #: src/screens/inventory-item-editor.jsx
-msgid "Escribe el numerador y el denominador como enteros positivos."
-msgstr "Escribe el numerador y el denominador como enteros positivos."
+msgid "No hace falta redondear."
+msgstr "No hace falta redondear."
 
+#. placeholder {0}: unitOf(fromUnit)
 #: src/screens/inventory-item-editor.jsx
-msgid "La conversión da unidades completas a esta escala."
-msgstr "La conversión da unidades completas a esta escala."
+msgid "Convertir 1 {0} requiere más decimales. Elige cómo redondear."
+msgstr "Convertir 1 {0} requiere más decimales. Elige cómo redondear."
 
 #: src/screens/inventory-item-editor.jsx
 msgid "Guardar conversión"
 msgstr "Guardar conversión"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "Elige una política de redondeo para guardar."
-msgstr "Elige una política de redondeo para guardar."
+msgid "Elige cómo redondear para guardar."
+msgstr "Elige cómo redondear para guardar."
 
 #: src/screens/inventory-item-editor.jsx
 #: src/screens/inventory-item-panel.jsx
@@ -4843,8 +4963,8 @@ msgid "Alérgenos"
 msgstr "Alérgenos"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "El set completo se guarda. Si quitas todas, el artículo queda sin alérgenos."
-msgstr "El set completo se guarda. Si quitas todas, el artículo queda sin alérgenos."
+msgid "Selecciona los alérgenos del artículo. Quita todas las etiquetas si no tiene alérgenos."
+msgstr "Selecciona los alérgenos del artículo. Quita todas las etiquetas si no tiene alérgenos."
 
 #: src/screens/inventory-item-editor.jsx
 msgid "Crea primero una etiqueta de alérgeno en la lista."
@@ -4871,8 +4991,8 @@ msgid "Referencia"
 msgstr "Referencia"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "La API rechaza una referencia repetida."
-msgstr "La API rechaza una referencia repetida."
+msgid "Usa una referencia distinta para cada artículo."
+msgstr "Usa una referencia distinta para cada artículo."
 
 #: src/screens/inventory-item-editor.jsx
 #: src/screens/operations-workspace.jsx
@@ -4882,33 +5002,30 @@ msgid "Tipo"
 msgstr "Tipo"
 
 #: src/screens/inventory-item-editor.jsx
-#: src/screens/inventory-item-panel.jsx
-msgid "Unidad base"
-msgstr "Unidad base"
+msgid "Decimales permitidos"
+msgstr "Decimales permitidos"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "Decimales de cantidad"
-msgstr "Decimales de cantidad"
+msgid "Control de existencias"
+msgstr "Control de existencias"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "Política de inventario"
-msgstr "Política de inventario"
+msgid "Si falta inventario"
+msgstr "Si falta inventario"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "Existencia negativa"
-msgstr "Existencia negativa"
+msgid "Cantidad mínima"
+msgstr "Cantidad mínima"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "Umbral de stock bajo"
-msgstr "Umbral de stock bajo"
+#: src/screens/prep-list.jsx
+msgid "Sin definir"
+msgstr "Sin definir"
 
+#. placeholder {0}: unitOf(baseUnit)
 #: src/screens/inventory-item-editor.jsx
-msgid "Sin umbral"
-msgstr "Sin umbral"
-
-#: src/screens/inventory-item-editor.jsx
-msgid "En la escala del artículo. 0 se guarda como un umbral real."
-msgstr "En la escala del artículo. 0 se guarda como un umbral real."
+msgid "En {0}. Marca el artículo cuando queda esta cantidad o menos."
+msgstr "En {0}. Marca el artículo cuando queda esta cantidad o menos."
 
 #: src/screens/inventory-item-editor.jsx
 #: src/screens/recipe-workspace.jsx
@@ -4922,17 +5039,18 @@ msgid "Sin vida útil"
 msgstr "Sin vida útil"
 
 #: src/screens/inventory-item-editor.jsx
-msgid "Par de preparación"
-msgstr "Par de preparación"
-
-#: src/screens/inventory-item-editor.jsx
 #: src/screens/prep-list.jsx
-msgid "Sin par"
-msgstr "Sin par"
+msgid "Cantidad que quieres tener lista"
+msgstr "Cantidad que quieres tener lista"
+
+#. placeholder {0}: unitOf(baseUnit)
+#: src/screens/inventory-item-editor.jsx
+msgid "En {0}. Es la cantidad que quieres tener disponible para trabajar."
+msgstr "En {0}. Es la cantidad que quieres tener disponible para trabajar."
 
 #: src/screens/inventory-item-editor.jsx
-msgid "En la escala del artículo. La lista de preparación lo resta."
-msgstr "En la escala del artículo. La lista de preparación lo resta."
+msgid "Escribe 0 o una cantidad mayor, con hasta {quantityScale} decimales. Si la cantidad es demasiado grande, redúcela."
+msgstr "Escribe 0 o una cantidad mayor, con hasta {quantityScale} decimales. Si la cantidad es demasiado grande, redúcela."
 
 #: src/screens/inventory-item-editor.jsx
 msgid "Guarda el artículo para agregar conversiones y alérgenos."
@@ -4949,10 +5067,6 @@ msgstr "Confirmar archivo"
 #: src/screens/staff.jsx
 msgid "Archivar"
 msgstr "Archivar"
-
-#: src/screens/inventory-item-editor.jsx
-msgid "La vida útil y el umbral se guardan en la escala del artículo."
-msgstr "La vida útil y el umbral se guardan en la escala del artículo."
 
 #: src/screens/inventory-item-panel.jsx
 #: src/screens/inventory-workspace.jsx
@@ -5018,6 +5132,10 @@ msgid "Editar"
 msgstr "Editar"
 
 #: src/screens/inventory-item-panel.jsx
+msgid "Unidad base"
+msgstr "Unidad base"
+
+#: src/screens/inventory-item-panel.jsx
 msgid "Vida útil"
 msgstr "Vida útil"
 
@@ -5075,6 +5193,10 @@ msgstr "Ninguno declarado"
 #~ msgstr "Crea un insumo, un producto o un empaque"
 
 #: src/screens/inventory-workspace.jsx
+#~ msgid "Poner costo"
+#~ msgstr "Poner costo"
+
+#: src/screens/inventory-workspace.jsx
 msgid "Todo"
 msgstr "Todo"
 
@@ -5095,8 +5217,8 @@ msgid "Revisar"
 msgstr "Revisar"
 
 #: src/screens/inventory-workspace.jsx
-msgid "Poner costo"
-msgstr "Poner costo"
+msgid "Ver costos"
+msgstr "Ver costos"
 
 #: src/screens/inventory-workspace.jsx
 msgid "Activar conteo"
@@ -5277,6 +5399,11 @@ msgstr "El pedido ya no existe. Recarga la lista."
 #: src/screens/invoice-inbox.jsx
 msgid "Un artículo ya no existe. Recarga la lista."
 msgstr "Un artículo ya no existe. Recarga la lista."
+
+#: src/screens/invoice-inbox.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Revisa los datos. La API no aceptó la operación."
+msgstr "Revisa los datos. La API no aceptó la operación."
 
 #: src/screens/invoice-inbox.jsx
 msgid "No puedes administrar las facturas."
@@ -7767,6 +7894,14 @@ msgid "Liberar una reserva del monedero"
 msgstr "Liberar una reserva del monedero"
 
 #: src/screens/prep-list.jsx
+#~ msgid "Aún no hay artículos con par. Define el par en Inventario."
+#~ msgstr "Aún no hay artículos con par. Define el par en Inventario."
+
+#: src/screens/prep-list.jsx
+#~ msgid "Par"
+#~ msgstr "Par"
+
+#: src/screens/prep-list.jsx
 msgid "No puedes administrar la preparación."
 msgstr "No puedes administrar la preparación."
 
@@ -7787,8 +7922,8 @@ msgid "Imprimir etiquetas"
 msgstr "Imprimir etiquetas"
 
 #: src/screens/prep-list.jsx
-msgid "Aún no hay artículos con par. Define el par en Inventario."
-msgstr "Aún no hay artículos con par. Define el par en Inventario."
+msgid "Define en Inventario la cantidad que quieres tener lista para cada artículo."
+msgstr "Define en Inventario la cantidad que quieres tener lista para cada artículo."
 
 #: src/screens/prep-list.jsx
 #: src/screens/recipe-workspace.jsx
@@ -7799,10 +7934,6 @@ msgstr "Artículo"
 #: src/screens/recipe-workspace.jsx
 msgid "Unidad"
 msgstr "Unidad"
-
-#: src/screens/prep-list.jsx
-msgid "Par"
-msgstr "Par"
 
 #: src/screens/prep-list.jsx
 msgid "Uso previsto"
@@ -8070,6 +8201,10 @@ msgid "Abre un recibo para ver la venta con sus conceptos, impuestos y forma de 
 msgstr "Abre un recibo para ver la venta con sus conceptos, impuestos y forma de pago. El recibo oficial se imprime en la caja; aquí puedes ordenar una COPIA controlada cuando el cliente la pide."
 
 #: src/screens/recipe-workspace.jsx
+#~ msgid "La explosión baja cada sub-receta hasta el insumo. Un insumo sin recepción no tiene precio, y por eso no se muestra un cero."
+#~ msgstr "La explosión baja cada sub-receta hasta el insumo. Un insumo sin recepción no tiene precio, y por eso no se muestra un cero."
+
+#: src/screens/recipe-workspace.jsx
 msgid "Sub-receta"
 msgstr "Sub-receta"
 
@@ -8177,8 +8312,8 @@ msgid "Sí"
 msgstr "Sí"
 
 #: src/screens/recipe-workspace.jsx
-msgid "La explosión baja cada sub-receta hasta el insumo. Un insumo sin recepción no tiene precio, y por eso no se muestra un cero."
-msgstr "La explosión baja cada sub-receta hasta el insumo. Un insumo sin recepción no tiene precio, y por eso no se muestra un cero."
+msgid "El desglose muestra los ingredientes de cada receta. Un ingrediente sin compras registradas aún no tiene precio."
+msgstr "El desglose muestra los ingredientes de cada receta. Un ingrediente sin compras registradas aún no tiene precio."
 
 #: src/screens/recipe-workspace.jsx
 msgid "Editar receta"
@@ -8244,7 +8379,7 @@ msgstr "Quitar el componente {0}"
 msgid "Elige un artículo de tu inventario."
 msgstr "Elige un artículo de tu inventario."
 
-#. placeholder {0}: item.quantityScale > 0 ? ` (${item.quantityScale} decimales).` : ' (sin decimales).'
+#. placeholder {0}: scale > 0 ? ` (${scale} decimales).` : ' (sin decimales).'
 #: src/screens/recipe-workspace.jsx
 msgid "La cantidad no cabe en la escala del artículo{0}"
 msgstr "La cantidad no cabe en la escala del artículo{0}"

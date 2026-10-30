@@ -298,14 +298,14 @@ export function subRecipeCostByItemId(recipes, itemsById) {
  * rather than rounded: the operator can see the refusal, and the server stores
  * exactly what the screen showed.
  */
-export function scaledQuantityText(text, scale) {
+export function scaledQuantityText(text, scale, { allowZero = false } = {}) {
   const digits = scaleOf(scale);
   const trimmed = String(text == null ? '' : text).trim();
   if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
   const [whole, fraction = ''] = trimmed.split('.');
   if (fraction.length > digits) return null;
   const value = BigInt(whole) * pow10(digits) + BigInt(fraction.padEnd(digits, '0') || '0');
-  if (value <= 0n || value > MAX_SAFE) return null;
+  if ((!allowZero && value === 0n) || value > MAX_SAFE) return null;
   return value;
 }
 
@@ -337,5 +337,21 @@ export function recipeToDraft(recipe) {
       roundingPolicy: component.roundingPolicy || 'exact',
       required: component.required !== false,
     })),
+  };
+}
+
+/** Conserva la unidad, la escala y la conversión de un componente existente. */
+export function recipeComponentFromDraft(line, item) {
+  if (!item) return null;
+  const scale = line.quantity?.scale ?? item.quantityScale;
+  const value = scaledQuantityText(line.quantityText, scale);
+  if (value === null) return null;
+  return {
+    inventoryItemId: line.inventoryItemId,
+    quantity: { value: Number(value), scale, unit: line.quantity?.unit ?? item.baseUnit },
+    conversionNumerator: line.conversionNumerator ?? 1,
+    conversionDenominator: line.conversionDenominator ?? 1,
+    roundingPolicy: line.roundingPolicy ?? 'exact',
+    required: line.required !== false,
   };
 }

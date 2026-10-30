@@ -3,6 +3,8 @@ import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { useAdministrativeCommand } from '@/lib/administrative-command.jsx';
+import { hasRequiredPermission } from '@/lib/module-registry.js';
+import { useMerchant } from '@/lib/merchant-context.jsx';
 import { UNIT_LABEL } from './inventory-copy.js';
 import {
   QUICK_LEVELS,
@@ -128,6 +130,11 @@ function itemOptions(result) {
 export default function InventoryCount({ locationId, onClose, onDone }) {
   const { t, i18n } = useLingui();
   const command = useAdministrativeCommand();
+  const merchant = useMerchant();
+  const canCancel = hasRequiredPermission(
+    { permissions: ['inventory.count.create'] },
+    merchant?.capabilities,
+  );
   const commandRef = useRef(command);
   const started = useRef(false);
 
@@ -142,6 +149,8 @@ export default function InventoryCount({ locationId, onClose, onDone }) {
   const [loaded, setLoaded] = useState(seeded.loaded);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [activeCounts, setActiveCounts] = useState({});
+  const [confirmRecovery, setConfirmRecovery] = useState(false);
   const [pin, setPin] = useState('');
   const [truncated, setTruncated] = useState(false);
 
@@ -157,6 +166,11 @@ export default function InventoryCount({ locationId, onClose, onDone }) {
         parameters: { limit: 100 },
       });
       const result = response.result || {};
+      setActiveCounts(
+        result.activeCount
+          ? { [result.activeCount.count.inventoryLocationId]: result.activeCount.count }
+          : {},
+      );
       setDraft(createDraft({ locationId, areas: areaOptions(result), items: itemOptions(result) }));
       setTruncated(Boolean(result.page?.hasMore));
       setError('');
@@ -170,9 +184,22 @@ export default function InventoryCount({ locationId, onClose, onDone }) {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    if (seeded.stored) return;
+    if (seeded.stored) {
+      for (const areaId of seeded.stored.selectedAreaIds || []) {
+        commandRef.current
+          .execute('inventory.overview', areaId, {
+            parameters: { inventoryLocationId: areaId, limit: 100 },
+          })
+          .then(({ result }) => {
+            if (result?.activeCount)
+              setActiveCounts((current) => ({ ...current, [areaId]: result.activeCount.count }));
+          })
+          .catch((cause) => setError(cause?.message || t`No se pudo leer el inventario.`));
+      }
+      return;
+    }
     loadAreas();
-  }, [seeded, loadAreas]);
+  }, [seeded, loadAreas, t]);
 
   useEffect(() => {
     if (!draft) return;
@@ -197,7 +224,48 @@ export default function InventoryCount({ locationId, onClose, onDone }) {
     const response = await commandRef.current.execute('inventory.overview', areaId, {
       parameters: { inventoryLocationId: areaId, limit: 100 },
     });
-    return response.result || {};
+    const overview = response.result || {};
+    setActiveCounts((current) => {
+      const next = { ...current };
+      if (overview.activeCount) next[areaId] = overview.activeCount.count;
+      else delete next[areaId];
+      return next;
+    });
+    return overview;
+  }
+
+  async function recoverCounts() {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      for (const areaId of Object.keys(activeCounts)) {
+        const overview = await readArea(areaId);
+        const current = overview.activeCount?.count;
+        if (!current) continue;
+        await commandRef.current.execute('inventory.count.cancel', current.id, {
+          targetVersion: current.version,
+          parameters: {
+            inventoryLocationId: areaId,
+            expectedVersion: current.version,
+            policyFingerprint: overview.policy.fingerprint,
+            approvalFingerprint: null,
+            businessDate: new Date().toISOString().slice(0, 10),
+            countId: current.id,
+            attempt: current.attempt,
+          },
+        });
+      }
+      clearStoredDraft(locationId);
+      setActiveCounts({});
+      setConfirmRecovery(false);
+      setReveal(null);
+      await loadAreas();
+    } catch (cause) {
+      setError(cause?.message || t`No se pudo cancelar el conteo.`);
+    } finally {
+      setBusy(false);
+    }
   }
 
   /**
@@ -451,7 +519,11 @@ export default function InventoryCount({ locationId, onClose, onDone }) {
       onDone?.();
       onClose?.();
     } catch (cause) {
-      setError(cause?.message || t`No se pudo enviar el conteo.`);
+      setError(
+        cause?.code === 'INVENTORY_COUNT_BUSY'
+          ? t`El inventario está ocupado. Intenta enviar el conteo de nuevo.`
+          : cause?.message || t`No se pudo enviar el conteo.`,
+      );
     } finally {
       setBusy(false);
     }
@@ -528,6 +600,48 @@ export default function InventoryCount({ locationId, onClose, onDone }) {
           <I.X size={16} />
         </button>
       </div>
+
+      {canCancel && Object.keys(activeCounts).length > 0 ? (
+        <div className="inv-row-note" role="status">
+          <p>
+            <Trans>
+              Hay un conteo activo. Si cambió el inventario, cancélalo e inicia otro conteo.
+            </Trans>
+          </p>
+          {confirmRecovery ? (
+            <>
+              <p>
+                <Trans>El historial se conserva. Debes registrar de nuevo las cantidades.</Trans>
+              </p>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={busy}
+                onClick={() => setConfirmRecovery(false)}
+              >
+                <Trans>Volver</Trans>
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={busy}
+                onClick={recoverCounts}
+              >
+                <Trans>Confirmar cancelación</Trans>
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={busy}
+              onClick={() => setConfirmRecovery(true)}
+            >
+              <Trans>Cancelar conteo activo y volver a contar</Trans>
+            </button>
+          )}
+        </div>
+      ) : null}
 
       {truncated ? (
         <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-3)' }}>

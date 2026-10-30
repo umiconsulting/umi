@@ -35,6 +35,10 @@ abstract interface class InventoryRepository {
     String merchantId,
     CreateInventoryCountRequest command,
   );
+  Future<InventoryCountResult> cancelCount(
+    String merchantId,
+    CancelInventoryCountRequest command,
+  );
   Future<InventoryCountResult> submitCount(
     String merchantId,
     SubmitInventoryCountRequest command,
@@ -68,7 +72,8 @@ Future<PrepList> requestPrepList(
   };
   // The server coerces any query text to a boolean, so a false flag stays out
   // of the request: its default is already false.
-  if (query.includeAbovePar == true) queryParameters['includeAbovePar'] = 'true';
+  if (query.includeAbovePar == true)
+    queryParameters['includeAbovePar'] = 'true';
   return PrepList.fromJson(
     await api.request(
       method: ApiMethod.get,
@@ -189,6 +194,18 @@ final class ApiInventoryRepository implements InventoryRepository {
     await _api.request(
       method: ApiMethod.post,
       path: UmiRoutes.posInventoryCounts(merchantId),
+      body: command.toJson(),
+    ),
+  );
+
+  @override
+  Future<InventoryCountResult> cancelCount(
+    String merchantId,
+    CancelInventoryCountRequest command,
+  ) async => InventoryCountResult.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posInventoryCountCancel(merchantId, command.countId),
       body: command.toJson(),
     ),
   );

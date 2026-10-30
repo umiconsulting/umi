@@ -141,7 +141,10 @@ function publicError(status: number, payload: string | object, correlationId: st
   return {
     code,
     message,
-    retryable: status === 429 || status >= SERVER_ERROR_MIN,
+    retryable:
+      status === 429 ||
+      status >= SERVER_ERROR_MIN ||
+      (status === 409 && code === 'INVENTORY_COUNT_BUSY'),
     correlationId,
     ...(fieldErrors ? { fieldErrors } : {}),
     ...(details || retryAfterSeconds !== undefined

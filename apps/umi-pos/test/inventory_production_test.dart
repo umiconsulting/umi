@@ -165,6 +165,11 @@ class _ProductionFake implements InventoryRepository {
     CreateInventoryCountRequest command,
   ) => throw UnimplementedError();
   @override
+  Future<InventoryCountResult> cancelCount(
+    String merchantId,
+    CancelInventoryCountRequest command,
+  ) => throw UnimplementedError();
+  @override
   Future<InventoryCountResult> submitCount(
     String merchantId,
     SubmitInventoryCountRequest command,

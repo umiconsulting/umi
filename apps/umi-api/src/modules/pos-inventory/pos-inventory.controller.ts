@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/co
 import type { z } from 'zod';
 import {
   AvailabilityQuery,
+  CancelInventoryCountRequest,
   CreateInventoryCountRequest,
   DamageRecord,
   InventoryAdjustment,
@@ -136,6 +137,16 @@ export class PosInventoryController {
     @Body(new ZodValidationPipe(CreateInventoryCountRequest)) dto: CreateInventoryCountRequest,
   ) {
     return this.inventory.createCount(user, merchantId, dto);
+  }
+
+  @Post('counts/:countId/cancel')
+  cancelCount(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('countId') countId: string,
+    @Body(new ZodValidationPipe(CancelInventoryCountRequest)) dto: CancelInventoryCountRequest,
+  ) {
+    return this.inventory.cancelCount(user, merchantId, countId, dto);
   }
 
   @Post('counts/:countId/submit')
