@@ -25,7 +25,12 @@ import {
   conversionRatio,
   mergeConversions,
 } from './inventory-model.js';
-import { itemQuantityDraft, itemQuantityParameters } from './inventory-item-editor-model.js';
+import {
+  initialCostDraft,
+  initialCostParameters,
+  itemQuantityDraft,
+  itemQuantityParameters,
+} from './inventory-item-editor-model.js';
 import './inventory-item-editor.css';
 
 /** The one-line command failure notice. A component, so it stays in this file. */
@@ -534,7 +539,17 @@ function ItemAllergensEditor({ item, allergens, onSaved }) {
  * The item editor, following the product editor in operations-workspace.jsx: one
  * modal, the id decided once at open, and `command.execute` for every write.
  */
-export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, onSaved }) {
+export function ItemEditor({
+  item,
+  itemId,
+  flatConversions,
+  allergens,
+  currency = 'MXN',
+  costBasis,
+  costBasisError,
+  onClose,
+  onSaved,
+}) {
   const { t, i18n } = useLingui();
   const command = useAdministrativeCommand();
   const editing = Boolean(item);
@@ -556,6 +571,10 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
   // PAR is what the kitchen wants on hand. It is not the low-stock threshold: that one
   // is a purchase alarm, this one is what the prep list subtracts from (§8.4).
   const [parQuantity, setParQuantity] = useState(() => itemQuantityDraft(item).parQuantity);
+  const [initialCost, setInitialCost] = useState(() =>
+    initialCostDraft(item?.initialUnitCostMinor),
+  );
+  const costParameters = initialCostParameters(initialCost, item);
   const [referenceError, setReferenceError] = useState(null);
   const [confirmArchive, setConfirmArchive] = useState(false);
 
@@ -570,17 +589,19 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
 
   async function save() {
     setReferenceError(null);
-    if (!quantityParameters) return;
+    if (!quantityParameters || !costParameters) return;
     const optionalShelfLife = shelfLifeDays === '' ? null : Number(shelfLifeDays);
     const parameters = editing
       ? {
           displayName: displayName.trim(),
+          ...costParameters,
           ...quantityParameters,
           shelfLifeDays: optionalShelfLife,
           trackingPolicy,
           negativeStockPolicy,
         }
       : {
+          ...costParameters,
           publicReference: publicReference.trim(),
           displayName: displayName.trim(),
           itemType,
@@ -784,7 +805,51 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
               </Trans>
             </span>
           </label>
+          <label>
+            <Trans>Costo inicial por {unitOf(baseUnit)}</Trans>
+            <div className="inventory-initial-cost-input">
+              <input
+                className="input"
+                inputMode="decimal"
+                value={initialCost}
+                placeholder={t`Sin definir`}
+                aria-label={t`Costo inicial por ${unitOf(baseUnit)}`}
+                aria-invalid={!costParameters || undefined}
+                aria-describedby={
+                  costParameters
+                    ? 'inventory-item-cost-hint'
+                    : 'inventory-item-cost-hint inventory-item-cost-error'
+                }
+                onChange={(event) => setInitialCost(event.target.value)}
+              />
+              <span>{currency}</span>
+            </div>
+            <span id="inventory-item-cost-hint" className="muted" style={{ fontSize: 11.5 }}>
+              <Trans>Se usa mientras no haya compras registradas.</Trans>
+            </span>
+          </label>
         </div>
+        {!costParameters ? (
+          <p
+            id="inventory-item-cost-error"
+            role="alert"
+            style={{ color: 'var(--danger)', margin: 0, fontSize: 12.5 }}
+          >
+            <Trans>
+              Escribe 0 o un costo mayor, con hasta 2 decimales. Si el costo es demasiado grande,
+              redúcelo.
+            </Trans>
+          </p>
+        ) : null}
+        {costBasisError ? (
+          <p role="alert" className="muted">
+            <Trans>No se pudo leer la base del costo.</Trans>
+          </p>
+        ) : costBasis?.basis === 'weighted_average_of_receipts' ? (
+          <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
+            <Trans>Las compras registradas tienen prioridad sobre el costo inicial guardado.</Trans>
+          </p>
+        ) : null}
         {!quantityParameters ? (
           <p
             id="inventory-item-quantity-error"
@@ -816,6 +881,7 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
             disabled={
               command.pending ||
               !quantityParameters ||
+              !costParameters ||
               displayName.trim().length === 0 ||
               (!editing && !referenceValid)
             }

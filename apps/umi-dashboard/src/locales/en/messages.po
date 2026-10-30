@@ -4090,6 +4090,32 @@ msgstr "The label no longer exists. Refresh the list."
 #~ msgstr "This dish cannot be costed. The price of {0} {1} is missing:"
 
 #: src/screens/inventory-costing.jsx
+#~ msgid "Su insumo nunca se ha recibido, así que no hay precio"
+#~ msgstr "Its ingredient has never been received, so there is no price"
+
+#: src/screens/inventory-costing.jsx
+#~ msgid "Registra una recepción de compra de ese insumo."
+#~ msgstr "Record a purchase receipt for that ingredient."
+
+#: src/screens/inventory-costing.jsx
+#~ msgid "Ningún platillo tiene costo todavía. Mientras un insumo no se reciba, su precio se desconoce, y con él el de todos los platillos que lo usan."
+#~ msgstr "No dish has a cost yet. Until an ingredient is received its price is unknown, and so is the price of every dish that uses it."
+
+#. placeholder {0}: data.basis.length
+#. placeholder {1}: data.basis.filter((item) => item.unitCostMinor == null).length
+#: src/screens/inventory-costing.jsx
+#~ msgid "{0} insumos · {1} sin recepciones"
+#~ msgstr "{0} ingredients · {1} with no receipts"
+
+#: src/screens/inventory-costing.jsx
+#~ msgid "Este negocio no tiene insumos en inventario todavía."
+#~ msgstr "This business has no ingredients in inventory yet."
+
+#: src/screens/inventory-costing.jsx
+#~ msgid "El costo de un insumo es el promedio ponderado de lo que realmente se pagó al recibirlo, no lo que se pidió. Un insumo sin recepciones no tiene precio, y por eso no aparece como cero."
+#~ msgstr "An ingredient's cost is the weighted average of what was actually paid when it arrived, not what was ordered. An ingredient with no receipts has no price, which is why it is not shown as zero."
+
+#: src/screens/inventory-costing.jsx
 msgid "Nadie registró qué consume este platillo"
 msgstr "Nobody recorded what this dish consumes"
 
@@ -4098,8 +4124,8 @@ msgid "La receta existe pero no tiene componentes"
 msgstr "The recipe exists but has no components"
 
 #: src/screens/inventory-costing.jsx
-msgid "Su insumo nunca se ha recibido, así que no hay precio"
-msgstr "Its ingredient has never been received, so there is no price"
+msgid "El ingrediente no tiene costo inicial ni compras registradas"
+msgstr "The ingredient has no initial cost or recorded purchases"
 
 #: src/screens/inventory-costing.jsx
 msgid "No se lleva en inventario, así que su costo no se calcula"
@@ -4118,8 +4144,8 @@ msgid "Agrega los insumos y sus cantidades a la receta."
 msgstr "Add the ingredients and their quantities to the recipe."
 
 #: src/screens/inventory-costing.jsx
-msgid "Registra una recepción de compra de ese insumo."
-msgstr "Record a purchase receipt for that ingredient."
+msgid "Agrega un costo inicial o registra una compra del ingrediente."
+msgstr "Add an initial cost or record a purchase for the ingredient."
 
 #: src/screens/inventory-costing.jsx
 msgid "No hay nada que arreglar: este producto no se cuenta en inventario."
@@ -4135,6 +4161,7 @@ msgstr "With a cost"
 
 #: src/screens/inventory-costing.jsx
 #: src/screens/inventory-item-editor.jsx
+#: src/screens/inventory-item-panel.jsx
 #: src/screens/inventory-workspace.jsx
 #: src/screens/menu-engineering.jsx
 #: src/screens/recipe-workspace.jsx
@@ -4309,8 +4336,8 @@ msgid "Ningún platillo coincide con esa búsqueda."
 msgstr "No dish matches that search."
 
 #: src/screens/inventory-costing.jsx
-msgid "Ningún platillo tiene costo todavía. Mientras un insumo no se reciba, su precio se desconoce, y con él el de todos los platillos que lo usan."
-msgstr "No dish has a cost yet. Until an ingredient is received its price is unknown, and so is the price of every dish that uses it."
+msgid "Ningún platillo tiene costo todavía. Agrega un costo inicial o registra una compra."
+msgstr "No dish has a cost yet. Add an initial cost or record a purchase."
 
 #: src/screens/inventory-costing.jsx
 msgid "Todos los platillos del catálogo tienen costo."
@@ -4424,20 +4451,32 @@ msgstr "Where the cost comes from"
 #. placeholder {0}: data.basis.length
 #. placeholder {1}: data.basis.filter((item) => item.unitCostMinor == null).length
 #: src/screens/inventory-costing.jsx
-msgid "{0} insumos · {1} sin recepciones"
-msgstr "{0} ingredients · {1} with no receipts"
+msgid "{0} artículos · {1} sin costo"
+msgstr "{0} items · {1} without a cost"
 
 #: src/screens/inventory-costing.jsx
+#: src/screens/inventory-item-editor.jsx
+#: src/screens/inventory-item-panel.jsx
 msgid "No se pudo leer la base del costo."
 msgstr "The cost basis could not be read."
 
 #: src/screens/inventory-costing.jsx
-msgid "Este negocio no tiene insumos en inventario todavía."
-msgstr "This business has no ingredients in inventory yet."
+msgid "Este negocio no tiene artículos en inventario todavía."
+msgstr "This business has no inventory items yet."
 
 #: src/screens/inventory-costing.jsx
-msgid "El costo de un insumo es el promedio ponderado de lo que realmente se pagó al recibirlo, no lo que se pidió. Un insumo sin recepciones no tiene precio, y por eso no aparece como cero."
-msgstr "An ingredient's cost is the weighted average of what was actually paid when it arrived, not what was ordered. An ingredient with no receipts has no price, which is why it is not shown as zero."
+msgid "El costo usa el promedio ponderado de las compras recibidas. Si no hay compras, usa el costo inicial guardado. Sin ninguno de los dos, el artículo queda sin costo."
+msgstr "The cost uses the weighted average of received purchases. With no purchases, it uses the saved initial cost. Without either, the item has no cost."
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Artículo"
+msgstr "Item"
+
+#: src/screens/inventory-costing.jsx
+msgid "Origen del costo"
+msgstr "Cost source"
 
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
@@ -4460,9 +4499,14 @@ msgid "Recibido"
 msgstr "Received"
 
 #: src/screens/inventory-costing.jsx
-#: src/screens/recipe-workspace.jsx
-msgid "Sin precio"
-msgstr "No price"
+#: src/screens/inventory-item-panel.jsx
+msgid "Costo inicial"
+msgstr "Initial cost"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-item-panel.jsx
+msgid "Calculado con compras"
+msgstr "Calculated from purchases"
 
 #. placeholder {0}: item.receiptCount
 #: src/screens/inventory-costing.jsx
@@ -5052,6 +5096,24 @@ msgstr "Quantity you want ready"
 msgid "En {0}. Es la cantidad que quieres tener disponible para trabajar."
 msgstr "In {0}. This is the quantity you want available for work."
 
+#. placeholder {0}: unitOf(baseUnit)
+#: src/screens/inventory-item-editor.jsx
+msgid "Costo inicial por {0}"
+msgstr "Initial cost per {0}"
+
+#: src/screens/inventory-item-editor.jsx
+msgid "Se usa mientras no haya compras registradas."
+msgstr "Used until purchases are recorded."
+
+#: src/screens/inventory-item-editor.jsx
+msgid "Escribe 0 o un costo mayor, con hasta 2 decimales. Si el costo es demasiado grande, redúcelo."
+msgstr "Enter 0 or a higher cost, with up to 2 decimal places. Reduce the cost if it is too large."
+
+#: src/screens/inventory-item-editor.jsx
+#: src/screens/inventory-item-panel.jsx
+msgid "Las compras registradas tienen prioridad sobre el costo inicial guardado."
+msgstr "Recorded purchases take priority over the saved initial cost."
+
 #: src/screens/inventory-item-editor.jsx
 msgid "Escribe 0 o una cantidad mayor, con hasta {quantityScale} decimales. Si la cantidad es demasiado grande, redúcela."
 msgstr "Enter 0 or a larger quantity, with up to {quantityScale} decimal places. Reduce quantities that are too large."
@@ -5071,6 +5133,14 @@ msgstr "Confirm archive"
 #: src/screens/staff.jsx
 msgid "Archivar"
 msgstr "Archive"
+
+#: src/screens/inventory-item-panel.jsx
+#~ msgid "El costo viene de las facturas recibidas."
+#~ msgstr "The cost comes from the received invoices."
+
+#: src/screens/inventory-item-panel.jsx
+#~ msgid "Ningún recibo ha fijado el costo de este artículo. Los márgenes no lo incluyen."
+#~ msgstr "No receipt has set the cost of this item. The margins exclude it."
 
 #: src/screens/inventory-item-panel.jsx
 #: src/screens/inventory-workspace.jsx
@@ -5157,12 +5227,26 @@ msgid "No hay conversiones. El artículo se cuenta en su unidad base."
 msgstr "There are no conversions. The item counts in its base unit."
 
 #: src/screens/inventory-item-panel.jsx
-msgid "El costo viene de las facturas recibidas."
-msgstr "The cost comes from the received invoices."
+msgid "Cargando el costo…"
+msgstr "Loading the cost…"
 
 #: src/screens/inventory-item-panel.jsx
-msgid "Ningún recibo ha fijado el costo de este artículo. Los márgenes no lo incluyen."
-msgstr "No receipt has set the cost of this item. The margins exclude it."
+msgid "Agrega un costo inicial o registra una compra."
+msgstr "Add an initial cost or record a purchase."
+
+#. placeholder {0}: formatMoney(item.initialUnitCostMinor, currency)
+#: src/screens/inventory-item-panel.jsx
+msgid "Costo inicial guardado: {0} {currency} / {unit}."
+msgstr "Saved initial cost: {0} {currency} / {unit}."
+
+#: src/screens/inventory-item-panel.jsx
+#: src/screens/inventory-workspace.jsx
+msgid "Agregar costo"
+msgstr "Add cost"
+
+#: src/screens/inventory-item-panel.jsx
+msgid "Editar costo inicial"
+msgstr "Edit initial cost"
 
 #: src/screens/inventory-item-panel.jsx
 msgid "Ninguno declarado"
@@ -5201,6 +5285,10 @@ msgstr "None declared"
 #~ msgstr "Set cost"
 
 #: src/screens/inventory-workspace.jsx
+#~ msgid "Ver costos"
+#~ msgstr "View costs"
+
+#: src/screens/inventory-workspace.jsx
 msgid "Todo"
 msgstr "All"
 
@@ -5219,10 +5307,6 @@ msgstr "Archived"
 #: src/screens/inventory-workspace.jsx
 msgid "Revisar"
 msgstr "Review"
-
-#: src/screens/inventory-workspace.jsx
-msgid "Ver costos"
-msgstr "View costs"
 
 #: src/screens/inventory-workspace.jsx
 msgid "Activar conteo"
@@ -7934,11 +8018,6 @@ msgstr "Set the quantity you want ready for each item in Inventory."
 
 #: src/screens/prep-list.jsx
 #: src/screens/recipe-workspace.jsx
-msgid "Artículo"
-msgstr "Item"
-
-#: src/screens/prep-list.jsx
-#: src/screens/recipe-workspace.jsx
 msgid "Unidad"
 msgstr "Unit"
 
@@ -8294,6 +8373,30 @@ msgstr "Open a receipt to see the sale: its items, taxes and payment method. The
 #~ msgstr "Could not save the recipe."
 
 #: src/screens/recipe-workspace.jsx
+#~ msgid "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada ingrediente."
+#~ msgstr "The cost is for one yield unit, calculated from each ingredient purchase price."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Registra una compra para conocer su costo."
+#~ msgstr "Record a purchase to know its cost."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Registra una compra de estos ingredientes para conocer el costo."
+#~ msgstr "Record a purchase of these ingredients to know the cost."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "El costo se calcula con las compras registradas de tus ingredientes."
+#~ msgstr "The cost uses recorded purchases of your ingredients."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "El desglose muestra los ingredientes de cada receta. Un ingrediente sin compras registradas aún no tiene precio."
+#~ msgstr "The breakdown shows the ingredients of each recipe. An ingredient with no recorded purchases has no price yet."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Ingrediente comprado."
+#~ msgstr "Purchased ingredient."
+
+#: src/screens/recipe-workspace.jsx
 msgid "Sub-receta"
 msgstr "Sub-recipe"
 
@@ -8372,8 +8475,8 @@ msgid "Editar {0}"
 msgstr "Edit {0}"
 
 #: src/screens/recipe-workspace.jsx
-msgid "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada ingrediente."
-msgstr "The cost is for one yield unit, calculated from each ingredient purchase price."
+msgid "El costo es el de una unidad de rendimiento, calculado con el costo de cada ingrediente."
+msgstr "The cost is for one unit of yield, calculated from the cost of each ingredient."
 
 #: src/screens/recipe-workspace.jsx
 msgid "Cargando el costo de ingredientes…"
@@ -8401,8 +8504,12 @@ msgid "Sí"
 msgstr "Yes"
 
 #: src/screens/recipe-workspace.jsx
-msgid "El desglose muestra los ingredientes de cada receta. Un ingrediente sin compras registradas aún no tiene precio."
-msgstr "The breakdown shows the ingredients of each recipe. An ingredient with no recorded purchases has no price yet."
+msgid "Sin precio"
+msgstr "No price"
+
+#: src/screens/recipe-workspace.jsx
+msgid "El desglose muestra los ingredientes de cada receta. Agrega un costo inicial o registra una compra para conocer su costo."
+msgstr "The breakdown shows the ingredients of each recipe. Add an initial cost or record a purchase to calculate its cost."
 
 #: src/screens/recipe-workspace.jsx
 msgid "La configuración de inventario cambió. Guarda de nuevo para revisar el estado actual."
@@ -8498,16 +8605,16 @@ msgid "La cantidad no cabe en la escala del artículo{0}"
 msgstr "The quantity does not fit the scale of the item{0}"
 
 #: src/screens/recipe-workspace.jsx
-msgid "Ingrediente comprado."
-msgstr "Purchased ingredient."
+msgid "Ingrediente."
+msgstr "Ingredient."
 
 #: src/screens/recipe-workspace.jsx
 msgid "El costo de esta sub-receta aún no se calcula. Revisa los precios de sus ingredientes."
 msgstr "This sub-recipe has no cost yet. Check its ingredient prices."
 
 #: src/screens/recipe-workspace.jsx
-msgid "Registra una compra para conocer su costo."
-msgstr "Record a purchase to know its cost."
+msgid "Agrega un costo inicial o registra una compra para conocer su costo."
+msgstr "Add an initial cost or record a purchase to calculate its cost."
 
 #. placeholder {0}: formatMoney(basis)
 #. placeholder {1}: unitOf(item.baseUnit)
@@ -8524,8 +8631,8 @@ msgid "Una cantidad no da unidades completas del artículo. Ajusta el rendimient
 msgstr "An item quantity does not yield whole units. Adjust the yield or quantity to calculate the cost."
 
 #: src/screens/recipe-workspace.jsx
-msgid "Registra una compra de estos ingredientes para conocer el costo."
-msgstr "Record a purchase of these ingredients to know the cost."
+msgid "Agrega un costo inicial o registra una compra de estos ingredientes."
+msgstr "Add an initial cost or record a purchase for these ingredients."
 
 #: src/screens/recipe-workspace.jsx
 msgid "Agrega un ingrediente para calcular el costo."
@@ -8549,8 +8656,8 @@ msgid "Costo guardado: {0}. El número de arriba es el cálculo en pantalla."
 msgstr "Saved cost: {0}. The number above is the calculation on screen."
 
 #: src/screens/recipe-workspace.jsx
-msgid "El costo se calcula con las compras registradas de tus ingredientes."
-msgstr "The cost uses recorded purchases of your ingredients."
+msgid "El costo usa las compras registradas o el costo inicial de tus ingredientes."
+msgstr "The cost uses recorded purchases or the initial cost of your ingredients."
 
 #: src/screens/recipe-workspace.jsx
 msgid "Las ventas descuentan un artículo de inventario."
