@@ -78,3 +78,9 @@ La prueba detectó que una reserva podía acumular la receta anterior y la nueva
 También detectó que una venta con autorización para saldo negativo perdía esa autorización al confirmar el inventario.
 La corrección usará una migración nueva de la función de confirmación. Conservará los controles del permiso y la relación con el comando.
 La devolución registra una intención de reposición. La reposición explícita y autorizada debe usar las cantidades de la venta original.
+
+## Base del PR
+
+El PR #232 se fusionó fuera de esta sesión el 30 de octubre de 2026.
+Su commit de integración es `5ac984e5668970f3990b486f7bb690046c0b39a7`.
+Su contenido coincide con la base de esta rama. El PR de la fase 2 se abrirá contra `main` y quedará pendiente de aprobación.

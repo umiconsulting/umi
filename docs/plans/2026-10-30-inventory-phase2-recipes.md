@@ -132,4 +132,4 @@ Assert deltas and historical recipe/mapping IDs. Keep each additional scenario i
 pnpm --filter @umi/api exec vitest run --config vitest.integration.config.ts src/modules/inventory-authoring/inventory-recipe-sales.integration.ts
 ```
 
-- [ ] Commit the task with its verification report. The controller then runs the complete PR gates, requests a final branch review and opens the stacked PR. Leave both PRs open for approval.
+- [ ] Commit the task with its verification report. The controller then runs the complete PR gates, requests a final branch review and opens the phase 2 PR against `main`. PR #232 was merged externally on 2026-10-30. Leave the new PR open for approval.
