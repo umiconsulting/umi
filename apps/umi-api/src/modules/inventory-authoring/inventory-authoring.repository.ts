@@ -12,6 +12,8 @@ import type {
   InventoryRecipeComponentInput,
   InventoryRecipeCreateRequest,
   InventoryRecipeQuery,
+  InventoryRecipeTargetQuery,
+  InventoryRecipeTarget,
   InventoryRecipeUpdateRequest,
   InventoryItemType,
   InventoryUnitConversion,
@@ -70,6 +72,9 @@ export type AllergenListCursor = { code: string };
  * list by the version that is current, and the id breaks a tie.
  */
 export type RecipeListCursor = { createdAt: string; id: string };
+
+/** The target key places the base product before its variants. */
+export type RecipeTargetCursor = { productId: string; targetId: string };
 
 /**
  * One recipe version as stored, with its components and its explosion already read.
@@ -704,6 +709,42 @@ export class InventoryAuthoringRepository {
 
   // ── Recipes ───────────────────────────────────────────────────────────────
 
+  /** Active products and variants are targets before they have a sales mapping. */
+  listRecipeTargets(
+    merchantId: string,
+    query: InventoryRecipeTargetQuery,
+    cursor: RecipeTargetCursor | null,
+  ): Promise<{ rows: InventoryRecipeTarget[]; hasMore: boolean }> {
+    return this.pg.runWithMerchant(merchantId, null, async (client) => {
+      const result = await client.query<
+        Omit<InventoryRecipeTarget, 'priceMinor'> & { priceMinor: string }
+      >(
+        `WITH targets AS (
+          SELECT p.id AS product_id,p.name AS product_name,p.active AS product_active,
+                 NULL::uuid AS variant_id,NULL::text AS variant_name,p.price AS price_minor,
+                 '0'::text AS target_id
+            FROM merchant.product p WHERE p.merchant_id=$1::uuid AND p.active
+          UNION ALL
+          SELECT p.id,p.name,p.active,v.id,v.name,p.price+v.price_delta,v.id::text
+            FROM merchant.product p JOIN merchant.product_variant v
+              ON v.merchant_id=p.merchant_id AND v.product_id=p.id AND v.active
+           WHERE p.merchant_id=$1::uuid AND p.active
+        )
+        SELECT product_id::text AS "productId",product_name AS "productName",product_active AS "productActive",
+               variant_id::text AS "variantId",variant_name AS "variantName",price_minor::text AS "priceMinor"
+          FROM targets WHERE $2::uuid IS NULL OR (product_id,target_id)>($2::uuid,$3::text)
+         ORDER BY product_id,target_id LIMIT $4`,
+        [merchantId, cursor?.productId ?? null, cursor?.targetId ?? null, query.limit + 1],
+      );
+      return {
+        rows: result.rows
+          .slice(0, query.limit)
+          .map((row) => ({ ...row, priceMinor: Number(row.priceMinor) })),
+        hasMore: result.rows.length > query.limit,
+      };
+    });
+  }
+
   /**
    * The console's recipe list: every version the merchant has, with its components
    * and its explosion.
@@ -879,12 +920,52 @@ export class InventoryAuthoringRepository {
     recipeId: string,
     dto: InventoryRecipeCreateRequest,
   ): Promise<StoredRecipe> {
+    let recipeVersion = 1;
+    if (dto.targetKind === 'product' && dto.productId) {
+      await this.lockProduct(client, merchantId, dto.productId);
+      if (dto.replaceSalesMapping) {
+        await this.checkSalesMapping(
+          client,
+          merchantId,
+          dto.productId,
+          dto.variantId ?? null,
+          null,
+          dto.replaceSalesMapping,
+        );
+      }
+      const existing = await client.query<{ id: string; version: number; active: boolean }>(
+        `SELECT id,version,active FROM merchant.inventory_recipe
+          WHERE merchant_id=$1::uuid AND product_id=$2::uuid
+            AND variant_id IS NOT DISTINCT FROM $3::uuid ORDER BY version DESC FOR UPDATE`,
+        [merchantId, dto.productId, dto.variantId ?? null],
+      );
+      const active = existing.rows.find((row) => row.active);
+      if (active)
+        throw new ConflictException({
+          code: 'INVENTORY_RECIPE_TARGET_INVALID',
+          details: {
+            reason: 'ACTIVE_RECIPE_EXISTS',
+            recipeId: active.id,
+          },
+        });
+      if (!dto.replaceSalesMapping) {
+        await this.checkSalesMapping(
+          client,
+          merchantId,
+          dto.productId,
+          dto.variantId ?? null,
+          null,
+          dto.replaceSalesMapping,
+        );
+      }
+      recipeVersion = (existing.rows[0]?.version ?? 0) + 1;
+    }
     try {
       await client.query(
         `INSERT INTO merchant.inventory_recipe
            (id,merchant_id,product_id,variant_id,target_item_id,version,yield_quantity,
             yield_scale,yield_unit,shelf_life_days,active)
-         VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,1,$6::bigint,$7::smallint,
+         VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$10::integer,$6::bigint,$7::smallint,
                  $8::text,$9::integer,true)`,
         [
           recipeId,
@@ -896,9 +977,20 @@ export class InventoryAuthoringRepository {
           dto.yieldQuantity.scale,
           dto.yieldQuantity.unit,
           dto.shelfLifeDays ?? null,
+          recipeVersion,
         ],
       );
       await this.insertRecipeComponents(client, merchantId, recipeId, dto.components);
+      if (dto.targetKind === 'product' && dto.productId) {
+        await this.writeSalesMapping(
+          client,
+          merchantId,
+          dto.productId,
+          dto.variantId ?? null,
+          recipeId,
+          'recipe',
+        );
+      }
     } catch (error) {
       throw recipeWriteError(error);
     }
@@ -910,9 +1002,7 @@ export class InventoryAuthoringRepository {
    * WRITTEN, so the stored cost of the version the owner saw stays explainable. The
    * old row is retired first, because one target has one active version.
    *
-   * AN ACTIVE CATALOG MAPPING IS REPOINTED TO THE NEW VERSION in the same
-   * transaction. A mapping left on the retired row stops consuming and stops costing,
-   * and it would do so silently: the plate would simply cost nothing.
+   * Each sales mapping keeps its recipe ID. A new mapping names the new recipe version.
    */
   async updateRecipe(
     client: PoolClient,
@@ -920,9 +1010,21 @@ export class InventoryAuthoringRepository {
     recipeId: string,
     dto: InventoryRecipeUpdateRequest,
   ): Promise<StoredRecipe> {
+    await this.lockRecipeProduct(client, merchantId, recipeId);
     const current = await this.lockRecipe(client, merchantId, recipeId);
     if (!current.active) throw retiredRecipe();
     assertVersion('inventory_recipe', current.version, dto.expectedVersion);
+
+    const mapping = current.productId
+      ? await this.checkSalesMapping(
+          client,
+          merchantId,
+          current.productId,
+          current.variantId,
+          recipeId,
+          dto.replaceSalesMapping,
+        )
+      : null;
 
     const yieldValue = dto.yieldQuantity?.value ?? current.yieldQuantity;
     const yieldScale = dto.yieldQuantity?.scale ?? current.yieldScale;
@@ -964,11 +1066,18 @@ export class InventoryAuthoringRepository {
       } else {
         await this.copyRecipeComponents(client, merchantId, nextRecipeId, recipeId);
       }
-      await client.query(
-        `UPDATE merchant.inventory_catalog_mapping SET recipe_id=$3::uuid
-          WHERE merchant_id=$1::uuid AND recipe_id=$2::uuid AND active`,
-        [merchantId, recipeId, nextRecipeId],
-      );
+      if (current.productId) {
+        await this.writeSalesMapping(
+          client,
+          merchantId,
+          current.productId,
+          current.variantId,
+          nextRecipeId,
+          mapping?.recipe_id === recipeId && mapping.mapping_type === 'bundle'
+            ? 'bundle'
+            : 'recipe',
+        );
+      }
     } catch (error) {
       throw recipeWriteError(error);
     }
@@ -985,6 +1094,7 @@ export class InventoryAuthoringRepository {
     recipeId: string,
     expectedVersion: number,
   ): Promise<StoredRecipe> {
+    await this.lockRecipeProduct(client, merchantId, recipeId);
     const current = await this.lockRecipe(client, merchantId, recipeId);
     if (!current.active) throw retiredRecipe();
     assertVersion('inventory_recipe', current.version, expectedVersion);
@@ -994,7 +1104,116 @@ export class InventoryAuthoringRepository {
         WHERE merchant_id=$1::uuid AND id=$2::uuid`,
       [merchantId, recipeId],
     );
+    await client.query(
+      `UPDATE merchant.inventory_catalog_mapping SET active=false,retired_at=clock_timestamp()
+        WHERE merchant_id=$1::uuid AND recipe_id=$2::uuid AND active`,
+      [merchantId, recipeId],
+    );
     return this.loadRecipe(client, merchantId, recipeId);
+  }
+
+  /** Product locks coordinate recipe writes with catalog edits. */
+  private async lockProduct(
+    client: PoolClient,
+    merchantId: string,
+    productId: string,
+  ): Promise<void> {
+    const result = await client.query(
+      `SELECT id FROM merchant.product WHERE merchant_id=$1::uuid AND id=$2::uuid FOR UPDATE`,
+      [merchantId, productId],
+    );
+    if (!result.rows[0]) throw new ConflictException({ code: 'INVENTORY_RECIPE_TARGET_INVALID' });
+  }
+
+  private async lockRecipeProduct(
+    client: PoolClient,
+    merchantId: string,
+    recipeId: string,
+  ): Promise<void> {
+    const result = await client.query<{ product_id: string | null }>(
+      `SELECT product_id FROM merchant.inventory_recipe WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [merchantId, recipeId],
+    );
+    if (!result.rows[0]) throw new NotFoundException({ code: 'INVENTORY_RECIPE_NOT_FOUND' });
+    if (result.rows[0].product_id)
+      await this.lockProduct(client, merchantId, result.rows[0].product_id);
+  }
+
+  private async checkSalesMapping(
+    client: PoolClient,
+    merchantId: string,
+    productId: string,
+    variantId: string | null,
+    ownedRecipeId: string | null,
+    confirmation: InventoryRecipeCreateRequest['replaceSalesMapping'],
+  ): Promise<{
+    id: string;
+    version: number;
+    mapping_type: string;
+    recipe_id: string | null;
+  } | null> {
+    const result = await client.query<{
+      id: string;
+      version: number;
+      mapping_type: string;
+      recipe_id: string | null;
+    }>(
+      `SELECT id,version,mapping_type,recipe_id FROM merchant.inventory_catalog_mapping
+        WHERE merchant_id=$1::uuid AND product_id=$2::uuid
+          AND variant_id IS NOT DISTINCT FROM $3::uuid AND active FOR UPDATE`,
+      [merchantId, productId, variantId],
+    );
+    const current = result.rows[0] ?? null;
+    const confirmationMatches =
+      current !== null &&
+      confirmation?.mappingId === current.id &&
+      confirmation.expectedVersion === current.version;
+    const ownsMapping =
+      current !== null &&
+      ownedRecipeId !== null &&
+      current.recipe_id === ownedRecipeId &&
+      (current.mapping_type === 'recipe' || current.mapping_type === 'bundle');
+    if (
+      (confirmation && !confirmationMatches) ||
+      (current && !ownsMapping && !confirmationMatches)
+    ) {
+      throw new ConflictException({
+        code: 'INVENTORY_RECIPE_MAPPING_CONFLICT',
+        details: {
+          mappingId: current?.id ?? null,
+          mappingVersion: current?.version ?? null,
+          mappingType: current?.mapping_type ?? null,
+        },
+      });
+    }
+    return current;
+  }
+
+  private async writeSalesMapping(
+    client: PoolClient,
+    merchantId: string,
+    productId: string,
+    variantId: string | null,
+    recipeId: string,
+    mappingType: string,
+  ): Promise<void> {
+    const version = await client.query<{ version: number }>(
+      `SELECT coalesce(max(version),0)::int AS version FROM merchant.inventory_catalog_mapping
+        WHERE merchant_id=$1::uuid AND product_id=$2::uuid AND variant_id IS NOT DISTINCT FROM $3::uuid`,
+      [merchantId, productId, variantId],
+    );
+    await client.query(
+      `UPDATE merchant.inventory_catalog_mapping SET active=false,retired_at=clock_timestamp()
+        WHERE merchant_id=$1::uuid AND product_id=$2::uuid
+          AND variant_id IS NOT DISTINCT FROM $3::uuid AND active`,
+      [merchantId, productId, variantId],
+    );
+    await client.query(
+      `INSERT INTO merchant.inventory_catalog_mapping
+        (merchant_id,product_id,variant_id,mapping_type,recipe_id,conversion_numerator,conversion_denominator,version)
+       VALUES($1::uuid,$2::uuid,$3::uuid,$4,$5::uuid,1,1,$6)`,
+      [merchantId, productId, variantId, mappingType, recipeId, version.rows[0].version + 1],
+    );
   }
 
   /** Lock the version row: every recipe write reads its version before it moves it. */

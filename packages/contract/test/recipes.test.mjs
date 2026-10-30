@@ -172,3 +172,37 @@ test('SupplierInvoiceUploadRequest needs a document', () => {
   });
   assert.ok(withXml.success, JSON.stringify(withXml.error?.issues));
 });
+
+test('recipe save accepts an exact mapping confirmation', () => {
+  const request = InventoryRecipeCreateRequest.safeParse({
+    ...command,
+    targetKind: 'product',
+    productId: uuid('7'),
+    yieldQuantity: { value: 1, scale: 0, unit: 'portion' },
+    components: [ingredient(uuid('3'))],
+    replaceSalesMapping: { mappingId: uuid('8'), expectedVersion: 2 },
+  });
+  assert.ok(request.success, JSON.stringify(request.error?.issues));
+});
+test('recipe target query and response describe base products and variants', async () => {
+  const api = await import('../dist/index.js');
+  assert.ok(api.InventoryRecipeTargetQuery);
+  assert.equal(api.InventoryRecipeTargetQuery.parse({}).limit, 100);
+  assert.equal(api.InventoryRecipeTargetQuery.safeParse({ limit: 101 }).success, false);
+  assert.ok(
+    api.InventoryRecipeTargetList.safeParse({
+      targets: [
+        {
+          productId: uuid('3'),
+          productName: 'Café',
+          productActive: true,
+          variantId: null,
+          variantName: null,
+          priceMinor: 2500,
+        },
+      ],
+      page: { limit: 100, hasMore: false, nextCursor: null },
+      correlationId: uuid('4'),
+    }).success,
+  );
+});

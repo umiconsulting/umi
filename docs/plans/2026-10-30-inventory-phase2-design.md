@@ -8,6 +8,8 @@ El usuario autorizó continuar por fases y dejar el PR #232 pendiente de aprobac
 - Guardar una receta de producto o variante conecta esa receta con las ventas siguientes.
 - Guardar una receta de artículo conserva su uso para preparación. No crea una conexión con ventas.
 - Una receta existente sin conexión se conecta cuando el propietario la guarda de nuevo.
+- Si ya hay una receta activa para el mismo producto o variante, el propietario debe editarla. Crear otra no retira la anterior.
+- Crear una receta después de retirar la anterior continúa su número de versión.
 - Si el producto o variante ya tiene otra configuración de inventario, guardar devuelve un conflicto explicable.
 - La pantalla permite cancelar o confirmar el reemplazo exacto de esa configuración. No se reemplaza de forma silenciosa.
 - La confirmación contiene el identificador y la versión de la configuración encontrada. Un cambio posterior invalida la confirmación.
@@ -29,6 +31,7 @@ Las versiones anteriores de conexiones conservan el identificador que guardaron 
 El contrato agrega `replaceSalesMapping: { mappingId, expectedVersion }` como parámetro opcional de creación y actualización.
 El error `INVENTORY_RECIPE_MAPPING_CONFLICT` lleva `details.mappingId`, `details.mappingVersion` y `details.mappingType`.
 Una confirmación obsoleta devuelve conflicto y conserva todos los datos anteriores.
+Crear sobre una receta activa devuelve `INVENTORY_RECIPE_TARGET_INVALID`, con `details.reason=ACTIVE_RECIPE_EXISTS` y `details.recipeId`.
 El contrato agrega una consulta paginada `GET /api/merchants/:merchantId/recipe-targets` en el módulo existente.
 La consulta usa la autorización de lectura de recetas y el aislamiento por negocio.
 

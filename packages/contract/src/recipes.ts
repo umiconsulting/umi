@@ -444,6 +444,42 @@ export const InventoryRecipeList = z
   .strict();
 export type InventoryRecipeList = z.infer<typeof InventoryRecipeList>;
 
+const replaceSalesMapping = z
+  .object({
+    mappingId: Uuid,
+    expectedVersion: z.number().int().positive(),
+  })
+  .strict();
+
+export const InventoryRecipeTargetQuery = z
+  .object({
+    cursor: OpaqueCursor.optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(100),
+  })
+  .strict();
+export type InventoryRecipeTargetQuery = z.infer<typeof InventoryRecipeTargetQuery>;
+
+export const InventoryRecipeTarget = z
+  .object({
+    productId: Uuid,
+    productName: z.string().min(1).max(240),
+    productActive: z.boolean(),
+    variantId: Uuid.nullable(),
+    variantName: z.string().min(1).max(240).nullable(),
+    priceMinor: MinorUnits,
+  })
+  .strict();
+export type InventoryRecipeTarget = z.infer<typeof InventoryRecipeTarget>;
+
+export const InventoryRecipeTargetList = z
+  .object({
+    targets: z.array(InventoryRecipeTarget).max(100),
+    page: PageInfo,
+    correlationId: CorrelationId,
+  })
+  .strict();
+export type InventoryRecipeTargetList = z.infer<typeof InventoryRecipeTargetList>;
+
 /**
  * A new recipe, at version 1. The target is exactly one of a product, a variant or
  * an inventory item, which is the database's own check (plan D2). A component list
@@ -459,6 +495,7 @@ export const InventoryRecipeCreateRequest = z
   .object({
     ...commandShape,
     targetKind: InventoryRecipeTargetKind,
+    replaceSalesMapping: replaceSalesMapping.optional(),
     productId: Uuid.optional(),
     variantId: Uuid.optional(),
     targetItemId: Uuid.optional(),
@@ -491,6 +528,7 @@ export const InventoryRecipeUpdateRequest = z
   .object({
     ...commandShape,
     recipeId: Uuid,
+    replaceSalesMapping: replaceSalesMapping.optional(),
     yieldQuantity: PositiveInventoryQuantity.optional(),
     shelfLifeDays: z.number().int().min(0).max(3650).nullable().optional(),
     components: z.array(InventoryRecipeComponentInput).min(1).max(200).optional(),
@@ -572,6 +610,9 @@ export const recipesModels = {
   InventoryAuthoringItemArchiveRequest,
   InventoryAuthoringItemAllergenSetRequest,
   InventoryRecipeTargetKind,
+  InventoryRecipeTargetQuery,
+  InventoryRecipeTarget,
+  InventoryRecipeTargetList,
   InventoryRecipeComponentInput,
   InventoryRecipeComponent,
   InventoryRecipeQuery,

@@ -23,6 +23,8 @@ import {
   type InventoryRecipeExplosionItem,
   type InventoryRecipeList,
   type InventoryRecipeQuery,
+  type InventoryRecipeTargetQuery,
+  type InventoryRecipeTargetList,
   type InventoryRecipeRetireRequest,
   type InventoryRecipeUpdateRequest,
   type InventoryUnitConversionList,
@@ -62,6 +64,7 @@ import {
   type RecipeExplosionRow,
   type RecipeComponentRow,
   type RecipeListCursor,
+  type RecipeTargetCursor,
   type RecipeRow,
   type StoredRecipe,
 } from './inventory-authoring.repository';
@@ -197,6 +200,43 @@ export class InventoryAuthoringService {
   }
 
   // ── The recipe reads ──────────────────────────────────────────────────────
+
+  /** Return active targets with an opaque cursor for the next page. */
+  async recipeTargets(
+    access: MerchantAccess,
+    query: InventoryRecipeTargetQuery,
+  ): Promise<InventoryRecipeTargetList> {
+    const decoded = decodeCursor(query.cursor, [
+      ['productId', 'uuid'],
+      ['targetId', 'text'],
+    ]);
+    if (decoded && decoded.targetId !== '0' && !UUID_SHAPE.test(String(decoded.targetId))) {
+      throw new BadRequestException({ code: 'VALIDATION_FAILED' });
+    }
+    const cursor: RecipeTargetCursor | null = decoded
+      ? {
+          productId: String(decoded.productId),
+          targetId: String(decoded.targetId),
+        }
+      : null;
+    const { rows, hasMore } = await this.repo.listRecipeTargets(access.merchantId, query, cursor);
+    const last = rows.at(-1);
+    return {
+      targets: rows,
+      page: {
+        limit: query.limit,
+        hasMore,
+        nextCursor:
+          hasMore && last
+            ? encodeCursor({
+                productId: last.productId,
+                targetId: last.variantId ?? '0',
+              })
+            : null,
+      },
+      correlationId: this.correlationId(),
+    };
+  }
 
   /**
    * The console's recipe list, each version carrying the TRUE cost of one unit of its
@@ -714,9 +754,8 @@ export class InventoryAuthoringService {
   }
 
   /**
-   * Amend a recipe: retire the version the caller read, write the next one, and repoint
-   * the mapping that names it. The response carries the NEW version's id, which is what
-   * the editor must use for its next write.
+   * Retire the previous recipe and write a new recipe with a new sales mapping.
+   * The editor uses the new recipe ID for its next change.
    */
   private async updateRecipe(
     user: AuthUser,

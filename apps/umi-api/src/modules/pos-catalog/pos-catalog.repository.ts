@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { randomUUID } from 'node:crypto';
 import type { CatalogCategory, CatalogProductDetail, CatalogProductSummary } from '@umi/contract';
@@ -189,15 +189,15 @@ export class PosCatalogRepository {
       `SELECT p.id::text,p.name,p.description,p.sku,p.barcode,p.price::int AS "priceMinorUnits",
               p.tax_rate_basis_points AS "taxRateBasisPoints",
               p.requires_preparation AS "requiresPreparation",
-              p.category_id::text AS "categoryId",m.inventory_item_id::text AS "inventoryItemId",
+              p.category_id::text AS "categoryId",m.inventory_item_id::text AS "inventoryItemId",m.mapping_type AS "inventoryMappingType",
               coalesce(v.version,1)::int AS version, business.currency
          FROM merchant.product p
          JOIN merchant.merchant business ON business.id=p.merchant_id
          LEFT JOIN merchant.aggregate_version v ON v.merchant_id=p.merchant_id
           AND v.aggregate_type='catalog_product' AND v.aggregate_id=p.id
          LEFT JOIN LATERAL (
-           SELECT mapping.inventory_item_id FROM merchant.inventory_catalog_mapping mapping
-           WHERE mapping.merchant_id=p.merchant_id AND mapping.product_id=p.id AND mapping.active
+           SELECT mapping.inventory_item_id,mapping.mapping_type FROM merchant.inventory_catalog_mapping mapping
+           WHERE mapping.merchant_id=p.merchant_id AND mapping.product_id=p.id AND mapping.variant_id IS NULL AND mapping.active
            ORDER BY mapping.created_at DESC LIMIT 1
          ) m ON true
         WHERE p.merchant_id=$1::uuid AND p.id=$2::uuid`,
@@ -723,6 +723,23 @@ export class PosCatalogRepository {
     rawInventoryItemId: unknown,
   ) {
     const inventoryItemId = nullableUuid(rawInventoryItemId);
+    const active = await client.query<{ id: string; version: number; mapping_type: string }>(
+      `SELECT id,version,mapping_type FROM merchant.inventory_catalog_mapping
+        WHERE merchant_id=$1::uuid AND product_id=$2::uuid AND variant_id IS NULL AND active`,
+      [merchantId, productId],
+    );
+    const current = active.rows[0];
+    if (current && (current.mapping_type === 'recipe' || current.mapping_type === 'bundle')) {
+      if (!inventoryItemId) return;
+      throw new ConflictException({
+        code: 'INVENTORY_RECIPE_MAPPING_CONFLICT',
+        details: {
+          mappingId: current.id,
+          mappingVersion: current.version,
+          mappingType: current.mapping_type,
+        },
+      });
+    }
     if (inventoryItemId) {
       const item = await client.query(
         `SELECT 1 FROM merchant.inventory_item

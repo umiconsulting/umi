@@ -36,6 +36,7 @@ import { PosInventoryRepository } from '../pos-inventory/pos-inventory.repositor
 import { PosInventoryService } from '../pos-inventory/pos-inventory.service';
 import { ProcurementRepository } from '../procurement/procurement.repository';
 import { ProcurementService } from '../procurement/procurement.service';
+import { PosCatalogRepository } from '../pos-catalog/pos-catalog.repository';
 import { InventoryAuthoringRepository } from './inventory-authoring.repository';
 import { InventoryAuthoringService } from './inventory-authoring.service';
 
@@ -128,7 +129,7 @@ const RECIPE_PLATE = fixtureId(0xeb);
 const RECIPE_CYCLE_A = fixtureId(0xec);
 const RECIPE_CYCLE_B = fixtureId(0xed);
 const PRODUCT_PLATE = fixtureId(0xee);
-const MAPPING_PLATE = fixtureId(0xef);
+let plateMappingId: string;
 const SUPPLIER = fixtureId(0xbc);
 
 const RAW_REFERENCE = `HARINA-RAW-${RUN}`;
@@ -235,6 +236,7 @@ describe('inventory authoring · items, conversions and allergens', () => {
     status: number;
     code: string;
     fieldErrors: Record<string, string[]> | undefined;
+    details: unknown;
   }> {
     try {
       await work();
@@ -243,11 +245,13 @@ describe('inventory authoring · items, conversions and allergens', () => {
       const body = (typeof error.getResponse === 'function' ? error.getResponse() : {}) as {
         code?: unknown;
         fieldErrors?: Record<string, string[]>;
+        details?: unknown;
       };
       return {
         status: error.status ?? 0,
         code: typeof body.code === 'string' ? body.code : '(no code)',
         fieldErrors: body.fieldErrors,
+        details: body.details,
       };
     }
     throw new Error('the API ACCEPTED a command it was supposed to refuse');
@@ -1161,14 +1165,13 @@ describe('inventory authoring · items, conversions and allergens', () => {
         { inventoryItemId: ITEM_PREP_TWO, quantity: { value: 3, scale: 0, unit: 'portion' } },
       ],
     });
-    await pg.query(
-      `INSERT INTO merchant.inventory_catalog_mapping
-         (id,merchant_id,product_id,mapping_type,recipe_id,conversion_numerator,
-          conversion_denominator,version,active)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,'recipe',$4::uuid,1,1,1,true)
-       ON CONFLICT (id) DO NOTHING`,
-      [MAPPING_PLATE, MERCHANT, PRODUCT_PLATE, RECIPE_PLATE],
+    const mapping = await pg.query(
+      `SELECT id, mapping_type, recipe_id FROM merchant.inventory_catalog_mapping
+      WHERE merchant_id=$1 AND product_id=$2 AND active`,
+      [MERCHANT, PRODUCT_PLATE],
     );
+    plateMappingId = mapping.rows[0]?.id;
+    expect(mapping.rows[0]).toMatchObject({ mapping_type: 'recipe', recipe_id: RECIPE_PLATE });
 
     const list = InventoryRecipeList.parse(
       await scoped(() => authoring.recipes(access, InventoryRecipeQuery.parse({}))),
@@ -1332,12 +1335,30 @@ describe('inventory authoring · items, conversions and allergens', () => {
 
     // THE MAPPING FOLLOWS. Left on the retired row it would silently stop costing and
     // stop consuming, and the plate would read as free.
-    const mapping = await pg.query<{ recipe_id: string }>(
-      `SELECT recipe_id::text AS recipe_id FROM merchant.inventory_catalog_mapping
+    const mapping = await pg.query<{ recipe_id: string; active: boolean }>(
+      `SELECT recipe_id::text AS recipe_id, active FROM merchant.inventory_catalog_mapping
         WHERE merchant_id=$1::uuid AND id=$2::uuid`,
-      [MERCHANT, MAPPING_PLATE],
+      [MERCHANT, plateMappingId],
     );
-    expect(mapping.rows[0].recipe_id).toBe(updated.recipe.id);
+    expect(mapping.rows[0]).toMatchObject({ recipe_id: RECIPE_PLATE, active: false });
+    const activeMapping = await pg.query(
+      `SELECT recipe_id,version FROM merchant.inventory_catalog_mapping
+      WHERE merchant_id=$1 AND product_id=$2 AND active`,
+      [MERCHANT, PRODUCT_PLATE],
+    );
+    expect(activeMapping.rows[0]).toMatchObject({ recipe_id: updated.recipe.id, version: 2 });
+    await pg.runWithMerchant(MERCHANT, USER, (client) =>
+      new PosCatalogRepository(pg).updateAdministrative(client, MERCHANT, PRODUCT_PLATE, 1, {
+        priceMinorUnits: 46000,
+        inventoryItemId: null,
+      }),
+    );
+    const afterPriceEdit = await pg.query(
+      `SELECT recipe_id FROM merchant.inventory_catalog_mapping
+      WHERE merchant_id=$1 AND product_id=$2 AND active`,
+      [MERCHANT, PRODUCT_PLATE],
+    );
+    expect(afterPriceEdit.rows[0]?.recipe_id).toBe(updated.recipe.id);
 
     // The retired version stays readable, with the components it was written with.
     const retiredComponents = await pg.query<{ total: string }>(
@@ -1384,6 +1405,530 @@ describe('inventory authoring · items, conversions and allergens', () => {
     const row = (await recipeRows()).find((entry) => entry.id === plate!.id);
     expect(row).toMatchObject({ active: false, version: 2 });
     expect(row?.retired_at).not.toBeNull();
+    const mapping = await pg.query(
+      `SELECT id FROM merchant.inventory_catalog_mapping
+      WHERE merchant_id=$1 AND recipe_id=$2 AND active`,
+      [MERCHANT, plate!.id],
+    );
+    expect(mapping.rows).toEqual([]);
+  });
+
+  const mappingRows = async (productId: string) =>
+    (
+      await pg.query<{
+        id: string;
+        recipe_id: string | null;
+        active: boolean;
+        version: number;
+        mapping_type: string;
+        variant_id: string | null;
+      }>(
+        `SELECT id,recipe_id,active,version,mapping_type,variant_id
+      FROM merchant.inventory_catalog_mapping WHERE merchant_id=$1 AND product_id=$2 ORDER BY version`,
+        [MERCHANT, productId],
+      )
+    ).rows;
+
+  const newProduct = async () => {
+    const productId = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.product(id,merchant_id,name,price,active)
+      VALUES($1,$2,'Producto sin receta',2500,true)`,
+      [productId, MERCHANT],
+    );
+    return productId;
+  };
+  const productRecipe = (productId: string, extra: Record<string, unknown> = {}) => ({
+    targetKind: 'product',
+    productId,
+    yieldQuantity: { value: 1, scale: 0, unit: 'portion' },
+    components: [{ inventoryItemId: ITEM_RAW, quantity: { value: 1, scale: 3, unit: 'kilogram' } }],
+    ...extra,
+  });
+
+  it.each(['direct', 'non_stock'])(
+    'requires exact confirmation to replace a %s mapping and replays once',
+    async (mappingType) => {
+      const productId = await newProduct();
+      const mappingId = randomUUID();
+      const recipeId = randomUUID();
+      await pg.query(
+        `INSERT INTO merchant.inventory_catalog_mapping
+      (id,merchant_id,product_id,mapping_type,inventory_item_id,version)
+      VALUES($1,$2,$3,$4,$5,4)`,
+        [mappingId, MERCHANT, productId, mappingType, mappingType === 'direct' ? ITEM_RAW : null],
+      );
+      const conflict = await refusal(() => createRecipe(recipeId, productRecipe(productId)));
+      expect(conflict).toMatchObject({ status: 409, code: 'INVENTORY_RECIPE_MAPPING_CONFLICT' });
+      expect(
+        (await pg.query('SELECT id FROM merchant.inventory_recipe WHERE id=$1', [recipeId])).rows,
+      ).toEqual([]);
+      const commandId = randomUUID();
+      const idempotencyKey = randomUUID();
+      const input = {
+        targetAggregateId: recipeId,
+        commandId,
+        idempotencyKey,
+        parameters: productRecipe(productId, {
+          replaceSalesMapping: { mappingId, expectedVersion: 4 },
+        }),
+      };
+      const created = await send('inventory.recipe.create', input);
+      expect(await send('inventory.recipe.create', input)).toEqual(created);
+      expect(await mappingRows(productId)).toMatchObject([
+        { id: mappingId, active: false, version: 4 },
+        { recipe_id: recipeId, active: true, version: 5, mapping_type: 'recipe' },
+      ]);
+    },
+  );
+
+  it('refuses stale confirmation after the mapping disappears', async () => {
+    const productId = await newProduct();
+    const recipeId = randomUUID();
+    const result = await refusal(() =>
+      createRecipe(
+        recipeId,
+        productRecipe(productId, {
+          replaceSalesMapping: { mappingId: randomUUID(), expectedVersion: 1 },
+        }),
+      ),
+    );
+    expect(result).toMatchObject({ status: 409, code: 'INVENTORY_RECIPE_MAPPING_CONFLICT' });
+    expect(
+      (await pg.query('SELECT id FROM merchant.inventory_recipe WHERE id=$1', [recipeId])).rows,
+    ).toEqual([]);
+  });
+
+  it('preserves the historical mapping on update and deactivates it on retirement', async () => {
+    const productId = await newProduct();
+    const recipeId = randomUUID();
+    await createRecipe(recipeId, productRecipe(productId));
+    // A legacy bundle represents a mapping created before recipe authoring connected sales.
+    await pg.query(
+      'UPDATE merchant.inventory_catalog_mapping SET active=false,retired_at=clock_timestamp() WHERE merchant_id=$1 AND product_id=$2',
+      [MERCHANT, productId],
+    );
+    const mappingId = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.inventory_catalog_mapping(id,merchant_id,product_id,mapping_type,recipe_id,version)
+      VALUES($1,$2,$3,'bundle',$4,8)`,
+      [mappingId, MERCHANT, productId, recipeId],
+    );
+    const updated = await send('inventory.recipe.update', {
+      targetAggregateId: recipeId,
+      targetVersion: 1,
+    });
+    const nextId = (updated as { recipe: { id: string } }).recipe.id;
+    const rows = await mappingRows(productId);
+    expect(rows.find((row) => row.id === mappingId)).toMatchObject({
+      recipe_id: recipeId,
+      active: false,
+    });
+    expect(rows.find((row) => row.active)).toMatchObject({
+      recipe_id: nextId,
+      version: 9,
+      mapping_type: 'bundle',
+    });
+    await send('inventory.recipe.retire', { targetAggregateId: nextId, targetVersion: 2 });
+    expect((await mappingRows(productId)).filter((row) => row.active)).toEqual([]);
+  });
+
+  it('keeps recipe mappings for catalog price edits and rejects a direct item replacement', async () => {
+    const productId = await newProduct();
+    const recipeId = randomUUID();
+    await createRecipe(recipeId, productRecipe(productId));
+    await pg.runWithMerchant(MERCHANT, USER, (client) =>
+      new PosCatalogRepository(pg).updateAdministrative(client, MERCHANT, productId, 1, {
+        priceMinorUnits: 2600,
+        inventoryItemId: null,
+      }),
+    );
+    expect((await mappingRows(productId)).find((row) => row.active)).toMatchObject({
+      recipe_id: recipeId,
+    });
+    expect(
+      await refusal(() =>
+        pg.runWithMerchant(MERCHANT, USER, (client) =>
+          new PosCatalogRepository(pg).updateAdministrative(client, MERCHANT, productId, 2, {
+            inventoryItemId: ITEM_RAW,
+          }),
+        ),
+      ),
+    ).toMatchObject({
+      status: 409,
+      code: 'INVENTORY_RECIPE_MAPPING_CONFLICT',
+    });
+    const detail = await scoped(() =>
+      new PosCatalogRepository(pg).administrativeDetail(MERCHANT, productId),
+    );
+    expect(detail).toMatchObject({ inventoryMappingType: 'recipe', inventoryItemId: null });
+  });
+
+  it('connects a legacy unmapped recipe on save and never maps item recipes', async () => {
+    const productId = await newProduct();
+    const recipeId = randomUUID();
+    await createRecipe(recipeId, productRecipe(productId));
+    await pg.query(
+      'UPDATE merchant.inventory_catalog_mapping SET active=false,retired_at=clock_timestamp() WHERE merchant_id=$1 AND product_id=$2',
+      [MERCHANT, productId],
+    );
+    const updated = await send('inventory.recipe.update', {
+      targetAggregateId: recipeId,
+      targetVersion: 1,
+    });
+    expect((await mappingRows(productId)).find((row) => row.active)).toMatchObject({
+      recipe_id: (updated as { recipe: { id: string } }).recipe.id,
+    });
+    const itemMappings = await pg.query(
+      `SELECT id FROM merchant.inventory_catalog_mapping
+      WHERE merchant_id=$1 AND recipe_id=ANY($2::uuid[])`,
+      [MERCHANT, [RECIPE_PREP_ONE, RECIPE_PREP_TWO]],
+    );
+    expect(itemMappings.rows).toEqual([]);
+  });
+
+  it('refuses a second active recipe even with mapping confirmation and allocates versions after retirement', async () => {
+    const productId = await newProduct();
+    const recipeId = randomUUID();
+    await createRecipe(recipeId, productRecipe(productId));
+    expect(await refusal(() => createRecipe(randomUUID(), productRecipe(productId)))).toMatchObject(
+      {
+        status: 409,
+        code: 'INVENTORY_RECIPE_TARGET_INVALID',
+        details: { reason: 'ACTIVE_RECIPE_EXISTS', recipeId },
+      },
+    );
+    const mapping = (await mappingRows(productId)).find((row) => row.active)!;
+    const refused = await refusal(() =>
+      createRecipe(
+        randomUUID(),
+        productRecipe(productId, {
+          replaceSalesMapping: { mappingId: mapping.id, expectedVersion: mapping.version },
+        }),
+      ),
+    );
+    expect(refused).toMatchObject({
+      status: 409,
+      code: 'INVENTORY_RECIPE_TARGET_INVALID',
+      details: { reason: 'ACTIVE_RECIPE_EXISTS', recipeId },
+    });
+    await send('inventory.recipe.retire', { targetAggregateId: recipeId, targetVersion: 1 });
+    const created = await createRecipe(randomUUID(), productRecipe(productId));
+    expect((created as { recipe: { version: number } }).recipe.version).toBe(2);
+  });
+
+  it('serializes concurrent creates and exact replacements under the product lock', async () => {
+    const productId = await newProduct();
+    const mappingId = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.inventory_catalog_mapping(id,merchant_id,product_id,mapping_type,version)
+      VALUES($1,$2,$3,'non_stock',1)`,
+      [mappingId, MERCHANT, productId],
+    );
+    const results = await Promise.allSettled(
+      [1, 2].map(() =>
+        createRecipe(
+          randomUUID(),
+          productRecipe(productId, {
+            replaceSalesMapping: { mappingId, expectedVersion: 1 },
+          }),
+        ),
+      ),
+    );
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find(
+      (result) => result.status === 'rejected',
+    ) as PromiseRejectedResult;
+    expect(rejected.reason.getResponse()).toMatchObject({
+      code: 'INVENTORY_RECIPE_MAPPING_CONFLICT',
+    });
+    expect((await mappingRows(productId)).filter((row) => row.active)).toHaveLength(1);
+    const unmapped = await newProduct();
+    const creations = await Promise.allSettled(
+      [1, 2].map(() => createRecipe(randomUUID(), productRecipe(unmapped))),
+    );
+    expect(creations.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect((await mappingRows(unmapped)).filter((row) => row.active)).toHaveLength(1);
+  });
+
+  it('lists unmapped base targets and active variants with stable pages and merchant isolation', async () => {
+    const productId = await newProduct();
+    const variantId = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.product_variant(id,merchant_id,product_id,name,price_delta,active)
+      VALUES($1,$2,$3,'Grande',500,true)`,
+      [variantId, MERCHANT, productId],
+    );
+    const highPriceProduct = await newProduct();
+    await pg.query('UPDATE merchant.product SET price=3000000000 WHERE id=$1', [highPriceProduct]);
+    const inactiveProduct = await newProduct();
+    const inactiveVariant = randomUUID();
+    await pg.query('UPDATE merchant.product SET active=false WHERE id=$1', [inactiveProduct]);
+    await pg.query(
+      `INSERT INTO merchant.product_variant(id,merchant_id,product_id,name,price_delta,active)
+      VALUES($1,$2,$3,'Retirada',100,false)`,
+      [inactiveVariant, MERCHANT, productId],
+    );
+    // This call also proves the administrative detail selects the base target only.
+    await createRecipe(randomUUID(), productRecipe(productId, { variantId }));
+    expect(
+      await scoped(() => new PosCatalogRepository(pg).administrativeDetail(MERCHANT, productId)),
+    ).toMatchObject({ inventoryMappingType: null });
+    const targets: Array<{ productId: string; variantId: string | null; priceMinor: number }> = [];
+    let cursor: string | undefined;
+    do {
+      const page = await scoped(() => authoring.recipeTargets(access, { limit: 2, cursor }));
+      targets.push(...page.targets);
+      cursor = page.page.nextCursor ?? undefined;
+    } while (cursor);
+    expect(new Set(targets.map((row) => `${row.productId}:${row.variantId}`)).size).toBe(
+      targets.length,
+    );
+    expect(targets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ productId, variantId: null, priceMinor: 2500 }),
+        expect.objectContaining({ productId, variantId, priceMinor: 3000 }),
+        expect.objectContaining({
+          productId: highPriceProduct,
+          variantId: null,
+          priceMinor: 3000000000,
+        }),
+      ]),
+    );
+    expect(
+      targets.some((row) => row.productId === inactiveProduct || row.variantId === inactiveVariant),
+    ).toBe(false);
+    const foreign = randomUUID();
+    await pg.query(`INSERT INTO merchant.merchant(id,name,handle) VALUES($1,'Otro',$2)`, [
+      foreign,
+      `other-${RUN}`,
+    ]);
+    const foreignProduct = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.product(id,merchant_id,name,price) VALUES($1,$2,'Ajeno',100)`,
+      [foreignProduct, foreign],
+    );
+    const ownPage = await scoped(() => authoring.recipeTargets(access, { limit: 100 }));
+    expect(ownPage.targets.some((row) => row.productId === foreignProduct)).toBe(false);
+    expect(
+      await refusal(() =>
+        scoped(() => authoring.recipeTargets(access, { limit: 100, cursor: 'invalid' })),
+      ),
+    ).toMatchObject({ status: 400, code: 'VALIDATION_FAILED' });
+  });
+
+  it('rolls back recipe writes for a foreign product or a variant of another product', async () => {
+    const productId = await newProduct();
+    const otherProductId = await newProduct();
+    const variantId = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.product_variant(id,merchant_id,product_id,name,price_delta)
+      VALUES($1,$2,$3,'Otro producto',100)`,
+      [variantId, MERCHANT, otherProductId],
+    );
+    const foreignMerchant = randomUUID();
+    const foreignProduct = randomUUID();
+    await pg.query(`INSERT INTO merchant.merchant(id,name,handle) VALUES($1,'Ajeno',$2)`, [
+      foreignMerchant,
+      `foreign-${RUN}`,
+    ]);
+    await pg.query(
+      `INSERT INTO merchant.product(id,merchant_id,name,price) VALUES($1,$2,'Ajeno',100)`,
+      [foreignProduct, foreignMerchant],
+    );
+    for (const parameters of [
+      productRecipe(productId, { variantId }),
+      productRecipe(foreignProduct),
+    ]) {
+      const recipeId = randomUUID();
+      expect(await refusal(() => createRecipe(recipeId, parameters))).toMatchObject({
+        status: 409,
+        code: 'INVENTORY_RECIPE_TARGET_INVALID',
+      });
+      expect(
+        (await pg.query('SELECT id FROM merchant.inventory_recipe WHERE id=$1', [recipeId])).rows,
+      ).toEqual([]);
+    }
+    expect(await mappingRows(productId)).toEqual([]);
+  });
+
+  it('refuses stale update confirmation and preserves the current recipe and mapping', async () => {
+    const productId = await newProduct();
+    const recipeId = randomUUID();
+    await createRecipe(recipeId, productRecipe(productId));
+    const previous = (await mappingRows(productId))[0];
+    await pg.query(
+      `UPDATE merchant.inventory_catalog_mapping SET active=false,retired_at=clock_timestamp()
+      WHERE id=$1`,
+      [previous.id],
+    );
+    const replacementId = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.inventory_catalog_mapping(id,merchant_id,product_id,mapping_type,version)
+      VALUES($1,$2,$3,'non_stock',2)`,
+      [replacementId, MERCHANT, productId],
+    );
+    expect(
+      await refusal(() =>
+        send('inventory.recipe.update', {
+          targetAggregateId: recipeId,
+          targetVersion: 1,
+          parameters: {
+            replaceSalesMapping: { mappingId: previous.id, expectedVersion: 1 },
+          },
+        }),
+      ),
+    ).toMatchObject({
+      status: 409,
+      code: 'INVENTORY_RECIPE_MAPPING_CONFLICT',
+      details: {
+        mappingId: replacementId,
+        mappingVersion: 2,
+        mappingType: 'non_stock',
+      },
+    });
+    expect(
+      (
+        await pg.query('SELECT active,version FROM merchant.inventory_recipe WHERE id=$1', [
+          recipeId,
+        ])
+      ).rows[0],
+    ).toMatchObject({ active: true, version: 1 });
+    expect((await mappingRows(productId)).find((row) => row.active)?.id).toBe(replacementId);
+    await pg.query(
+      `UPDATE merchant.inventory_catalog_mapping SET active=false,retired_at=clock_timestamp() WHERE id=$1`,
+      [replacementId],
+    );
+    expect(
+      await refusal(() =>
+        send('inventory.recipe.update', {
+          targetAggregateId: recipeId,
+          targetVersion: 1,
+          parameters: {
+            replaceSalesMapping: { mappingId: replacementId, expectedVersion: 2 },
+          },
+        }),
+      ),
+    ).toMatchObject({
+      status: 409,
+      code: 'INVENTORY_RECIPE_MAPPING_CONFLICT',
+      details: {
+        mappingId: null,
+        mappingVersion: null,
+        mappingType: null,
+      },
+    });
+    expect(
+      (
+        await pg.query('SELECT active,version FROM merchant.inventory_recipe WHERE id=$1', [
+          recipeId,
+        ])
+      ).rows[0],
+    ).toMatchObject({ active: true, version: 1 });
+    const latestId = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.inventory_catalog_mapping(id,merchant_id,product_id,mapping_type,version)
+      VALUES($1,$2,$3,'non_stock',3)`,
+      [latestId, MERCHANT, productId],
+    );
+    const updated = await send('inventory.recipe.update', {
+      targetAggregateId: recipeId,
+      targetVersion: 1,
+      parameters: {
+        replaceSalesMapping: { mappingId: latestId, expectedVersion: 3 },
+      },
+    });
+    expect((await mappingRows(productId)).find((row) => row.active)).toMatchObject({
+      recipe_id: (updated as { recipe: { id: string } }).recipe.id,
+      version: 4,
+      mapping_type: 'recipe',
+    });
+  });
+
+  it('restores the product recipe fallback when a variant recipe retires', async () => {
+    const productId = await newProduct();
+    const variantId = randomUUID();
+    const baseRecipe = randomUUID();
+    const variantRecipe = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.product_variant(id,merchant_id,product_id,name,price_delta)
+      VALUES($1,$2,$3,'Grande',100)`,
+      [variantId, MERCHANT, productId],
+    );
+    await createRecipe(baseRecipe, productRecipe(productId));
+    await createRecipe(
+      variantRecipe,
+      productRecipe(productId, {
+        variantId,
+        components: [
+          {
+            inventoryItemId: ITEM_RAW,
+            quantity: { value: 20000, scale: 3, unit: 'kilogram' },
+          },
+        ],
+      }),
+    );
+    const policyId = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.inventory_policy(id,merchant_id,location_id,inventory_location_id,version,fingerprint)
+      VALUES($1,$2,$3,$4,'variant-fallback',repeat('a',64))`,
+      [policyId, MERCHANT, LOCATION, STOCK_ROOM],
+    );
+    try {
+      const catalog = new PosCatalogRepository(pg);
+      const before = await scoped(() => catalog.detail(MERCHANT, LOCATION, productId));
+      expect(before?.variants.find((row) => row.id === variantId)?.availability).toBe(
+        'temporarily_unavailable',
+      );
+      await send('inventory.recipe.retire', { targetAggregateId: variantRecipe, targetVersion: 1 });
+      const after = await scoped(() => catalog.detail(MERCHANT, LOCATION, productId));
+      expect(after?.variants.find((row) => row.id === variantId)?.availability).toBe('enabled');
+      expect((await mappingRows(productId)).filter((row) => row.active)).toMatchObject([
+        { recipe_id: baseRecipe, variant_id: null },
+      ]);
+      const next = await createRecipe(randomUUID(), productRecipe(productId, { variantId }));
+      expect((next as { recipe: { version: number } }).recipe.version).toBe(2);
+    } finally {
+      await pg.query('DELETE FROM merchant.inventory_policy WHERE id=$1', [policyId]);
+    }
+  });
+
+  it('waits for the catalog product lock before it locks the recipe', async () => {
+    const productId = await newProduct();
+    const recipeId = randomUUID();
+    await createRecipe(recipeId, productRecipe(productId));
+    let pending: Promise<unknown> | undefined;
+    await pg.runWithMerchant(MERCHANT, USER, async (client) => {
+      await client.query('SELECT id FROM merchant.product WHERE id=$1 FOR UPDATE', [productId]);
+      const holderPid = (await client.query<{ pid: number }>('SELECT pg_backend_pid() AS pid'))
+        .rows[0].pid;
+      pending = send('inventory.recipe.update', { targetAggregateId: recipeId, targetVersion: 1 });
+      // Observe the actual database wait before the NOWAIT probe.
+      const deadline = Date.now() + 5000;
+      let waits: boolean;
+      do {
+        const result = await pg.query<{ waiting: boolean }>(
+          `SELECT EXISTS(
+          SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))
+        ) AS waiting`,
+          [holderPid],
+        );
+        waits = result.rows[0].waiting;
+        if (!waits) await new Promise((resolve) => setTimeout(resolve, 10));
+      } while (!waits && Date.now() < deadline);
+      expect(waits).toBe(true);
+      await client.query('SELECT id FROM merchant.inventory_recipe WHERE id=$1 FOR UPDATE NOWAIT', [
+        recipeId,
+      ]);
+      await new PosCatalogRepository(pg).updateAdministrative(client, MERCHANT, productId, 1, {
+        priceMinorUnits: 2800,
+        inventoryItemId: null,
+      });
+    });
+    const updated = (await pending) as { recipe: { id: string } };
+    expect((await mappingRows(productId)).find((row) => row.active)?.recipe_id).toBe(
+      updated.recipe.id,
+    );
   });
 
   // ── Production, yield, lots, prep and recall (phase 3) ─────────────────────

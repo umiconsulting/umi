@@ -4,6 +4,7 @@ import {
   InventoryAllergenQuery,
   InventoryAuthoringItemQuery,
   InventoryRecipeQuery,
+  InventoryRecipeTargetQuery,
   LotRecallQuery,
   PrepListQuery,
 } from '@umi/contract';
@@ -69,6 +70,15 @@ export class InventoryAuthoringController {
     @Query(new ZodValidationPipe(InventoryAllergenQuery)) query: InventoryAllergenQuery,
   ) {
     return this.authoring.allergens(access, query);
+  }
+
+  /** Products and variants available for a product recipe. */
+  @Get('recipe-targets')
+  recipeTargets(
+    @Merchant() access: MerchantAccess,
+    @Query(new ZodValidationPipe(InventoryRecipeTargetQuery)) query: InventoryRecipeTargetQuery,
+  ) {
+    return this.authoring.recipeTargets(access, query);
   }
 
   /**
