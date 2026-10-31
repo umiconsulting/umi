@@ -20,7 +20,7 @@
 - Persist the exact batch before sending. Retries reuse commandId, idempotencyKey, targetAggregateId and payload.
 - Never redirect a prepared batch to a different merchant. Stop unsent commands when the merchant changes or the dialog closes.
 - Use simple Spanish through Lingui. Preserve other locales and existing screens.
-- One PR: extend #242 on `fix/inventory-staging-integration`, directly to `staging`. Atomic commits. No merge or production deployment.
+- One new PR from `feat/inventory-bulk-import`, directly to `staging`. PR #242 is already merged. Atomic commits. No merge or production deployment.
 - Worktree: `/private/tmp/umi-inventory-staging-20261030`. Preserve the original checkout and other worktrees and services.
 - No initial balances, purchase photos, forecasts or notifications in this task.
 
@@ -93,7 +93,7 @@ UI translation belongs to Task 3; return stable codes for errors. Export guide/c
 - Entry: `{ key, rowNumbers, reference, label, status, errors, command }`.
 - Status: `new`, `update`, `unchanged`, `duplicate`, `error`; errors contain stable `code,column,rowNumber` as available.
 - Command is null or `{ operation, targetAggregateId, targetVersion, parameters }`. Create IDs are assigned once when the batch is prepared.
-- `prepareImportBatch({ merchantId, preview, storage }) -> batch`; persists before return, and refuses an unresolved prior batch.
+- `prepareImportBatch({ merchantId, locationId, preview, storage }) -> batch`; persists before return, and refuses an unresolved prior batch.
 - `readImportBatch(storage, merchantId, kind)` returns the validated saved batch or null.
 - `runImportBatch({ batch, storage, execute, isCurrentMerchant, signal, onProgress, delay }) -> Promise<batch>`.
 - `execute(merchantId, operation, targetAggregateId, options)` receives exact persisted identifiers and parameters.
@@ -122,7 +122,7 @@ Do not supply `replaceSalesMapping`; report the backend conflict for manual reso
 - [ ] Write RED recovery tests with an in-memory storage and stateful command receiver, then implement the runner.
 
 ```js
-const before = prepareImportBatch({merchantId, preview, storage});
+const before = prepareImportBatch({merchantId, locationId, preview, storage});
 await runImportBatch({...options, batch: before}); // receiver records command, response is lost
 const recovered = readImportBatch(storage, merchantId, 'items');
 await runImportBatch({...options, batch: recovered});
@@ -131,6 +131,7 @@ expect(receiver.received[1]).toEqual(receiver.received[0]);
 ```
 
 Persist exact random UUIDs for every eligible command before the first send. Persist status before and after every command.
+Persist the original selected location at confirmation. Reuse that location on every attempt, including a null location.
 A saved `sending` entry becomes ambiguous on recovery. Unknown/5xx outcomes stop the batch and remain retryable.
 Completed entries never resend. Definitive 4xx errors appear in results; 401/403/429 stop further sends and permit deliberate retry where valid.
 Use a 400 ms default between sends. Tests inject delay. Check signal and merchant before each send and after delays.
@@ -154,7 +155,7 @@ Explicit clear may discard never-sent pending entries and definite401/403/429 re
 - Export `fetchInventoryImportSnapshot(merchantId)` and `executeInventoryImportCommand(merchantId, operation, targetAggregateId, options)` from data.jsx.
 - Snapshot returns `{merchantId, items, recipes, targets}` with all pages, including archived items, active recipes and active product variants.
 - Use existing `_apiFetch`, route builders and pagination safeguards; the explicit merchant argument determines every request URL.
-- Import commands fix `locationId: null` and `approvalId: null`. These merchant-wide writes must retain their fingerprint after a location switch.
+- Import commands use the saved `options.locationId` and fixed `approvalId: null`. Capture the selected location at confirmation; never read the current location for a retry.
 
 - [ ] Write a failing interaction or browser test for selecting a file, viewing preview and cancelling with zero commands.
 - [ ] Add `Importar artículos` and `Importar recetas` to the corresponding workspace headers, gated by existing `merchant.manage`.
@@ -210,6 +211,6 @@ Verify a user without merchant.manage cannot access imports and API writes still
 
 ## Delivery
 
-After task reviews and a final review, push atomic commits to the existing PR branch.
-Rewrite PR 242 title/body around its complete final scope and verified results; retain base `staging`.
+After task reviews and a final review, push atomic commits to `feat/inventory-bulk-import`.
+Create one new PR for imports, with base `staging`. Describe the final scope and verified results.
 Confirm published HEAD, CI and open review state. Do not merge or enable auto-merge.

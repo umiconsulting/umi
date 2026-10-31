@@ -4,7 +4,8 @@
 
 El propietario descarga e importa artículos y recetas desde el dashboard en CSV y Excel (.xlsx).
 La vista previa precede a la confirmación. Un resultado descargable identifica cada fila y receta.
-El usuario pidió ambos formatos y autorizó continuar. La entrega amplía el PR 242, con base `staging`.
+El usuario pidió ambos formatos y autorizó continuar. La entrega usa un nuevo PR con base `staging`.
+El PR 242 ya se integró. La rama de esta entrega es `feat/inventory-bulk-import`.
 Los commits son atómicos. El PR permanece abierto para aprobación.
 
 ## Decisión
@@ -98,7 +99,8 @@ Una nueva importación requiere terminar o resolver la anterior; un resultado am
 El propietario puede descartar expresamente las filas nunca enviadas o rechazadas de forma definitiva por permisos o límite de solicitudes.
 Los registros ya guardados permanecen. La pantalla usa `Detener pendientes` durante un lote y `Cancelar` antes de confirmarlo.
 Un archivo reimportado se compara con el estado actual y no crea duplicados ni versiones idénticas.
-Los comandos de autoría usan el negocio original y `locationId: null`; un cambio de sucursal no modifica su identidad al reintentar.
+Los comandos usan el negocio original y la sucursal seleccionada al confirmar.
+El diario conserva ese `locationId`, incluso cuando es nulo. Cambiar de sucursal no modifica los reintentos.
 
 ## Implementación y fuentes
 
