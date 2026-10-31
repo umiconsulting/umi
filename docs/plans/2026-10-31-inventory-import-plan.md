@@ -6,7 +6,7 @@
 
 **Architecture:** Browser file adapters produce rows for pure preview planners. A persistent sequential runner calls existing administrative commands. The backend remains the write authority.
 
-**Tech Stack:** React 18, Lingui 6, Vite 5, Vitest 2, Playwright, ExcelJS 4.4.0, Papa Parse 5.7.0, existing NestJS API and PostgreSQL.
+**Tech Stack:** React 18, Lingui 6, Vite 5, Vitest 2, Playwright, ExcelJS 4.4.0, read-excel-file 9.3.14, Papa Parse 5.7.0, existing NestJS API and PostgreSQL.
 
 **Spec:** `docs/plans/2026-10-31-inventory-import-design.md`
 
@@ -69,6 +69,7 @@ Optional item columns are `costo_unitario,existencia_minima,cantidad_preparacion
 Recipe columns are `producto_id,variante_id,rendimiento,unidad_rendimiento,ingrediente_codigo,cantidad,unidad`; only variante_id may be blank or omitted.
 No parser evaluates formulas. A formula cell is a row error, with its remaining values retained for recipe grouping.
 Accept strings and finite safe numeric cells; reject dates, booleans, formulas and unsupported Excel object values.
+Preserve original numeric XML text with read-excel-file/universal. Reject UNSAFE_NUMBER when ExcelJS's native numeric value differs from that exact value. The review regression is costo_unitario numeric XML `0.10000000000000001`; safe `0.1000` retains its original string.
 Keep all data strings; numbers from Excel become ordinary decimal strings only when safe. Never silently accept exponent notation.
 Excel parses only `Articulos` or `Recetas`; guide/example/reference sheets cannot become import data.
 Template data sheets have headers only. Guide explains every field, valid code and example. All XLSX cells use explicit text values.
@@ -136,6 +137,8 @@ Use a 400 ms default between sends. Tests inject delay. Check signal and merchan
 Storage failure before send means no send; failure after response must leave a recoverable old identity, never allocate another.
 Callback errors cannot turn a committed write into a fresh command. Persist results against the original merchant even after context changes.
 Validate saved shape before use; malformed storage cannot trigger commands. Keep error messages bounded and avoid credentials.
+Permit only the four article/recipe create/update operations in saved journals. Persist minimal result IDs and versions, not full projections.
+Explicit clear may discard never-sent pending entries and definite401/403/429 retryable entries. It refuses sending/ambiguous outcomes and active runners. Saved records remain.
 - [ ] Run focused tests and lint. Commit as `feat(dashboard): validate and recover inventory imports`.
 
 ### Task 3: Dashboard import workflow
@@ -151,6 +154,7 @@ Validate saved shape before use; malformed storage cannot trigger commands. Keep
 - Export `fetchInventoryImportSnapshot(merchantId)` and `executeInventoryImportCommand(merchantId, operation, targetAggregateId, options)` from data.jsx.
 - Snapshot returns `{merchantId, items, recipes, targets}` with all pages, including archived items, active recipes and active product variants.
 - Use existing `_apiFetch`, route builders and pagination safeguards; the explicit merchant argument determines every request URL.
+- Import commands fix `locationId: null` and `approvalId: null`. These merchant-wide writes must retain their fingerprint after a location switch.
 
 - [ ] Write a failing interaction or browser test for selecting a file, viewing preview and cancelling with zero commands.
 - [ ] Add `Importar artículos` and `Importar recetas` to the corresponding workspace headers, gated by existing `merchant.manage`.
@@ -162,7 +166,9 @@ An invalid recipe lists all associated row numbers and the failing row. Confirma
 Disable save while references/file are loading or failed, when nothing changes, or when no valid entries remain.
 Only confirmation prepares/persists/sends a new batch. Loading, download and cancellation must not write.
 - [ ] Integrate the runner and saved batch recovery. Display progress, stop/cancel safely, report successes/errors and refresh existing lists after writes.
+Before confirmation, `Cancelar` writes nothing. During a batch, `Detener pendientes` stops unsent entries and explains that saved records remain.
 Keep the exact saved batch immutable through an ambiguous result. Reopen/reload offers recovery before another file.
+An explicit `Nueva importación` may discard known unsent or definite rejected entries through clearImportBatch; it remains blocked for sending/ambiguous entries.
 The dialog aborts pending file work and unsent commands on unmount or merchant change; no stale preview can save to another merchant.
 Result downloads support both CSV and Excel and include all input rows, including duplicates and errors.
 Use a dedicated copy mapper for stable validation/backend errors; never show raw objects, stack traces or English codes to owners.

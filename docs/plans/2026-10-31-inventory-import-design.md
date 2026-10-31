@@ -95,7 +95,10 @@ Los envíos son secuenciales, separados por al menos 400 ms, para respetar el l�
 Cambiar de negocio o cerrar la pantalla detiene los comandos que todavía no comenzaron.
 El comando en curso conserva el negocio original; su resultado se guarda en el diario original.
 Una nueva importación requiere terminar o resolver la anterior; un resultado ambiguo no se descarta.
+El propietario puede descartar expresamente las filas nunca enviadas o rechazadas de forma definitiva por permisos o límite de solicitudes.
+Los registros ya guardados permanecen. La pantalla usa `Detener pendientes` durante un lote y `Cancelar` antes de confirmarlo.
 Un archivo reimportado se compara con el estado actual y no crea duplicados ni versiones idénticas.
+Los comandos de autoría usan el negocio original y `locationId: null`; un cambio de sucursal no modifica su identidad al reintentar.
 
 ## Implementación y fuentes
 
@@ -104,10 +107,14 @@ Fuente: https://github.com/exceljs/exceljs/tree/v4.4.0 y README del tag, consult
 La vista web de GitHub omitió el README; se consultó el archivo oficial en raw.githubusercontent.com.
 Hecho documentado: Papa Parse 5.7.0 interpreta CSV y ofrece `escapeFormulae` al exportar.
 Fuente: https://www.papaparse.com/docs y los metadatos oficiales de npm, consultados el 2026-10-31.
-Estas bibliotecas no estaban instaladas. Ambas funcionan sin interacción y solo se agregan al dashboard.
-El costo es una dependencia para Excel y otra para CSV, cargadas dentro del worker al usar la función.
+Hecho documentado: read-excel-file 9.3.14 permite conservar los números originales mediante `parseNumber: value => value`.
+Fuente: https://github.com/catamphetamine/read-excel-file, sección de precisión, consultada el 2026-10-31.
+Una prueba con XML numérico `0.10000000000000001` mostró que ExcelJS entrega `0.1` antes de validar.
+El lector adicional compara el valor original y rechaza la pérdida de precisión. Los números seguros conservan su representación original.
+Estas bibliotecas no estaban instaladas. Funcionan sin interacción y solo se agregan al dashboard.
+El costo es dos dependencias para Excel y una para CSV, cargadas dentro del worker al usar la función.
 Se prefieren a un parser propio por las reglas de comillas, codificación y tipos de celda.
-La alternativa read-excel-file/write-excel-file exige dos bibliotecas para Excel; ExcelJS también permite detectar fórmulas.
+ExcelJS conserva la validación de tipos y fórmulas y genera los archivos. El lector adicional conserva la precisión numérica.
 Inferencia específica de Umi: los comandos actuales cubren la atomicidad requerida por artículo y receta.
 Fuentes locales: `recipes.ts`, `inventory-authoring.service.ts`, `inventory-authoring.repository.ts` y `administrative-command.jsx`.
 
