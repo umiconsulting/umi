@@ -6,7 +6,12 @@ import { Menu } from '@/components/menu.jsx';
 import { useAdministrativeCommand } from '@/lib/administrative-command.jsx';
 import { hasRequiredPermission } from '@/lib/module-registry.js';
 import { useMerchant } from '@/lib/merchant-context.jsx';
-import { useInventoryAllergens, useInventoryItems, useInventoryUnitConversions } from '@/data.jsx';
+import {
+  useInventoryAllergens,
+  useInventoryCostBasis,
+  useInventoryItems,
+  useInventoryUnitConversions,
+} from '@/data.jsx';
 import {
   PAGE_SIZE,
   VIEW_KEYS,
@@ -77,7 +82,7 @@ const NEED_COPY = {
 const NEED_LABEL = {
   count: msg`Contar`,
   review_stock: msg`Revisar`,
-  set_cost: msg`Ver costos`,
+  set_cost: msg`Agregar costo`,
   enable_tracking: msg`Activar conteo`,
 };
 
@@ -119,6 +124,13 @@ export default function InventoryWorkspace() {
   const itemsState = useInventoryItems({ includeArchived: view === 'archived' }, refresh);
   const conversionsState = useInventoryUnitConversions(refresh);
   const allergensState = useInventoryAllergens(refresh);
+  const basisState = useInventoryCostBasis(refresh);
+  const basisById = useMemo(
+    () => new Map(basisState.data.items.map((entry) => [entry.inventoryItemId, entry])),
+    [basisState.data.items],
+  );
+  const currency =
+    merchant?.selectedMerchant?.currency || capabilities?.merchant?.currency || 'MXN';
 
   const locationId = merchant?.selectedLocationId || merchant?.selectedLocation?.id || '';
   const locationName =
@@ -210,7 +222,7 @@ export default function InventoryWorkspace() {
   /** The row's own verb. Each need opens the smallest surface that answers it. */
   const runNeed = useCallback(
     (need, item) => {
-      if (need === 'set_cost') window.location.assign('/inventory/costos');
+      if (need === 'set_cost') setEditor({ item, id: item.id });
       else if (need === 'count') setCountOpen(true);
       else if (need === 'enable_tracking') setEditor({ item, id: item.id });
       else openPanel(item);
@@ -265,7 +277,7 @@ export default function InventoryWorkspace() {
         (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        setPaletteOpen(true);
+        if (!editor) setPaletteOpen(true);
         return;
       }
       /**
@@ -439,6 +451,7 @@ export default function InventoryWorkspace() {
       <div className="inv-split" data-panel={panelItem ? 'open' : 'closed'}>
         <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
           <div
+            className="inv-toolbar"
             style={{
               display: 'flex',
               gap: 12,
@@ -462,11 +475,10 @@ export default function InventoryWorkspace() {
                 </button>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="inv-toolbar-actions">
               <input
                 ref={searchRef}
                 className="input"
-                style={{ width: 220 }}
                 value={query}
                 placeholder={t`Buscar artículo`}
                 aria-label={t`Buscar artículo`}
@@ -795,6 +807,10 @@ export default function InventoryWorkspace() {
         {panelItem ? (
           <InventoryItemPanel
             item={panelItem}
+            costBasis={basisById.get(panelItem.id)}
+            costBasisLoading={basisState.loading || !basisState.loaded}
+            costBasisError={basisState.error}
+            currency={currency}
             signals={allSignals.get(panelItem.id) || itemSignals(panelItem, locationId, costedIds)}
             unit={
               UNIT_LABEL[panelItem.baseUnit]
@@ -820,6 +836,9 @@ export default function InventoryWorkspace() {
       {editor ? (
         <ItemEditor
           item={editor.item}
+          currency={currency}
+          costBasis={basisById.get(editor.id)}
+          costBasisError={basisState.error}
           itemId={editor.id}
           flatConversions={conversionsState.data.items}
           allergens={allergensState.data.allergens}

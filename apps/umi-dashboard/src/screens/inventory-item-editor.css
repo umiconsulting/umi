@@ -56,3 +56,21 @@
     justify-self: center;
   }
 }
+
+.inventory-item-editor .inventory-initial-cost-input {
+  position: relative;
+}
+
+.inventory-item-editor .inventory-initial-cost-input input {
+  padding-right: 60px;
+}
+
+.inventory-item-editor .inventory-initial-cost-input > span {
+  position: absolute;
+  right: 12px;
+  top: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--ink-2);
+}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { Select } from '@/components/select.jsx';
@@ -9,6 +10,7 @@ import {
   ITEM_ERROR_COPY,
   ITEM_TYPE_LABEL,
   ITEM_TYPE_ORDER,
+  NEGATIVE_HINT,
   NEGATIVE_LABEL,
   NEGATIVE_ORDER,
   ROUNDING_LABEL,
@@ -25,7 +27,13 @@ import {
   conversionRatio,
   mergeConversions,
 } from './inventory-model.js';
-import { itemQuantityDraft, itemQuantityParameters } from './inventory-item-editor-model.js';
+import {
+  initialCostDraft,
+  initialCostParameters,
+  itemNegativeStockPolicy,
+  itemQuantityDraft,
+  itemQuantityParameters,
+} from './inventory-item-editor-model.js';
 import './inventory-item-editor.css';
 
 /** The one-line command failure notice. A component, so it stays in this file. */
@@ -534,7 +542,17 @@ function ItemAllergensEditor({ item, allergens, onSaved }) {
  * The item editor, following the product editor in operations-workspace.jsx: one
  * modal, the id decided once at open, and `command.execute` for every write.
  */
-export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, onSaved }) {
+export function ItemEditor({
+  item,
+  itemId,
+  flatConversions,
+  allergens,
+  currency = 'MXN',
+  costBasis,
+  costBasisError,
+  onClose,
+  onSaved,
+}) {
   const { t, i18n } = useLingui();
   const command = useAdministrativeCommand();
   const editing = Boolean(item);
@@ -544,8 +562,8 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
   const [baseUnit, setBaseUnit] = useState(item?.baseUnit || 'unit');
   const [quantityScale, setQuantityScale] = useState(String(item?.quantityScale ?? 0));
   const [trackingPolicy, setTrackingPolicy] = useState(item?.trackingPolicy || 'tracked');
-  const [negativeStockPolicy, setNegativeStockPolicy] = useState(
-    item?.negativeStockPolicy || 'block',
+  const [negativeStockPolicy, setNegativeStockPolicy] = useState(() =>
+    itemNegativeStockPolicy(item),
   );
   const [lowStockThreshold, setLowStockThreshold] = useState(
     () => itemQuantityDraft(item).lowStockThreshold,
@@ -556,6 +574,10 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
   // PAR is what the kitchen wants on hand. It is not the low-stock threshold: that one
   // is a purchase alarm, this one is what the prep list subtracts from (§8.4).
   const [parQuantity, setParQuantity] = useState(() => itemQuantityDraft(item).parQuantity);
+  const [initialCost, setInitialCost] = useState(() =>
+    initialCostDraft(item?.initialUnitCostMinor),
+  );
+  const costParameters = initialCostParameters(initialCost, item);
   const [referenceError, setReferenceError] = useState(null);
   const [confirmArchive, setConfirmArchive] = useState(false);
 
@@ -570,17 +592,19 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
 
   async function save() {
     setReferenceError(null);
-    if (!quantityParameters) return;
+    if (!quantityParameters || !costParameters) return;
     const optionalShelfLife = shelfLifeDays === '' ? null : Number(shelfLifeDays);
     const parameters = editing
       ? {
           displayName: displayName.trim(),
+          ...costParameters,
           ...quantityParameters,
           shelfLifeDays: optionalShelfLife,
           trackingPolicy,
           negativeStockPolicy,
         }
       : {
+          ...costParameters,
           publicReference: publicReference.trim(),
           displayName: displayName.trim(),
           itemType,
@@ -612,7 +636,7 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
     await onSaved();
   }
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" role="presentation">
       <section
         className="card modal-card inventory-item-editor"
@@ -739,6 +763,11 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
                 </option>
               ))}
             </Select>
+            {NEGATIVE_HINT[negativeStockPolicy] && (
+              <span className="muted" style={{ fontSize: 11.5 }}>
+                {i18n._(NEGATIVE_HINT[negativeStockPolicy])}
+              </span>
+            )}
           </label>
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
             <Trans>Cantidad mínima</Trans>
@@ -784,7 +813,51 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
               </Trans>
             </span>
           </label>
+          <label>
+            <Trans>Costo inicial por {unitOf(baseUnit)}</Trans>
+            <div className="inventory-initial-cost-input">
+              <input
+                className="input"
+                inputMode="decimal"
+                value={initialCost}
+                placeholder={t`Sin definir`}
+                aria-label={t`Costo inicial por ${unitOf(baseUnit)}`}
+                aria-invalid={!costParameters || undefined}
+                aria-describedby={
+                  costParameters
+                    ? 'inventory-item-cost-hint'
+                    : 'inventory-item-cost-hint inventory-item-cost-error'
+                }
+                onChange={(event) => setInitialCost(event.target.value)}
+              />
+              <span>{currency}</span>
+            </div>
+            <span id="inventory-item-cost-hint" className="muted" style={{ fontSize: 11.5 }}>
+              <Trans>Se usa mientras no haya compras registradas.</Trans>
+            </span>
+          </label>
         </div>
+        {!costParameters ? (
+          <p
+            id="inventory-item-cost-error"
+            role="alert"
+            style={{ color: 'var(--danger)', margin: 0, fontSize: 12.5 }}
+          >
+            <Trans>
+              Escribe 0 o un costo mayor, con hasta 2 decimales. Si el costo es demasiado grande,
+              redúcelo.
+            </Trans>
+          </p>
+        ) : null}
+        {costBasisError ? (
+          <p role="alert" className="muted">
+            <Trans>No se pudo leer la base del costo.</Trans>
+          </p>
+        ) : costBasis?.basis === 'weighted_average_of_receipts' ? (
+          <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
+            <Trans>Las compras registradas tienen prioridad sobre el costo inicial guardado.</Trans>
+          </p>
+        ) : null}
         {!quantityParameters ? (
           <p
             id="inventory-item-quantity-error"
@@ -816,6 +889,7 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
             disabled={
               command.pending ||
               !quantityParameters ||
+              !costParameters ||
               displayName.trim().length === 0 ||
               (!editing && !referenceValid)
             }
@@ -864,6 +938,7 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
           suppress={Boolean(referenceError)}
         />
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -106,8 +106,16 @@ export class InventoryCostingService {
             displayName: item.displayName,
             baseUnit: item.baseUnit,
             quantityScale: item.quantityScale,
-            basis: average ? ('weighted_average_of_receipts' as const) : ('no_receipts' as const),
-            unitCostMinor: average ? toSafeNumber(average.unitCostMinor) : null,
+            basis: average
+              ? ('weighted_average_of_receipts' as const)
+              : item.initialUnitCostMinor !== null
+                ? ('manual_initial' as const)
+                : ('no_receipts' as const),
+            unitCostMinor: average
+              ? toSafeNumber(average.unitCostMinor)
+              : item.initialUnitCostMinor === null
+                ? null
+                : toSafeNumber(toBigInt(item.initialUnitCostMinor)),
             receiptCount: count ? toSafeNumber(toBigInt(count.receiptCount)) : 0,
             receiptLineCount: count ? toSafeNumber(toBigInt(count.receiptLineCount)) : 0,
             receivedQuantity: quantityAtScale(
@@ -152,7 +160,7 @@ export class InventoryCostingService {
     ]);
 
     const itemsById = new Map(items.map((item) => [item.inventoryItemId, item]));
-    const unitCosts = unitCostsByItem(basis.buckets);
+    const unitCosts = unitCostsByItem(basis.buckets, items);
     const consumptionByPlate = new Map<string, Map<string, bigint>>();
     for (const row of consumption) {
       const item = itemsById.get(row.inventoryItemId);
@@ -335,7 +343,7 @@ export class InventoryCostingService {
       this.repo.readDays(access.merchantId, from, to, locationId),
     ]);
     const itemsById = new Map(items.map((item) => [item.inventoryItemId, item]));
-    const unitCosts = unitCostsByItem(basis.buckets);
+    const unitCosts = unitCostsByItem(basis.buckets, items);
     const revenue = new Map(read.revenue.map((row) => [row.businessDate, row]));
     const plates = new Map(read.plates.map((row) => [row.businessDate, row]));
     const unmappedByDay = new Map<
@@ -456,7 +464,7 @@ export class InventoryCostingService {
       this.repo.readCostBasis(access.merchantId),
       this.repo.readLowStock(access.merchantId, from, to, locationId),
     ]);
-    const unitCosts = unitCostsByItem(basis.buckets);
+    const unitCosts = unitCostsByItem(basis.buckets, items);
     const onHandByItem = new Map(
       read.onHand.map((row) => [row.inventoryItemId, toBigInt(row.onHand)]),
     );
@@ -707,13 +715,14 @@ export class InventoryCostingService {
           .map((version) => version.recipeId),
       ),
     ];
-    const [basis, rows] = await Promise.all([
+    const [basis, rows, items] = await Promise.all([
       legacyIds.length > 0 ? this.repo.readCostBasis(access.merchantId) : Promise.resolve(null),
       this.repo.readRecipeCostRows(access.merchantId, legacyIds),
+      legacyIds.length > 0 ? this.repo.items(access.merchantId) : Promise.resolve([]),
     ]);
-    // The SAME basis the recipe read uses, and the same keyed map: an item nobody
-    // delivered stays ABSENT, so a missing cost never becomes a zero.
-    const unitCosts = basis === null ? new Map<string, bigint>() : unitCostsByItem(basis.buckets);
+    // Reuse the current basis for versions that have no saved cost.
+    const unitCosts =
+      basis === null ? new Map<string, bigint>() : unitCostsByItem(basis.buckets, items);
     const rowsByRecipe = new Map<string, RecipeCostRow[]>();
     for (const row of rows) {
       const list = rowsByRecipe.get(row.recipeId) ?? [];
@@ -959,7 +968,7 @@ function scaleOf(item: ItemRow): number {
   return item.quantityScale;
 }
 
-/** The one cost per item, from the same weighted average the basis view reports. */
+/** Initial amounts supply a fallback. Real receipt averages replace them, including zero. */
 function unitCostsByItem(
   rows: readonly {
     inventoryItemId: string;
@@ -967,8 +976,13 @@ function unitCostsByItem(
     unitCostMinor: string;
     quantity: string;
   }[],
+  items: readonly ItemRow[],
 ): Map<string, bigint> {
   const costs = new Map<string, bigint>();
+  for (const item of items) {
+    if (item.initialUnitCostMinor !== null)
+      costs.set(item.inventoryItemId, toBigInt(item.initialUnitCostMinor));
+  }
   for (const [inventoryItemId, buckets] of groupBuckets(rows)) {
     const average = weightedAverageUnitCost(buckets);
     if (average) costs.set(inventoryItemId, average.unitCostMinor);
