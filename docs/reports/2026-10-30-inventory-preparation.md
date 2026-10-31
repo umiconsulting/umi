@@ -2,7 +2,8 @@
 
 Date: 2026-10-30. The delivery PR targets `staging` and remains open for approval.
 The latest user instruction supersedes the earlier stacked-base plan.
-The controller owns a prerequisite integration PR for the previously approved inventory and mobile changes.
+The controller owns separate prerequisite PRs for the previously approved inventory and mobile changes.
+Their delivery links will be updated separately.
 
 ## Delivered behavior
 
@@ -51,7 +52,8 @@ All preparation fixture items have no target quantity.
 | Catalog extraction and strict compilation | No drift; 2345 messages per locale; no missing English messages | `/private/tmp/umi-preparation-ui-i18n-check.log` |
 | Real browser acceptance                   | 1 passed in 9.9 seconds                                         | `/private/tmp/umi-preparation-browser.log`       |
 
-Commands ran from `/private/tmp/umi-inventory-preparation-20261030` with Node 22 and pnpm 10:
+Verification uses `/private/tmp/umi-inventory-preparation-20261030`, Node 22, and pnpm 10.
+The browser command below now removes the color-environment conflict:
 
 ```sh
 export PATH="/Users/moon/.npm/_npx/c29883048cd047b6/node_modules/node/bin:/Users/moon/.npm/_npx/c29883048cd047b6/node_modules/.bin:$PATH"
@@ -61,6 +63,7 @@ pnpm --filter @umi/dashboard lint
 pnpm --filter @umi/dashboard build
 pnpm --filter @umi/dashboard i18n:extract
 pnpm --filter @umi/dashboard i18n:compile
+env -u NO_COLOR \
 UMI_PREPARATION_FIXTURE=/private/tmp/umi-inventory-preparation-ui-fixture.json \
 UMI_PREPARATION_EVIDENCE_DIR=/private/tmp/umi-preparation-evidence \
 pnpm exec playwright test --config /private/tmp/umi-inventory-preparation-playwright.config.mjs
@@ -132,3 +135,53 @@ The retained recipe history and resulting synthetic production lots form part of
 
 No production data, push, merge, deployment, notification, backend rebuild, or contract edit occurred in this dashboard task.
 The controller owns final whole-schema checks, affected checks, `check:pr`, independent review, and PR publication.
+
+## Review correction: pending keyboard focus
+
+Review finding I1 identified a focus escape while every dialog control was disabled.
+Chromium moved focus to the page body during pending preview and production requests.
+The original key handler could not capture the next Tab from the body.
+
+The preparation sheet now uses the native modal dialog and `showModal()`.
+The browser makes the background inert while the dialog stays open.
+A layout effect focuses the dialog when a command becomes pending.
+The Tab handler keeps focus on the dialog when no controls are enabled.
+The native cancel event stays blocked, so a pending command cannot be dismissed.
+The existing ambiguous command body and identity remain unchanged.
+
+Two focused Chromium regressions failed before the fix and passed after it:
+
+| Check                    | Result                   | Log                                                                                          |
+| ------------------------ | ------------------------ | -------------------------------------------------------------------------------------------- |
+| Pending preview focus    | RED failed; GREEN passed | `/private/tmp/umi-preparation-focus-red.log`, `/private/tmp/umi-preparation-focus-green.log` |
+| Pending production focus | RED failed; GREEN passed | Same logs                                                                                    |
+
+The GREEN run passed both tests in 4.9 seconds.
+The tests hold the command response while all form controls are disabled.
+They check focus before and after Tab and Shift+Tab.
+They also verify that a background tab rejects programmatic focus.
+Cancellation stays disabled during pending commands and ambiguous production results.
+A retry uses the identical complete request body.
+After ordinary cancellation, the background becomes usable again.
+These focused regressions send no production write to the server.
+
+```sh
+env -u NO_COLOR \
+UMI_PREPARATION_FIXTURE=/private/tmp/umi-inventory-preparation-ui-fixture.json \
+UMI_PREPARATION_EVIDENCE_DIR=/private/tmp/umi-preparation-evidence \
+pnpm exec playwright test \
+  --config /private/tmp/umi-inventory-preparation-playwright.config.mjs \
+  --grep 'pending .* keeps keyboard focus'
+```
+
+The command removes the conflicting `NO_COLOR` variable and retains the existing color setting.
+The focused RED and GREEN logs contain no color-environment warning.
+The original full acceptance and stock evidence remain applicable.
+The focused correction did not repeat the full acceptance or package suites.
+The controller owns the final gates and review.
+
+Screenshots: [pending preview](evidence/2026-10-30-inventory-preparation/pending-preview-focus.png) and
+[pending production](evidence/2026-10-30-inventory-preparation/pending-produce-focus.png).
+
+Changed dialog and browser test files passed targeted ESLint with no warnings.
+Changed source and report files passed Prettier and `git diff --check`.

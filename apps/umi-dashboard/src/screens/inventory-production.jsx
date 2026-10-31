@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -72,10 +72,11 @@ export default function InventoryProduction({ recipe = null, locationId, onClose
       ? i18n._(ERROR_COPY[cause.code])
       : t`No se pudo completar la operación. Intenta de nuevo.`;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previous = document.activeElement;
     const dialog = dialogRef.current;
-    dialog?.focus();
+    dialog.showModal();
+    dialog.focus();
     const trap = (event) => {
       if (event.key !== 'Tab') return;
       const controls = [
@@ -84,9 +85,17 @@ export default function InventoryProduction({ recipe = null, locationId, onClose
           'button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]',
         ),
       ];
+      if (controls.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
       const first = controls[0];
       const last = controls.at(-1);
-      if (
+      if (document.activeElement === dialog) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (
         event.shiftKey &&
         (document.activeElement === first || document.activeElement === dialog)
       ) {
@@ -99,10 +108,15 @@ export default function InventoryProduction({ recipe = null, locationId, onClose
     };
     dialog?.addEventListener('keydown', trap);
     return () => {
-      dialog?.removeEventListener('keydown', trap);
+      dialog.removeEventListener('keydown', trap);
+      dialog.close();
       previous?.focus();
     };
   }, []);
+
+  useLayoutEffect(() => {
+    if (command.pending) dialogRef.current?.focus();
+  }, [command.pending]);
 
   useEffect(() => {
     if (!locationId || !canProduce) return;
@@ -208,14 +222,24 @@ export default function InventoryProduction({ recipe = null, locationId, onClose
   const failedRead = readError || itemsState.error || recipesState.error;
   return createPortal(
     <div className="sheet-backdrop" style={{ zIndex: 1000 }}>
-      <section
+      <dialog
         ref={dialogRef}
         className="sheet"
-        style={{ width: 520, maxWidth: '100vw' }}
+        style={{
+          width: 520,
+          maxWidth: '100vw',
+          maxHeight: '100dvh',
+          margin: 0,
+          left: 'auto',
+          padding: 0,
+          border: 0,
+          color: 'inherit',
+        }}
         role="dialog"
         aria-modal="true"
         aria-label={t`Nueva preparación`}
         tabIndex={-1}
+        onCancel={(event) => event.preventDefault()}
       >
         <div className="sheet-head">
           <h3 style={{ margin: 0 }}>
@@ -398,7 +422,7 @@ export default function InventoryProduction({ recipe = null, locationId, onClose
             )
           ) : null}
         </div>
-      </section>
+      </dialog>
     </div>,
     document.body,
   );
