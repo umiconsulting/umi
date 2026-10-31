@@ -13,6 +13,9 @@ try {
   Reflect.deleteProperty(globalThis, 'localStorage');
 }
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  output: 'export',
+  images: { unoptimized: true },
+};
 
 export default nextConfig;

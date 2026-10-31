@@ -1,0 +1,9 @@
+name = "umi-landing"
+pages_build_output_dir = "./out"
+compatibility_date = "2026-09-01"
+
+[vars]
+API_ORIGIN = "https://api.umiconsulting.co"
+
+[env.preview.vars]
+API_ORIGIN = "https://api-staging.umiconsulting.co"
