@@ -11,7 +11,7 @@
 
 - Work only in `/private/tmp/umi-inventory-preparation-20261030`, branch `feat/inventory-dashboard-preparation`.
 - Keep PRs open for approval. Do not merge, deploy production, enable auto-merge, or send notifications.
-- Target `staging` for each new PR. The preparation PR depends on the separate integration of the approved cost, stock-policy, and mobile changes.
+- Deliver this inventory work through PR #242 to `staging`, with atomic commits. Include the approved cost, stock-policy, and mobile changes that are absent from `staging`.
 - Preserve previous clients: omitted new fields keep the existing one-recipe-batch behavior.
 - Use exact scaled quantities, existing authorization, command identity, transaction boundaries, and stock ledger.
 - Do not edit applied migrations or the SDK generator. Regenerate artifacts from the canonical contract.

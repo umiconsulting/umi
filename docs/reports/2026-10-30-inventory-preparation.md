@@ -1,9 +1,9 @@
 # Direct inventory preparation
 
-Date: 2026-10-30. The delivery PR targets `staging` and remains open for approval.
-The latest user instruction supersedes the earlier stacked-base plan.
-The controller owns separate prerequisite PRs for the previously approved inventory and mobile changes.
-Their delivery links will be updated separately.
+Date: 2026-10-30. [PR #242](https://github.com/umiconsulting/umi/pull/242) targets `staging` and remains open for approval.
+The latest user instruction requires one PR for this delivery, with atomic commits.
+It includes the approved cost, stock-policy, and mobile changes that are absent from `staging`, plus direct preparation.
+This replaces the earlier plan for PRs with intermediate target branches.
 
 ## Delivered behavior
 
