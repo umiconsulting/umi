@@ -53,6 +53,8 @@ Verificar escritorio y móvil. Conservar las vistas locales anteriores y sus dat
 - Rama: `feat/inventory-dashboard-preparation`; base inicial `18e067d6`.
 - Incorporar cualquier corrección posterior del PR móvil antes de publicar esta rama.
 - Conservar los PRs abiertos. No fusionar, activar auto-merge ni desplegar producción.
+- Los PRs nuevos tienen `staging` como destino, por instrucción del usuario.
+- Integrar primero los cambios previos de costo manual, saldo negativo y acceso móvil mediante un PR separado hacia `staging`.
 - No enviar avisos ni leer o cambiar datos de producción.
 - Usar lenguaje sencillo y comandos atómicos. Conservar permisos, auditoría, costos y versiones.
 - No editar el checkout original ni otros worktrees.
