@@ -35,11 +35,13 @@ The existing workspaces only add entry buttons and refresh after successful writ
 ### Task 1: CSV and Excel templates and file adapters
 
 **Files:**
+
 - Create: `apps/umi-dashboard/src/lib/inventory-import/{schema,format,worker,file-client}.js`
 - Test: `apps/umi-dashboard/src/lib/inventory-import/format.spec.js`
 - Modify: `apps/umi-dashboard/package.json`, `pnpm-lock.yaml`
 
 **Interfaces:**
+
 - `IMPORT_LIMITS = { maxBytes: 2097152, maxRows: 500, maxRecipes: 100, maxComponents: 200, timeoutMs: 15000 }`.
 - `parseImportFile({ kind, format, bytes }) -> Promise<{ headers, rows }>`; kind is `items` or `recipes`; format is `csv` or `xlsx`; bytes is an ArrayBuffer.
 - Each row: `{ rowNumber, values: { [column]: string }, errors: [{ code, column }] }`. File errors throw `Error` with stable `code`.
@@ -77,16 +79,19 @@ The recipe reference download lists product/variant IDs with names and ingredien
 CSV references use a combined typed list; XLSX can use separate reference sheets. Results contain every provided result row.
 Use a worker for both formats. Terminate on completion, failure, timeout or AbortSignal. Lazy load ExcelJS inside format handling.
 UI translation belongs to Task 3; return stable codes for errors. Export guide/copy descriptors from schema or a focused copy module. Resolve those through Lingui on the main thread and pass plain strings through `labels`. Keep column keys and data sheet names stable across locales.
+
 - [ ] Run focused tests and lint the changed JS. Record versions and tests in the report.
 - [ ] Commit this independently testable adapter as `feat(dashboard): add CSV and Excel inventory templates`.
 
 ### Task 2: Exact previews and recoverable batch execution
 
 **Files:**
+
 - Create: `apps/umi-dashboard/src/lib/inventory-import/{preview,runner}.js`, optional focused planner helpers.
 - Test: `apps/umi-dashboard/src/lib/inventory-import/{preview,runner}.spec.js`
 
 **Interfaces:**
+
 - Consume parsed rows and column constants from Task 1.
 - `buildImportPreview({ kind, parsed, snapshot }) -> { kind, entries, counts }`.
 - Snapshot: `{ merchantId, items, recipes, targets }`, complete active/archived articles and active recipes/targets.
@@ -109,16 +114,16 @@ expect(buildImportPreview({kind: 'recipes', parsed: inconsistentYieldRows, snaps
 ```
 
 - [ ] Implement item create/update/unchanged with existing schemas as reference. Required codes are case-sensitive and merchant-scoped.
-Reject all duplicate item codes, archived targets, immutable field changes, invalid enum values, precision overflow and unsupported quantities.
-Blank optional cells omit updates. A zero cost remains zero. Never mutate stock, policies of existing articles or catalog products.
-New articles use `tracked` and `allow_and_flag`. Article quantity optional fields are scaled integers, matching the existing contract.
+      Reject all duplicate item codes, archived targets, immutable field changes, invalid enum values, precision overflow and unsupported quantities.
+      Blank optional cells omit updates. A zero cost remains zero. Never mutate stock, policies of existing articles or catalog products.
+      New articles use `tracked` and `allow_and_flag`. Article quantity optional fields are scaled integers, matching the existing contract.
 - [ ] Implement recipe grouping by product/variant. Match only active exact IDs from targets and active ingredient codes from items.
-Validate yield equality numerically and by unit; reject missing targets, wrong variants, repeated ingredients and groups over 200 components.
-If a row has no usable product/variant grouping key, block the recipe file until corrected; its intended recipe cannot safely be inferred.
-Use exact active item conversions or the base unit. Use `componentBaseQuantity` for exact per-yield consumption and safe bounds.
-Reject any invalid group as a whole. Preserve recipe shelf life by omitting it. Send the full component list on update.
-Compare persisted recipe inputs semantically, ignoring ingredient order and decimal representation, to avoid identical versions.
-Do not supply `replaceSalesMapping`; report the backend conflict for manual resolution. No implicit replacement authorization.
+      Validate yield equality numerically and by unit; reject missing targets, wrong variants, repeated ingredients and groups over 200 components.
+      If a row has no usable product/variant grouping key, block the recipe file until corrected; its intended recipe cannot safely be inferred.
+      Use exact active item conversions or the base unit. Use `componentBaseQuantity` for exact per-yield consumption and safe bounds.
+      Reject any invalid group as a whole. Preserve recipe shelf life by omitting it. Send the full component list on update.
+      Compare persisted recipe inputs semantically, ignoring ingredient order and decimal representation, to avoid identical versions.
+      Do not supply `replaceSalesMapping`; report the backend conflict for manual resolution. No implicit replacement authorization.
 - [ ] Write RED recovery tests with an in-memory storage and stateful command receiver, then implement the runner.
 
 ```js
@@ -140,16 +145,19 @@ Callback errors cannot turn a committed write into a fresh command. Persist resu
 Validate saved shape before use; malformed storage cannot trigger commands. Keep error messages bounded and avoid credentials.
 Permit only the four article/recipe create/update operations in saved journals. Persist minimal result IDs and versions, not full projections.
 Explicit clear may discard never-sent pending entries and definite401/403/429 retryable entries. It refuses sending/ambiguous outcomes and active runners. Saved records remain.
+
 - [ ] Run focused tests and lint. Commit as `feat(dashboard): validate and recover inventory imports`.
 
 ### Task 3: Dashboard import workflow
 
 **Files:**
+
 - Create: `apps/umi-dashboard/src/screens/inventory-import-dialog.jsx` and focused supporting copy/style modules if needed.
 - Modify: `apps/umi-dashboard/src/screens/inventory-workspace.jsx`, `recipe-workspace.jsx`, `data.jsx`, existing style and locale catalogs.
 - Test: focused workflow tests following existing dashboard practices.
 
 **Interfaces:**
+
 - Consume the file, preview and runner interfaces from Tasks 1 and 2.
 - Export `InventoryImportDialog({ kind, onClose, onSaved })` as the default component.
 - Export `fetchInventoryImportSnapshot(merchantId)` and `executeInventoryImportCommand(merchantId, operation, targetAggregateId, options)` from data.jsx.
@@ -159,30 +167,32 @@ Explicit clear may discard never-sent pending entries and definite401/403/429 re
 
 - [ ] Write a failing interaction or browser test for selecting a file, viewing preview and cancelling with zero commands.
 - [ ] Add `Importar artículos` and `Importar recetas` to the corresponding workspace headers, gated by existing `merchant.manage`.
-The modal uses native dialog and the established preparation dialog focus/lifecycle pattern. It must work with keyboard and mobile width.
-Use simple Spanish actions: `Descargar plantilla`, `Excel (.xlsx)`, `CSV`, `Elegir archivo`, `Revisar archivo`, `Cancelar`, `Importar N artículos/recetas`, `Reintentar pendientes`, `Descargar resultado`.
-Offer guide, examples and references; explain code fields and that existing records can update. State that stock is entered through purchases or adjustments.
-Preview has summary counts and row numbers, status, name/reference and actionable error. Paginate long previews so 500 rows do not overflow.
-An invalid recipe lists all associated row numbers and the failing row. Confirmation states complete ingredient replacement for updated recipes.
-Disable save while references/file are loading or failed, when nothing changes, or when no valid entries remain.
-Only confirmation prepares/persists/sends a new batch. Loading, download and cancellation must not write.
+      The modal uses native dialog and the established preparation dialog focus/lifecycle pattern. It must work with keyboard and mobile width.
+      Use simple Spanish actions: `Descargar plantilla`, `Excel (.xlsx)`, `CSV`, `Elegir archivo`, `Revisar archivo`, `Cancelar`, `Importar N artículos/recetas`, `Reintentar pendientes`, `Descargar resultado`.
+      Offer guide, examples and references; explain code fields and that existing records can update. State that stock is entered through purchases or adjustments.
+      Preview has summary counts and row numbers, status, name/reference and actionable error. Paginate long previews so 500 rows do not overflow.
+      An invalid recipe lists all associated row numbers and the failing row. Confirmation states complete ingredient replacement for updated recipes.
+      Disable save while references/file are loading or failed, when nothing changes, or when no valid entries remain.
+      Only confirmation prepares/persists/sends a new batch. Loading, download and cancellation must not write.
 - [ ] Integrate the runner and saved batch recovery. Display progress, stop/cancel safely, report successes/errors and refresh existing lists after writes.
-Before confirmation, `Cancelar` writes nothing. During a batch, `Detener pendientes` stops unsent entries and explains that saved records remain.
-Keep the exact saved batch immutable through an ambiguous result. Reopen/reload offers recovery before another file.
-An explicit `Nueva importación` may discard known unsent or definite rejected entries through clearImportBatch; it remains blocked for sending/ambiguous entries.
-The dialog aborts pending file work and unsent commands on unmount or merchant change; no stale preview can save to another merchant.
-Result downloads support both CSV and Excel and include all input rows, including duplicates and errors.
-Use a dedicated copy mapper for stable validation/backend errors; never show raw objects, stack traces or English codes to owners.
+      Before confirmation, `Cancelar` writes nothing. During a batch, `Detener pendientes` stops unsent entries and explains that saved records remain.
+      Keep the exact saved batch immutable through an ambiguous result. Reopen/reload offers recovery before another file.
+      An explicit `Nueva importación` may discard known unsent or definite rejected entries through clearImportBatch; it remains blocked for sending/ambiguous entries.
+      The dialog aborts pending file work and unsent commands on unmount or merchant change; no stale preview can save to another merchant.
+      Result downloads support both CSV and Excel and include all input rows, including duplicates and errors.
+      Use a dedicated copy mapper for stable validation/backend errors; never show raw objects, stack traces or English codes to owners.
 - [ ] Extract/compile Lingui; fill new English translations, preserving existing catalogs. Run focused workflow tests, full dashboard tests, lint and build.
 - [ ] Commit as `feat(dashboard): add article and recipe import workflow`.
 
 ### Task 4: Real browser and database verification
 
 **Files:**
+
 - Add: durable browser/integration tests in existing test directories, plus sanitized evidence under `docs/verification/`.
 - Temporary fixture scripts and private credentials stay under `/private/tmp`, mode 600 for credentials.
 
 **Interfaces:**
+
 - Exercise the production workflow from Task 3; invoke existing API checkout flow for the sale assertion.
 - Use a new isolated PostgreSQL database and new preview ports; preserve all previous environments.
 
@@ -205,6 +215,7 @@ Verify an invalid recipe never leaves a partial recipe or active sales mapping. 
 Make a sale with the imported recipe and verify exact inventory movements through the existing checkout flow.
 Test mobile at 390 px and keyboard focus/escape; verify preview/result scroll and aligned buttons. No horizontal page overflow.
 Verify a user without merchant.manage cannot access imports and API writes still refuse unauthorized access.
+
 - [ ] Record observed facts, commands, versions and limitations without secrets. Run Gitleaks with redaction before committing evidence.
 - [ ] Run the relevant dashboard build/lint/tests and `check:pr`; run API/schema tests only if their code changes or a named concern requires them.
 - [ ] Commit tests and evidence as `test(inventory): verify CSV and Excel import workflows`.

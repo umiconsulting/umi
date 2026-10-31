@@ -186,15 +186,13 @@ export async function verifyImportClose({ page, fixture, expect, base }) {
   await page.getByRole('button', { name: 'Importar artículos', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Importar artículos', exact: true });
   const key = randomUUID().slice(0, 8);
-  await dialog
-    .getByLabel('Elegir archivo', { exact: true })
-    .setInputFiles({
-      name: 'cerrar.csv',
-      mimeType: 'text/csv',
-      buffer: Buffer.from(
-        `codigo,nombre,tipo,unidad,decimales\nCLOSE-${key},Cierre ${key},ingredient,gram,0\nPENDING-${key},Pendiente ${key},ingredient,gram,0\n`,
-      ),
-    });
+  await dialog.getByLabel('Elegir archivo', { exact: true }).setInputFiles({
+    name: 'cerrar.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      `codigo,nombre,tipo,unidad,decimales\nCLOSE-${key},Cierre ${key},ingredient,gram,0\nPENDING-${key},Pendiente ${key},ingredient,gram,0\n`,
+    ),
+  });
   await dialog.getByRole('button', { name: 'Revisar archivo', exact: true }).click();
   let release;
   const gate = new Promise((resolve) => {

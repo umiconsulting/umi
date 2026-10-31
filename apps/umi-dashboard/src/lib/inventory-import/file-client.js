@@ -27,7 +27,10 @@ export async function runImportFileTask(action, payload, { signal } = {}) {
       worker.onmessageerror = () => finish(fileError('WORKER_FAILED'));
       timer = setTimeout(() => finish(fileError('WORKER_TIMEOUT')), IMPORT_LIMITS.timeoutMs);
       signal?.addEventListener('abort', abort, { once: true });
-      worker.postMessage({ action, payload }, action === 'parse' && payload.bytes instanceof ArrayBuffer ? [payload.bytes] : []);
+      worker.postMessage(
+        { action, payload },
+        action === 'parse' && payload.bytes instanceof ArrayBuffer ? [payload.bytes] : [],
+      );
     } catch {
       finish(fileError('WORKER_FAILED'));
     }

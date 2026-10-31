@@ -18,8 +18,11 @@ export const COLUMN_DEFINITIONS = {
   cantidad: msg`Cantidad del ingrediente. Usa la precisión del artículo y una conversión exacta.`,
 };
 export const GUIDE_COPY = {
-  field: msg`Campo`, required: msg`Obligatorio`, description: msg`Descripción`, example: msg`Ejemplo`,
-  requiredValue: msg`Sí`, optional: msg`No`,
+  field: msg`Campo`,
+  required: msg`Obligatorio`,
+  description: msg`Descripción`,
+  example: msg`Ejemplo`,
+  requiredValue: msg`Sí`,
+  optional: msg`No`,
   instructions: msg`Usa punto decimal y celdas de texto. No uses fórmulas ni notación científica.`,
 };
-
