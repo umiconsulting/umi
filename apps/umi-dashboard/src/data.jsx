@@ -1,3 +1,4 @@
+import { loadPreparationPages } from './screens/inventory-production-model.js';
 import { buildPath } from '@umi/contract/route-table';
 import { t } from '@lingui/core/macro';
 import {
@@ -2248,14 +2249,26 @@ async function _loadInventoryItems(ctx, includeArchived) {
   if (includeArchived) query.set('includeArchived', 'true');
   const base = routes.inventory.items(merchantId);
   const [withCost, costedOnly] = await Promise.all([
-    _apiFetch(`${base}?${query.toString()}&includeItemsWithoutCost=true`),
-    _apiFetch(`${base}?${query.toString()}`),
+    loadPreparationPages(
+      (cursor) =>
+        _apiFetch(
+          `${base}?${query.toString()}&includeItemsWithoutCost=true${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+        ),
+      'items',
+    ),
+    loadPreparationPages(
+      (cursor) =>
+        _apiFetch(
+          `${base}?${query.toString()}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+        ),
+      'items',
+    ),
   ]);
   return {
-    items: (withCost && withCost.items) || [],
-    page: (withCost && withCost.page) || null,
-    correlationId: (withCost && withCost.correlationId) || null,
-    costedIds: ((costedOnly && costedOnly.items) || []).map((item) => item.id),
+    items: withCost,
+    page: null,
+    correlationId: null,
+    costedIds: costedOnly.map((item) => item.id),
   };
 }
 
@@ -2345,17 +2358,13 @@ const EMPTY_INVENTORY_RECIPES = { recipes: [], page: null, correlationId: null }
 async function _loadInventoryRecipes(ctx, includeRetired) {
   const merchantId = _merchantId(ctx);
   if (!merchantId || !_canManageInventory(ctx)) return EMPTY_INVENTORY_RECIPES;
-  // 100 is the page cap the contract states (`InventoryRecipeQuery.limit`). A café
-  // with more recipes pages later; asking for more is refused as VALIDATION_FAILED,
-  // and a refusal reads as an empty recipe list.
-  const query = new URLSearchParams({ limit: '100' });
-  if (includeRetired) query.set('includeRetired', 'true');
-  const response = await _apiFetch(`${routes.inventory.recipes(merchantId)}?${query.toString()}`);
-  return {
-    recipes: (response && response.recipes) || [],
-    page: (response && response.page) || null,
-    correlationId: (response && response.correlationId) || null,
-  };
+  const recipes = await loadPreparationPages((cursor) => {
+    const query = new URLSearchParams({ limit: '100' });
+    if (includeRetired) query.set('includeRetired', 'true');
+    if (cursor) query.set('cursor', cursor);
+    return _apiFetch(`${routes.inventory.recipes(merchantId)}?${query}`);
+  }, 'recipes');
+  return { recipes, page: null, correlationId: null };
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

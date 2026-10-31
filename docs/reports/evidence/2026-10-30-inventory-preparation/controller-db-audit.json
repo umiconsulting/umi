@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "newLots": 4,
+  "newMovements": 8,
+  "rejectedCommandsWithoutWrites": 2,
+  "identicalRetryWithoutDuplicate": true,
+  "ledgerMatchesBalances": true,
+  "commands": [
+    {
+      "commandId": "d744d7d2-b40c-4483-9afe-b98439ee219b",
+      "lotId": "5307f313-2f40-4032-a2b0-cde48425648e",
+      "lots": 1,
+      "movements": 2,
+      "produced": 5,
+      "consumed": [500]
+    },
+    {
+      "commandId": "c2851c1d-bc55-4243-af72-c6e52ae67627",
+      "lotId": "a4d03397-7620-4b00-82e2-c7cd3b7ed89f",
+      "lots": 1,
+      "movements": 2,
+      "produced": 20,
+      "consumed": [2000]
+    },
+    {
+      "commandId": "3fad82ef-95ac-4f63-bc09-d98344952908",
+      "lotId": "5a321a19-b1a3-44fd-9170-a4030647e392",
+      "lots": 1,
+      "movements": 2,
+      "produced": 5,
+      "consumed": [50]
+    },
+    {
+      "commandId": "92cd8476-ee1b-41b8-aa7e-7518a27df4f3",
+      "lotId": "437c8d96-ee3b-4bd3-aaa4-db6808d76672",
+      "lots": 1,
+      "movements": 2,
+      "produced": 5,
+      "consumed": [500]
+    }
+  ]
+}

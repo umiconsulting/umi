@@ -1,3 +1,4 @@
+import InventoryProduction from './inventory-production.jsx';
 import { useMemo, useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
@@ -194,6 +195,8 @@ export default function RecipeWorkspace() {
   const [showRetired, setShowRetired] = useState(false);
   const [query, setQuery] = useState('');
   const [editor, setEditor] = useState(null);
+  const [production, setProduction] = useState(null);
+  const locationId = merchant?.selectedLocationId || merchant?.selectedLocation?.id || null;
 
   const recipesState = useInventoryRecipes({ includeRetired: showRetired }, refresh);
   const itemsState = useInventoryItems({ includeArchived: false }, refresh);
@@ -352,6 +355,15 @@ export default function RecipeWorkspace() {
                     )}
                   </td>
                   <td style={CELL}>
+                    {recipe.targetItemId && recipe.active !== false ? (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        type="button"
+                        onClick={() => setProduction(recipe)}
+                      >
+                        <Trans>Preparar</Trans>
+                      </button>
+                    ) : null}
                     <button
                       className="btn-icon"
                       type="button"
@@ -374,6 +386,15 @@ export default function RecipeWorkspace() {
         </div>
       )}
 
+      {production ? (
+        <InventoryProduction
+          key={`${locationId}:${production.id}`}
+          recipe={production}
+          locationId={locationId}
+          onClose={() => setProduction(null)}
+          onDone={() => setRefresh((value) => value + 1)}
+        />
+      ) : null}
       {editor ? (
         <RecipeEditor
           key={editor.id}

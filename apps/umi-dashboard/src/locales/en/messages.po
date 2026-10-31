@@ -147,6 +147,7 @@ msgstr "Session expired"
 
 #: src/data.jsx
 #: src/screens/inventory-copy.js
+#: src/screens/inventory-production.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/prep-list.jsx
@@ -447,6 +448,7 @@ msgstr "Open café"
 #: src/screens/inventory-filters.jsx
 #: src/screens/inventory-item-editor.jsx
 #: src/screens/inventory-item-panel.jsx
+#: src/screens/inventory-production.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
@@ -525,6 +527,7 @@ msgstr "Password · 8 characters or more"
 #: src/screens/inventory-count.jsx
 #: src/screens/inventory-item-editor.jsx
 #: src/screens/inventory-item-panel.jsx
+#: src/screens/inventory-production.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/members.jsx
 #: src/screens/recipe-workspace.jsx
@@ -4590,6 +4593,7 @@ msgid "Estas porciones extra no son parte del costo de la receta; su dinero est�
 msgstr "These extra portions are not part of the recipe's cost; their money is in the day's cost."
 
 #: src/screens/inventory-count.jsx
+#: src/screens/inventory-production.jsx
 msgid "Almacén"
 msgstr "Storage"
 
@@ -5277,6 +5281,143 @@ msgstr "Edit initial cost"
 msgid "Ninguno declarado"
 msgstr "None declared"
 
+#: src/screens/inventory-production.jsx
+msgid "La receta cambió. Revisa de nuevo los ingredientes antes de confirmar."
+msgstr "The recipe changed. Review the ingredients again before you confirm."
+
+#: src/screens/inventory-production.jsx
+msgid "Esta cantidad no permite medir los ingredientes con exactitud. Elige otra cantidad."
+msgstr "This quantity cannot use exact ingredient measurements. Choose another quantity."
+
+#: src/screens/inventory-production.jsx
+msgid "Revisa la cantidad que quieres preparar."
+msgstr "Check the quantity to prepare."
+
+#: src/screens/inventory-production.jsx
+msgid "Falta una conversión de unidades. Revisa el artículo y su receta."
+msgstr "A unit conversion is missing. Check the item and its recipe."
+
+#: src/screens/inventory-production.jsx
+msgid "El almacén ya no está disponible. Cierra y vuelve a abrir la preparación."
+msgstr "This stock location is no longer available. Close and reopen preparation."
+
+#: src/screens/inventory-production.jsx
+msgid "El artículo ya no tiene una receta activa. Actualiza la lista."
+msgstr "This item no longer has an active recipe. Refresh the list."
+
+#: src/screens/inventory-production.jsx
+msgid "El artículo está archivado. Elige otro artículo."
+msgstr "This item is archived. Choose another item."
+
+#: src/screens/inventory-production.jsx
+msgid "No hay ingredientes suficientes. Registra su entrada antes de preparar."
+msgstr "There are not enough ingredients. Record their receipt before preparation."
+
+#: src/screens/inventory-production.jsx
+msgid "Esta preparación necesita aprobación por falta de ingredientes. Pide ayuda a la persona responsable."
+msgstr "This preparation needs approval because ingredients are insufficient. Ask the person in charge for help."
+
+#: src/screens/inventory-production.jsx
+msgid "Espera un momento antes de intentar de nuevo."
+msgstr "Wait a moment before you try again."
+
+#: src/screens/inventory-production.jsx
+msgid "No tienes permiso para registrar preparaciones."
+msgstr "You do not have permission to record preparations."
+
+#: src/screens/inventory-production.jsx
+msgid "No se pudo completar la operación. Intenta de nuevo."
+msgstr "The operation could not be completed. Try again."
+
+#: src/screens/inventory-production.jsx
+#: src/screens/prep-list.jsx
+msgid "Nueva preparación"
+msgstr "New preparation"
+
+#. placeholder {0}: quantityOf(result.producedQuantity)
+#: src/screens/inventory-production.jsx
+msgid "Preparación registrada: {0}."
+msgstr "Preparation recorded: {0}."
+
+#. placeholder {0}: result.lotReference
+#: src/screens/inventory-production.jsx
+msgid "Lote: {0}"
+msgstr "Lot: {0}"
+
+#: src/screens/inventory-production.jsx
+msgid "Elige una sucursal para registrar una preparación."
+msgstr "Choose a branch to record a preparation."
+
+#: src/screens/inventory-production.jsx
+msgid "No se pudieron cargar los artículos, las recetas o los almacenes. Cierra y vuelve a intentar."
+msgstr "Items, recipes, or stock locations could not be loaded. Close and try again."
+
+#: src/screens/inventory-production.jsx
+#: src/screens/prep-list.jsx
+msgid "Cargando la preparación…"
+msgstr "Loading prep…"
+
+#: src/screens/inventory-production.jsx
+msgid "No hay un almacén activo en esta sucursal. Pide a la persona responsable que lo configure."
+msgstr "This branch has no active stock location. Ask the person in charge to configure one."
+
+#: src/screens/inventory-production.jsx
+msgid "No hay artículos activos con receta para preparar. Crea una receta de artículo en Recetas."
+msgstr "There are no active items with a recipe to prepare. Create an item recipe in Recipes."
+
+#: src/screens/inventory-production.jsx
+msgid "Artículo a preparar"
+msgstr "Item to prepare"
+
+#: src/screens/inventory-production.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Elige un artículo"
+msgstr "Choose an item"
+
+#: src/screens/inventory-production.jsx
+msgid "Elige un almacén"
+msgstr "Choose a stock location"
+
+#: src/screens/inventory-production.jsx
+#: src/screens/prep-list.jsx
+msgid "Cantidad a preparar"
+msgstr "Quantity to make"
+
+#. placeholder {0}: unitOf(item.baseUnit)
+#: src/screens/inventory-production.jsx
+msgid "Unidad: {0}"
+msgstr "Unit: {0}"
+
+#: src/screens/inventory-production.jsx
+msgid "Escribe una cantidad mayor que cero con los decimales del artículo, sin redondear."
+msgstr "Enter a quantity above zero with the item decimal precision, without rounding."
+
+#: src/screens/inventory-production.jsx
+msgid "Ingredientes revisados"
+msgstr "Reviewed ingredients"
+
+#. placeholder {0}: quantityOf(preview.plannedQuantity)
+#: src/screens/inventory-production.jsx
+msgid "Ingredientes para {0}"
+msgstr "Ingredients for {0}"
+
+#: src/screens/inventory-production.jsx
+msgid "No pudimos confirmar el resultado. Reintenta para consultar la misma preparación antes de salir."
+msgstr "The result could not be confirmed. Retry to check the same preparation before you leave."
+
+#: src/screens/inventory-production.jsx
+msgid "Reintentar preparación"
+msgstr "Retry preparation"
+
+#: src/screens/inventory-production.jsx
+msgid "Confirmar preparación"
+msgstr "Confirm preparation"
+
+#: src/screens/inventory-production.jsx
+msgid "Revisar ingredientes"
+msgstr "Review ingredients"
+
 #: src/screens/inventory-workspace.jsx
 #~ msgid "Mostrar archivados"
 #~ msgstr "Show archived"
@@ -5534,11 +5675,6 @@ msgstr "Supplier description"
 #: src/screens/invoice-inbox.jsx
 msgid "Artículo del inventario"
 msgstr "Inventory item"
-
-#: src/screens/invoice-inbox.jsx
-#: src/screens/recipe-workspace.jsx
-msgid "Elige un artículo"
-msgstr "Choose an item"
 
 #: src/screens/invoice-inbox.jsx
 msgid "Recordar el SKU del proveedor"
@@ -8022,10 +8158,6 @@ msgid "No puedes administrar la preparación."
 msgstr "You cannot manage prep."
 
 #: src/screens/prep-list.jsx
-msgid "Cargando la preparación…"
-msgstr "Loading prep…"
-
-#: src/screens/prep-list.jsx
 msgid "Mostrar también los que ya tienen suficiente"
 msgstr "Also show the items that already have enough"
 
@@ -8049,10 +8181,6 @@ msgstr "Unit"
 #: src/screens/prep-list.jsx
 msgid "Uso previsto"
 msgstr "Forecast usage"
-
-#: src/screens/prep-list.jsx
-msgid "Cantidad a preparar"
-msgstr "Quantity to make"
 
 #. placeholder {0}: item.expiresOn
 #: src/screens/prep-list.jsx
@@ -8493,6 +8621,10 @@ msgstr "Retired"
 #: src/screens/recipe-workspace.jsx
 msgid "{0, plural, one {Se usa en # receta} other {Se usa en # recetas}}"
 msgstr "{0, plural, one {Used in # recipe} other {Used in # recipes}}"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Preparar"
+msgstr "Prepare"
 
 #. placeholder {0}: recipe.targetName
 #: src/screens/recipe-workspace.jsx
