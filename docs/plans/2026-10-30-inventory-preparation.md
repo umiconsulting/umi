@@ -22,6 +22,7 @@ Read `docs/plans/2026-10-30-inventory-preparation-design.md` first. This task ow
 Use the current worktree and preserve all dashboard sources for Task 2. No subagents, pushes, or merges.
 
 **Files:**
+
 - Modify `packages/contract/src/pos-inventory.ts`, `dashboard-operations.ts`, `catalog.ts`, package version and generated artifacts.
 - Modify `apps/umi-api/src/modules/administrative-commands/administrative-command-execution.service.ts`, `administrative-command.policy.ts`, and relevant tests.
 - Modify `apps/umi-api/src/modules/pos-inventory/pos-inventory.service.ts`, `pos-inventory.repository.ts`, and focused tests.
@@ -107,6 +108,7 @@ Read the design and Task 1 report for exact accepted types. Own dashboard, brows
 No backend/contract edits without first reporting the issue to the controller. No subagents or pushes.
 
 **Files:**
+
 - Create `apps/umi-dashboard/src/screens/inventory-production.jsx`, `inventory-production-model.js`, and its model tests.
 - Modify `apps/umi-dashboard/src/screens/recipe-workspace.jsx` and `prep-list.jsx` to open the shared production dialog.
 - Update the English and Spanish Lingui catalogs using the existing extraction/compile tools.
