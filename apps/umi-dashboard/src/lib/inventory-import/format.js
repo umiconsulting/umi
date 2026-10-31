@@ -19,15 +19,26 @@ function validateFormat(format) {
   if (format !== 'csv' && format !== 'xlsx') throw fileError('UNSUPPORTED_FORMAT');
 }
 
-function cellText(value) {
+function normalizedDecimal(text) {
+  const negative = text.startsWith('-');
+  const [whole, fraction = ''] = (negative ? text.slice(1) : text).split('.');
+  const integer = whole.replace(/^0+(?=\d)/, '');
+  const decimal = fraction.replace(/0+$/, '');
+  const unsigned = `${integer}${decimal ? `.${decimal}` : ''}`;
+  return negative && unsigned !== '0' ? `-${unsigned}` : unsigned;
+}
+
+function cellText(value, originalNumber) {
   if (value == null) return { text: '' };
   if (typeof value === 'string') return { text: value };
   if (typeof value === 'number') {
     const text = String(value);
-    if (!Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER || /e/i.test(text)) {
+    if (!Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER || /e/i.test(text)
+      || typeof originalNumber !== 'string' || !/^-?\d+(?:\.\d+)?$/.test(originalNumber)
+      || normalizedDecimal(originalNumber) !== normalizedDecimal(text)) {
       return { text: '', code: 'UNSAFE_NUMBER' };
     }
-    return { text };
+    return { text: originalNumber };
   }
   if (value instanceof Date) return { text: '', code: 'DATE_CELL' };
   if (typeof value === 'object' && ('formula' in value || 'sharedFormula' in value)) {
@@ -95,9 +106,15 @@ async function parseXlsx(kind, bytes) {
   catch { throw fileError('INVALID_XLSX'); }
   const worksheet = workbook.getWorksheet(SHEETS[kind]);
   if (!worksheet) throw fileError('MISSING_DATA_SHEET');
+  // Retain numeric XML text before ExcelJS converts it to a JavaScript number.
+  const { readSheet } = await import('read-excel-file/universal');
+  let originalRows;
+  try {
+    originalRows = await readSheet(bytes, SHEETS[kind], { parseNumber: (text) => text, trim: false });
+  } catch { throw fileError('INVALID_XLSX'); }
   const source = [];
   worksheet.eachRow((row, rowNumber) => {
-    const cells = Array.from({ length: row.cellCount }, (_, index) => cellText(row.getCell(index + 1).value));
+    const cells = Array.from({ length: row.cellCount }, (_, index) => cellText(row.getCell(index + 1).value, originalRows[rowNumber - 1]?.[index]));
     if (cells.every(({ text, code }) => text.trim() === '' && !code)) return;
     source.push({ rowNumber, cells });
     if (source.length > IMPORT_LIMITS.maxRows + 1) throw fileError('TOO_MANY_ROWS');

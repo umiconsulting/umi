@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ExcelJS from 'exceljs';
 import Papa from 'papaparse';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const JSZip = createRequire(require.resolve('exceljs'))('jszip');
 
 const itemHeader = 'codigo,nombre,tipo,unidad,decimales';
 const recipeHeader = 'producto_id,rendimiento,unidad_rendimiento,ingrediente_codigo,cantidad,unidad';
@@ -70,6 +74,31 @@ describe('inventory CSV import', () => {
 });
 
 describe('inventory Excel import', () => {
+  it.each(['0.10000000000000001', '1.0000000000000001', '88259496234518.57'])('rejects original numeric XML that would lose decimal precision: %s', async (numericText) => {
+    const { parseImportFile } = await import('./format.js');
+    const original = await workbookBytes([[...itemHeader.split(','), 'costo_unitario'], [], ['001', 'Milk', 'ingredient', 'liter', '3', 0.1]]);
+    const zip = await JSZip.loadAsync(original);
+    const sheet = await zip.file('xl/worksheets/sheet1.xml').async('string');
+    zip.file('xl/worksheets/sheet1.xml', sheet.replace('<v>0.1</v>', `<v>${numericText}</v>`));
+    const bytes = await zip.generateAsync({ type: 'arraybuffer' });
+    const file = await parseImportFile({ kind: 'items', format: 'xlsx', bytes });
+    expect(file.rows[0]).toEqual({
+      rowNumber: 3,
+      values: { codigo: '001', nombre: 'Milk', tipo: 'ingredient', unidad: 'liter', decimales: '3', costo_unitario: '' },
+      errors: [{ code: 'UNSAFE_NUMBER', column: 'costo_unitario' }],
+    });
+  });
+
+  it('retains the exact original text of safe numeric cells and their column positions', async () => {
+    const { parseImportFile } = await import('./format.js');
+    const original = await workbookBytes([[...itemHeader.split(','), 'costo_unitario'], [], ['001', 'Milk', 'ingredient', 'liter', '3', 0.1]]);
+    const zip = await JSZip.loadAsync(original);
+    const sheet = await zip.file('xl/worksheets/sheet1.xml').async('string');
+    zip.file('xl/worksheets/sheet1.xml', sheet.replace('<v>0.1</v>', '<v>0.1000</v>'));
+    const file = await parseImportFile({ kind: 'items', format: 'xlsx', bytes: await zip.generateAsync({ type: 'arraybuffer' }) });
+    expect(file.rows[0]).toMatchObject({ rowNumber: 3, values: { codigo: '001', costo_unitario: '0.1000' }, errors: [] });
+  });
+
   it('preserves text codes, safe numeric strings and sheet row numbers', async () => {
     const file = await parseWorkbook([itemHeader.split(','), ['001', 'Leche', 'ingredient', 'liter', 3], [], ['002', 'Agua', 'ingredient', 'liter', 0.25]]);
     expect(file.rows[0]).toMatchObject({ rowNumber: 2, values: { codigo: '001', decimales: '3' }, errors: [] });
