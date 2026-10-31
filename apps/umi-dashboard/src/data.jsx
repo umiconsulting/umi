@@ -2435,6 +2435,52 @@ export async function fetchRecipeTargets(merchantId) {
   throw new Error(t`No se pudieron cargar todos los productos. Vuelve a intentar.`);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
+export async function fetchInventoryImportSnapshot(merchantId) {
+  const [items, recipes, targetResponse] = await Promise.all([
+    loadPreparationPages((cursor) => {
+      const query = new URLSearchParams({
+        limit: '100',
+        includeArchived: 'true',
+        includeItemsWithoutCost: 'true',
+      });
+      if (cursor) query.set('cursor', cursor);
+      return _apiFetch(`${routes.inventory.items(merchantId)}?${query}`);
+    }, 'items'),
+    loadPreparationPages((cursor) => {
+      const query = new URLSearchParams({ limit: '100' });
+      if (cursor) query.set('cursor', cursor);
+      return _apiFetch(`${routes.inventory.recipes(merchantId)}?${query}`);
+    }, 'recipes'),
+    fetchRecipeTargets(merchantId),
+  ]);
+  return { merchantId, items, recipes, targets: targetResponse.targets };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export async function executeInventoryImportCommand(
+  merchantId,
+  operation,
+  targetAggregateId,
+  options,
+) {
+  const { commandId, idempotencyKey, targetVersion, parameters } = options;
+  const result = await _apiFetch(routes.merchants.administrativeCommands(merchantId), {
+    method: 'POST',
+    body: JSON.stringify({
+      operation,
+      targetAggregateId,
+      targetVersion,
+      commandId,
+      idempotencyKey,
+      parameters,
+      locationId: options.locationId ?? null,
+      approvalId: null,
+    }),
+  });
+  return { result, commandId, idempotencyKey };
+}
+
 async function _loadRecipeTargets(ctx) {
   const merchantId = _merchantId(ctx);
   if (!merchantId || !_canManageInventory(ctx)) return EMPTY_RECIPE_TARGETS;
