@@ -46,7 +46,7 @@ The source files for the current images are:
 
 The privacy notice is a draft. Confirm the legal identity, address, data processors, transfers, and retention period. Review the notice before public form collection. The current legal basis is the [Mexican personal data law](https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPDPPP.pdf), articles 14 to 16, as published by the Chamber of Deputies.
 
-The browser sends the name, restaurant, email, optional WhatsApp number, optional message, and notice acceptance to `/api/contact`. When `NEXT_PUBLIC_UMI_API_BASE` is set, the same request goes to the central API. Both routes send an internal notification and then attempt a visitor confirmation. The central API does not create a lead row for this form. The landing mail service records campaign status and a provider message ID in server logs, without a recipient address. The example SMTP configuration names Brevo; the production provider and retention policy remain unverified.
+The browser sends the name, restaurant, email, optional WhatsApp number, optional message, and notice acceptance to `/api/contact`. On Cloudflare Pages, a Pages Function forwards this request to the central API. Preview uses the staging API; production uses the production API. The central API sends the team notification and then attempts visitor confirmation. It does not create a lead row for this form. Brevo is the intended mail provider; its deployed credentials and delivery remain unverified.
 
 Before release, check the deployed API target, hosting provider, mail provider, inbox owner, retention periods, and any transfers with the legal owner. Then replace every pending section in the notice and obtain approval for the final text.
 

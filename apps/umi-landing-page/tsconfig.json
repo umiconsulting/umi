@@ -57,6 +57,7 @@
   ],
   "exclude": [
     "node_modules",
+    "archive/next-api",
     ".next",
     "out",
     "dist",
