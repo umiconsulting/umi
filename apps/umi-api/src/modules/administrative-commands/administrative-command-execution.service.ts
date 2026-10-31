@@ -531,6 +531,23 @@ export class AdministrativeCommandExecutionService {
           // no business date, so the merchant's own business date is read here and the
           // policy fingerprint is the command's own — production verifies neither, it
           // posts through the one ledger door.
+          case 'inventory.production.preview':
+            return this.inventory.productionPreviewAdministrative(
+              user,
+              access,
+              persisted ?? context,
+              this.authoringDto(
+                ProductionRecord.pick({
+                  outputItemId: true,
+                  inventoryLocationId: true,
+                  quantity: true,
+                  commandId: true,
+                  idempotencyKey: true,
+                }),
+                request,
+                { outputItemId: request.targetAggregateId },
+              ),
+            );
           case 'inventory.production.produce':
             return this.executeInventory(
               user,

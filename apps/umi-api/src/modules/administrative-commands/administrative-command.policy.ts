@@ -185,6 +185,7 @@ export const ADMINISTRATIVE_COMMAND_POLICIES: readonly AdministrativeCommandPoli
   // batch the till would; both surfaces call one service method, so a batch is authored
   // once. `inventory.production.produce` is the key migration 76 grants to the four
   // roles that work the kitchen.
+  policy('inventory.production.preview', DASHBOARD, 'inventory.production.produce'),
   policy('inventory.production.produce', DASHBOARD, 'inventory.production.produce'),
   // Supplier invoices (plan §11, phase 5). The console captures a supplier's document,
   // lets a person correct the proposed matches, and commits the receipt that prices the

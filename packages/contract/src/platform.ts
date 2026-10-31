@@ -513,6 +513,9 @@ export const API_ERROR_CODES = [
   'INVENTORY_LOCATION_CHANGED',
   'INVENTORY_UNIT_CONVERSION_REQUIRED',
   'INVENTORY_QUANTITY_NOT_EXACT',
+  'INVENTORY_LOCATION_INVALID',
+  'INVENTORY_PREPARATION_CHANGED',
+  'INVENTORY_PRODUCTION_QUANTITY_INVALID',
   'INVENTORY_QUANTITY_SCALE_MISMATCH',
   // The inventory refusals the till has words for. The API has thrown these
   // since Gate 3E and the union never carried them, so

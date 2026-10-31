@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "9a18dcb8a1dada437cdbb0be61e85eefe6fdd5f9ab06efadc3c5117ff990f007",
-  "contractVersion": "2.49.0",
+  "contentHash": "e739dacbc05c0b288a8d23f150808d5025162d22dd7627a159a1bf870433610a",
+  "contractVersion": "2.50.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -809,6 +809,9 @@
             "INVENTORY_LOCATION_CHANGED",
             "INVENTORY_UNIT_CONVERSION_REQUIRED",
             "INVENTORY_QUANTITY_NOT_EXACT",
+            "INVENTORY_LOCATION_INVALID",
+            "INVENTORY_PREPARATION_CHANGED",
+            "INVENTORY_PRODUCTION_QUANTITY_INVALID",
             "INVENTORY_QUANTITY_SCALE_MISMATCH",
             "INVENTORY_COUNT_ALREADY_ACTIVE",
             "INVENTORY_COUNT_BUSY",
@@ -1037,6 +1040,9 @@
                 "INVENTORY_LOCATION_CHANGED",
                 "INVENTORY_UNIT_CONVERSION_REQUIRED",
                 "INVENTORY_QUANTITY_NOT_EXACT",
+                "INVENTORY_LOCATION_INVALID",
+                "INVENTORY_PREPARATION_CHANGED",
+                "INVENTORY_PRODUCTION_QUANTITY_INVALID",
                 "INVENTORY_QUANTITY_SCALE_MISMATCH",
                 "INVENTORY_COUNT_ALREADY_ACTIVE",
                 "INVENTORY_COUNT_BUSY",
@@ -30994,6 +31000,7 @@
             "inventory.recipe.create",
             "inventory.recipe.update",
             "inventory.recipe.retire",
+            "inventory.production.preview",
             "inventory.production.produce",
             "inventory.invoice.upload",
             "inventory.invoice.match",
@@ -31094,6 +31101,7 @@
         "inventory.recipe.create",
         "inventory.recipe.update",
         "inventory.recipe.retire",
+        "inventory.production.preview",
         "inventory.production.produce",
         "inventory.invoice.upload",
         "inventory.invoice.match",
@@ -72305,6 +72313,165 @@
       ],
       "type": "object"
     },
+    "ProductionPreview": {
+      "additionalProperties": false,
+      "properties": {
+        "consumed": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "displayName": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "inventoryItemId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "lineCostMinor": {
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "publicReference": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "quantity": {
+                "additionalProperties": false,
+                "properties": {
+                  "scale": {
+                    "maximum": 6,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "unit": {
+                    "enum": [
+                      "unit",
+                      "gram",
+                      "kilogram",
+                      "milliliter",
+                      "liter",
+                      "portion",
+                      "package",
+                      "box"
+                    ],
+                    "type": "string"
+                  },
+                  "value": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "value",
+                  "scale",
+                  "unit"
+                ],
+                "type": "object"
+              },
+              "unitCostMinor": {
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "inventoryItemId",
+              "publicReference",
+              "displayName",
+              "quantity",
+              "unitCostMinor",
+              "lineCostMinor"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
+        },
+        "inventoryLocationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "outputItemId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "plannedQuantity": {
+          "additionalProperties": false,
+          "properties": {
+            "scale": {
+              "maximum": 6,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "unit": {
+              "enum": [
+                "unit",
+                "gram",
+                "kilogram",
+                "milliliter",
+                "liter",
+                "portion",
+                "package",
+                "box"
+              ],
+              "type": "string"
+            },
+            "value": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "value",
+            "scale",
+            "unit"
+          ],
+          "type": "object"
+        },
+        "recipeFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "recipeId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "recipeVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "outputItemId",
+        "inventoryLocationId",
+        "recipeId",
+        "recipeVersion",
+        "plannedQuantity",
+        "consumed",
+        "recipeFingerprint"
+      ],
+      "type": "object"
+    },
     "ProductionRecord": {
       "additionalProperties": false,
       "properties": {
@@ -72400,6 +72567,47 @@
           "format": "uuid",
           "type": "string"
         },
+        "plannedQuantity": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "scale": {
+                  "maximum": 6,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "unit": {
+                  "enum": [
+                    "unit",
+                    "gram",
+                    "kilogram",
+                    "milliliter",
+                    "liter",
+                    "portion",
+                    "package",
+                    "box"
+                  ],
+                  "type": "string"
+                },
+                "value": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "value",
+                "scale",
+                "unit"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "policyFingerprint": {
           "pattern": "^[a-f0-9]{64}$",
           "type": "string"
@@ -72437,6 +72645,17 @@
             "unit"
           ],
           "type": "object"
+        },
+        "recipeFingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -105141,6 +105360,10 @@
       "public": true,
       "retryable": false
     },
+    "INVENTORY_LOCATION_INVALID": {
+      "public": true,
+      "retryable": false
+    },
     "INVENTORY_LOT_EXPIRY_INVALID": {
       "public": true,
       "retryable": false
@@ -105162,6 +105385,14 @@
       "retryable": false
     },
     "INVENTORY_POLICY_REQUIRED": {
+      "public": true,
+      "retryable": false
+    },
+    "INVENTORY_PREPARATION_CHANGED": {
+      "public": true,
+      "retryable": false
+    },
+    "INVENTORY_PRODUCTION_QUANTITY_INVALID": {
       "public": true,
       "retryable": false
     },

@@ -533,15 +533,21 @@ export const RestockCommand = z
  * and consumes what the recipe says, from the stock location the request names.
  * A client that could name its own inputs could post a batch that consumes nothing.
  *
- * `declaredQuantity` is not sent either. It is the recipe's own yield, and the
- * difference between it and `quantity` is the shortfall the server writes as
- * `production_yield_loss` (plan D4).
+ * The optional plan selects the batch quantity. Existing clients use the recipe yield.
+ * The server records any shortfall as `production_yield_loss`.
  */
 export const ProductionRecord = z
   .object({
     ...commandShape,
     outputItemId: Uuid,
     quantity: PositiveScaledQuantity,
+    /** Optional plan. Omission preserves the recipe-yield batch for existing clients. */
+    plannedQuantity: PositiveScaledQuantity.nullable().optional(),
+    recipeFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable()
+      .optional(),
     /**
      * The batch code, and the expiry the label prints. Omitted: the server mints a
      * code and takes the shelf life from the recipe, or from the item when the
@@ -568,6 +574,20 @@ export const ProductionConsumedLine = z
     lineCostMinor: z.number().int().min(0).safe().nullable(),
   })
   .strict();
+
+/** Exact preparation plan from the server. Costs do not form part of its fingerprint. */
+export const ProductionPreview = z
+  .object({
+    outputItemId: Uuid,
+    inventoryLocationId: Uuid,
+    recipeId: Uuid,
+    recipeVersion: z.number().int().positive(),
+    plannedQuantity: ScaledQuantity,
+    consumed: z.array(ProductionConsumedLine).max(200),
+    recipeFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+export type ProductionPreview = z.infer<typeof ProductionPreview>;
 
 export const ProductionResult = z
   .object({
@@ -854,6 +874,7 @@ export const posInventoryModels = {
   RestockCommand,
   ProductionRecord,
   ProductionConsumedLine,
+  ProductionPreview,
   ProductionResult,
   LotRecallBasis,
   LotRecallQuery,
