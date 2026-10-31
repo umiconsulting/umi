@@ -14,6 +14,7 @@ import {
   blankOptionGroup,
   blankVariant,
   catalogChoicesPayload,
+  catalogInventoryPatch,
   optionGroupFromServer,
   variantFromServer,
   variantPrice,
@@ -1055,6 +1056,8 @@ function CatalogDialog({ row, onClose, onComplete }) {
   const [categoryId, setCategoryId] = useState('');
   const [taxPercent, setTaxPercent] = useState(0);
   const [inventoryItemId, setInventoryItemId] = useState('');
+  const [savedInventoryItemId, setSavedInventoryItemId] = useState('');
+  const [inventoryMappingType, setInventoryMappingType] = useState(null);
   const [currency, setCurrency] = useState(row?.currency || 'MXN');
   const [variants, setVariants] = useState([]);
   const [optionGroups, setOptionGroups] = useState([]);
@@ -1080,6 +1083,8 @@ function CatalogDialog({ row, onClose, onComplete }) {
     setCategoryId(detail.categoryId || '');
     setTaxPercent((Number(detail.taxRateBasisPoints) || 0) / 100);
     setInventoryItemId(detail.inventoryItemId || '');
+    setSavedInventoryItemId(detail.inventoryItemId || '');
+    setInventoryMappingType(detail.inventoryMappingType || null);
     setCurrency(detail.currency || row?.currency || 'MXN');
     setVariants((detail.variants || []).map(variantFromServer));
     setOptionGroups((detail.optionGroups || []).map(optionGroupFromServer));
@@ -1126,7 +1131,7 @@ function CatalogDialog({ row, onClose, onComplete }) {
       barcode: barcode || null,
       requiresPreparation,
       categoryId: categoryId || null,
-      inventoryItemId: inventoryItemId || null,
+      ...catalogInventoryPatch(inventoryItemId, savedInventoryItemId),
       taxRateBasisPoints: Math.round((Number(taxPercent) || 0) * 100),
       ...choices,
     };
@@ -1296,14 +1301,20 @@ function CatalogDialog({ row, onClose, onComplete }) {
                 />{' '}
                 <Trans>Requiere preparación</Trans>
               </label>
-              <label>
-                <Trans>Artículo de inventario</Trans>
-                <input
-                  value={inventoryItemId}
-                  onChange={(event) => setInventoryItemId(event.target.value)}
-                  placeholder={t`UUID opcional`}
-                />
-              </label>
+              {inventoryMappingType === 'recipe' || inventoryMappingType === 'bundle' ? (
+                <p className="muted">
+                  <Trans>Descuenta ingredientes de una receta</Trans>
+                </p>
+              ) : (
+                <label>
+                  <Trans>Artículo de inventario</Trans>
+                  <input
+                    value={inventoryItemId}
+                    onChange={(event) => setInventoryItemId(event.target.value)}
+                    placeholder={t`UUID opcional`}
+                  />
+                </label>
+              )}
               <fieldset className="field-group">
                 <legend>
                   <Trans>Variantes vendibles</Trans>

@@ -3,6 +3,7 @@ import {
   blankOptionGroup,
   blankVariant,
   catalogChoicesPayload,
+  catalogInventoryPatch,
   optionGroupFromServer,
   variantFromServer,
   variantPrice,
@@ -74,5 +75,16 @@ describe('catalog product choices', () => {
       maxSelections: 2,
       modifiers: [expect.objectContaining({ id: 'm', active: false })],
     });
+  });
+});
+
+describe('catalog inventory edits', () => {
+  it('omits unchanged inventory links on price-only saves', () => {
+    expect(catalogInventoryPatch('', '')).toEqual({});
+    expect(catalogInventoryPatch('item-a', 'item-a')).toEqual({});
+  });
+  it('preserves deliberate direct-item changes and removal', () => {
+    expect(catalogInventoryPatch('item-b', 'item-a')).toEqual({ inventoryItemId: 'item-b' });
+    expect(catalogInventoryPatch('', 'item-a')).toEqual({ inventoryItemId: null });
   });
 });

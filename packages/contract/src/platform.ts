@@ -665,6 +665,7 @@ export const API_ERROR_CODES = [
   'INVENTORY_ITEM_REFERENCE_TAKEN',
   'INVENTORY_UNIT_CONVERSION_INVALID',
   'INVENTORY_RECIPE_NOT_FOUND',
+  'INVENTORY_RECIPE_MAPPING_CONFLICT',
   // A recipe chain that revisits an item, and one deeper than the runaway stop of 12.
   'INVENTORY_RECIPE_CYCLE',
   'INVENTORY_RECIPE_TOO_DEEP',

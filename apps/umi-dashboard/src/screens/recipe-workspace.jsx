@@ -19,6 +19,7 @@ import {
   recipeCostPreview,
   recipeComponentFromDraft,
   recipeToDraft,
+  recipeReplacementConfirmation,
   scaledQuantityText,
   subRecipeCostByItemId,
   subRecipeHint,
@@ -367,7 +368,7 @@ export default function RecipeWorkspace() {
           <p className="muted" style={{ margin: '8px 0 0', fontSize: 11.5 }}>
             <Trans>
               El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada
-              insumo.
+              ingrediente.
             </Trans>
           </p>
         </div>
@@ -381,6 +382,7 @@ export default function RecipeWorkspace() {
           items={itemsState.data.items}
           recipes={recipesState.data.recipes}
           targets={targetsState.data.targets}
+          targetsState={targetsState}
           costBasisById={costBasisById}
           onClose={() => setEditor(null)}
           onSaved={reload}
@@ -437,7 +439,7 @@ function ExplosionPanel({ state, unitOf }) {
   if (state.loading && !state.loaded) {
     return (
       <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
-        <Trans>Leyendo el costeo del servidor…</Trans>
+        <Trans>Cargando el costo de ingredientes…</Trans>
       </p>
     );
   }
@@ -446,13 +448,13 @@ function ExplosionPanel({ state, unitOf }) {
   return (
     <section style={{ display: 'grid', gap: 10 }}>
       <h4 style={{ margin: 0 }}>
-        <Trans>Costeo del servidor</Trans>
+        <Trans>Costo de ingredientes</Trans>
       </h4>
       {notExact.length > 0 ? (
         <p style={{ margin: 0, fontSize: 12.5, color: 'var(--warning)' }}>
           <Trans>
-            Una línea no da unidades completas del insumo. El servidor no publica un costo para esta
-            receta.
+            Una cantidad no da unidades completas del ingrediente. Revisa las cantidades para
+            conocer el costo.
           </Trans>
         </p>
       ) : null}
@@ -461,7 +463,7 @@ function ExplosionPanel({ state, unitOf }) {
           <thead>
             <tr style={{ borderBottom: '1px solid var(--line)' }}>
               <th scope="col" style={HEAD}>
-                <Trans>Insumo</Trans>
+                <Trans>Ingrediente</Trans>
               </th>
               <th scope="col" style={{ ...HEAD, textAlign: 'right' }}>
                 <Trans>Cantidad</Trans>
@@ -547,6 +549,7 @@ function RecipeEditor({
   items,
   recipes,
   targets,
+  targetsState,
   costBasisById,
   onClose,
   onSaved,
@@ -578,6 +581,9 @@ function RecipeEditor({
     })),
   );
   const [confirmRetire, setConfirmRetire] = useState(false);
+  const [replacement, setReplacement] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+  const [unresolvedSave, setUnresolvedSave] = useState(null);
 
   const explosion = useInventoryRecipeExplosion(editing ? recipeId : null, 0);
   const itemsById = useMemo(() => new Map((items || []).map((item) => [item.id, item])), [items]);
@@ -705,29 +711,57 @@ function RecipeEditor({
       ...(shelfLifeDays === '' ? {} : { shelfLifeDays: Number(shelfLifeDays.trim()) }),
       components,
     };
-    if (editing) {
-      const response = await command.execute('inventory.recipe.update', recipeId, {
-        targetVersion: recipe.version,
-        parameters,
+    const request = {
+      operation: editing ? 'inventory.recipe.update' : 'inventory.recipe.create',
+      targetVersion: editing ? recipe.version : null,
+      parameters: editing
+        ? parameters
+        : {
+            ...parameters,
+            targetKind,
+            ...(targetKind === 'item'
+              ? { targetItemId }
+              : { productId, ...(variantId ? { variantId } : {}) }),
+          },
+    };
+    await submitSave(request);
+  }
+
+  async function submitSave(request, token) {
+    const submitted = structuredClone({
+      ...request,
+      parameters: { ...request.parameters, ...(token ? { replaceSalesMapping: token } : {}) },
+    });
+    setUnresolvedSave(submitted);
+    setReplacement(null);
+    setSaveError(null);
+    try {
+      const response = await command.execute(submitted.operation, recipeId, {
+        targetVersion: submitted.targetVersion,
+        parameters: submitted.parameters,
       });
+      setUnresolvedSave(null);
       await onSaved(response?.result?.recipe || null);
-    } else if (targetKind === 'item') {
-      const response = await command.execute('inventory.recipe.create', recipeId, {
-        targetVersion: null,
-        parameters: { ...parameters, targetKind: 'item', targetItemId },
-      });
-      await onSaved(response?.result?.recipe || null);
-    } else {
-      const response = await command.execute('inventory.recipe.create', recipeId, {
-        targetVersion: null,
-        parameters: {
-          ...parameters,
-          targetKind: 'product',
-          productId,
-          ...(variantId ? { variantId } : {}),
-        },
-      });
-      await onSaved(response?.result?.recipe || null);
+    } catch (failure) {
+      // The shared command hook retains identity for network and 5xx failures.
+      // Keep the same payload until that command has a definite outcome.
+      if (!failure?.status || failure.status >= 500) return;
+      setUnresolvedSave(null);
+      const confirmation = recipeReplacementConfirmation(failure, submitted);
+      if (confirmation?.replacement) {
+        setReplacement(confirmation);
+      } else if (confirmation) {
+        setSaveError(
+          t`La configuración de inventario cambió. Guarda de nuevo para revisar el estado actual.`,
+        );
+      } else {
+        const payload = failure?.details?.error || failure?.details;
+        if (payload?.details?.reason === 'ACTIVE_RECIPE_EXISTS') {
+          setSaveError(
+            t`Este producto o variante ya tiene una receta activa. Cierra este borrador y edita esa receta.`,
+          );
+        }
+      }
     }
   }
 
@@ -766,438 +800,548 @@ function RecipeEditor({
           <h3 style={{ margin: 0 }}>
             {editing ? <Trans>Editar receta</Trans> : <Trans>Nueva receta</Trans>}
           </h3>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
+          <button
+            className="btn-icon"
+            type="button"
+            onClick={onClose}
+            aria-label={t`Cerrar`}
+            disabled={command.pending || Boolean(unresolvedSave)}
+          >
             <I.X size={16} />
           </button>
         </div>
 
-        {/* ── The target ─────────────────────────────────────────────────────── */}
-        <section style={{ display: 'grid', gap: 10 }}>
-          <h4 style={{ margin: 0 }}>
-            <Trans>Objetivo</Trans>
-          </h4>
-          {editing ? (
-            <p style={{ margin: 0, fontSize: 12.5 }}>
-              <strong>{recipe.targetName}</strong>{' '}
-              <span className="muted">
-                {TARGET_KIND_LABEL[recipe.targetKind]
-                  ? i18n._(TARGET_KIND_LABEL[recipe.targetKind])
-                  : recipe.targetKind}
-              </span>
-            </p>
-          ) : (
-            <div
-              role="group"
-              aria-label={t`Tipo de objetivo`}
-              style={{ display: 'inline-flex', gap: 8 }}
-            >
-              {['product', 'item'].map((kind) => (
-                <button
-                  key={kind}
-                  type="button"
-                  className={`btn ${targetKind === kind ? 'btn-primary' : 'btn-secondary'}`}
-                  aria-pressed={targetKind === kind}
-                  onClick={() => setTargetKind(kind)}
-                >
-                  {kind === 'product' ? <Trans>Producto</Trans> : <Trans>Artículo</Trans>}
-                </button>
-              ))}
-            </div>
-          )}
+        <fieldset
+          disabled={command.pending || Boolean(replacement) || Boolean(unresolvedSave)}
+          style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 16, minWidth: 0 }}
+        >
+          {/* ── The target ─────────────────────────────────────────────────────── */}
+          <section style={{ display: 'grid', gap: 10 }}>
+            <h4 style={{ margin: 0 }}>
+              <Trans>Receta para</Trans>
+            </h4>
+            {targetKind === 'product' ? (
+              <>
+                <p className="muted" style={{ margin: 0 }}>
+                  <Trans>
+                    Al guardar, las próximas ventas descontarán los ingredientes de esta receta.
+                  </Trans>
+                </p>
+                <p className="muted" style={{ margin: 0 }}>
+                  <Trans>
+                    La receta de una variante tiene prioridad sobre la receta del producto.
+                  </Trans>
+                </p>
+                {targetsState.loading ? (
+                  <p>
+                    <Trans>Cargando productos…</Trans>
+                  </p>
+                ) : null}
+                {targetsState.error ? (
+                  <p role="alert" style={{ color: 'var(--danger)' }}>
+                    {targetsState.error}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+            {editing ? (
+              <p style={{ margin: 0, fontSize: 12.5 }}>
+                <strong>{recipe.targetName}</strong>{' '}
+                <span className="muted">
+                  {TARGET_KIND_LABEL[recipe.targetKind]
+                    ? i18n._(TARGET_KIND_LABEL[recipe.targetKind])
+                    : recipe.targetKind}
+                </span>
+              </p>
+            ) : (
+              <div
+                role="group"
+                aria-label={t`Tipo de objetivo`}
+                style={{ display: 'inline-flex', gap: 8 }}
+              >
+                {['product', 'item'].map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    className={`btn ${targetKind === kind ? 'btn-primary' : 'btn-secondary'}`}
+                    aria-pressed={targetKind === kind}
+                    onClick={() => setTargetKind(kind)}
+                  >
+                    {kind === 'product' ? <Trans>Producto</Trans> : <Trans>Artículo</Trans>}
+                  </button>
+                ))}
+              </div>
+            )}
 
-          {!editing && targetKind === 'product' ? (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: 12,
-              }}
-            >
-              <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-                <Trans>Producto</Trans>
-                <Select
-                  value={productId}
-                  onChange={(event) => {
-                    setProductId(event.target.value);
-                    setVariantId('');
-                  }}
-                >
-                  <option value="">{t`Elige un producto`}</option>
-                  {productOptions.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-              {variantOptions.length > 0 ? (
+            {!editing && targetKind === 'product' ? (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: 12,
+                }}
+              >
                 <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-                  <Trans>Variante</Trans>
-                  <Select value={variantId} onChange={(event) => setVariantId(event.target.value)}>
-                    <option value="">{t`Sin variante`}</option>
-                    {variantOptions.map((variant) => (
-                      <option key={variant.variantId} value={variant.variantId}>
-                        {variant.variantName || variant.variantId}
+                  <Trans>Producto</Trans>
+                  <Select
+                    value={productId}
+                    onChange={(event) => {
+                      setProductId(event.target.value);
+                      setVariantId('');
+                    }}
+                  >
+                    <option value="">{t`Elige un producto`}</option>
+                    {productOptions.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name}
                       </option>
                     ))}
                   </Select>
                 </label>
-              ) : null}
-            </div>
-          ) : null}
+                {variantOptions.length > 0 ? (
+                  <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+                    <Trans>Variante</Trans>
+                    <Select
+                      value={variantId}
+                      onChange={(event) => setVariantId(event.target.value)}
+                    >
+                      <option value="">{t`Sin variante`}</option>
+                      {variantOptions.map((variant) => (
+                        <option key={variant.variantId} value={variant.variantId}>
+                          {variant.variantName || variant.variantId}
+                        </option>
+                      ))}
+                    </Select>
+                  </label>
+                ) : null}
+              </div>
+            ) : null}
 
-          {!editing && targetKind === 'item' ? (
-            <div style={{ display: 'grid', gap: 6 }}>
+            {!editing && targetKind === 'item' ? (
+              <div style={{ display: 'grid', gap: 6 }}>
+                <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+                  <Trans>Artículo</Trans>
+                  <Select
+                    value={targetItemId}
+                    onChange={(event) => chooseTargetItem(event.target.value)}
+                  >
+                    <option value="">{t`Elige un artículo`}</option>
+                    {itemOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.displayName} · {item.publicReference}
+                        {subRecipeHint(item.id, recipes)
+                          ? ` · ${i18n._(TARGET_KIND_LABEL.item)}`
+                          : ''}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+                {targetItemId ? (
+                  targetSubRecipe ? (
+                    <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
+                      <Plural
+                        value={targetSubRecipe.usedInRecipeCount}
+                        one="Sub-receta. Se usa en # receta."
+                        other="Sub-receta. Se usa en # recetas."
+                      />
+                    </p>
+                  ) : (
+                    <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
+                      <Trans>Este artículo no tiene receta propia.</Trans>
+                    </p>
+                  )
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+
+          {/* ── The yield ──────────────────────────────────────────────────────── */}
+          <section style={{ display: 'grid', gap: 10 }}>
+            <h4 style={{ margin: 0 }}>
+              <Trans>Rendimiento</Trans>
+            </h4>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: 12,
+              }}
+            >
               <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-                <Trans>Artículo</Trans>
-                <Select
-                  value={targetItemId}
-                  onChange={(event) => chooseTargetItem(event.target.value)}
-                >
-                  <option value="">{t`Elige un artículo`}</option>
-                  {itemOptions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.displayName} · {item.publicReference}
-                      {subRecipeHint(item.id, recipes)
-                        ? ` · ${i18n._(TARGET_KIND_LABEL.item)}`
-                        : ''}
+                <Trans>Cantidad</Trans>
+                <input
+                  className="input"
+                  inputMode="decimal"
+                  value={yieldValueText}
+                  onChange={(event) => setYieldValueText(event.target.value)}
+                />
+              </label>
+              <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+                <Trans>Decimales</Trans>
+                <Select value={yieldScale} onChange={(event) => setYieldScale(event.target.value)}>
+                  {[0, 1, 2, 3, 4, 5, 6].map((value) => (
+                    <option key={value} value={String(value)}>
+                      {value}
                     </option>
                   ))}
                 </Select>
               </label>
-              {targetItemId ? (
-                targetSubRecipe ? (
-                  <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
-                    <Plural
-                      value={targetSubRecipe.usedInRecipeCount}
-                      one="Sub-receta. Se usa en # receta."
-                      other="Sub-receta. Se usa en # recetas."
-                    />
-                  </p>
-                ) : (
-                  <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
-                    <Trans>Este artículo no tiene receta propia.</Trans>
-                  </p>
-                )
-              ) : null}
+              <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+                <Trans>Unidad</Trans>
+                <Select value={yieldUnit} onChange={(event) => setYieldUnit(event.target.value)}>
+                  {UNIT_ORDER.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {unitOf(unit)}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+                <Trans>Vida útil en días</Trans>
+                <input
+                  className="input"
+                  inputMode="numeric"
+                  value={shelfLifeDays}
+                  placeholder={t`Sin vida útil`}
+                  onChange={(event) => setShelfLifeDays(event.target.value)}
+                />
+              </label>
             </div>
-          ) : null}
-        </section>
+            {draftYield === null ? (
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--danger)' }}>
+                <Trans>Escribe la cantidad de rendimiento como un número mayor que cero.</Trans>
+              </p>
+            ) : null}
+            {shelfLifeValid ? null : (
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--danger)' }}>
+                <Trans>Escribe la vida útil como días completos.</Trans>
+              </p>
+            )}
+          </section>
 
-        {/* ── The yield ──────────────────────────────────────────────────────── */}
-        <section style={{ display: 'grid', gap: 10 }}>
-          <h4 style={{ margin: 0 }}>
-            <Trans>Rendimiento</Trans>
-          </h4>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-              gap: 12,
-            }}
-          >
-            <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-              <Trans>Cantidad</Trans>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={yieldValueText}
-                onChange={(event) => setYieldValueText(event.target.value)}
-              />
-            </label>
-            <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-              <Trans>Decimales</Trans>
-              <Select value={yieldScale} onChange={(event) => setYieldScale(event.target.value)}>
-                {[0, 1, 2, 3, 4, 5, 6].map((value) => (
-                  <option key={value} value={String(value)}>
-                    {value}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-              <Trans>Unidad</Trans>
-              <Select value={yieldUnit} onChange={(event) => setYieldUnit(event.target.value)}>
-                {UNIT_ORDER.map((unit) => (
-                  <option key={unit} value={unit}>
-                    {unitOf(unit)}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-              <Trans>Vida útil en días</Trans>
-              <input
-                className="input"
-                inputMode="numeric"
-                value={shelfLifeDays}
-                placeholder={t`Sin vida útil`}
-                onChange={(event) => setShelfLifeDays(event.target.value)}
-              />
-            </label>
-          </div>
-          {draftYield === null ? (
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--danger)' }}>
-              <Trans>Escribe la cantidad de rendimiento como un número mayor que cero.</Trans>
-            </p>
-          ) : null}
-          {shelfLifeValid ? null : (
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--danger)' }}>
-              <Trans>Escribe la vida útil como días completos.</Trans>
-            </p>
-          )}
-        </section>
+          {/* ── The components ─────────────────────────────────────────────────── */}
+          <section style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <h4 style={{ margin: 0 }}>
+                <Trans>Ingredientes</Trans>
+              </h4>
+              <button className="btn btn-secondary btn-sm" type="button" onClick={addLine}>
+                <I.Plus size={14} />
+                <Trans>Agregar ingrediente</Trans>
+              </button>
+            </div>
 
-        {/* ── The components ─────────────────────────────────────────────────── */}
-        <section style={{ display: 'grid', gap: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-            <h4 style={{ margin: 0 }}>
-              <Trans>Componentes</Trans>
-            </h4>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={addLine}>
-              <I.Plus size={14} />
-              <Trans>Agregar componente</Trans>
-            </button>
-          </div>
-
-          {lines.length === 0 ? (
-            <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
-              <Trans>Agrega el primer componente para calcular el costo.</Trans>
-            </p>
-          ) : (
-            <div style={{ display: 'grid' }}>
-              {lines.map((line, index) => {
-                const item = itemsById.get(line.inventoryItemId) || null;
-                const component = recipeComponentFromDraft(line, item);
-                const scale = line.quantity?.scale ?? item?.quantityScale;
-                const basis = item ? costBasisById.get(item.id) : null;
-                const hint = item ? subRecipeHint(item.id, recipes) : null;
-                return (
-                  <div
-                    key={line.key}
-                    style={{
-                      display: 'grid',
-                      gap: 6,
-                      padding: '10px 0',
-                      borderTop: '1px solid var(--line)',
-                    }}
-                  >
+            {lines.length === 0 ? (
+              <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
+                <Trans>Agrega el primer ingrediente para calcular el costo.</Trans>
+              </p>
+            ) : (
+              <div style={{ display: 'grid' }}>
+                {lines.map((line, index) => {
+                  const item = itemsById.get(line.inventoryItemId) || null;
+                  const component = recipeComponentFromDraft(line, item);
+                  const scale = line.quantity?.scale ?? item?.quantityScale;
+                  const basis = item ? costBasisById.get(item.id) : null;
+                  const hint = item ? subRecipeHint(item.id, recipes) : null;
+                  return (
                     <div
-                      style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}
+                      key={line.key}
+                      style={{
+                        display: 'grid',
+                        gap: 6,
+                        padding: '10px 0',
+                        borderTop: '1px solid var(--line)',
+                      }}
                     >
-                      <label style={{ display: 'grid', gap: 4, fontSize: 12, flex: '1 1 240px' }}>
-                        <Trans>Artículo</Trans>
-                        <Select
-                          value={line.inventoryItemId}
-                          onChange={(event) =>
-                            updateLine(line.key, {
-                              inventoryItemId: event.target.value,
-                              quantity: null,
-                              conversionNumerator: 1,
-                              conversionDenominator: 1,
-                              roundingPolicy: 'exact',
-                              required: true,
-                            })
-                          }
-                        >
-                          <option value="">{t`Elige un artículo`}</option>
-                          {itemOptions.map((option) => (
-                            <option key={option.id} value={option.id}>
-                              {option.displayName} · {option.publicReference}
-                              {subRecipeHint(option.id, recipes)
-                                ? ` · ${i18n._(TARGET_KIND_LABEL.item)}`
-                                : ''}
-                            </option>
-                          ))}
-                        </Select>
-                      </label>
-                      <label style={{ display: 'grid', gap: 4, fontSize: 12, width: 130 }}>
-                        <Trans>Cantidad</Trans>
-                        <input
-                          className="input"
-                          inputMode="decimal"
-                          value={line.quantityText}
-                          aria-label={t`Cantidad del componente ${index + 1}`}
-                          onChange={(event) =>
-                            updateLine(line.key, { quantityText: event.target.value })
-                          }
-                        />
-                      </label>
-                      <span className="muted" style={{ fontSize: 12, paddingBottom: 10 }}>
-                        {item ? unitOf(line.quantity?.unit ?? item.baseUnit) : '·'}
-                      </span>
-                      <button
-                        className="btn-icon"
-                        type="button"
-                        aria-label={t`Quitar el componente ${index + 1}`}
-                        onClick={() => removeLine(line.key)}
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 8,
+                          alignItems: 'flex-end',
+                          flexWrap: 'wrap',
+                        }}
                       >
-                        <I.Trash size={15} />
-                      </button>
-                    </div>
-                    {!item ? (
-                      <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
-                        <Trans>Elige un artículo de tu inventario.</Trans>
-                      </p>
-                    ) : (
-                      <>
-                        {component === null ? (
-                          <p style={{ margin: 0, fontSize: 11.5, color: 'var(--danger)' }}>
-                            <Trans>
-                              La cantidad no cabe en la escala del artículo
-                              {scale > 0 ? ` (${scale} decimales).` : ' (sin decimales).'}
-                            </Trans>
+                        <label style={{ display: 'grid', gap: 4, fontSize: 12, flex: '1 1 240px' }}>
+                          <Trans>Artículo</Trans>
+                          <Select
+                            value={line.inventoryItemId}
+                            onChange={(event) =>
+                              updateLine(line.key, {
+                                inventoryItemId: event.target.value,
+                                quantity: null,
+                                conversionNumerator: 1,
+                                conversionDenominator: 1,
+                                roundingPolicy: 'exact',
+                                required: true,
+                              })
+                            }
+                          >
+                            <option value="">{t`Elige un artículo`}</option>
+                            {itemOptions.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.displayName} · {option.publicReference}
+                                {subRecipeHint(option.id, recipes)
+                                  ? ` · ${i18n._(TARGET_KIND_LABEL.item)}`
+                                  : ''}
+                              </option>
+                            ))}
+                          </Select>
+                        </label>
+                        <label style={{ display: 'grid', gap: 4, fontSize: 12, width: 130 }}>
+                          <Trans>Cantidad</Trans>
+                          <input
+                            className="input"
+                            inputMode="decimal"
+                            value={line.quantityText}
+                            aria-label={t`Cantidad del ingrediente ${index + 1}`}
+                            onChange={(event) =>
+                              updateLine(line.key, { quantityText: event.target.value })
+                            }
+                          />
+                        </label>
+                        <span className="muted" style={{ fontSize: 12, paddingBottom: 10 }}>
+                          {item ? unitOf(line.quantity?.unit ?? item.baseUnit) : '·'}
+                        </span>
+                        <button
+                          className="btn-icon"
+                          type="button"
+                          aria-label={t`Quitar el ingrediente ${index + 1}`}
+                          onClick={() => removeLine(line.key)}
+                        >
+                          <I.Trash size={15} />
+                        </button>
+                      </div>
+                      {!item ? (
+                        <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
+                          <Trans>Elige un artículo de tu inventario.</Trans>
+                        </p>
+                      ) : (
+                        <>
+                          {component === null ? (
+                            <p style={{ margin: 0, fontSize: 11.5, color: 'var(--danger)' }}>
+                              <Trans>
+                                La cantidad no cabe en la escala del artículo
+                                {scale > 0 ? ` (${scale} decimales).` : ' (sin decimales).'}
+                              </Trans>
+                            </p>
+                          ) : null}
+                          <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
+                            {hint ? (
+                              <Plural
+                                value={hint.usedInRecipeCount}
+                                one="Sub-receta. Se usa en # receta."
+                                other="Sub-receta. Se usa en # recetas."
+                              />
+                            ) : (
+                              <Trans>Ingrediente comprado.</Trans>
+                            )}
                           </p>
-                        ) : null}
-                        <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
-                          {hint ? (
-                            <Plural
-                              value={hint.usedInRecipeCount}
-                              one="Sub-receta. Se usa en # receta."
-                              other="Sub-receta. Se usa en # recetas."
-                            />
-                          ) : (
-                            <Trans>Insumo comprado.</Trans>
-                          )}
-                        </p>
-                        <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
-                          {hint && subRecipeCosts.get(item.id)?.costMinor == null ? (
-                            <Trans>
-                              El costo de esta sub-receta aún no se calcula. Revisa los precios de
-                              sus insumos.
-                            </Trans>
-                          ) : basis == null ? (
-                            <Trans>Sin costo base. Registra una recepción de compra.</Trans>
-                          ) : (
-                            <Trans>
-                              Costo base: {formatMoney(basis)} por {unitOf(item.baseUnit)}.
-                            </Trans>
-                          )}
-                        </p>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
+                          <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
+                            {hint && subRecipeCosts.get(item.id)?.costMinor == null ? (
+                              <Trans>
+                                El costo de esta sub-receta aún no se calcula. Revisa los precios de
+                                sus ingredientes.
+                              </Trans>
+                            ) : basis == null ? (
+                              <Trans>Registra una compra para conocer su costo.</Trans>
+                            ) : (
+                              <Trans>
+                                Costo base: {formatMoney(basis)} por {unitOf(item.baseUnit)}.
+                              </Trans>
+                            )}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {/* ── The live cost ──────────────────────────────────────────────────── */}
+          <section className="card" style={{ padding: 14, display: 'grid', gap: 10 }}>
+            <h4 style={{ margin: 0 }}>
+              <Trans>Costo y margen</Trans>
+            </h4>
+            <div className="grid grid-4" style={{ gap: 12 }}>
+              <Figure
+                label={<Trans>Costo por unidad</Trans>}
+                value={preview.costMinor == null ? null : formatMoney(preview.costMinor)}
+                absent={costAbsent}
+                note={yieldText(draftYield, unitOf)}
+              />
+              <Figure
+                label={<Trans>Precio</Trans>}
+                value={priceMinor == null ? null : formatMoney(priceMinor)}
+                absent={priceMinor == null ? t`Sin precio` : null}
+              />
+              <Figure
+                label={<Trans>Margen</Trans>}
+                value={preview.marginMinor == null ? null : formatMoney(preview.marginMinor)}
+                absent={marginAbsent}
+              />
+              <Figure
+                label={<Trans>Margen %</Trans>}
+                value={marginPercent}
+                absent={marginPercent == null ? t`Sin margen` : null}
+              />
             </div>
-          )}
-        </section>
 
-        {/* ── The live cost ──────────────────────────────────────────────────── */}
-        <section className="card" style={{ padding: 14, display: 'grid', gap: 10 }}>
-          <h4 style={{ margin: 0 }}>
-            <Trans>Costo y margen</Trans>
-          </h4>
-          <div className="grid grid-4" style={{ gap: 12 }}>
-            <Figure
-              label={<Trans>Costo por unidad de rendimiento</Trans>}
-              value={preview.costMinor == null ? null : formatMoney(preview.costMinor)}
-              absent={costAbsent}
-              note={yieldText(draftYield, unitOf)}
-            />
-            <Figure
-              label={<Trans>Precio</Trans>}
-              value={priceMinor == null ? null : formatMoney(priceMinor)}
-              absent={priceMinor == null ? t`Sin precio` : null}
-            />
-            <Figure
-              label={<Trans>Margen</Trans>}
-              value={preview.marginMinor == null ? null : formatMoney(preview.marginMinor)}
-              absent={marginAbsent}
-            />
-            <Figure
-              label={<Trans>Margen %</Trans>}
-              value={marginPercent}
-              absent={marginPercent == null ? t`Sin margen` : null}
-            />
-          </div>
+            {preview.state === 'not_exact' ? (
+              <div style={{ display: 'grid', gap: 4 }}>
+                <p style={{ margin: 0, fontSize: 12.5, color: 'var(--warning)' }}>
+                  <Trans>
+                    Una cantidad no da unidades completas del artículo. Ajusta el rendimiento o la
+                    cantidad. Revisa las cantidades para conocer el costo.
+                  </Trans>
+                </p>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+                  {preview.notExact.map((inventoryItemId) => (
+                    <li key={inventoryItemId}>{nameOf(inventoryItemId)}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
-          {preview.state === 'not_exact' ? (
-            <div style={{ display: 'grid', gap: 4 }}>
-              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--warning)' }}>
+            {preview.state === 'no_cost' ? (
+              <div style={{ display: 'grid', gap: 4 }}>
+                <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)' }}>
+                  <Trans>Registra una compra de estos ingredientes para conocer el costo.</Trans>
+                </p>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+                  {preview.missingCost.map((inventoryItemId) => (
+                    <li key={inventoryItemId}>{nameOf(inventoryItemId)}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {preview.state === 'empty' ? (
+              <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
+                <Trans>Agrega un ingrediente para calcular el costo.</Trans>
+              </p>
+            ) : null}
+
+            {priceMinor == null ? (
+              <p className="muted" style={{ margin: 0, fontSize: 12 }}>
+                {targetKind === 'item' ? (
+                  <Trans>Una sub-receta no tiene precio de venta, así que no hay margen.</Trans>
+                ) : (
+                  <Trans>Sin precio no hay margen. Elige el producto para ver su precio.</Trans>
+                )}
+              </p>
+            ) : null}
+
+            {retired ? (
+              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)' }}>
+                <Trans>Esta versión está retirada. No se puede editar.</Trans>
+              </p>
+            ) : null}
+
+            {editing && recipe.costMinor != null ? (
+              <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
                 <Trans>
-                  Una cantidad no da unidades completas del artículo. Ajusta el rendimiento o la
-                  cantidad. El costo es desconocido, no cero.
+                  Costo guardado: {formatMoney(recipe.costMinor)}. El número de arriba es el cálculo
+                  en pantalla.
                 </Trans>
               </p>
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
-                {preview.notExact.map((inventoryItemId) => (
-                  <li key={inventoryItemId}>{nameOf(inventoryItemId)}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+            ) : null}
 
-          {preview.state === 'no_cost' ? (
-            <div style={{ display: 'grid', gap: 4 }}>
-              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)' }}>
-                <Trans>Falta el costo de estos artículos. El costo es desconocido, no cero.</Trans>
-              </p>
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
-                {preview.missingCost.map((inventoryItemId) => (
-                  <li key={inventoryItemId}>{nameOf(inventoryItemId)}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {preview.state === 'empty' ? (
-            <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
-              <Trans>Agrega un componente para calcular el costo.</Trans>
-            </p>
-          ) : null}
-
-          {priceMinor == null ? (
-            <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-              {targetKind === 'item' ? (
-                <Trans>Una sub-receta no tiene precio de venta, así que no hay margen.</Trans>
-              ) : (
-                <Trans>Sin precio no hay margen. Elige el producto para ver su precio.</Trans>
-              )}
-            </p>
-          ) : null}
-
-          {retired ? (
-            <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)' }}>
-              <Trans>Esta versión está retirada. No se puede editar.</Trans>
-            </p>
-          ) : null}
-
-          {editing && recipe.costMinor != null ? (
             <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
-              <Trans>
-                Costo guardado: {formatMoney(recipe.costMinor)}. El número de arriba es el cálculo
-                en pantalla.
-              </Trans>
+              <Trans>El costo se calcula con las compras registradas de tus ingredientes.</Trans>
             </p>
-          ) : null}
-
-          <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
-            <Trans>
-              El costo por unidad usa el precio de compra de cada insumo y se redondea una sola vez.
-              Al guardar, la lista muestra el costo que calculó el servidor.
-            </Trans>
-          </p>
-        </section>
-
+          </section>
+        </fieldset>
         {editing ? <ExplosionPanel state={explosion} unitOf={unitOf} /> : null}
 
+        {replacement ? (
+          <div role="alert" style={{ display: 'grid', gap: 10 }}>
+            <p style={{ margin: 0 }}>
+              {replacement.mappingType === 'direct'
+                ? t`Las ventas descuentan un artículo de inventario.`
+                : replacement.mappingType === 'non_stock'
+                  ? t`Las ventas no descuentan inventario.`
+                  : t`Las ventas descuentan ingredientes de otra receta.`}{' '}
+              {t`Usar esta receta cambiará esa configuración para las próximas ventas.`}
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-primary"
+                type="button"
+                disabled={command.pending}
+                onClick={() => submitSave(replacement.request, replacement.replacement)}
+              >
+                <Trans>Usar esta receta</Trans>
+              </button>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                disabled={command.pending}
+                onClick={() => {
+                  setReplacement(null);
+                  command.reset();
+                }}
+              >
+                <Trans>Cancelar</Trans>
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {unresolvedSave && !command.pending ? (
+          <div role="alert" style={{ display: 'grid', gap: 8 }}>
+            <p style={{ margin: 0 }}>
+              <Trans>
+                No pudimos confirmar el guardado. Reintenta para consultar el resultado sin cambiar
+                la receta.
+              </Trans>
+            </p>
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() => submitSave(unresolvedSave)}
+            >
+              <Trans>Reintentar guardado</Trans>
+            </button>
+          </div>
+        ) : null}
+        {saveError ? (
+          <p role="alert" style={{ color: 'var(--danger)' }}>
+            {saveError}
+          </p>
+        ) : null}
+        {confirmRetire && targetKind === 'product' ? (
+          <p role="alert">
+            <Trans>
+              Al retirar esta receta, las próximas ventas necesitarán otra configuración válida de
+              inventario.
+            </Trans>
+          </p>
+        ) : null}
+
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button
-            className="btn btn-primary"
-            type="button"
-            disabled={command.pending || !savable}
-            onClick={save}
-          >
-            <Trans>Guardar</Trans>
-          </button>
+          {!replacement && !unresolvedSave ? (
+            <button
+              className="btn btn-primary"
+              type="button"
+              disabled={
+                command.pending ||
+                Boolean(replacement) ||
+                !savable ||
+                (targetKind === 'product' && (targetsState.loading || Boolean(targetsState.error)))
+              }
+              onClick={save}
+            >
+              <Trans>Guardar</Trans>
+            </button>
+          ) : null}
           {editing && recipe.active !== false ? (
             confirmRetire ? (
               <>
                 <button
                   className="btn btn-secondary"
                   type="button"
-                  disabled={command.pending}
+                  disabled={command.pending || Boolean(unresolvedSave)}
                   onClick={retire}
                 >
                   <Trans>Confirmar retirada</Trans>
@@ -1205,6 +1349,7 @@ function RecipeEditor({
                 <button
                   className="btn btn-secondary"
                   type="button"
+                  disabled={command.pending || Boolean(unresolvedSave)}
                   onClick={() => setConfirmRetire(false)}
                 >
                   <Trans>Cancelar</Trans>
@@ -1214,7 +1359,7 @@ function RecipeEditor({
               <button
                 className="btn btn-secondary"
                 type="button"
-                disabled={command.pending}
+                disabled={command.pending || Boolean(replacement) || Boolean(unresolvedSave)}
                 onClick={() => setConfirmRetire(true)}
               >
                 <Trans>Retirar</Trans>
@@ -1222,11 +1367,11 @@ function RecipeEditor({
             )
           ) : null}
           <span className="muted" style={{ fontSize: 11.5 }}>
-            <Trans>Guardar escribe una versión nueva y retira la anterior.</Trans>
+            <Trans>Al editar, la receta anterior se conserva en el historial.</Trans>
           </span>
         </div>
 
-        <CommandNotice command={command} onReload={onSaved} />
+        {!replacement && !saveError ? <CommandNotice command={command} onReload={onSaved} /> : null}
       </section>
     </div>
   );

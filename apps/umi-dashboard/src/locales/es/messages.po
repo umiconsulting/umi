@@ -214,6 +214,10 @@ msgstr "La imagen es demasiado pesada. Prueba con una más simple."
 msgid "No se pudo leer el costo"
 msgstr "No se pudo leer el costo"
 
+#: src/data.jsx
+msgid "No se pudieron cargar todos los productos. Vuelve a intentar."
+msgstr "No se pudieron cargar todos los productos. Vuelve a intentar."
+
 #: src/lib/auth.jsx
 msgid "Credenciales incorrectas"
 msgstr "Credenciales incorrectas"
@@ -3974,6 +3978,7 @@ msgid "Existencia por variante"
 msgstr "Existencia por variante"
 
 #: src/screens/inventory-copy.js
+#: src/screens/recipe-workspace.jsx
 msgid "Ingrediente"
 msgstr "Ingrediente"
 
@@ -4355,7 +4360,6 @@ msgstr "No hay insumos con existencia registrada."
 
 #: src/screens/inventory-costing.jsx
 #: src/screens/inventory-filters.jsx
-#: src/screens/recipe-workspace.jsx
 #: src/screens/variance.jsx
 msgid "Insumo"
 msgstr "Insumo"
@@ -6432,6 +6436,10 @@ msgid "Requiere preparación"
 msgstr "Requiere preparación"
 
 #: src/screens/operations-workspace.jsx
+msgid "Descuenta ingredientes de una receta"
+msgstr "Descuenta ingredientes de una receta"
+
+#: src/screens/operations-workspace.jsx
 msgid "Artículo de inventario"
 msgstr "Artículo de inventario"
 
@@ -6605,7 +6613,6 @@ msgid "UUID de estación"
 msgstr "UUID de estación"
 
 #: src/screens/operations-workspace.jsx
-#: src/screens/recipe-workspace.jsx
 msgid "Objetivo"
 msgstr "Objetivo"
 
@@ -8205,6 +8212,88 @@ msgstr "Abre un recibo para ver la venta con sus conceptos, impuestos y forma de
 #~ msgstr "La explosión baja cada sub-receta hasta el insumo. Un insumo sin recepción no tiene precio, y por eso no se muestra un cero."
 
 #: src/screens/recipe-workspace.jsx
+#~ msgid "Leyendo el costeo del servidor…"
+#~ msgstr "Leyendo el costeo del servidor…"
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Costeo del servidor"
+#~ msgstr "Costeo del servidor"
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Una línea no da unidades completas del insumo. El servidor no publica un costo para esta receta."
+#~ msgstr "Una línea no da unidades completas del insumo. El servidor no publica un costo para esta receta."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Componentes"
+#~ msgstr "Componentes"
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Agregar componente"
+#~ msgstr "Agregar componente"
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Agrega el primer componente para calcular el costo."
+#~ msgstr "Agrega el primer componente para calcular el costo."
+
+#. placeholder {0}: index + 1
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Cantidad del componente {0}"
+#~ msgstr "Cantidad del componente {0}"
+
+#. placeholder {0}: index + 1
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Quitar el componente {0}"
+#~ msgstr "Quitar el componente {0}"
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Sin costo base. Registra una recepción de compra."
+#~ msgstr "Sin costo base. Registra una recepción de compra."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Una cantidad no da unidades completas del artículo. Ajusta el rendimiento o la cantidad. El costo es desconocido, no cero."
+#~ msgstr "Una cantidad no da unidades completas del artículo. Ajusta el rendimiento o la cantidad. El costo es desconocido, no cero."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Falta el costo de estos artículos. El costo es desconocido, no cero."
+#~ msgstr "Falta el costo de estos artículos. El costo es desconocido, no cero."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Agrega un componente para calcular el costo."
+#~ msgstr "Agrega un componente para calcular el costo."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "El costo por unidad usa el precio de compra de cada insumo y se redondea una sola vez. Al guardar, la lista muestra el costo que calculó el servidor."
+#~ msgstr "El costo por unidad usa el precio de compra de cada insumo y se redondea una sola vez. Al guardar, la lista muestra el costo que calculó el servidor."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada insumo."
+#~ msgstr "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada insumo."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Insumo comprado."
+#~ msgstr "Insumo comprado."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "El costo de esta sub-receta aún no se calcula. Revisa los precios de sus insumos."
+#~ msgstr "El costo de esta sub-receta aún no se calcula. Revisa los precios de sus insumos."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Costo por unidad de rendimiento"
+#~ msgstr "Costo por unidad de rendimiento"
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Guardar escribe una versión nueva y retira la anterior."
+#~ msgstr "Guardar escribe una versión nueva y retira la anterior."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "La receta anterior se conserva en el historial."
+#~ msgstr "La receta anterior se conserva en el historial."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "No se pudo guardar la receta."
+#~ msgstr "No se pudo guardar la receta."
+
+#: src/screens/recipe-workspace.jsx
 msgid "Sub-receta"
 msgstr "Sub-receta"
 
@@ -8283,20 +8372,20 @@ msgid "Editar {0}"
 msgstr "Editar {0}"
 
 #: src/screens/recipe-workspace.jsx
-msgid "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada insumo."
-msgstr "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada insumo."
+msgid "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada ingrediente."
+msgstr "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada ingrediente."
 
 #: src/screens/recipe-workspace.jsx
-msgid "Leyendo el costeo del servidor…"
-msgstr "Leyendo el costeo del servidor…"
+msgid "Cargando el costo de ingredientes…"
+msgstr "Cargando el costo de ingredientes…"
 
 #: src/screens/recipe-workspace.jsx
-msgid "Costeo del servidor"
-msgstr "Costeo del servidor"
+msgid "Costo de ingredientes"
+msgstr "Costo de ingredientes"
 
 #: src/screens/recipe-workspace.jsx
-msgid "Una línea no da unidades completas del insumo. El servidor no publica un costo para esta receta."
-msgstr "Una línea no da unidades completas del insumo. El servidor no publica un costo para esta receta."
+msgid "Una cantidad no da unidades completas del ingrediente. Revisa las cantidades para conocer el costo."
+msgstr "Una cantidad no da unidades completas del ingrediente. Revisa las cantidades para conocer el costo."
 
 #: src/screens/recipe-workspace.jsx
 msgid "Exacto"
@@ -8316,8 +8405,32 @@ msgid "El desglose muestra los ingredientes de cada receta. Un ingrediente sin c
 msgstr "El desglose muestra los ingredientes de cada receta. Un ingrediente sin compras registradas aún no tiene precio."
 
 #: src/screens/recipe-workspace.jsx
+msgid "La configuración de inventario cambió. Guarda de nuevo para revisar el estado actual."
+msgstr "La configuración de inventario cambió. Guarda de nuevo para revisar el estado actual."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Este producto o variante ya tiene una receta activa. Cierra este borrador y edita esa receta."
+msgstr "Este producto o variante ya tiene una receta activa. Cierra este borrador y edita esa receta."
+
+#: src/screens/recipe-workspace.jsx
 msgid "Editar receta"
 msgstr "Editar receta"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Receta para"
+msgstr "Receta para"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Al guardar, las próximas ventas descontarán los ingredientes de esta receta."
+msgstr "Al guardar, las próximas ventas descontarán los ingredientes de esta receta."
+
+#: src/screens/recipe-workspace.jsx
+msgid "La receta de una variante tiene prioridad sobre la receta del producto."
+msgstr "La receta de una variante tiene prioridad sobre la receta del producto."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Cargando productos…"
+msgstr "Cargando productos…"
 
 #: src/screens/recipe-workspace.jsx
 msgid "Tipo de objetivo"
@@ -8354,26 +8467,26 @@ msgid "Escribe la vida útil como días completos."
 msgstr "Escribe la vida útil como días completos."
 
 #: src/screens/recipe-workspace.jsx
-msgid "Componentes"
-msgstr "Componentes"
+msgid "Ingredientes"
+msgstr "Ingredientes"
 
 #: src/screens/recipe-workspace.jsx
-msgid "Agregar componente"
-msgstr "Agregar componente"
+msgid "Agregar ingrediente"
+msgstr "Agregar ingrediente"
 
 #: src/screens/recipe-workspace.jsx
-msgid "Agrega el primer componente para calcular el costo."
-msgstr "Agrega el primer componente para calcular el costo."
-
-#. placeholder {0}: index + 1
-#: src/screens/recipe-workspace.jsx
-msgid "Cantidad del componente {0}"
-msgstr "Cantidad del componente {0}"
+msgid "Agrega el primer ingrediente para calcular el costo."
+msgstr "Agrega el primer ingrediente para calcular el costo."
 
 #. placeholder {0}: index + 1
 #: src/screens/recipe-workspace.jsx
-msgid "Quitar el componente {0}"
-msgstr "Quitar el componente {0}"
+msgid "Cantidad del ingrediente {0}"
+msgstr "Cantidad del ingrediente {0}"
+
+#. placeholder {0}: index + 1
+#: src/screens/recipe-workspace.jsx
+msgid "Quitar el ingrediente {0}"
+msgstr "Quitar el ingrediente {0}"
 
 #: src/screens/recipe-workspace.jsx
 msgid "Elige un artículo de tu inventario."
@@ -8385,16 +8498,16 @@ msgid "La cantidad no cabe en la escala del artículo{0}"
 msgstr "La cantidad no cabe en la escala del artículo{0}"
 
 #: src/screens/recipe-workspace.jsx
-msgid "Insumo comprado."
-msgstr "Insumo comprado."
+msgid "Ingrediente comprado."
+msgstr "Ingrediente comprado."
 
 #: src/screens/recipe-workspace.jsx
-msgid "El costo de esta sub-receta aún no se calcula. Revisa los precios de sus insumos."
-msgstr "El costo de esta sub-receta aún no se calcula. Revisa los precios de sus insumos."
+msgid "El costo de esta sub-receta aún no se calcula. Revisa los precios de sus ingredientes."
+msgstr "El costo de esta sub-receta aún no se calcula. Revisa los precios de sus ingredientes."
 
 #: src/screens/recipe-workspace.jsx
-msgid "Sin costo base. Registra una recepción de compra."
-msgstr "Sin costo base. Registra una recepción de compra."
+msgid "Registra una compra para conocer su costo."
+msgstr "Registra una compra para conocer su costo."
 
 #. placeholder {0}: formatMoney(basis)
 #. placeholder {1}: unitOf(item.baseUnit)
@@ -8407,20 +8520,16 @@ msgid "Costo y margen"
 msgstr "Costo y margen"
 
 #: src/screens/recipe-workspace.jsx
-msgid "Costo por unidad de rendimiento"
-msgstr "Costo por unidad de rendimiento"
+msgid "Una cantidad no da unidades completas del artículo. Ajusta el rendimiento o la cantidad. Revisa las cantidades para conocer el costo."
+msgstr "Una cantidad no da unidades completas del artículo. Ajusta el rendimiento o la cantidad. Revisa las cantidades para conocer el costo."
 
 #: src/screens/recipe-workspace.jsx
-msgid "Una cantidad no da unidades completas del artículo. Ajusta el rendimiento o la cantidad. El costo es desconocido, no cero."
-msgstr "Una cantidad no da unidades completas del artículo. Ajusta el rendimiento o la cantidad. El costo es desconocido, no cero."
+msgid "Registra una compra de estos ingredientes para conocer el costo."
+msgstr "Registra una compra de estos ingredientes para conocer el costo."
 
 #: src/screens/recipe-workspace.jsx
-msgid "Falta el costo de estos artículos. El costo es desconocido, no cero."
-msgstr "Falta el costo de estos artículos. El costo es desconocido, no cero."
-
-#: src/screens/recipe-workspace.jsx
-msgid "Agrega un componente para calcular el costo."
-msgstr "Agrega un componente para calcular el costo."
+msgid "Agrega un ingrediente para calcular el costo."
+msgstr "Agrega un ingrediente para calcular el costo."
 
 #: src/screens/recipe-workspace.jsx
 msgid "Una sub-receta no tiene precio de venta, así que no hay margen."
@@ -8440,8 +8549,40 @@ msgid "Costo guardado: {0}. El número de arriba es el cálculo en pantalla."
 msgstr "Costo guardado: {0}. El número de arriba es el cálculo en pantalla."
 
 #: src/screens/recipe-workspace.jsx
-msgid "El costo por unidad usa el precio de compra de cada insumo y se redondea una sola vez. Al guardar, la lista muestra el costo que calculó el servidor."
-msgstr "El costo por unidad usa el precio de compra de cada insumo y se redondea una sola vez. Al guardar, la lista muestra el costo que calculó el servidor."
+msgid "El costo se calcula con las compras registradas de tus ingredientes."
+msgstr "El costo se calcula con las compras registradas de tus ingredientes."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Las ventas descuentan un artículo de inventario."
+msgstr "Las ventas descuentan un artículo de inventario."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Las ventas no descuentan inventario."
+msgstr "Las ventas no descuentan inventario."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Las ventas descuentan ingredientes de otra receta."
+msgstr "Las ventas descuentan ingredientes de otra receta."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Usar esta receta cambiará esa configuración para las próximas ventas."
+msgstr "Usar esta receta cambiará esa configuración para las próximas ventas."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Usar esta receta"
+msgstr "Usar esta receta"
+
+#: src/screens/recipe-workspace.jsx
+msgid "No pudimos confirmar el guardado. Reintenta para consultar el resultado sin cambiar la receta."
+msgstr "No pudimos confirmar el guardado. Reintenta para consultar el resultado sin cambiar la receta."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Reintentar guardado"
+msgstr "Reintentar guardado"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Al retirar esta receta, las próximas ventas necesitarán otra configuración válida de inventario."
+msgstr "Al retirar esta receta, las próximas ventas necesitarán otra configuración válida de inventario."
 
 #: src/screens/recipe-workspace.jsx
 msgid "Confirmar retirada"
@@ -8452,8 +8593,8 @@ msgid "Retirar"
 msgstr "Retirar"
 
 #: src/screens/recipe-workspace.jsx
-msgid "Guardar escribe una versión nueva y retira la anterior."
-msgstr "Guardar escribe una versión nueva y retira la anterior."
+msgid "Al editar, la receta anterior se conserva en el historial."
+msgstr "Al editar, la receta anterior se conserva en el historial."
 
 #: src/screens/reembolsos.jsx
 msgid "Parciales"

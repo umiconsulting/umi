@@ -131,3 +131,8 @@ export function catalogChoicesPayload(variants, optionGroups) {
       })),
   };
 }
+
+/** Send only deliberate edits to the direct inventory link. */
+export function catalogInventoryPatch(value, savedValue) {
+  return value === savedValue ? {} : { inventoryItemId: value || null };
+}

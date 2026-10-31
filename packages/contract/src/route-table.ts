@@ -781,6 +781,27 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
   },
 
   {
+    id: 'inventoryRecipe.targets',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/recipe-targets',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'InventoryRecipeTargetQuery',
+      response: 'InventoryRecipeTargetList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+
+  {
     id: 'inventoryRecipe.list',
     method: 'GET',
     path: '/api/merchants/:merchantId/recipes',
