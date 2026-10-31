@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { itemQuantityDraft, itemQuantityParameters } from './inventory-item-editor-model.js';
+import {
+  itemQuantityDraft,
+  itemQuantityParameters,
+  parseInitialCost,
+  initialCostDraft,
+  initialCostParameters,
+} from './inventory-item-editor-model.js';
 
 describe('item quantities in the item unit', () => {
   it('opens stored quantities as ordinary quantities', () => {
@@ -47,5 +53,48 @@ describe('item quantities in the item unit', () => {
       parQuantity: 3000,
     });
     expect(itemQuantityParameters(draft, 0)).toBeNull();
+  });
+});
+
+describe('initial cost in exact centavos', () => {
+  it.each([
+    ['100.25', 10025],
+    ['100,25', 10025],
+    ['', null],
+    ['  ', null],
+    ['0', 0],
+    ['0.01', 1],
+    ['90071992547409.91', 9007199254740991],
+  ])('parses %s exactly', (text, value) => {
+    expect(parseInitialCost(text)).toEqual({ valid: true, value });
+  });
+  it.each(['-1', '1e3', '1.001', '90071992547409.92', '.', '+1', '1,000.00', 'Infinity'])(
+    'refuses %s',
+    (text) => {
+      expect(parseInitialCost(text)).toEqual({ valid: false, value: null });
+    },
+  );
+  it('opens every saved cent exactly, including the safe boundary', () => {
+    expect(initialCostDraft(null)).toBe('');
+    expect(initialCostDraft(0)).toBe('0.00');
+    expect(initialCostDraft(10025)).toBe('100.25');
+    expect(initialCostDraft(9007199254740991)).toBe('90071992547409.91');
+  });
+  it('creates absent, zero and positive values explicitly', () => {
+    expect(initialCostParameters('', null)).toEqual({ initialUnitCostMinor: null });
+    expect(initialCostParameters('0', null)).toEqual({ initialUnitCostMinor: 0 });
+    expect(initialCostParameters('100,25', null)).toEqual({ initialUnitCostMinor: 10025 });
+  });
+  it('preserves unchanged amounts and sends explicit clear or changes', () => {
+    expect(initialCostParameters('100.25', { initialUnitCostMinor: 10025 })).toEqual({});
+    expect(initialCostParameters('', { initialUnitCostMinor: null })).toEqual({});
+    expect(initialCostParameters('0.00', { initialUnitCostMinor: 0 })).toEqual({});
+    expect(initialCostParameters('', { initialUnitCostMinor: 10025 })).toEqual({
+      initialUnitCostMinor: null,
+    });
+    expect(initialCostParameters('120', { initialUnitCostMinor: 10025 })).toEqual({
+      initialUnitCostMinor: 12000,
+    });
+    expect(initialCostParameters('1.001', { initialUnitCostMinor: 10025 })).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "8b0590414aa86049aefcad7072510722fa2db7fb26d7932961ab3824c91b776d",
-  "contractVersion": "2.48.0",
+  "contentHash": "9a18dcb8a1dada437cdbb0be61e85eefe6fdd5f9ab06efadc3c5117ff990f007",
+  "contractVersion": "2.49.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -24183,6 +24183,7 @@
     "CostBasisKind": {
       "enum": [
         "weighted_average_of_receipts",
+        "manual_initial",
         "no_receipts"
       ],
       "type": "string"
@@ -44667,6 +44668,18 @@
           "format": "uuid",
           "type": "string"
         },
+        "initialUnitCostMinor": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "itemType": {
           "enum": [
             "physical_product",
@@ -44788,6 +44801,7 @@
         "lowStockThreshold",
         "parQuantity",
         "shelfLifeDays",
+        "initialUnitCostMinor",
         "active",
         "version",
         "allergens",
@@ -44889,6 +44903,18 @@
         "idempotencyKey": {
           "format": "uuid",
           "type": "string"
+        },
+        "initialUnitCostMinor": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "itemType": {
           "enum": [
@@ -45142,6 +45168,18 @@
                 "format": "uuid",
                 "type": "string"
               },
+              "initialUnitCostMinor": {
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "itemType": {
                 "enum": [
                   "physical_product",
@@ -45263,6 +45301,7 @@
               "lowStockThreshold",
               "parQuantity",
               "shelfLifeDays",
+              "initialUnitCostMinor",
               "active",
               "version",
               "allergens",
@@ -45381,6 +45420,18 @@
         "idempotencyKey": {
           "format": "uuid",
           "type": "string"
+        },
+        "initialUnitCostMinor": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "inventoryItemId": {
           "format": "uuid",
@@ -45566,6 +45617,7 @@
               "basis": {
                 "enum": [
                   "weighted_average_of_receipts",
+                  "manual_initial",
                   "no_receipts"
                 ],
                 "type": "string"
@@ -47568,6 +47620,7 @@
         "basis": {
           "enum": [
             "weighted_average_of_receipts",
+            "manual_initial",
             "no_receipts"
           ],
           "type": "string"

@@ -6,6 +6,7 @@ import { I } from '@/icons.jsx';
 import { Menu } from '@/components/menu.jsx';
 import { useAdministrativeCommand } from '@/lib/administrative-command.jsx';
 import { conversionSummary, mergeConversions } from './inventory-model.js';
+import { formatMoney } from '@/lib/format.js';
 import { ITEM_TYPE_LABEL, TRACKING_LABEL, UNIT_LABEL } from './inventory-copy.js';
 
 /**
@@ -35,6 +36,10 @@ const NARROW_QUERY = '(max-width: 1023px)';
 
 export default function InventoryItemPanel({
   item,
+  costBasis,
+  costBasisLoading,
+  costBasisError,
+  currency = 'MXN',
   signals,
   unit,
   conversions,
@@ -273,16 +278,75 @@ export default function InventoryItemPanel({
             <Trans>Costo</Trans>
           </span>
         </div>
-        {signals.hasCost ? (
-          <p style={{ margin: 0, fontSize: 13.5 }}>
-            <Trans>El costo viene de las facturas recibidas.</Trans>
+        {item.active === false ? (
+          <>
+            <p style={{ margin: 0, fontSize: 13.5 }}>
+              <Trans>Costo no disponible</Trans>
+            </p>
+            <p className="muted">
+              <Trans>El artículo está archivado. La fuente del costo no está disponible.</Trans>
+            </p>
+            {item.initialUnitCostMinor != null ? (
+              <p className="muted">
+                <Trans>
+                  Costo inicial guardado: {formatMoney(item.initialUnitCostMinor, currency)}{' '}
+                  {currency} / {unit}.
+                </Trans>
+              </p>
+            ) : null}
+          </>
+        ) : costBasisError ? (
+          <p role="alert" className="muted">
+            <Trans>No se pudo leer la base del costo.</Trans>
+          </p>
+        ) : costBasisLoading ? (
+          <p className="muted">
+            <Trans>Cargando el costo…</Trans>
           </p>
         ) : (
-          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-            <Trans>
-              Ningún recibo ha fijado el costo de este artículo. Los márgenes no lo incluyen.
-            </Trans>
-          </p>
+          <>
+            <p style={{ margin: 0, fontSize: 13.5 }}>
+              {costBasis?.basis === 'manual_initial' ? (
+                <Trans>Costo inicial</Trans>
+              ) : costBasis?.basis === 'weighted_average_of_receipts' ? (
+                <Trans>Calculado con compras</Trans>
+              ) : (
+                <Trans>Sin costo</Trans>
+              )}
+            </p>
+            {costBasis?.unitCostMinor != null ? (
+              <p style={{ margin: '6px 0', fontVariantNumeric: 'tabular-nums' }}>
+                {formatMoney(costBasis.unitCostMinor, currency)} {currency} / {unit}
+              </p>
+            ) : (
+              <p className="muted">
+                <Trans>Agrega un costo inicial o registra una compra.</Trans>
+              </p>
+            )}
+            {costBasis?.basis === 'weighted_average_of_receipts' &&
+            item.initialUnitCostMinor != null ? (
+              <>
+                <p className="muted">
+                  <Trans>
+                    Costo inicial guardado: {formatMoney(item.initialUnitCostMinor, currency)}{' '}
+                    {currency} / {unit}.
+                  </Trans>
+                </p>
+                <p className="muted">
+                  <Trans>
+                    Las compras registradas tienen prioridad sobre el costo inicial guardado.
+                  </Trans>
+                </p>
+              </>
+            ) : null}
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onEdit}>
+              {costBasis?.unitCostMinor == null ? (
+                <Trans>Agregar costo</Trans>
+              ) : (
+                <Trans>Editar costo inicial</Trans>
+              )}
+            </button>
+          </>
         )}
       </div>
 

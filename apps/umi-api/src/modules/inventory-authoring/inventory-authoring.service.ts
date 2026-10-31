@@ -522,6 +522,7 @@ export class InventoryAuthoringService {
             actorUserId: user.id,
             publicReference: item.publicReference,
             itemType: item.itemType,
+            initialUnitCostMinor: item.initialUnitCostMinor,
           },
         });
         return item;
@@ -534,7 +535,7 @@ export class InventoryAuthoringService {
     user: AuthUser,
     access: MerchantAccess,
     context: PersistedDashboardAdministrativeCommandContext,
-    dto: InventoryAuthoringItemArchiveRequest,
+    dto: InventoryAuthoringItemUpdateRequest,
   ) {
     const result = await this.run(
       'inventory.item.update',
@@ -553,7 +554,13 @@ export class InventoryAuthoringService {
           entityType: 'inventory_item',
           entityId: item.id,
           outcome: 'success',
-          publicData: { actorUserId: user.id, version: item.version },
+          publicData: {
+            actorUserId: user.id,
+            version: item.version,
+            ...(dto.initialUnitCostMinor !== undefined
+              ? { initialUnitCostMinor: item.initialUnitCostMinor }
+              : {}),
+          },
         });
         return item;
       },
@@ -928,8 +935,7 @@ function encodeCursor(value: Record<string, unknown>): string {
 function unitCostsOf(items: readonly InventoryItemCostBasis[]): Map<string, bigint> {
   const costs = new Map<string, bigint>();
   for (const item of items) {
-    // `basis: no_receipts` carries a null `unitCostMinor`, and null is NOT a zero: an
-    // item nobody delivered has no cost, and the map has no entry for it.
+    // A missing basis remains absent. An explicit zero remains a known cost.
     if (item.unitCostMinor === null) continue;
     costs.set(item.inventoryItemId, BigInt(item.unitCostMinor));
   }

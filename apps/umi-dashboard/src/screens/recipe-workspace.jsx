@@ -367,7 +367,7 @@ export default function RecipeWorkspace() {
           </table>
           <p className="muted" style={{ margin: '8px 0 0', fontSize: 11.5 }}>
             <Trans>
-              El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada
+              El costo es el de una unidad de rendimiento, calculado con el costo de cada
               ingrediente.
             </Trans>
           </p>
@@ -531,7 +531,7 @@ function ExplosionPanel({ state, unitOf }) {
       </div>
       <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
         {i18n._(
-          msg`El desglose muestra los ingredientes de cada receta. Un ingrediente sin compras registradas aún no tiene precio.`,
+          msg`El desglose muestra los ingredientes de cada receta. Agrega un costo inicial o registra una compra para conocer su costo.`,
         )}
       </p>
     </section>
@@ -1133,7 +1133,7 @@ function RecipeEditor({
                                 other="Sub-receta. Se usa en # recetas."
                               />
                             ) : (
-                              <Trans>Ingrediente comprado.</Trans>
+                              <Trans>Ingrediente.</Trans>
                             )}
                           </p>
                           <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
@@ -1143,7 +1143,9 @@ function RecipeEditor({
                                 sus ingredientes.
                               </Trans>
                             ) : basis == null ? (
-                              <Trans>Registra una compra para conocer su costo.</Trans>
+                              <Trans>
+                                Agrega un costo inicial o registra una compra para conocer su costo.
+                              </Trans>
                             ) : (
                               <Trans>
                                 Costo base: {formatMoney(basis)} por {unitOf(item.baseUnit)}.
@@ -1207,7 +1209,9 @@ function RecipeEditor({
             {preview.state === 'no_cost' ? (
               <div style={{ display: 'grid', gap: 4 }}>
                 <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)' }}>
-                  <Trans>Registra una compra de estos ingredientes para conocer el costo.</Trans>
+                  <Trans>
+                    Agrega un costo inicial o registra una compra de estos ingredientes.
+                  </Trans>
                 </p>
                 <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
                   {preview.missingCost.map((inventoryItemId) => (
@@ -1249,7 +1253,9 @@ function RecipeEditor({
             ) : null}
 
             <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
-              <Trans>El costo se calcula con las compras registradas de tus ingredientes.</Trans>
+              <Trans>
+                El costo usa las compras registradas o el costo inicial de tus ingredientes.
+              </Trans>
             </p>
           </section>
         </fieldset>

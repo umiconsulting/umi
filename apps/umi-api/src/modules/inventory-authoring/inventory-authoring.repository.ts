@@ -22,16 +22,12 @@ import type {
 } from '@umi/contract';
 import type { PoolClient } from 'pg';
 import { PgService } from '../../shared/database/pg.service';
+import { toSafeNumber } from '../inventory-costing/inventory-costing-domain';
 
 /**
- * The console's inventory AUTHORING surface, against the real schema (plan §11,
- * phase 1). This file owns the items, their unit conversions and their allergen
- * labels. It writes no ledger row and no cost.
- *
- * WHY THERE IS NO COST COLUMN HERE. The cost basis is the weighted average of
- * receipts (`inventory-costing.ts`), so an item row holds no price. This module
- * therefore writes the model behind that read and never a number of its own — the
- * moment it stored one, the plate cost and the receipt would disagree.
+ * The console owns inventory items, unit conversions, allergen labels, and initial costs.
+ * Initial costs apply only until received purchases supply a weighted average.
+ * These writes preserve the stock ledger.
  *
  * THE VERSION COLUMNS ARE THE CONCURRENCY CONTROL, and the task decides which one
  * each write names:
@@ -192,6 +188,7 @@ type ItemRow = {
   negativeStockPolicy: string;
   lowStockThreshold: string | null;
   parQuantity: string | null;
+  initialUnitCostMinor: string | null;
   shelfLifeDays: number | null;
   active: boolean;
   version: number;
@@ -232,6 +229,7 @@ const ITEM_COLUMNS = `i.id::text AS id,i.public_reference AS "publicReference",
   i.quantity_scale AS "quantityScale",i.tracking_policy AS "trackingPolicy",
   i.negative_stock_policy AS "negativeStockPolicy",
   i.low_stock_threshold::text AS "lowStockThreshold",
+  i.initial_unit_cost_minor::text AS "initialUnitCostMinor",
   i.par_quantity::text AS "parQuantity",i.shelf_life_days AS "shelfLifeDays",
   i.active,i.version`;
 
@@ -316,10 +314,8 @@ export class InventoryAuthoringRepository {
    * The console's item list, each item with its conversions, its labels and its
    * on-hand per location.
    *
-   * `includeItemsWithoutCost` is applied literally, and it defaults to false, the same
-   * default the costing read takes. The console asks for the wider list explicitly,
-   * because an owner who has just created an ingredient must see it and an ingredient
-   * has no receipt until the first delivery arrives.
+   * The default list requires received purchases or a non-null initial amount.
+   * An explicit zero is a known cost. The wider list also includes missing costs.
    */
   listItems(
     merchantId: string,
@@ -332,7 +328,7 @@ export class InventoryAuthoringRepository {
           WHERE i.merchant_id=$1::uuid
             AND ($2::boolean OR i.active)
             AND ($3::text IS NULL OR (i.public_reference,i.id) > ($3::text,$4::uuid))
-            AND ($5::boolean OR EXISTS (
+            AND ($5::boolean OR i.initial_unit_cost_minor IS NOT NULL OR EXISTS (
                   SELECT 1 FROM merchant.purchase_order_receipt_line l
                    WHERE l.merchant_id=i.merchant_id AND l.inventory_item_id=i.id))
           ORDER BY i.public_reference,i.id
@@ -431,8 +427,8 @@ export class InventoryAuthoringRepository {
         `INSERT INTO merchant.inventory_item
            (id,merchant_id,public_reference,display_name,item_type,base_unit,quantity_scale,
             tracking_policy,negative_stock_policy,reservation_required,low_stock_threshold,
-            par_quantity,shelf_life_days)
-         VALUES ($1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+            par_quantity,shelf_life_days,initial_unit_cost_minor)
+         VALUES ($1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [
           itemId,
           merchantId,
@@ -448,6 +444,7 @@ export class InventoryAuthoringRepository {
           dto.lowStockThreshold,
           dto.parQuantity,
           dto.shelfLifeDays,
+          dto.initialUnitCostMinor ?? null,
         ],
       );
     } catch (error) {
@@ -483,6 +480,7 @@ export class InventoryAuthoringRepository {
          low_stock_threshold=CASE WHEN $6::boolean THEN $7::bigint ELSE low_stock_threshold END,
          shelf_life_days=CASE WHEN $8::boolean THEN $9::integer ELSE shelf_life_days END,
          par_quantity=CASE WHEN $10::boolean THEN $11::bigint ELSE par_quantity END,
+         initial_unit_cost_minor=CASE WHEN $12::boolean THEN $13::bigint ELSE initial_unit_cost_minor END,
          reservation_required=coalesce($4::text,tracking_policy) <> 'not_tracked',
          version=version+1
        WHERE merchant_id=$1::uuid AND id=$2::uuid`,
@@ -498,6 +496,8 @@ export class InventoryAuthoringRepository {
         dto.shelfLifeDays ?? null,
         dto.parQuantity !== undefined,
         dto.parQuantity ?? null,
+        dto.initialUnitCostMinor !== undefined,
+        dto.initialUnitCostMinor ?? null,
       ],
     );
     return this.loadItem(client, merchantId, itemId, true);
@@ -1487,6 +1487,8 @@ export class InventoryAuthoringRepository {
       // PAR is not the low-stock threshold: it is the level the kitchen wants on hand,
       // and the prep list is what subtracts from it (plan §8.4).
       parQuantity: row.parQuantity === null ? null : Number(row.parQuantity),
+      initialUnitCostMinor:
+        row.initialUnitCostMinor === null ? null : toSafeNumber(BigInt(row.initialUnitCostMinor)),
       shelfLifeDays: row.shelfLifeDays,
       active: row.active,
       version: row.version,

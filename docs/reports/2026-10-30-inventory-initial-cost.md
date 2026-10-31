@@ -1,0 +1,59 @@
+# Costo inicial de inventario — 2026-10-30
+
+El formulario de artículos permite guardar un costo inicial por unidad. El campo muestra la moneda del negocio y admite cero explícito.
+
+El panel y el reporte distinguen `Costo inicial`, `Calculado con compras` y `Sin costo`. Las compras recibidas tienen prioridad. El panel conserva visible el costo inicial guardado cuando las compras fijan el costo activo.
+
+`Agregar costo` abre el editor del artículo. Las recetas permiten un costo inicial o una compra registrada. Los cambios ajenos conservan el costo; borrar el campo lo elimina.
+
+## Verificación
+
+- Dinero exacto: 18 casos nuevos fallaron antes de la implementación; después pasaron las 29 pruebas del modelo.
+- Dashboard: 445 pruebas correctas en 36 archivos.
+- Chromium real: regresión e2e completa correcta, con clics y lecturas persistidas de la API aislada.
+- Creación a 100.00/kg, edición a 120.00/kg, cancelación, campo vacío, cero y valores inválidos verificados.
+- Un cambio ajeno conserva el costo. Un reintento tras una respuesta perdida conserva el borrador y la identidad del comando.
+- Receta de 1.25 kg: 125.00 con costo inicial de 100.00; 150.00 tras cambiarlo a 120.00.
+- Compras recibidas: 1 kg a 140.00 y 3 kg a 100.00. Costo activo: 110.00/kg. Receta: 137.50.
+- El costo inicial conserva las existencias. Las dos recepciones reales registran 4 kg.
+- Un fallo al consultar la fuente muestra el error y conserva la distinción con un artículo sin costo.
+- Lingui: extracción y compilación estricta correctas. Build correcto. Lint: cero errores y 68 avisos previos.
+- Backend, según la verificación del controlador: 346 pruebas correctas y dos exclusiones previas. Migración aplicada de nuevo correctamente.
+
+Se inspeccionaron las capturas de escritorio y móvil. El campo conserva su unidad y moneda. Guardar y Cancelar son accesibles con desplazamiento. El diálogo no presenta desbordamiento horizontal.
+
+El controlador ejecutó `check:pr` contra `origin/feat/inventory-phase2-recipes`. Pasaron las comprobaciones y las ocho tareas de compilación, lint y pruebas afectadas. La API pasó 2120 pruebas, con 29 exclusiones previas. Pasaron los tipos de API y contrato.
+
+La migración conservó 94 artículos existentes con costo inicial vacío y 76 saldos sin cambios. Se verificó una instalación desde cero y la aplicación repetida sobre datos de prueba.
+
+## Compatibilidad y límites
+
+El SDK de Dart distingue ahora un campo omitido de un valor nulo explícito. Así, editar otro dato conserva el costo. Las pruebas ejecutables verifican conservar, borrar, cero y un importe positivo contra el contrato y comandos reales.
+
+La corrección del generador afecta 189 campos opcionales que admiten nulo, en 88 clases. Los campos conservan sus tipos. Los parámetros escalares usan `Object?` y validan el tipo al construir el objeto. Los parámetros de colecciones conservan sus tipos, incluidos literales vacíos y constructores constantes. Pasaron 104 pruebas de contrato, el análisis de Dart y la comprobación de generación.
+
+Los costos históricos diarios mantienen su criterio previo de costo actual. Las versiones guardadas de recetas conservan sus importes. Las pruebas locales verifican el backend y el dashboard; no prueban la interacción del POS nativo. La consulta previa de SQL conserva 15 sentencias fuera de su cobertura.
+
+## Evidencia
+
+- [Formulario de escritorio](evidence/2026-10-30-inventory-initial-cost/initial-cost-create-desktop.png).
+- [Costo activo y costo inicial guardado](evidence/2026-10-30-inventory-initial-cost/initial-cost-source-desktop.png).
+- [Campo en móvil](evidence/2026-10-30-inventory-initial-cost/initial-cost-field-390.png).
+- [Guardar y Cancelar en móvil](evidence/2026-10-30-inventory-initial-cost/initial-cost-controls-390.png).
+- [Reporte de fuentes](evidence/2026-10-30-inventory-initial-cost/initial-cost-report-desktop.png).
+
+Herramientas: Node 22.23.3, pnpm 10.29.3, Vitest 2.1.9, Playwright 1.62.1, Vite 5.4.21 y Lingui 6.6.0. Se usaron las herramientas existentes del repositorio y el procedimiento de `docs/development/LOCAL_VERIFICATION_PLAYBOOK.md`.
+
+El build conserva el aviso previo de paquetes mayores de 500 kB. Las pruebas de sesión emiten sus mensajes esperados de fallos simulados. La publicación y la aprobación del PR quedan pendientes del controlador.
+
+## Corrección final: artículos archivados
+
+El panel muestra `Costo no disponible` cuando el artículo está archivado. Explica que la fuente no está disponible y conserva el costo inicial con la etiqueta `Costo inicial guardado`, incluido cero.
+
+La regresión real falló antes del cambio y pasó después. Archivó mediante el editor un artículo con dos compras y costo inicial de 120.00/kg. La API conservó 12000 centavos. Otro artículo archivado conservó cero. Ambos quedaron fuera de la lectura existente de fuentes, como establece la API.
+
+El panel ya no presenta `Sin costo` ni ofrece `Agregar costo` para esos artículos. La corrección conserva las consultas y los cálculos existentes.
+
+La regresión enfocada pasó en 1.2 segundos. La suite del dashboard conservó sus 445 pruebas correctas. Lingui y build pasaron; lint mantuvo cero errores y 68 avisos previos.
+
+Se inspeccionaron las capturas del [artículo con compras](evidence/2026-10-30-inventory-initial-cost/initial-cost-archived-purchases.png) y del [costo inicial cero](evidence/2026-10-30-inventory-initial-cost/initial-cost-archived-zero.png).
