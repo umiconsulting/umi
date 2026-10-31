@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { Select } from '@/components/select.jsx';
@@ -635,7 +636,7 @@ export function ItemEditor({
     await onSaved();
   }
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" role="presentation">
       <section
         className="card modal-card inventory-item-editor"
@@ -937,6 +938,7 @@ export function ItemEditor({
           suppress={Boolean(referenceError)}
         />
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

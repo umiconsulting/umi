@@ -277,7 +277,7 @@ export default function InventoryWorkspace() {
         (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        setPaletteOpen(true);
+        if (!editor) setPaletteOpen(true);
         return;
       }
       /**
@@ -451,6 +451,7 @@ export default function InventoryWorkspace() {
       <div className="inv-split" data-panel={panelItem ? 'open' : 'closed'}>
         <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
           <div
+            className="inv-toolbar"
             style={{
               display: 'flex',
               gap: 12,
@@ -474,11 +475,10 @@ export default function InventoryWorkspace() {
                 </button>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="inv-toolbar-actions">
               <input
                 ref={searchRef}
                 className="input"
-                style={{ width: 220 }}
                 value={query}
                 placeholder={t`Buscar artículo`}
                 aria-label={t`Buscar artículo`}
