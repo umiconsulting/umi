@@ -355,3 +355,22 @@ export function recipeComponentFromDraft(line, item) {
     required: line.required !== false,
   };
 }
+
+/** Capture the draft that the owner must confirm after a sales conflict. */
+export function recipeReplacementConfirmation(error, request) {
+  if (error?.code !== 'INVENTORY_RECIPE_MAPPING_CONFLICT') return null;
+  const payload = error.details?.error || error.details;
+  const details = payload?.details || payload || {};
+  const valid =
+    typeof details.mappingId === 'string' &&
+    details.mappingId.length > 0 &&
+    Number.isSafeInteger(details.mappingVersion) &&
+    details.mappingVersion > 0;
+  return {
+    request: structuredClone(request),
+    replacement: valid
+      ? { mappingId: details.mappingId, expectedVersion: details.mappingVersion }
+      : null,
+    mappingType: details.mappingType || null,
+  };
+}

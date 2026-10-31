@@ -187,7 +187,7 @@ import type { ZodTypeAny } from 'zod';
 /**
  * 2.46.0 — kitchen snapshots expose the normalized order fulfillment type.
  */
-export const CONTRACT_VERSION = '2.47.0';
+export const CONTRACT_VERSION = '2.48.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;

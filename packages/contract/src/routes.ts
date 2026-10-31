@@ -292,6 +292,8 @@ export const routes = {
     unitConversions: (merchantId: string): string =>
       buildPath('inventoryUnitConversion.list', { merchantId }),
     allergens: (merchantId: string): string => buildPath('inventoryAllergen.list', { merchantId }),
+    recipeTargets: (merchantId: string): string =>
+      buildPath('inventoryRecipe.targets', { merchantId }),
     recipes: (merchantId: string): string => buildPath('inventoryRecipe.list', { merchantId }),
     recipeExplosion: (merchantId: string, recipeId: string): string =>
       buildPath('inventoryRecipe.explode', { merchantId, recipeId }),

@@ -659,9 +659,30 @@ export class PosCheckoutRepository {
     };
   }
 
+  private async lockInventoryProducts(client: PoolClient, cart: CheckoutCart): Promise<void> {
+    // The caller locks the cart first. Product order is stable across overlapping carts.
+    // Shared locks keep approval and capture consistent with exclusive mapping writers.
+    await client.query(
+      `SELECT id FROM merchant.product
+        WHERE merchant_id=$1::uuid AND id=ANY($2::uuid[])
+        ORDER BY id FOR SHARE`,
+      [cart.merchantId, [...new Set(cart.lines.map((line) => line.productId))]],
+    );
+  }
+
   async negativeStockApprovalRequired(client: PoolClient, cart: CheckoutCart): Promise<boolean> {
+    await this.lockInventoryProducts(client, cart);
     const result = await client.query<{ required: boolean }>(
-      `WITH chosen_mapping AS (
+      `WITH captured_reservation AS (
+         SELECT id FROM merchant.inventory_reservation
+          WHERE cart_id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+            AND status='active' AND expires_at>clock_timestamp() AND cart_version=$4
+       ), captured AS (
+         SELECT l.inventory_item_id,sum(l.required_quantity) AS quantity
+           FROM merchant.inventory_reservation_line l
+           JOIN captured_reservation r ON r.id=l.reservation_id
+          GROUP BY l.inventory_item_id
+       ), chosen_mapping AS (
          SELECT l.id AS sale_line_id,l.quantity,selected.*
            FROM merchant.pos_cart_line l
            JOIN LATERAL (
@@ -672,6 +693,7 @@ export class PosCheckoutRepository {
               ORDER BY (candidate.variant_id=l.variant_id) DESC NULLS LAST LIMIT 1
            ) selected ON true
           WHERE l.cart_id=$1::uuid AND l.merchant_id=$2::uuid
+            AND NOT EXISTS (SELECT 1 FROM captured_reservation)
        ), direct AS (
          SELECT m.inventory_item_id,m.quantity::numeric*m.conversion_numerator/
                 m.conversion_denominator AS required
@@ -692,17 +714,19 @@ export class PosCheckoutRepository {
             AND (rc.modifier_id IS NULL OR lm.id IS NOT NULL)
        ), required AS (
          SELECT inventory_item_id,sum(required) AS quantity
-           FROM (SELECT * FROM direct UNION ALL SELECT * FROM recipe) source
+           FROM (SELECT * FROM direct UNION ALL SELECT * FROM recipe
+                 UNION ALL SELECT inventory_item_id,quantity FROM captured) source
           GROUP BY inventory_item_id
        )
        SELECT coalesce(bool_or(i.negative_stock_policy='manager_override'
-                AND coalesce(b.available,0)<ceil(required.quantity)),false) AS required
+                AND coalesce(b.available,0)+coalesce(captured.quantity,0)<ceil(required.quantity)),false) AS required
          FROM required
          JOIN merchant.inventory_item i ON i.id=required.inventory_item_id
          JOIN merchant.inventory_policy p ON p.merchant_id=$2::uuid AND p.location_id=$3::uuid
          LEFT JOIN merchant.stock_balance b ON b.inventory_location_id=p.inventory_location_id
-          AND b.inventory_item_id=required.inventory_item_id`,
-      [cart.id, cart.merchantId, cart.locationId],
+          AND b.inventory_item_id=required.inventory_item_id
+         LEFT JOIN captured ON captured.inventory_item_id=required.inventory_item_id`,
+      [cart.id, cart.merchantId, cart.locationId, cart.version],
     );
     return result.rows[0]?.required ?? false;
   }
@@ -773,6 +797,7 @@ export class PosCheckoutRepository {
     correlationId: string,
     negativeStockApprovalId: string | null,
   ): Promise<InventoryReservation> {
+    await this.lockInventoryProducts(client, cart);
     await client.query(`SELECT merchant.expire_inventory_reservations($1::uuid,$2::uuid)`, [
       cart.merchantId,
       cart.locationId,
@@ -781,6 +806,7 @@ export class PosCheckoutRepository {
       id: string;
       status: InventoryReservation['status'];
       expiresAt: string;
+      cartVersion: number;
     }>(
       `INSERT INTO merchant.inventory_reservation
          (merchant_id,location_id,cart_id,status,cart_version,line_snapshot,expires_at)
@@ -789,11 +815,24 @@ export class PosCheckoutRepository {
          status=CASE WHEN merchant.inventory_reservation.status IN ('released','expired')
                      THEN 'reserved' ELSE merchant.inventory_reservation.status END,
          line_snapshot=excluded.line_snapshot,expires_at=excluded.expires_at,updated_at=now()
-       RETURNING id::text,status,expires_at::text AS "expiresAt"`,
+       RETURNING id::text,status,expires_at::text AS "expiresAt",cart_version AS "cartVersion"`,
       [cart.merchantId, cart.locationId, cart.id, cart.version, JSON.stringify(lineSnapshot)],
     );
     const reservation = rows[0];
     if (!reservation) throw new Error('RESERVATION_CONFLICT');
+    if (reservation.status === 'active') {
+      if (reservation.cartVersion !== cart.version) {
+        throw new ConflictException({ code: 'RESERVATION_VERSION_CHANGED' });
+      }
+      // An active reservation already holds its quantities and recipe identities.
+      // A later catalog edit must not append a second set of reservation lines.
+      return {
+        id: reservation.id,
+        status: reservation.status,
+        expiresAt: reservation.expiresAt,
+        lineCount: cart.lines.length,
+      };
+    }
     const policy = await client.query<{ inventoryLocationId: string }>(
       `SELECT inventory_location_id::text AS "inventoryLocationId"
          FROM merchant.inventory_policy
@@ -982,7 +1021,9 @@ export class PosCheckoutRepository {
       reservation.status = 'active';
     }
     return {
-      ...reservation,
+      id: reservation.id,
+      status: reservation.status,
+      expiresAt: reservation.expiresAt,
       lineCount: cart.lines.length,
     };
   }

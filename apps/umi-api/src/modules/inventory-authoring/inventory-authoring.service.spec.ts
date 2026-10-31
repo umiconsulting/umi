@@ -9,6 +9,8 @@ import {
   InventoryRecipeCreateRequest,
   InventoryRecipeList,
   InventoryRecipeQuery,
+  InventoryRecipeTargetQuery,
+  InventoryRecipeTargetList,
 } from '@umi/contract';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import type { PersistedDashboardAdministrativeCommandContext } from '../administrative-commands/administrative-command-context.service';
@@ -107,6 +109,7 @@ function serviceFixture(
     listItems: vi.fn().mockResolvedValue({ rows: [item], hasMore: false }),
     listAllergens: vi.fn().mockResolvedValue({ rows: [], hasMore: false }),
     listRecipes: vi.fn().mockResolvedValue({ rows: [], hasMore: false }),
+    listRecipeTargets: vi.fn().mockResolvedValue({ rows: [], hasMore: false }),
     readRecipeHeader: vi.fn().mockResolvedValue(null),
     explodeRecipe: vi.fn().mockResolvedValue([]),
     createRecipe: vi.fn(),
@@ -212,6 +215,77 @@ describe('inventory authoring service', () => {
     await expect(
       service.items(access, InventoryAuthoringItemQuery.parse({ cursor: forged })),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('refuses malformed target cursor keys before the repository receives them', async () => {
+    const { service } = serviceFixture();
+    for (const value of [
+      'invalid',
+      Buffer.from(JSON.stringify({ productId: id(3), targetId: 'invalid' })).toString('base64url'),
+    ]) {
+      await expect(
+        service.recipeTargets(access, InventoryRecipeTargetQuery.parse({ cursor: value })),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    }
+  });
+
+  it('gives the base target and a nil UUID variant different page cursors', async () => {
+    const { service, repository } = serviceFixture();
+    const target = {
+      productId: id(6),
+      productName: 'Café',
+      productActive: true,
+      variantId: null,
+      variantName: null,
+      priceMinor: 2500,
+    };
+    const read = repository.listRecipeTargets as ReturnType<typeof vi.fn>;
+    read.mockResolvedValueOnce({ rows: [target], hasMore: true });
+    read.mockResolvedValueOnce({
+      rows: [
+        { ...target, variantId: '00000000-0000-0000-0000-000000000000', variantName: 'Grande' },
+      ],
+      hasMore: true,
+    });
+    const base = await service.recipeTargets(
+      access,
+      InventoryRecipeTargetQuery.parse({ limit: 1 }),
+    );
+    const variant = await service.recipeTargets(
+      access,
+      InventoryRecipeTargetQuery.parse({ limit: 1 }),
+    );
+    expect(base.page.nextCursor).not.toBe(variant.page.nextCursor);
+  });
+
+  it('returns a target page and continues from its base target key', async () => {
+    const { service, repository } = serviceFixture();
+    (repository.listRecipeTargets as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      rows: [
+        {
+          productId: id(6),
+          productName: 'Café',
+          productActive: true,
+          variantId: null,
+          variantName: null,
+          priceMinor: 2500,
+        },
+      ],
+      hasMore: true,
+    });
+    const first = InventoryRecipeTargetList.parse(
+      await service.recipeTargets(access, InventoryRecipeTargetQuery.parse({ limit: 1 })),
+    );
+    expect(first.targets[0].priceMinor).toBe(2500);
+    const second = await service.recipeTargets(
+      access,
+      InventoryRecipeTargetQuery.parse({ limit: 1, cursor: first.page.nextCursor }),
+    );
+    expect(repository.listRecipeTargets).toHaveBeenLastCalledWith(id(3), expect.anything(), {
+      productId: id(6),
+      targetId: '0',
+    });
+    expect(second.page).toEqual({ limit: 1, hasMore: false, nextCursor: null });
   });
 
   it('answers the item list as a contract-shaped page', async () => {

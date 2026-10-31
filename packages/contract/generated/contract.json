@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "8e63c2e81825b513a99f6b4ef3a472093b6ecb676e28d0ed567d2f12f4d56635",
-  "contractVersion": "2.47.0",
+  "contentHash": "8b0590414aa86049aefcad7072510722fa2db7fb26d7932961ab3824c91b776d",
+  "contractVersion": "2.48.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -892,6 +892,7 @@
             "INVENTORY_ITEM_REFERENCE_TAKEN",
             "INVENTORY_UNIT_CONVERSION_INVALID",
             "INVENTORY_RECIPE_NOT_FOUND",
+            "INVENTORY_RECIPE_MAPPING_CONFLICT",
             "INVENTORY_RECIPE_CYCLE",
             "INVENTORY_RECIPE_TOO_DEEP",
             "INVENTORY_RECIPE_TARGET_INVALID",
@@ -1119,6 +1120,7 @@
                 "INVENTORY_ITEM_REFERENCE_TAKEN",
                 "INVENTORY_UNIT_CONVERSION_INVALID",
                 "INVENTORY_RECIPE_NOT_FOUND",
+                "INVENTORY_RECIPE_MAPPING_CONFLICT",
                 "INVENTORY_RECIPE_CYCLE",
                 "INVENTORY_RECIPE_TOO_DEEP",
                 "INVENTORY_RECIPE_TARGET_INVALID",
@@ -51336,6 +51338,24 @@
           "format": "uuid",
           "type": "string"
         },
+        "replaceSalesMapping": {
+          "additionalProperties": false,
+          "properties": {
+            "expectedVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "mappingId": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "mappingId",
+            "expectedVersion"
+          ],
+          "type": "object"
+        },
         "shelfLifeDays": {
           "maximum": 3650,
           "minimum": 0,
@@ -52051,12 +52071,201 @@
       ],
       "type": "object"
     },
+    "InventoryRecipeTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "priceMinor": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "productActive": {
+          "type": "boolean"
+        },
+        "productId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "productName": {
+          "maxLength": 240,
+          "minLength": 1,
+          "type": "string"
+        },
+        "variantId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "variantName": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "productId",
+        "productName",
+        "productActive",
+        "variantId",
+        "variantName",
+        "priceMinor"
+      ],
+      "type": "object"
+    },
     "InventoryRecipeTargetKind": {
       "enum": [
         "product",
         "item"
       ],
       "type": "string"
+    },
+    "InventoryRecipeTargetList": {
+      "additionalProperties": false,
+      "properties": {
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "page": {
+          "additionalProperties": false,
+          "properties": {
+            "hasMore": {
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "nextCursor": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "limit",
+            "hasMore",
+            "nextCursor"
+          ],
+          "type": "object"
+        },
+        "targets": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "priceMinor": {
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "productActive": {
+                "type": "boolean"
+              },
+              "productId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "productName": {
+                "maxLength": 240,
+                "minLength": 1,
+                "type": "string"
+              },
+              "variantId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "variantName": {
+                "anyOf": [
+                  {
+                    "maxLength": 240,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "productId",
+              "productName",
+              "productActive",
+              "variantId",
+              "variantName",
+              "priceMinor"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        }
+      },
+      "required": [
+        "targets",
+        "page",
+        "correlationId"
+      ],
+      "type": "object"
+    },
+    "InventoryRecipeTargetQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 100,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
     },
     "InventoryRecipeUpdateRequest": {
       "additionalProperties": false,
@@ -52155,6 +52364,24 @@
         "recipeId": {
           "format": "uuid",
           "type": "string"
+        },
+        "replaceSalesMapping": {
+          "additionalProperties": false,
+          "properties": {
+            "expectedVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "mappingId": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "mappingId",
+            "expectedVersion"
+          ],
+          "type": "object"
         },
         "shelfLifeDays": {
           "anyOf": [
@@ -104901,6 +105128,10 @@
       "public": true,
       "retryable": false
     },
+    "INVENTORY_RECIPE_MAPPING_CONFLICT": {
+      "public": true,
+      "retryable": false
+    },
     "INVENTORY_RECIPE_NOT_FOUND": {
       "public": true,
       "retryable": false
@@ -105667,6 +105898,22 @@
       "pin": false,
       "request": "PurchaseOrderScopeQuery",
       "response": "PurchaseOrder"
+    },
+    "GET /api/merchants/:merchantId/recipe-targets": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "VALIDATION_FAILED"
+      ],
+      "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "merchant.manage",
+      "pin": false,
+      "request": "InventoryRecipeTargetQuery",
+      "response": "InventoryRecipeTargetList"
     },
     "GET /api/merchants/:merchantId/recipes": {
       "approval": false,
