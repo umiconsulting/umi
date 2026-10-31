@@ -77,7 +77,7 @@ const NEED_COPY = {
 const NEED_LABEL = {
   count: msg`Contar`,
   review_stock: msg`Revisar`,
-  set_cost: msg`Poner costo`,
+  set_cost: msg`Ver costos`,
   enable_tracking: msg`Activar conteo`,
 };
 

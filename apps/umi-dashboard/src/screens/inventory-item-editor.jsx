@@ -23,9 +23,10 @@ import {
   activeConversionFor,
   allergenCodeValid,
   conversionRatio,
-  conversionSummary,
   mergeConversions,
 } from './inventory-model.js';
+import { itemQuantityDraft, itemQuantityParameters } from './inventory-item-editor-model.js';
+import './inventory-item-editor.css';
 
 /** The one-line command failure notice. A component, so it stays in this file. */
 function CommandNotice({ command, copy, suppress = false }) {
@@ -271,7 +272,9 @@ function ConversionsEditor({ item, flatConversions, onSaved }) {
     roundingPolicy,
   };
   const ratio = conversionRatio(draft);
-  const preview = conversionSummary(draft, unitOf);
+  const equivalence = (conversion) =>
+    `${conversion.denominator} ${unitOf(conversion.fromUnit)} = ${conversion.numerator} ${unitOf(conversion.toUnit)}`;
+  const preview = ratio ? equivalence(draft) : null;
   const blocked = !ratio || (!ratio.divides && roundingPolicy === 'exact');
 
   function edit(conversion) {
@@ -305,8 +308,8 @@ function ConversionsEditor({ item, flatConversions, onSaved }) {
       </h4>
       <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
         <Trans>
-          Convierte la unidad de compra a la unidad base del artículo. Un gramo a kilogramo se
-          escribe 1 y 1000, con escala 3.
+          Escribe dos cantidades equivalentes. Por ejemplo: 1000 g = 1 kg. Usa números enteros
+          mayores que cero.
         </Trans>
       </p>
       {conversions.length === 0 ? (
@@ -320,9 +323,7 @@ function ConversionsEditor({ item, flatConversions, onSaved }) {
               key={conversion.id}
               style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
             >
-              <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                {conversionSummary(conversion, unitOf) || conversion.id}
-              </span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{equivalence(conversion)}</span>
               <span className="sub-pill">{i18n._(ROUNDING_LABEL[conversion.roundingPolicy])}</span>
               <button
                 className="btn-icon"
@@ -336,48 +337,66 @@ function ConversionsEditor({ item, flatConversions, onSaved }) {
           ))}
         </div>
       )}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-          <Trans>Unidad origen</Trans>
-          <Select value={fromUnit} onChange={(event) => setFromUnit(event.target.value)}>
-            {UNIT_ORDER.map((unit) => (
-              <option key={unit} value={unit}>
-                {unitOf(unit)}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-          <Trans>Unidad destino</Trans>
-          <Select value={toUnit} onChange={(event) => setToUnit(event.target.value)}>
-            {UNIT_ORDER.map((unit) => (
-              <option key={unit} value={unit}>
-                {unitOf(unit)}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <label style={{ display: 'grid', gap: 4, fontSize: 12, width: 110 }}>
-          <Trans>Numerador</Trans>
-          <input
-            className="input"
-            inputMode="numeric"
-            value={numerator}
-            onChange={(event) => setNumerator(event.target.value)}
-          />
-        </label>
-        <label style={{ display: 'grid', gap: 4, fontSize: 12, width: 110 }}>
-          <Trans>Denominador</Trans>
-          <input
-            className="input"
-            inputMode="numeric"
-            value={denominator}
-            onChange={(event) => setDenominator(event.target.value)}
-          />
-        </label>
-        <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+      <div className="inventory-conversion-equation">
+        <div className="inventory-conversion-group">
+          <label>
+            <Trans>Cantidad de compra</Trans>
+            <input
+              className="input"
+              inputMode="numeric"
+              value={denominator}
+              onChange={(event) => setDenominator(event.target.value)}
+            />
+          </label>
+          <label>
+            <Trans>Unidad de compra</Trans>
+            <Select
+              className="select"
+              value={fromUnit}
+              onChange={(event) => setFromUnit(event.target.value)}
+            >
+              {UNIT_ORDER.map((unit) => (
+                <option key={unit} value={unit}>
+                  {unitOf(unit)}
+                </option>
+              ))}
+            </Select>
+          </label>
+        </div>
+        <span className="inventory-conversion-equals" aria-hidden="true">
+          =
+        </span>
+        <div className="inventory-conversion-group">
+          <label>
+            <Trans>Equivale a</Trans>
+            <input
+              className="input"
+              inputMode="numeric"
+              value={numerator}
+              onChange={(event) => setNumerator(event.target.value)}
+            />
+          </label>
+          <label>
+            <Trans>Unidad de inventario</Trans>
+            <Select
+              className="select"
+              value={toUnit}
+              onChange={(event) => setToUnit(event.target.value)}
+            >
+              {UNIT_ORDER.map((unit) => (
+                <option key={unit} value={unit}>
+                  {unitOf(unit)}
+                </option>
+              ))}
+            </Select>
+          </label>
+        </div>
+      </div>
+      <div className="inventory-conversion-rounding">
+        <label>
           <Trans>Redondeo</Trans>
           <Select
+            className="select"
             value={roundingPolicy}
             onChange={(event) => setRoundingPolicy(event.target.value)}
           >
@@ -389,14 +408,11 @@ function ConversionsEditor({ item, flatConversions, onSaved }) {
           </Select>
         </label>
       </div>
-      <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-        <Trans>Escala del artículo: {item.quantityScale} decimales.</Trans>
-      </p>
       {preview ? (
         <p style={{ margin: 0, fontSize: 12.5 }}>{preview}</p>
       ) : (
         <p style={{ margin: 0, fontSize: 12.5, color: 'var(--danger)' }}>
-          <Trans>Escribe el numerador y el denominador como enteros positivos.</Trans>
+          <Trans>Escribe dos cantidades enteras mayores que cero.</Trans>
         </p>
       )}
       {ratio ? (
@@ -408,11 +424,10 @@ function ConversionsEditor({ item, flatConversions, onSaved }) {
           }}
         >
           {ratio.divides ? (
-            <Trans>La conversión da unidades completas a esta escala.</Trans>
+            <Trans>No hace falta redondear.</Trans>
           ) : (
             <Trans>
-              Las unidades no se dividen exactamente a esta escala. Elige redondear hacia abajo,
-              hacia arriba o al más cercano.
+              Convertir 1 {unitOf(fromUnit)} requiere más decimales. Elige cómo redondear.
             </Trans>
           )}
         </p>
@@ -428,7 +443,7 @@ function ConversionsEditor({ item, flatConversions, onSaved }) {
         </button>
         {blocked && ratio ? (
           <span className="muted" style={{ fontSize: 12 }}>
-            <Trans>Elige una política de redondeo para guardar.</Trans>
+            <Trans>Elige cómo redondear para guardar.</Trans>
           </span>
         ) : null}
       </div>
@@ -476,7 +491,9 @@ function ItemAllergensEditor({ item, allergens, onSaved }) {
         <Trans>Alérgenos</Trans>
       </h4>
       <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
-        <Trans>El set completo se guarda. Si quitas todas, el artículo queda sin alérgenos.</Trans>
+        <Trans>
+          Selecciona los alérgenos del artículo. Quita todas las etiquetas si no tiene alérgenos.
+        </Trans>
       </p>
       {options.length === 0 ? (
         <p className="muted" style={{ margin: 0 }}>
@@ -531,33 +548,35 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
     item?.negativeStockPolicy || 'block',
   );
   const [lowStockThreshold, setLowStockThreshold] = useState(
-    item?.lowStockThreshold == null ? '' : String(item.lowStockThreshold),
+    () => itemQuantityDraft(item).lowStockThreshold,
   );
   const [shelfLifeDays, setShelfLifeDays] = useState(
     item?.shelfLifeDays == null ? '' : String(item.shelfLifeDays),
   );
   // PAR is what the kitchen wants on hand. It is not the low-stock threshold: that one
   // is a purchase alarm, this one is what the prep list subtracts from (§8.4).
-  const [parQuantity, setParQuantity] = useState(
-    item?.parQuantity == null ? '' : String(item.parQuantity),
-  );
+  const [parQuantity, setParQuantity] = useState(() => itemQuantityDraft(item).parQuantity);
   const [referenceError, setReferenceError] = useState(null);
   const [confirmArchive, setConfirmArchive] = useState(false);
 
   const unitOf = (unit) => (UNIT_LABEL[unit] ? i18n._(UNIT_LABEL[unit]) : unit);
   const referenceValid = /^[A-Za-z0-9._:-]{1,80}$/.test(publicReference.trim());
+  const quantityParameters = itemQuantityParameters(
+    { lowStockThreshold, parQuantity },
+    quantityScale,
+  );
+  const thresholdValid = itemQuantityParameters({ lowStockThreshold }, quantityScale) !== null;
+  const parValid = itemQuantityParameters({ parQuantity }, quantityScale) !== null;
 
   async function save() {
     setReferenceError(null);
-    const optionalThreshold = lowStockThreshold === '' ? null : Number(lowStockThreshold);
+    if (!quantityParameters) return;
     const optionalShelfLife = shelfLifeDays === '' ? null : Number(shelfLifeDays);
-    const optionalPar = parQuantity === '' ? null : Number(parQuantity);
     const parameters = editing
       ? {
           displayName: displayName.trim(),
-          lowStockThreshold: optionalThreshold,
+          ...quantityParameters,
           shelfLifeDays: optionalShelfLife,
-          parQuantity: optionalPar,
           trackingPolicy,
           negativeStockPolicy,
         }
@@ -569,9 +588,8 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
           quantityScale: Number(quantityScale),
           trackingPolicy,
           negativeStockPolicy,
-          lowStockThreshold: optionalThreshold,
+          ...quantityParameters,
           shelfLifeDays: optionalShelfLife,
-          parQuantity: optionalPar,
         };
     try {
       await command.execute(editing ? 'inventory.item.update' : 'inventory.item.create', itemId, {
@@ -597,7 +615,7 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
   return (
     <div className="modal-backdrop" role="presentation">
       <section
-        className="card modal-card"
+        className="card modal-card inventory-item-editor"
         role="dialog"
         aria-modal="true"
         aria-label={editing ? t`Editar artículo` : t`Nuevo artículo`}
@@ -618,13 +636,7 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
           </button>
         </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-            gap: 12,
-          }}
-        >
+        <div className="inventory-item-fields">
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
             <Trans>Referencia</Trans>
             <input
@@ -639,7 +651,7 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
             />
             {!editing ? (
               <span className="muted" style={{ fontSize: 11.5 }}>
-                <Trans>La API rechaza una referencia repetida.</Trans>
+                <Trans>Usa una referencia distinta para cada artículo.</Trans>
               </span>
             ) : null}
             {referenceError ? (
@@ -658,6 +670,7 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
             <Trans>Tipo</Trans>
             <Select
+              className="select"
               value={itemType}
               disabled={editing}
               onChange={(event) => setItemType(event.target.value)}
@@ -670,8 +683,9 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
             </Select>
           </label>
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Unidad base</Trans>
+            <Trans>Unidad de inventario</Trans>
             <Select
+              className="select"
               value={baseUnit}
               disabled={editing}
               onChange={(event) => setBaseUnit(event.target.value)}
@@ -684,8 +698,9 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
             </Select>
           </label>
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Decimales de cantidad</Trans>
+            <Trans>Decimales permitidos</Trans>
             <Select
+              className="select"
               value={quantityScale}
               disabled={editing}
               onChange={(event) => setQuantityScale(event.target.value)}
@@ -698,8 +713,9 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
             </Select>
           </label>
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Política de inventario</Trans>
+            <Trans>Control de existencias</Trans>
             <Select
+              className="select"
               value={trackingPolicy}
               onChange={(event) => setTrackingPolicy(event.target.value)}
             >
@@ -711,8 +727,9 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
             </Select>
           </label>
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Existencia negativa</Trans>
+            <Trans>Si falta inventario</Trans>
             <Select
+              className="select"
               value={negativeStockPolicy}
               onChange={(event) => setNegativeStockPolicy(event.target.value)}
             >
@@ -724,16 +741,20 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
             </Select>
           </label>
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Umbral de stock bajo</Trans>
+            <Trans>Cantidad mínima</Trans>
             <input
               className="input"
-              inputMode="numeric"
+              inputMode="decimal"
               value={lowStockThreshold}
-              placeholder={t`Sin umbral`}
+              placeholder={t`Sin definir`}
+              aria-invalid={!thresholdValid || undefined}
+              aria-describedby={!thresholdValid ? 'inventory-item-quantity-error' : undefined}
               onChange={(event) => setLowStockThreshold(event.target.value)}
             />
             <span className="muted" style={{ fontSize: 11.5 }}>
-              <Trans>En la escala del artículo. 0 se guarda como un umbral real.</Trans>
+              <Trans>
+                En {unitOf(baseUnit)}. Marca el artículo cuando queda esta cantidad o menos.
+              </Trans>
             </span>
           </label>
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
@@ -747,19 +768,35 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
             />
           </label>
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Par de preparación</Trans>
+            <Trans>Cantidad que quieres tener lista</Trans>
             <input
               className="input"
-              inputMode="numeric"
+              inputMode="decimal"
               value={parQuantity}
-              placeholder={t`Sin par`}
+              placeholder={t`Sin definir`}
+              aria-invalid={!parValid || undefined}
+              aria-describedby={!parValid ? 'inventory-item-quantity-error' : undefined}
               onChange={(event) => setParQuantity(event.target.value)}
             />
             <span className="muted" style={{ fontSize: 11.5 }}>
-              <Trans>En la escala del artículo. La lista de preparación lo resta.</Trans>
+              <Trans>
+                En {unitOf(baseUnit)}. Es la cantidad que quieres tener disponible para trabajar.
+              </Trans>
             </span>
           </label>
         </div>
+        {!quantityParameters ? (
+          <p
+            id="inventory-item-quantity-error"
+            role="alert"
+            style={{ color: 'var(--danger)', margin: 0, fontSize: 12.5 }}
+          >
+            <Trans>
+              Escribe 0 o una cantidad mayor, con hasta {quantityScale} decimales. Si la cantidad es
+              demasiado grande, redúcela.
+            </Trans>
+          </p>
+        ) : null}
 
         {editing ? (
           <>
@@ -777,11 +814,17 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
             className="btn btn-primary"
             type="button"
             disabled={
-              command.pending || displayName.trim().length === 0 || (!editing && !referenceValid)
+              command.pending ||
+              !quantityParameters ||
+              displayName.trim().length === 0 ||
+              (!editing && !referenceValid)
             }
             onClick={save}
           >
             <Trans>Guardar</Trans>
+          </button>
+          <button className="btn btn-secondary" type="button" onClick={onClose}>
+            <Trans>Cancelar</Trans>
           </button>
           {editing && item.active !== false ? (
             confirmArchive ? (
@@ -813,9 +856,6 @@ export function ItemEditor({ item, itemId, flatConversions, allergens, onClose, 
               </button>
             )
           ) : null}
-          <span className="muted" style={{ fontSize: 11.5 }}>
-            <Trans>La vida útil y el umbral se guardan en la escala del artículo.</Trans>
-          </span>
         </div>
 
         <CommandNotice

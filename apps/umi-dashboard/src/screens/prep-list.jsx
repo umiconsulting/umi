@@ -57,7 +57,7 @@ const UNIT_LABEL = {
 
 const PREP_ERROR_COPY = {
   PERMISSION_DENIED: msg`No tienes permiso para administrar el inventario.`,
-  VALIDATION_FAILED: msg`Revisa los datos. La API no aceptó la operación.`,
+  VALIDATION_FAILED: msg`Revisa los datos antes de guardar.`,
   SERVICE_UNAVAILABLE: msg`El servicio no está disponible. Intenta de nuevo después.`,
 };
 
@@ -227,7 +227,9 @@ export default function PrepListWorkspace() {
         </p>
       ) : rows.length === 0 ? (
         <p className="muted">
-          <Trans>Aún no hay artículos con par. Define el par en Inventario.</Trans>
+          <Trans>
+            Define en Inventario la cantidad que quieres tener lista para cada artículo.
+          </Trans>
         </p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -241,7 +243,7 @@ export default function PrepListWorkspace() {
                   <Trans>Unidad</Trans>
                 </th>
                 <th scope="col" style={{ ...HEAD, textAlign: 'right' }}>
-                  <Trans>Par</Trans>
+                  <Trans>Cantidad que quieres tener lista</Trans>
                 </th>
                 <th scope="col" style={{ ...HEAD, textAlign: 'right' }}>
                   <Trans>Existencia</Trans>
@@ -287,7 +289,7 @@ export default function PrepListWorkspace() {
                     <td style={NUM}>
                       {cell.state === 'no_par' ? (
                         <NoValue>
-                          <Trans>Sin par</Trans>
+                          <Trans>Sin definir</Trans>
                         </NoValue>
                       ) : prepText ? (
                         <strong style={{ fontWeight: 600 }}>{prepText}</strong>

@@ -513,6 +513,7 @@ export const API_ERROR_CODES = [
   'INVENTORY_LOCATION_CHANGED',
   'INVENTORY_UNIT_CONVERSION_REQUIRED',
   'INVENTORY_QUANTITY_NOT_EXACT',
+  'INVENTORY_QUANTITY_SCALE_MISMATCH',
   // The inventory refusals the till has words for. The API has thrown these
   // since Gate 3E and the union never carried them, so
   // `AllExceptionsFilter`'s allow-list re-labelled every one of them as
@@ -522,6 +523,7 @@ export const API_ERROR_CODES = [
   // the contract publishes.
 
   'INVENTORY_COUNT_ALREADY_ACTIVE',
+  'INVENTORY_COUNT_BUSY',
   'INVENTORY_VERSION_CHANGED',
   'INVENTORY_VARIANCE_REASON_REQUIRED',
   'INVENTORY_CURSOR_INVALID',

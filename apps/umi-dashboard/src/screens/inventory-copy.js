@@ -89,11 +89,11 @@ export const ITEM_ERROR_COPY = {
   INVENTORY_ITEM_NOT_FOUND: msg`El artículo ya no existe. Actualiza la lista.`,
   OPTIMISTIC_VERSION_CONFLICT: msg`Los datos cambiaron. Cierra el editor y vuelve a abrirlo.`,
   PERMISSION_DENIED: msg`No tienes permiso para administrar el inventario.`,
-  VALIDATION_FAILED: msg`Revisa los datos. La API no aceptó la operación.`,
+  VALIDATION_FAILED: msg`Revisa los datos antes de guardar.`,
   SERVICE_UNAVAILABLE: msg`El servicio no está disponible. Intenta de nuevo después.`,
 };
 export const CONVERSION_ERROR_COPY = {
-  INVENTORY_UNIT_CONVERSION_INVALID: msg`Las unidades no se dividen exactamente a esta escala. Elige redondear hacia abajo, hacia arriba o al más cercano.`,
+  INVENTORY_UNIT_CONVERSION_INVALID: msg`El resultado necesita más decimales de los permitidos. Elige redondear hacia abajo, hacia arriba o al más cercano.`,
   INVENTORY_ITEM_NOT_FOUND: msg`El artículo ya no existe. Actualiza la lista.`,
   OPTIMISTIC_VERSION_CONFLICT: msg`Los datos cambiaron. Cierra el editor y vuelve a abrirlo.`,
   PERMISSION_DENIED: msg`No tienes permiso para administrar el inventario.`,
@@ -104,7 +104,7 @@ export const ALLERGEN_ERROR_COPY = {
   INVENTORY_ITEM_NOT_FOUND: msg`El artículo ya no existe. Actualiza la lista.`,
   OPTIMISTIC_VERSION_CONFLICT: msg`Los datos cambiaron. Cierra el editor y vuelve a abrirlo.`,
   PERMISSION_DENIED: msg`No tienes permiso para administrar el inventario.`,
-  VALIDATION_FAILED: msg`Revisa los datos. La API no aceptó la operación.`,
+  VALIDATION_FAILED: msg`Revisa los datos antes de guardar.`,
   SERVICE_UNAVAILABLE: msg`El servicio no está disponible. Intenta de nuevo después.`,
 };
 

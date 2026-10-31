@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "95f2ac7fef8eef0abeab453e5f5f004477da0398685a2272fa8aadaa75f4cd12",
-  "contractVersion": "2.46.0",
+  "contentHash": "8e63c2e81825b513a99f6b4ef3a472093b6ecb676e28d0ed567d2f12f4d56635",
+  "contractVersion": "2.47.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -809,7 +809,9 @@
             "INVENTORY_LOCATION_CHANGED",
             "INVENTORY_UNIT_CONVERSION_REQUIRED",
             "INVENTORY_QUANTITY_NOT_EXACT",
+            "INVENTORY_QUANTITY_SCALE_MISMATCH",
             "INVENTORY_COUNT_ALREADY_ACTIVE",
+            "INVENTORY_COUNT_BUSY",
             "INVENTORY_VERSION_CHANGED",
             "INVENTORY_VARIANCE_REASON_REQUIRED",
             "INVENTORY_CURSOR_INVALID",
@@ -1034,7 +1036,9 @@
                 "INVENTORY_LOCATION_CHANGED",
                 "INVENTORY_UNIT_CONVERSION_REQUIRED",
                 "INVENTORY_QUANTITY_NOT_EXACT",
+                "INVENTORY_QUANTITY_SCALE_MISMATCH",
                 "INVENTORY_COUNT_ALREADY_ACTIVE",
+                "INVENTORY_COUNT_BUSY",
                 "INVENTORY_VERSION_CHANGED",
                 "INVENTORY_VARIANCE_REASON_REQUIRED",
                 "INVENTORY_CURSOR_INVALID",
@@ -3807,6 +3811,88 @@
         "expectedShiftVersion",
         "expectedLedgerSequence",
         "reasonCode"
+      ],
+      "type": "object"
+    },
+    "CancelInventoryCountRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalFingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approvalId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "attempt": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "businessDate": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "countId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expectedVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "inventoryLocationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "policyFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "inventoryLocationId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "expectedVersion",
+        "policyFingerprint",
+        "businessDate",
+        "countId",
+        "attempt"
       ],
       "type": "object"
     },
@@ -30865,6 +30951,7 @@
             "inventory.damage",
             "inventory.quarantine",
             "inventory.count.create",
+            "inventory.count.cancel",
             "inventory.count.submit",
             "inventory.count.reconcile",
             "inventory.recovery",
@@ -30964,6 +31051,7 @@
         "inventory.damage",
         "inventory.quarantine",
         "inventory.count.create",
+        "inventory.count.cancel",
         "inventory.count.submit",
         "inventory.count.reconcile",
         "inventory.recovery",
@@ -46136,6 +46224,10 @@
               "type": "null"
             }
           ]
+        },
+        "version": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
         }
       },
       "required": [
@@ -46148,6 +46240,7 @@
         "blind",
         "snapshotLedgerSequence",
         "attempt",
+        "version",
         "lines",
         "createdAt",
         "submittedAt"
@@ -46351,6 +46444,10 @@
                   "type": "null"
                 }
               ]
+            },
+            "version": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
             }
           },
           "required": [
@@ -46363,6 +46460,7 @@
             "blind",
             "snapshotLedgerSequence",
             "attempt",
+            "version",
             "lines",
             "createdAt",
             "submittedAt"
@@ -48195,6 +48293,10 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "version": {
+                      "exclusiveMinimum": 0,
+                      "type": "integer"
                     }
                   },
                   "required": [
@@ -48207,6 +48309,7 @@
                     "blind",
                     "snapshotLedgerSequence",
                     "attempt",
+                    "version",
                     "lines",
                     "createdAt",
                     "submittedAt"
@@ -52820,6 +52923,10 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "version": {
+                          "exclusiveMinimum": 0,
+                          "type": "integer"
                         }
                       },
                       "required": [
@@ -52832,6 +52939,7 @@
                         "blind",
                         "snapshotLedgerSequence",
                         "attempt",
+                        "version",
                         "lines",
                         "createdAt",
                         "submittedAt"
@@ -104721,6 +104829,10 @@
       "public": true,
       "retryable": false
     },
+    "INVENTORY_COUNT_BUSY": {
+      "public": true,
+      "retryable": false
+    },
     "INVENTORY_COUNT_NOT_FOUND": {
       "public": true,
       "retryable": false
@@ -104778,6 +104890,10 @@
       "retryable": false
     },
     "INVENTORY_QUANTITY_OUT_OF_RANGE": {
+      "public": true,
+      "retryable": false
+    },
+    "INVENTORY_QUANTITY_SCALE_MISMATCH": {
       "public": true,
       "retryable": false
     },
@@ -108253,6 +108369,22 @@
       "permission": "inventory.count.create",
       "pin": false,
       "request": "CreateInventoryCountRequest",
+      "response": "InventoryCountResult"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/inventory/counts/:countId/cancel": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "inventory.count.create",
+      "pin": false,
+      "request": "CancelInventoryCountRequest",
       "response": "InventoryCountResult"
     },
     "POST /api/v1/pos/merchants/:merchantId/inventory/counts/:countId/reconcile": {

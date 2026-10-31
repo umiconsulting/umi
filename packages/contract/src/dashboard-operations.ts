@@ -102,6 +102,7 @@ export const DashboardAdministrativeOperation = z.enum([
   'inventory.damage',
   'inventory.quarantine',
   'inventory.count.create',
+  'inventory.count.cancel',
   'inventory.count.submit',
   'inventory.count.reconcile',
   'inventory.recovery',

@@ -387,3 +387,55 @@ export function sortByUrgency(items, locationId, costedIds) {
     return String(a?.displayName || '').localeCompare(String(b?.displayName || ''));
   });
 }
+
+/** La lectura actual fija la escala y la versión del ajuste. */
+export function adjustmentBalance(overview, itemId, locationId) {
+  const item = overview?.items?.find((row) => row.id === itemId);
+  if (!item) return null;
+  const locations = (overview.locations || []).filter(
+    (row) => row.locationId === locationId && row.active !== false,
+  );
+  const balances = (overview.balances || []).filter(
+    (row) =>
+      row.inventoryItemId === itemId &&
+      locations.some((location) => location.id === row.inventoryLocationId),
+  );
+  if (balances.length > 1) return null;
+  const balance = balances[0];
+  const inventoryLocationId =
+    balance?.inventoryLocationId ?? (locations.length === 1 ? locations[0].id : null);
+  if (!inventoryLocationId) return null;
+  const value = balance?.onHand ?? 0;
+  if (!Number.isSafeInteger(value)) return null;
+  return {
+    inventoryLocationId,
+    value,
+    text: formatScaled(value, item.scale),
+    scale: item.scale,
+    unit: item.baseUnit,
+    version: balance?.version ?? 1,
+  };
+}
+
+/** Calcula el movimiento con enteros exactos y conserva la versión leída. */
+export function adjustmentDelta(text, balance) {
+  if (!balance) return null;
+  const raw = String(text ?? '')
+    .trim()
+    .replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(raw)) return null;
+  const [whole, fraction = ''] = raw.split('.');
+  if (fraction.length > balance.scale) return null;
+  const target =
+    BigInt(whole) * 10n ** BigInt(balance.scale) +
+    BigInt(fraction.padEnd(balance.scale, '0') || '0');
+  if (target > MAX_SAFE) return null;
+  const delta = target - BigInt(balance.value);
+  const magnitude = delta < 0n ? -delta : delta;
+  if (magnitude > MAX_SAFE) return null;
+  return {
+    direction: delta < 0n ? 'decrease' : 'increase',
+    quantity: { value: Number(magnitude), scale: balance.scale, unit: balance.unit },
+    expectedVersion: balance.version,
+  };
+}

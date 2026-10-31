@@ -24,6 +24,9 @@ Future<void> showInventoryCenter(
     merchantId: merchant.id,
     locationId: location.id,
     operatorSessionId: operator.id,
+    canReadHistory: OperatorPermissions(
+      operator.permissions,
+    ).allows('inventory.history.read'),
   );
   await Navigator.of(context).push<void>(
     PosPageRoute(
@@ -57,6 +60,7 @@ final class InventorySurface extends StatefulWidget {
 final class _InventorySurfaceState extends State<InventorySurface> {
   final Map<String, TextEditingController> _countInputs = {};
   final Map<String, String> _varianceReasons = {};
+  (Object?, Object?)? _countIdentity;
   bool _countInvalid = false;
 
   List<Map<String, Object?>> get _countItems {
@@ -126,7 +130,19 @@ final class _InventorySurfaceState extends State<InventorySurface> {
   }
 
   void _changed() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final count = widget.controller.state.count?.count;
+    final identity = count == null ? null : (count['id'], count['attempt']);
+    setState(() {
+      if (_countIdentity != identity) {
+        for (final input in _countInputs.values) {
+          input.clear();
+        }
+        _varianceReasons.clear();
+        _countInvalid = false;
+        _countIdentity = identity;
+      }
+    });
   }
 
   String _copy(String es, String en) =>
@@ -136,8 +152,14 @@ final class _InventorySurfaceState extends State<InventorySurface> {
   Widget build(BuildContext context) {
     final state = widget.controller.state;
     final overview = state.overview;
-    final historyCount = state.history?.entries.length ?? 0;
-    final hasMoreHistory = state.history?.page['hasMore'] == true;
+    final canReadHistory =
+        widget.scope.canReadHistory &&
+        widget.permissions.allows('inventory.history.read');
+    final historyCount = canReadHistory
+        ? state.history?.entries.length ?? 0
+        : 0;
+    final hasMoreHistory =
+        canReadHistory && state.history?.page['hasMore'] == true;
     final blindCountActive =
         state.count?.count['status'] == 'counting' &&
         state.count?.count['blind'] == true;
@@ -227,7 +249,12 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                             .toList(),
                       ),
                     ),
-                  if (widget.permissions.allows('inventory.count.create'))
+                  if (widget.permissions.allows('inventory.count.create') &&
+                      (state.count == null ||
+                          [
+                            'committed',
+                            'cancelled',
+                          ].contains(state.count!.count['status'])))
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                       child: Align(
@@ -277,7 +304,7 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                             itemCount:
                                 overview.items.length +
                                 historyCount +
-                                1 +
+                                (canReadHistory ? 1 : 0) +
                                 (hasMoreHistory ? 1 : 0),
                             itemBuilder: (context, index) {
                               if (index < overview.items.length) {
@@ -368,6 +395,8 @@ final class _InventorySurfaceState extends State<InventorySurface> {
             ),
           ),
           children: [
+            if (widget.permissions.allows('inventory.count.create'))
+              _cancelCountButton(),
             for (final item in _countItems)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
@@ -432,6 +461,11 @@ final class _InventorySurfaceState extends State<InventorySurface> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: PosSelectFormField<String>(
+                  key: ValueKey((
+                    count['id'],
+                    count['attempt'],
+                    variance['inventoryItemId'],
+                  )),
                   initialValue:
                       _varianceReasons[variance['inventoryItemId']! as String],
                   decoration: PosFieldDecoration(
@@ -452,7 +486,10 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                   },
                 ),
               ),
-            if (status != 'committed' &&
+            if (!['committed', 'cancelled'].contains(status) &&
+                widget.permissions.allows('inventory.count.create'))
+              _cancelCountButton(),
+            if (!['committed', 'cancelled'].contains(status) &&
                 widget.permissions.allows('inventory.count.reconcile')) ...[
               const SizedBox(height: 12),
               PosButton.icon(
@@ -482,6 +519,50 @@ final class _InventorySurfaceState extends State<InventorySurface> {
       ),
     );
   }
+
+  Widget _cancelCountButton() => PosTextButton(
+    onPressed: widget.controller.state.busy
+        ? null
+        : () async {
+            final confirmed = await showPosDialog<bool>(
+              context: context,
+              builder: (dialogContext) => PosAlertDialog(
+                title: Text(
+                  _copy('Cancelar conteo activo', 'Cancel active count'),
+                ),
+                content: Text(
+                  _copy(
+                    'El historial se conserva. Registra de nuevo las cantidades en un conteo nuevo.',
+                    'History stays available. Enter the quantities again in a new count.',
+                  ),
+                ),
+                actions: [
+                  PosTextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: Text(_copy('Volver', 'Back')),
+                  ),
+                  PosButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: Text(
+                      _copy('Cancelar y volver a contar', 'Cancel and recount'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed != true) return;
+            await widget.controller.cancelCount(widget.scope);
+            if (mounted && widget.controller.state.count == null) {
+              setState(() {
+                for (final input in _countInputs.values) {
+                  input.clear();
+                }
+                _varianceReasons.clear();
+              });
+            }
+          },
+    child: Text(_copy('Cancelar conteo activo', 'Cancel active count')),
+  );
 
   Future<void> _approvalDialog() async {
     final entry = widget.entry;
@@ -1034,6 +1115,10 @@ final class _InventorySurfaceState extends State<InventorySurface> {
   };
 
   String _error(String code) => switch (code) {
+    'INVENTORY_COUNT_BUSY' => _copy(
+      'El inventario está ocupado. Intenta enviar el conteo de nuevo.',
+      'Inventory is busy. Try to submit the count again.',
+    ),
     'APPROVAL_REQUIRED' => _copy(
       'Esta operación requiere una aprobación vinculada.',
       'This operation requires a bound approval.',

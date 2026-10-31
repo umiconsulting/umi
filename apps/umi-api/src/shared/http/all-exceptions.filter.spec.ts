@@ -29,6 +29,20 @@ function harness() {
 }
 
 describe('AllExceptionsFilter public contract', () => {
+  it('publishes count lock contention as a retryable conflict', () => {
+    const { host, status, send } = harness();
+    new AllExceptionsFilter().catch(
+      new ConflictException({ code: 'INVENTORY_COUNT_BUSY', retryable: true }),
+      host as never,
+    );
+    expect(status).toHaveBeenCalledWith(409);
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.objectContaining({ code: 'INVENTORY_COUNT_BUSY', retryable: true }),
+      }),
+    );
+  });
+
   it.each([
     'CART_ACTOR_BUSY',
     'CART_ACCOUNT_BUSY',
