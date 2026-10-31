@@ -595,7 +595,7 @@ export const ProductionResult = z
     lotId: Uuid,
     lotReference: z.string().min(1).max(80),
     outputItemId: Uuid,
-    /** What the recipe says the batch yields, at the output item's scale. */
+    /** The selected plan, or the recipe yield when no plan is supplied, at the output item's scale. */
     declaredQuantity: ScaledQuantity,
     /** What the cook said came out. */
     producedQuantity: ScaledQuantity,
