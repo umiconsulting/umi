@@ -21,4 +21,4 @@ The page names ONCA for the full integration and Kalala Café and El Gran Ribera
 
 ## Publication gate
 
-The page at `/aviso-de-privacidad` is a draft. Confirm the responsible legal entity, address, processors, transfers, and retention period. Approve the final notice before the demo form collects public submissions. The production deploy requires the repository variable `UMI_LANDING_PUBLICATION_APPROVED=true`. The source for the current notice draft is the [Mexican personal data law](https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPDPPP.pdf), articles 14 to 16.
+The page at `/aviso-de-privacidad` is a draft. Confirm the responsible legal entity, address, processors, transfers, and retention period, then update the public notice. The production deploy keeps the demo form enabled as requested. The source for the current notice draft is the [Mexican personal data law](https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPDPPP.pdf), articles 14 to 16.
