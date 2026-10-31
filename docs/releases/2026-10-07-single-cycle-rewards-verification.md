@@ -1,8 +1,8 @@
 # Local verification of reward changes
 
-The implementation remains on `feat/loyalty-expiry-and-redemption`, based on `affd6bc`.
+The October 7 implementation used `feat/loyalty-expiry-and-redemption`, based on `affd6bc`.
 All database changes and browser operations used private fixtures.
-Production deployment and tenant activation remain pending.
+October 17 production health reports a later API deployment. Current production database activation remains unverified.
 Customer balance corrections use separate private audit records.
 Independent final spec and quality review passed through implementation commit `8c50526`.
 The reviewer found no open Critical or Important issue.
@@ -30,6 +30,57 @@ The dashboard workflow now derives the contract version from the shared catalog.
 
 The schema checks cover expiry, retained visits, concurrent claims, replay, reversals, tenant isolation, reminders, and wallet refresh retries.
 The private release fixture passed preflight, activation, activation rerun, and verification SQL.
+
+## Archive restore and activation rehearsal, October 17
+
+The complete custom archive was created on October 11. Its checksum passed a fresh verification on October 17.
+The isolated restore used PostgreSQL 17.11 and vector 0.8.7. The archive source used PostgreSQL 17.6 and vector 0.8.0.
+The restore covered `umi`, `merchant`, `runtime`, `public.tg_touch_updated_at`, and supported extensions.
+Provider schemas and extensions remained outside this local scope. The complete archive remains preserved.
+Production login roles used local `NOLOGIN` placeholders with only the required application memberships.
+
+All 2,680 canonical metadata rows matched after ACL default and order normalization and the reparse of two CHECK constraints.
+Exact data hashes matched for the visit, redemption, card, and reward tables. Sequence states also matched.
+The base migration passed two applications with all tenant policies disabled. The privilege checks passed.
+
+The actual EGR activation migration passed against the restored application.
+Original history and the gift, stored value, and points tables remained unchanged.
+Partial progress and existing reward obligations remained preserved.
+Further base and activation applications preserved policy timestamps, deadlines, all card data, entitlements, links, and audits.
+The initial PostgreSQL guard suite passed 13 tests. The review corrections increased this suite to 20 tests, and all passed.
+The revised guards reject a missing EGR tenant, including in an empty database, and require the exact transaction activation setting.
+The substitute routine and table now match the real policy constraints, activation-time check, and pending-policy update.
+The lock test restores its committed fixture, and a subsequent test verifies that cleanup.
+
+The revised migration also passed a fresh archive restore with the actual activation routine.
+An attempt without the activation setting failed and left the policy and entitlement tables empty.
+The documented transaction command activated the policy. Its rerun preserved all data in the saved comparison.
+The revised verification script reported zero unaudited candidates and zero incorrect activation grace deadlines in the restored snapshot.
+For live activation, compare candidate card IDs with the saved preflight. An overlapping registration can have an earlier transaction timestamp without an activation audit.
+
+No application consumers started, and this rehearsal made no production changes.
+The worker, Cash build, and delivery checks remain open. Keep reminder flags off until the approved template adapter passes verification.
+
+## Reproducible EGR fixture, October 17
+
+The final follow-up passed all 20 migration guard tests on PostgreSQL 17.11.
+The empty-database regression failed before removal of the successful skip. It now verifies that a failed activation makes no policy writes and that seeding EGR permits a retry.
+
+A separate fresh database passed the actual `00_run.sh` bootstrap and all nine canonical rehearsal tests.
+The synthetic fixture uses the exact EGR identity and a 7/9 reward ladder without production customer data.
+It rejects unsafe database names and incompatible reward ladders. Fixture and activation reruns preserve changed progress, policy timestamps, and reward deadlines.
+Another tenant's policy and cards remain unchanged.
+
+The verification regressions first reproduced successful exits for an absent policy and an incorrect grace deadline.
+The final script exits with an SQL error for those cases and for an incompatible active policy.
+The tests require `psql` exit code 3 and the expected diagnostic, so connection failures cannot satisfy these assertions.
+The local-only harness also passed with an inherited `PGHOSTADDR` override after removing that override from child connections.
+Verification uses one read-only, repeatable-read snapshot in UTC.
+The stricter script also passed against the restored archive, and the saved history and balance preservation assertions passed again.
+
+The canonical rehearsal is part of API CI. The base reward migration and `00_run.sh` remain unchanged.
+The release guide includes the libpq service setup and separate local and staging fixture instructions.
+No production database was accessed or changed during this follow-up.
 
 ## Browser operations
 
