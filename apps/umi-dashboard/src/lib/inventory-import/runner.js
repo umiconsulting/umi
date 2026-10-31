@@ -12,13 +12,14 @@ export function readImportBatch(storage, merchantId, kind) {
   return batch;
 }
 
-export function prepareImportBatch({ merchantId, preview, storage }) {
+export function prepareImportBatch({ merchantId, locationId = null, preview, storage }) {
   const prior = readImportBatch(storage, merchantId, preview.kind);
   if (prior) throw fileError(unresolved(prior) ? 'UNRESOLVED_BATCH' : 'BATCH_EXISTS');
   const batch = {
     schemaVersion: 1,
     id: crypto.randomUUID(),
     merchantId,
+    locationId,
     kind: preview.kind,
     revision: 0,
     entries: preview.entries.map((entry) => ({
@@ -142,6 +143,7 @@ export async function runImportBatch({
           command.operation,
           command.targetAggregateId,
           {
+            locationId: batch.locationId,
             commandId: command.commandId,
             idempotencyKey: command.idempotencyKey,
             targetVersion: command.targetVersion,

@@ -603,6 +603,7 @@ describe('recoverable import batches', () => {
       'inventory.recipe.update',
       id(9),
       {
+        locationId: null,
         commandId: batch.entries[0].command.commandId,
         idempotencyKey: batch.entries[0].command.idempotencyKey,
         targetVersion: 7,
@@ -629,4 +630,56 @@ describe('recoverable import batches', () => {
     await runImportBatch(options(prepare(storage), storage, async () => ok));
     expect(() => prepare(storage)).toThrow('BATCH_EXISTS');
   });
+});
+
+it('persists the original location through reload and lost-response replay', async () => {
+  const storage = memory();
+  const originalLocation = id(55);
+  const batch = prepareImportBatch({
+    merchantId,
+    locationId: originalLocation,
+    preview: preview(),
+    storage,
+  });
+  expect(batch.locationId).toBe(originalLocation);
+  const requests = [];
+  await runImportBatch(
+    options(batch, storage, async (...args) => {
+      requests.push(args);
+      throw new Error('lost');
+    }),
+  );
+  const reloaded = readImportBatch(storage, merchantId, 'items');
+  expect(reloaded.locationId).toBe(originalLocation);
+  await runImportBatch(
+    options(reloaded, storage, async (...args) => {
+      requests.push(args);
+      return ok;
+    }),
+  );
+  expect(requests[0][3].locationId).toBe(originalLocation);
+  expect(requests[1]).toEqual(requests[0]);
+});
+it('keeps a legacy ambiguous null-location request null on replay', async () => {
+  const storage = memory();
+  const batch = prepare(storage);
+  await runImportBatch(
+    options(batch, storage, async () => {
+      throw new Error('lost');
+    }),
+  );
+  const key = [...storage.data.keys()][0];
+  const legacy = JSON.parse(storage.getItem(key));
+  delete legacy.locationId;
+  storage.setItem(key, JSON.stringify(legacy));
+  const recovered = readImportBatch(storage, merchantId, 'items');
+  expect(recovered.locationId).toBeNull();
+  let sent;
+  await runImportBatch(
+    options(recovered, storage, async (_merchant, _operation, _target, command) => {
+      sent = command;
+      return ok;
+    }),
+  );
+  expect(sent.locationId).toBeNull();
 });

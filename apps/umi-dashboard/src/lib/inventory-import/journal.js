@@ -124,6 +124,7 @@ const schema = z
     schemaVersion: z.literal(1),
     id: uuid,
     merchantId: uuid,
+    locationId: uuid.nullable().default(null),
     kind: z.enum(['items', 'recipes']),
     revision: amount,
     entries: z.array(entry).max(IMPORT_LIMITS.maxRows),
