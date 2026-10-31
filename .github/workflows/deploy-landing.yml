@@ -39,7 +39,7 @@ jobs:
       - name: Build static landing
         run: pnpm --filter @umi/landing build
       - name: Deploy to Cloudflare Pages
-        if: github.event_name != 'pull_request' && (github.ref_name == 'staging' || vars.UMI_LANDING_PUBLICATION_APPROVED == 'true')
+        if: github.event_name != 'pull_request'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 8aef562d6d0c51b70f1b83fa1d2912a4
