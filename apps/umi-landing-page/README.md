@@ -15,6 +15,8 @@ The app uses Next.js 15.5.20 and exports static pages to `out`. Cloudflare Pages
 
 GitHub Actions deploys a push only when `apps/umi-landing-page/**` changes. A push to `main` updates production. A push to any other branch updates that branch's Cloudflare preview alias; for example, `staging.umi-landing-d8n.pages.dev` for `staging`. Changes elsewhere in the monorepo do not trigger a landing deployment. Manual `workflow_dispatch` remains available for recovery.
 
+The static export includes `robots.txt` and `sitemap.xml`. Both point crawlers to the public `www` URL. The file in `public` with a 32-character hexadecimal name verifies ownership for IndexNow submissions. Search engines decide when to refresh indexed content.
+
 Use `pnpm dlx wrangler@4.129.0 pages dev out --binding API_ORIGIN=https://api-staging.umiconsulting.co` to test the Pages Function locally. The `wrangler.toml` file points preview deployments at the staging API and production deployments at the production API.
 
 ## Client material
