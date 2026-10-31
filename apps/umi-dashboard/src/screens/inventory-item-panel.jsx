@@ -7,7 +7,7 @@ import { Menu } from '@/components/menu.jsx';
 import { useAdministrativeCommand } from '@/lib/administrative-command.jsx';
 import { conversionSummary, mergeConversions } from './inventory-model.js';
 import { formatMoney } from '@/lib/format.js';
-import { ITEM_TYPE_LABEL, TRACKING_LABEL, UNIT_LABEL } from './inventory-copy.js';
+import { ITEM_TYPE_LABEL, NEGATIVE_LABEL, TRACKING_LABEL, UNIT_LABEL } from './inventory-copy.js';
 
 /**
  * The item panel — the read surface for one item (redesign plan D13).
@@ -241,9 +241,9 @@ export default function InventoryItemPanel({
           </dt>
           <dd>{item.shelfLifeDays == null ? t`Sin vida útil` : t`${item.shelfLifeDays} días`}</dd>
           <dt>
-            <Trans>Negativos</Trans>
+            <Trans>Si falta inventario</Trans>
           </dt>
-          <dd>{item.negativeStockPolicy}</dd>
+          <dd>{i18n._(NEGATIVE_LABEL[item.negativeStockPolicy])}</dd>
         </dl>
       </div>
 

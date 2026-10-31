@@ -3898,6 +3898,10 @@ msgstr "Save adjustment"
 #~ msgstr "The units do not divide evenly at this scale. Choose round down, round up or round half up."
 
 #: src/screens/inventory-copy.js
+#~ msgid "Permitir y marcar"
+#~ msgstr "Allow and flag"
+
+#: src/screens/inventory-copy.js
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
@@ -4024,8 +4028,8 @@ msgid "Con autorización"
 msgstr "Manager override"
 
 #: src/screens/inventory-copy.js
-msgid "Permitir y marcar"
-msgstr "Allow and flag"
+msgid "Permitir saldo negativo"
+msgstr "Allow negative stock"
 
 #: src/screens/inventory-copy.js
 msgid "Pedido pendiente"
@@ -4034,6 +4038,18 @@ msgstr "Backorder"
 #: src/screens/inventory-copy.js
 msgid "No aplica"
 msgstr "Not applicable"
+
+#: src/screens/inventory-copy.js
+msgid "Permite vender aunque la existencia registrada no alcance. El saldo puede quedar negativo."
+msgstr "Allows sales when the recorded stock is insufficient. The balance can become negative."
+
+#: src/screens/inventory-copy.js
+msgid "Impide la venta cuando la existencia registrada no alcanza."
+msgstr "Prevents a sale when the recorded stock is insufficient."
+
+#: src/screens/inventory-copy.js
+msgid "Pide autorización para vender cuando la existencia registrada no alcanza."
+msgstr "Requires approval to sell when the recorded stock is insufficient."
 
 #: src/screens/inventory-copy.js
 msgid "Exacta"
@@ -5058,6 +5074,7 @@ msgid "Control de existencias"
 msgstr "Stock control"
 
 #: src/screens/inventory-item-editor.jsx
+#: src/screens/inventory-item-panel.jsx
 msgid "Si falta inventario"
 msgstr "When stock runs out"
 
@@ -5143,6 +5160,10 @@ msgstr "Archive"
 #~ msgstr "No receipt has set the cost of this item. The margins exclude it."
 
 #: src/screens/inventory-item-panel.jsx
+#~ msgid "Negativos"
+#~ msgstr "Negative stock"
+
+#: src/screens/inventory-item-panel.jsx
 #: src/screens/inventory-workspace.jsx
 msgid "En nivel"
 msgstr "At level"
@@ -5212,10 +5233,6 @@ msgstr "Base unit"
 #: src/screens/inventory-item-panel.jsx
 msgid "Vida útil"
 msgstr "Shelf life"
-
-#: src/screens/inventory-item-panel.jsx
-msgid "Negativos"
-msgstr "Negative stock"
 
 #: src/screens/inventory-item-panel.jsx
 #: src/screens/ventas-report.jsx

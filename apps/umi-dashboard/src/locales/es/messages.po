@@ -3898,6 +3898,10 @@ msgstr "Guardar ajuste"
 #~ msgstr "Las unidades no se dividen exactamente a esta escala. Elige redondear hacia abajo, hacia arriba o al más cercano."
 
 #: src/screens/inventory-copy.js
+#~ msgid "Permitir y marcar"
+#~ msgstr "Permitir y marcar"
+
+#: src/screens/inventory-copy.js
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
@@ -4024,8 +4028,8 @@ msgid "Con autorización"
 msgstr "Con autorización"
 
 #: src/screens/inventory-copy.js
-msgid "Permitir y marcar"
-msgstr "Permitir y marcar"
+msgid "Permitir saldo negativo"
+msgstr "Permitir saldo negativo"
 
 #: src/screens/inventory-copy.js
 msgid "Pedido pendiente"
@@ -4034,6 +4038,18 @@ msgstr "Pedido pendiente"
 #: src/screens/inventory-copy.js
 msgid "No aplica"
 msgstr "No aplica"
+
+#: src/screens/inventory-copy.js
+msgid "Permite vender aunque la existencia registrada no alcance. El saldo puede quedar negativo."
+msgstr "Permite vender aunque la existencia registrada no alcance. El saldo puede quedar negativo."
+
+#: src/screens/inventory-copy.js
+msgid "Impide la venta cuando la existencia registrada no alcanza."
+msgstr "Impide la venta cuando la existencia registrada no alcanza."
+
+#: src/screens/inventory-copy.js
+msgid "Pide autorización para vender cuando la existencia registrada no alcanza."
+msgstr "Pide autorización para vender cuando la existencia registrada no alcanza."
 
 #: src/screens/inventory-copy.js
 msgid "Exacta"
@@ -5058,6 +5074,7 @@ msgid "Control de existencias"
 msgstr "Control de existencias"
 
 #: src/screens/inventory-item-editor.jsx
+#: src/screens/inventory-item-panel.jsx
 msgid "Si falta inventario"
 msgstr "Si falta inventario"
 
@@ -5143,6 +5160,10 @@ msgstr "Archivar"
 #~ msgstr "Ningún recibo ha fijado el costo de este artículo. Los márgenes no lo incluyen."
 
 #: src/screens/inventory-item-panel.jsx
+#~ msgid "Negativos"
+#~ msgstr "Negativos"
+
+#: src/screens/inventory-item-panel.jsx
 #: src/screens/inventory-workspace.jsx
 msgid "En nivel"
 msgstr "En nivel"
@@ -5212,10 +5233,6 @@ msgstr "Unidad base"
 #: src/screens/inventory-item-panel.jsx
 msgid "Vida útil"
 msgstr "Vida útil"
-
-#: src/screens/inventory-item-panel.jsx
-msgid "Negativos"
-msgstr "Negativos"
 
 #: src/screens/inventory-item-panel.jsx
 #: src/screens/ventas-report.jsx

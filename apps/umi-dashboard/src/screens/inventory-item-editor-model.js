@@ -53,3 +53,8 @@ export function initialCostParameters(text, item) {
   if (item && parsed.value === (item.initialUnitCostMinor ?? null)) return {};
   return { initialUnitCostMinor: parsed.value };
 }
+
+/** Preserve a saved policy when the editor opens. */
+export function itemNegativeStockPolicy(item) {
+  return item ? item.negativeStockPolicy || 'block' : 'allow_and_flag';
+}
