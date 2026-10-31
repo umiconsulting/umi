@@ -1,10 +1,38 @@
 import Image from 'next/image';
+import type { Metadata } from 'next';
 import { ArrowDown, ArrowUpRight } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import ContactSection from '@/components/home/ContactSection';
 import ShaderBackground from '@/components/background/ShaderBackground';
 import PosShowcase from '@/components/home/PosShowcase';
+
+const title = 'Umi — Una sola operación para tu restaurante';
+const description =
+  'Pedidos, cocina, cobro y clientes en una sola operación. Conoce cómo Umi conecta el trabajo diario de tu restaurante.';
+const siteUrl = 'https://www.umiconsulting.co/';
+const previewImage = `${siteUrl}editorial/sea-hero.jpg`;
+
+export const metadata: Metadata = {
+  title,
+  description,
+  alternates: { canonical: siteUrl },
+  openGraph: {
+    title,
+    description,
+    url: siteUrl,
+    siteName: 'Umi',
+    locale: 'es_MX',
+    type: 'website',
+    images: [{ url: previewImage, width: 2752, height: 1536, alt: 'Umi para restaurantes' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title,
+    description,
+    images: [previewImage],
+  },
+};
 
 const work = [
   {
