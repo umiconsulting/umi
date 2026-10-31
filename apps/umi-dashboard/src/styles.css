@@ -5001,11 +5001,27 @@ time,
 }
 
 /* ---------- the view chips ---------- */
+.inv-toolbar {
+  min-width: 0;
+}
+.inv-toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+}
+.inv-toolbar-actions > .input {
+  width: 220px;
+  min-width: 0;
+  flex: 1 1 180px;
+}
 .inv-views {
   display: flex;
   gap: 6px;
   overflow-x: auto;
   padding-bottom: 2px;
+  max-width: 100%;
 }
 .inv-view {
   display: inline-flex;
@@ -5023,6 +5039,7 @@ time,
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
+  flex-shrink: 0;
 }
 .inv-view:hover {
   color: var(--ink-1);
@@ -5149,6 +5166,28 @@ time,
 }
 @media (hover: none) {
   .inv-row-action {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .inv-toolbar-actions {
+    width: 100%;
+  }
+  .inv-toolbar-actions > .input {
+    flex-basis: 100%;
+  }
+  .inv-attention-row {
+    flex-wrap: wrap;
+  }
+  .inv-row {
+    grid-template-columns: 8px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding-inline: 10px;
+  }
+  .inv-row-action {
+    grid-column: 2 / -1;
+    justify-self: end;
     opacity: 1;
   }
 }

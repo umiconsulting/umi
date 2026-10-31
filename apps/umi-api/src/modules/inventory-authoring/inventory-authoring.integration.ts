@@ -2220,7 +2220,7 @@ describe('inventory authoring · items, conversions and allergens', () => {
     expect(row?.publicReference).toBe(PREP_ONE_REFERENCE);
     expect(row?.unit).toBe('portion');
     expect(row?.shelfLifeDays).toBe(3);
-    // PAR minus on-hand minus forecast usage, floored at zero. No sale has consumed the
+    // PAR plus forecast usage minus on-hand, floored at zero. No sale has consumed the
     // prep yet, so the forecast is zero and the shortfall is par minus on-hand.
     expect(row?.parQuantity).toMatchObject({ value: 20, scale: 0 });
     expect(row?.forecastUsageQuantity.value).toBe(0);

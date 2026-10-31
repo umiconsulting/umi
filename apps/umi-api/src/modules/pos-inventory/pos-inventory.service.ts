@@ -59,7 +59,7 @@ export class PosInventoryService {
    * reads it here with the same `inventory.read` the rest of this screen uses.
    *
    * The forecast itself is the costing module's, called with the merchant id only: one
-   * author for the rate, the honest denominator and the par subtraction. This module
+   * author for the rate, its denominator, and the preparation formula. This module
    * must not grow a second one.
    */
   async prepList(user: AuthUser, merchantId: string, query: PosPrepListQuery) {
@@ -201,6 +201,33 @@ export class PosInventoryService {
   /** The merchant's business date, for the console's version of the produce command. */
   currentBusinessDate(merchantId: string): Promise<string> {
     return this.repo.currentBusinessDate(merchantId);
+  }
+
+  async productionPreviewAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    context: DashboardAdministrativeCommandContext & { commandRecordId?: string },
+    dto: Pick<ProduceRequest, 'outputItemId' | 'inventoryLocationId' | 'quantity'>,
+  ) {
+    if (!context.locationId || !context.commandRecordId) {
+      throw new ForbiddenException({ code: 'ADMINISTRATIVE_COMMAND_CONTEXT_REQUIRED' });
+    }
+    const authorization = await this.repo.authorizeAdministrative({
+      userId: user.id,
+      merchantId: access.merchantId,
+      locationId: context.locationId,
+      dashboardSessionId: user.sessionId,
+      administrativeCommandId: context.commandRecordId,
+      permissions: access.permissions,
+      permission: 'inventory.production.produce',
+    });
+    if (!authorization) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    return this.repo.productionPreview(
+      user.id,
+      access.merchantId,
+      { ...dto, locationId: context.locationId },
+      await this.unitCostsByItem(access.merchantId),
+    );
   }
 
   private async produceAuthorized(

@@ -65,14 +65,14 @@ const UNIT_LABEL = {
 const DEFECT_LABEL = {
   no_inventory_mapping: msg`Nadie registró qué consume este platillo`,
   no_recipe_components: msg`La receta existe pero no tiene componentes`,
-  no_cost_basis: msg`Su insumo nunca se ha recibido, así que no hay precio`,
+  no_cost_basis: msg`El ingrediente no tiene costo inicial ni compras registradas`,
   non_stock_mapping: msg`No se lleva en inventario, así que su costo no se calcula`,
   unit_conversion_not_exact: msg`La receta no se convierte en unidades completas del insumo`,
 };
 const DEFECT_FIX = {
   no_inventory_mapping: msg`Crea la receta o la asignación de inventario del producto.`,
   no_recipe_components: msg`Agrega los insumos y sus cantidades a la receta.`,
-  no_cost_basis: msg`Registra una recepción de compra de ese insumo.`,
+  no_cost_basis: msg`Agrega un costo inicial o registra una compra del ingrediente.`,
   non_stock_mapping: msg`No hay nada que arreglar: este producto no se cuenta en inventario.`,
   unit_conversion_not_exact: msg`Ajusta la cantidad para que dé unidades completas del insumo.`,
 };
@@ -580,8 +580,7 @@ export default function InventoryCostingScreen() {
               <Trans>Ningún platillo coincide con esa búsqueda.</Trans>
             ) : view === 'costed' ? (
               <Trans>
-                Ningún platillo tiene costo todavía. Mientras un insumo no se reciba, su precio se
-                desconoce, y con él el de todos los platillos que lo usan.
+                Ningún platillo tiene costo todavía. Agrega un costo inicial o registra una compra.
               </Trans>
             ) : (
               <Trans>Todos los platillos del catálogo tienen costo.</Trans>
@@ -859,8 +858,8 @@ export default function InventoryCostingScreen() {
         eyebrow={<Trans>De dónde sale el costo</Trans>}
         meta={
           <Trans>
-            {data.basis.length} insumos ·{' '}
-            {data.basis.filter((item) => item.unitCostMinor == null).length} sin recepciones
+            {data.basis.length} artículos ·{' '}
+            {data.basis.filter((item) => item.unitCostMinor == null).length} sin costo
           </Trans>
         }
       >
@@ -870,15 +869,14 @@ export default function InventoryCostingScreen() {
           </div>
         ) : data.basis.length === 0 ? (
           <div className="card" style={{ padding: 18, color: 'var(--ink-2)' }}>
-            <Trans>Este negocio no tiene insumos en inventario todavía.</Trans>
+            <Trans>Este negocio no tiene artículos en inventario todavía.</Trans>
           </div>
         ) : (
           <>
             <div style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>
               <Trans>
-                El costo de un insumo es el promedio ponderado de lo que realmente se pagó al
-                recibirlo, no lo que se pidió. Un insumo sin recepciones no tiene precio, y por eso
-                no aparece como cero.
+                El costo usa el promedio ponderado de las compras recibidas. Si no hay compras, usa
+                el costo inicial guardado. Sin ninguno de los dos, el artículo queda sin costo.
               </Trans>
             </div>
             <div style={{ overflowX: 'auto' }}>
@@ -886,7 +884,10 @@ export default function InventoryCostingScreen() {
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--line)' }}>
                     <th scope="col" style={CELL_HEAD}>
-                      <Trans>Insumo</Trans>
+                      <Trans>Artículo</Trans>
+                    </th>
+                    <th scope="col" style={CELL_HEAD}>
+                      <Trans>Origen del costo</Trans>
                     </th>
                     <th scope="col" style={{ ...CELL_HEAD, textAlign: 'right' }}>
                       <Trans>Costo unitario</Trans>
@@ -914,10 +915,19 @@ export default function InventoryCostingScreen() {
                           {item.publicReference}
                         </div>
                       </td>
+                      <td style={CELL}>
+                        {item.basis === 'manual_initial' ? (
+                          <Trans>Costo inicial</Trans>
+                        ) : item.basis === 'weighted_average_of_receipts' ? (
+                          <Trans>Calculado con compras</Trans>
+                        ) : (
+                          <Trans>Sin costo</Trans>
+                        )}
+                      </td>
                       <td style={{ ...CELL, textAlign: 'right' }}>
                         {item.unitCostMinor == null ? (
                           <NotCosted>
-                            <Trans>Sin precio</Trans>
+                            <Trans>Sin costo</Trans>
                           </NotCosted>
                         ) : (
                           <Figures>
@@ -1183,7 +1193,7 @@ function PlateDetail({ plate, window, quantity, unitOf, percentOf, shortDate }) 
                   <td style={{ ...CELL, textAlign: 'right' }}>
                     {component.unitCostMinor == null ? (
                       <NotCosted>
-                        <Trans>Sin precio</Trans>
+                        <Trans>Sin costo</Trans>
                       </NotCosted>
                     ) : (
                       <Figures>

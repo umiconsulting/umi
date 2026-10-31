@@ -157,3 +157,18 @@ regexes = [
   '''^e557c1faea71be5bd2297d6bb4824d9b5fc760b9$''',
   '''^719ca258807ec047e73be04606e14e39$''',
 ]
+
+[[allowlists]]
+description = "Exact idempotency UUIDs from the local inventory preparation browser fixture"
+# docs/reports/evidence/2026-10-30-inventory-preparation/api-evidence.json records
+# synthetic local commands. administrative-command.jsx generates these IDs with
+# crypto.randomUUID(). They identify commands and grant no access.
+# Three exact values cover four findings because the response-loss retry repeats
+# its original request. Secret-value anchors keep other values detectable in
+# the same evidence file. No path or UUID-pattern exception applies here.
+regexTarget = 'secret'
+regexes = [
+  '''^859524ee\-60c1\-4161\-ab14\-e7d23a2cf5c5$''',
+  '''^adc72189\-8288\-4a17\-bfe2\-47300891cd95$''',
+  '''^8dc37cc3\-8085\-4123\-9367\-56c261bc5d68$''',
+]

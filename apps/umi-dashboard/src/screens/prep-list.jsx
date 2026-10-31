@@ -1,3 +1,4 @@
+import InventoryProduction from './inventory-production.jsx';
 import { useMemo, useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -18,7 +19,7 @@ import {
  * plan 8.4, D13 and 11 Phase 3).
  *
  * The board answers one question: WHAT DO I MAKE. The quantity comes from the
- * server, which subtracts the on-hand and the forecast usage from the par over
+ * server, which adds forecast usage to the par and subtracts available stock over
  * the shelf-life window, so the screen never repeats that formula. The order is
  * the kitchen's own order: the largest quantity first.
  *
@@ -125,6 +126,7 @@ export default function PrepListWorkspace() {
   const capabilities = merchant?.capabilities || null;
   const canManage = hasRequiredPermission(MANAGE_GATE, capabilities);
   const [refresh, setRefresh] = useState(0);
+  const [production, setProduction] = useState(false);
   const [includeAbovePar, setIncludeAbovePar] = useState(false);
   const [download, setDownload] = useState({ pending: false, error: null });
 
@@ -167,6 +169,14 @@ export default function PrepListWorkspace() {
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
+      {production ? (
+        <InventoryProduction
+          key={locationId}
+          locationId={locationId}
+          onClose={() => setProduction(false)}
+          onDone={() => setRefresh((value) => value + 1)}
+        />
+      ) : null}
       <div
         style={{
           display: 'flex',
@@ -181,7 +191,10 @@ export default function PrepListWorkspace() {
           label={t`Mostrar también los que ya tienen suficiente`}
           onChange={setIncludeAbovePar}
         />
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" type="button" onClick={() => setProduction(true)}>
+            <Trans>Nueva preparación</Trans>
+          </button>
           <button
             className="btn-icon"
             type="button"

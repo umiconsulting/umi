@@ -153,6 +153,7 @@ export const DashboardAdministrativeOperation = z.enum([
   'inventory.recipe.retire',
   // Production (plan §8.1 and §11, phase 3). The console posts the same batch the
   // till does, through the same door, so a batch is never authored twice.
+  'inventory.production.preview',
   'inventory.production.produce',
   // Supplier invoices (plan §10 and §11, phase 5). CAPTURE AND APPROVAL ARE TWO KEYS:
   // migration 76 grants `inventory.invoice.approve` to owner and admin alone, so the

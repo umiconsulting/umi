@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { ProductionConsumedLine, ProductionRecord, ProductionResult } from '@umi/contract';
 import type {
+  ProductionPreview,
   AvailabilityResult,
   InventoryAdjustment,
   InventoryCountResult,
@@ -96,6 +97,7 @@ interface ProductionOutputRow {
 /** The active recipe of the output item. Its yield is the batch the cook produced. */
 interface ProductionRecipeRow {
   id: string;
+  version: number;
   yieldQuantity: string;
   yieldScale: number;
   yieldUnit: string;
@@ -108,6 +110,8 @@ interface ProductionExplosionRow {
   numerator: string;
   denominator: string;
   hasRecipe: boolean;
+  recipePath: string[];
+  active: boolean;
   publicReference: string;
   displayName: string;
   baseUnit: string;
@@ -1498,34 +1502,41 @@ export class PosInventoryRepository {
     return this.countResult(client, merchantId, dto.locationId, dto.countId, correlationId);
   }
 
-  /**
-   * PRODUCE (plan §8.1, §8.2 and D4, D5, D9). One batch, one transaction, one command.
-   *
-   * THE COOK SAYS WHAT CAME OUT; THE SERVER SAYS WHAT WENT IN. The request names the
-   * output item and the quantity that was actually produced. The server explodes the
-   * item's ACTIVE recipe through `merchant.explode_inventory_recipe` — the same walk
-   * the recipe editor and the sale path use — and consumes one row per leaf input item.
-   *
-   * THE DECLARED YIELD IS THE BATCH, NOT THE PRODUCED QUANTITY. A recipe declares what
-   * its full batch yields, so the inputs are consumed for that declared yield while the
-   * stock entry credits what really came out. The difference is the named
-   * `production_yield_loss` of D4, posted on the output item. A batch that meets or beats
-   * its yield writes no loss row, and the ledger's own negative-stock guard decides
-   * whether a shortfall is allowed to land.
-   *
-   * THE COST IS THE PHASE 2 ARITHMETIC, REUSED. The weighted-average receipt basis is the
-   * one `InventoryCostingService` reads, and the money is summed through
-   * `plateCostMinor`, so a prep's cost and the recipe editor's cost cannot disagree.
-   */
-  async produce(
+  /** Read the exact plan without stock or lot writes. */
+  async productionPreview(
+    userId: string,
+    merchantId: string,
+    dto: Pick<ProduceRequest, 'outputItemId' | 'inventoryLocationId' | 'quantity' | 'locationId'>,
+    unitCosts: Map<string, bigint>,
+  ): Promise<ProductionPreview> {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) =>
+        (await this.productionPlan(client, merchantId, dto, unitCosts, dto.quantity)).preview,
+      dto.locationId,
+    );
+  }
+
+  private async productionPlan(
     client: PoolClient,
     merchantId: string,
-    authorization: InventoryAuthorization,
-    dto: ProduceRequest,
+    dto: Pick<ProduceRequest, 'outputItemId' | 'inventoryLocationId' | 'locationId'>,
     unitCosts: Map<string, bigint>,
-    correlationId: string,
-  ): Promise<ProduceResult> {
-    const fingerprint = this.operationFingerprint('pos.inventory.production', dto);
+    plannedQuantity?: ProduceRequest['plannedQuantity'],
+  ): Promise<{
+    outputItem: ProductionOutputRow;
+    recipe: ProductionRecipeRow;
+    declared: ProductionInput['quantity'];
+    inputs: ProductionInput[];
+    preview: ProductionPreview;
+  }> {
+    const location = await client.query(
+      `SELECT id FROM merchant.inventory_location
+        WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND id=$3::uuid AND active FOR SHARE`,
+      [merchantId, dto.locationId, dto.inventoryLocationId],
+    );
+    if (!location.rows[0]) throw new ConflictException({ code: 'INVENTORY_LOCATION_INVALID' });
     const itemResult = await client.query<ProductionOutputRow>(
       `SELECT base_unit AS "baseUnit",quantity_scale AS "quantityScale",
               shelf_life_days AS "shelfLifeDays",active
@@ -1537,20 +1548,8 @@ export class PosInventoryRepository {
     if (!outputItem || !outputItem.active) {
       throw new ConflictException({ code: 'INVENTORY_ITEM_ARCHIVED' });
     }
-    // The produced quantity is normalized onto the item's own scale, so a client that
-    // sends another unit divides exactly here or is refused, exactly as a sale is.
-    const produced = await this.normalizeQuantity(
-      client,
-      merchantId,
-      dto.outputItemId,
-      dto.quantity,
-    );
-    if (dto.expiresOn !== null && dto.expiresOn < dto.businessDate) {
-      throw new ConflictException({ code: 'INVENTORY_LOT_EXPIRY_INVALID' });
-    }
-
     const recipeResult = await client.query<ProductionRecipeRow>(
-      `SELECT id::text AS id,yield_quantity::text AS "yieldQuantity",yield_scale AS "yieldScale",
+      `SELECT id::text AS id,version,yield_quantity::text AS "yieldQuantity",yield_scale AS "yieldScale",
               yield_unit AS "yieldUnit",shelf_life_days AS "shelfLifeDays"
          FROM merchant.inventory_recipe
         WHERE merchant_id=$1::uuid AND target_item_id=$2::uuid AND active
@@ -1559,27 +1558,172 @@ export class PosInventoryRepository {
     );
     const recipe = recipeResult.rows[0];
     if (!recipe) throw new ConflictException({ code: 'INVENTORY_RECIPE_REQUIRED' });
-    // The declared yield, on the output item's own scale. A recipe whose yield does not
-    // divide there cannot be produced, and says so with the sale path's own code.
-    const declared = await this.normalizeQuantity(client, merchantId, dto.outputItemId, {
-      value: Number(recipe.yieldQuantity),
-      scale: recipe.yieldScale,
-      unit: recipe.yieldUnit,
-    });
+    const recipeYield = await this.normalizeQuantity(
+      client,
+      merchantId,
+      dto.outputItemId,
+      {
+        value: Number(recipe.yieldQuantity),
+        scale: recipe.yieldScale,
+        unit: recipe.yieldUnit,
+      },
+      false,
+      true,
+    );
+    const declared = plannedQuantity
+      ? await this.normalizeQuantity(
+          client,
+          merchantId,
+          dto.outputItemId,
+          plannedQuantity,
+          false,
+          true,
+        )
+      : recipeYield;
 
+    const lockedRecipes = new Set([recipe.id]);
+    for (;;) {
+      const paths = await client.query<{ id: string }>(
+        `SELECT DISTINCT unnest(e.recipe_path)::text AS id
+           FROM merchant.explode_inventory_recipe($1::uuid,$2::uuid) e`,
+        [merchantId, recipe.id],
+      );
+      const pending = paths.rows
+        .map((row) => row.id)
+        .filter((id) => !lockedRecipes.has(id))
+        .sort();
+      if (pending.length === 0) break;
+      await client.query(
+        `SELECT id FROM merchant.inventory_recipe WHERE merchant_id=$1::uuid AND id=ANY($2::uuid[])
+          ORDER BY id FOR SHARE`,
+        [merchantId, pending],
+      );
+      for (const id of pending) lockedRecipes.add(id);
+    }
+    // Hold the ingredients and their conversions until the same plan reaches the ledger.
+    await client.query(
+      `SELECT id FROM merchant.inventory_item WHERE merchant_id=$1::uuid AND id IN
+        (SELECT inventory_item_id FROM merchant.explode_inventory_recipe($1::uuid,$2::uuid))
+        ORDER BY id FOR SHARE`,
+      [merchantId, recipe.id],
+    );
+    const nestedYields = await client.query<ProductionRecipeRow & { targetItemId: string }>(
+      `SELECT id::text,version,target_item_id::text AS "targetItemId",
+              yield_quantity::text AS "yieldQuantity",yield_scale AS "yieldScale",
+              yield_unit AS "yieldUnit",shelf_life_days AS "shelfLifeDays"
+         FROM merchant.inventory_recipe WHERE merchant_id=$1::uuid AND id=ANY($2::uuid[])
+          AND id<>$3::uuid AND active`,
+      [merchantId, [...lockedRecipes], recipe.id],
+    );
+    const yieldConversions = new Map<string, { numerator: bigint; denominator: bigint }>();
+    for (const nested of nestedYields.rows) {
+      const normalized = await this.normalizeQuantity(
+        client,
+        merchantId,
+        nested.targetItemId,
+        {
+          value: Number(nested.yieldQuantity),
+          scale: nested.yieldScale,
+          unit: nested.yieldUnit,
+        },
+        false,
+        true,
+      );
+      yieldConversions.set(nested.id, {
+        numerator: BigInt(nested.yieldQuantity) * pow10(normalized.scale),
+        denominator: BigInt(normalized.value) * pow10(nested.yieldScale),
+      });
+    }
     const explosion = await client.query<ProductionExplosionRow>(
       `SELECT e.inventory_item_id::text AS "inventoryItemId",
               e.numerator::text AS numerator,e.denominator::text AS denominator,
-              e.has_recipe AS "hasRecipe",i.public_reference AS "publicReference",
+              e.has_recipe AS "hasRecipe",e.recipe_path AS "recipePath",i.public_reference AS "publicReference",
               i.display_name AS "displayName",i.base_unit AS "baseUnit",
-              i.quantity_scale AS "quantityScale"
+              i.quantity_scale AS "quantityScale",i.active
          FROM merchant.explode_inventory_recipe($1::uuid,$2::uuid) e
          JOIN merchant.inventory_item i
            ON i.merchant_id=$1::uuid AND i.id=e.inventory_item_id
         ORDER BY e.depth,e.path`,
       [merchantId, recipe.id],
     );
-    const inputs = productionInputs(explosion.rows, declared.value, produced.scale, unitCosts);
+    // A recipe can first appear on a leaf while this transaction acquires locks.
+    // Read again if the final walk contains a recipe that this plan has not locked.
+    if (explosion.rows.some((row) => row.recipePath.some((id) => !lockedRecipes.has(id)))) {
+      return this.productionPlan(client, merchantId, dto, unitCosts, plannedQuantity);
+    }
+    const inputs = productionInputs(
+      explosion.rows,
+      declared.value,
+      recipeYield.value,
+      recipe,
+      unitCosts,
+      yieldConversions,
+    );
+
+    const consumed = productionConsumedLines(inputs);
+    const recipeFingerprint = commandFingerprint('inventory.production.plan', {
+      outputItemId: dto.outputItemId,
+      recipeId: recipe.id,
+      recipeVersion: recipe.version,
+      plannedQuantity: declared,
+      consumed: inputs
+        .map((input) => ({ inventoryItemId: input.inventoryItemId, quantity: input.quantity }))
+        .sort((left, right) => left.inventoryItemId.localeCompare(right.inventoryItemId)),
+    });
+    return {
+      outputItem,
+      recipe,
+      declared,
+      inputs,
+      preview: {
+        outputItemId: dto.outputItemId,
+        inventoryLocationId: dto.inventoryLocationId,
+        recipeId: recipe.id,
+        recipeVersion: recipe.version,
+        plannedQuantity: declared as ProductionPreview['plannedQuantity'],
+        consumed,
+        recipeFingerprint,
+      } satisfies ProductionPreview,
+    };
+  }
+
+  /**
+   * Commit the selected plan through the existing lot and ledger transaction.
+   * Existing clients consume one recipe yield and record any output shortfall.
+   */
+  async produce(
+    client: PoolClient,
+    merchantId: string,
+    authorization: InventoryAuthorization,
+    dto: ProduceRequest,
+    unitCosts: Map<string, bigint>,
+    correlationId: string,
+  ): Promise<ProduceResult> {
+    const fingerprint = this.operationFingerprint('pos.inventory.production', dto);
+    const { outputItem, recipe, declared, inputs, preview } = await this.productionPlan(
+      client,
+      merchantId,
+      dto,
+      unitCosts,
+      dto.plannedQuantity,
+    );
+    const produced = await this.normalizeQuantity(
+      client,
+      merchantId,
+      dto.outputItemId,
+      dto.quantity,
+      false,
+      true,
+    );
+    if (dto.plannedQuantity && produced.value > declared.value) {
+      throw new ConflictException({ code: 'INVENTORY_PRODUCTION_QUANTITY_INVALID' });
+    }
+    if (dto.recipeFingerprint && dto.recipeFingerprint !== preview.recipeFingerprint) {
+      throw new ConflictException({ code: 'INVENTORY_PREPARATION_CHANGED' });
+    }
+    if (dto.expiresOn !== null && dto.expiresOn < dto.businessDate) {
+      throw new ConflictException({ code: 'INVENTORY_LOT_EXPIRY_INVALID' });
+    }
 
     // The lot is written FIRST, because the ledger's one door refuses a lot that does
     // not exist or that belongs to another item or stock location.
@@ -1703,27 +1847,7 @@ export class PosInventoryRepository {
       });
     }
 
-    const consumed: ConsumedLine[] = inputs.map((input) => {
-      const lineCost =
-        input.unitCostMinor === null
-          ? null
-          : quantityCostMinor(
-              { value: BigInt(input.quantity.value), scale: input.quantity.scale },
-              input.unitCostMinor,
-            );
-      return {
-        inventoryItemId: input.inventoryItemId,
-        publicReference: input.publicReference,
-        displayName: input.displayName,
-        quantity: {
-          value: input.quantity.value,
-          scale: input.quantity.scale,
-          unit: input.quantity.unit as ConsumedLine['quantity']['unit'],
-        },
-        unitCostMinor: input.unitCostMinor === null ? null : toSafeNumber(input.unitCostMinor),
-        lineCostMinor: lineCost === null ? null : toSafeNumber(lineCost),
-      };
-    });
+    const consumed = productionConsumedLines(inputs);
 
     return {
       commandId: dto.commandId,
@@ -2223,6 +2347,7 @@ export class PosInventoryRepository {
     inventoryItemId: string,
     quantity: { value: number; scale: number; unit: string },
     allowZero = false,
+    requireExact = false,
   ): Promise<{ value: number; scale: number; unit: string }> {
     const itemResult = await client.query<{
       baseUnit: string;
@@ -2271,7 +2396,7 @@ export class PosInventoryRepository {
     let converted = scaledNumerator / scaledDenominator;
     const remainder = scaledNumerator % scaledDenominator;
     if (remainder !== 0n) {
-      if (roundingPolicy === 'exact') {
+      if (requireExact || roundingPolicy === 'exact') {
         throw new ConflictException({ code: 'INVENTORY_QUANTITY_NOT_EXACT' });
       }
       if (roundingPolicy === 'ceiling') converted += 1n;
@@ -2297,20 +2422,29 @@ export class PosInventoryRepository {
  * `INVENTORY_QUANTITY_NOT_EXACT` — the same refusal a sale makes — because a consumed
  * quantity nobody can hold at the item's scale cannot be posted to the ledger.
  *
- * `declaredValue` is the recipe's full yield at the OUTPUT item's scale, and each
- * explosion row is the quantity for ONE yield unit, so the product is the batch.
+ * Scale the selected output against the normalized recipe yield. The explosion uses
+ * the recipe yield unit, which can differ from the output item's base unit.
  */
 function productionInputs(
   rows: readonly ProductionExplosionRow[],
   declaredValue: number,
-  outputScale: number,
+  normalizedYieldValue: number,
+  recipe: ProductionRecipeRow,
   unitCosts: Map<string, bigint>,
+  yieldConversions: Map<string, { numerator: bigint; denominator: bigint }>,
 ): ProductionInput[] {
   const leaves = new Map<string, { row: ProductionExplosionRow; num: bigint; den: bigint }>();
   for (const row of rows) {
+    if (!row.active) throw new ConflictException({ code: 'INVENTORY_ITEM_ARCHIVED' });
     if (row.hasRecipe) continue;
-    const num = productionInteger(row.numerator);
-    const den = productionInteger(row.denominator);
+    let num = productionInteger(row.numerator);
+    let den = productionInteger(row.denominator);
+    for (const recipeId of row.recipePath) {
+      const conversion = yieldConversions.get(recipeId);
+      if (!conversion) continue;
+      num *= conversion.numerator;
+      den *= conversion.denominator;
+    }
     if (den <= 0n)
       throw new Error(`productionInputs: a non-positive denominator: ${row.denominator}`);
     const existing = leaves.get(row.inventoryItemId);
@@ -2327,8 +2461,12 @@ function productionInputs(
 
   const inputs: ProductionInput[] = [];
   for (const entry of leaves.values()) {
-    const numerator = entry.num * BigInt(declaredValue) * pow10(entry.row.quantityScale);
-    const denominator = entry.den * pow10(outputScale);
+    const numerator =
+      entry.num *
+      BigInt(declaredValue) *
+      BigInt(recipe.yieldQuantity) *
+      pow10(entry.row.quantityScale);
+    const denominator = entry.den * BigInt(normalizedYieldValue) * pow10(recipe.yieldScale);
     if (numerator % denominator !== 0n) {
       throw new ConflictException({ code: 'INVENTORY_QUANTITY_NOT_EXACT' });
     }
@@ -2390,4 +2528,28 @@ function greatestCommonDivisor(left: bigint, right: bigint): bigint {
     b = remainder;
   }
   return a === 0n ? 1n : a;
+}
+
+function productionConsumedLines(inputs: ProductionInput[]): ConsumedLine[] {
+  return inputs.map((input) => {
+    const lineCost =
+      input.unitCostMinor === null
+        ? null
+        : quantityCostMinor(
+            { value: BigInt(input.quantity.value), scale: input.quantity.scale },
+            input.unitCostMinor,
+          );
+    return {
+      inventoryItemId: input.inventoryItemId,
+      publicReference: input.publicReference,
+      displayName: input.displayName,
+      quantity: {
+        value: input.quantity.value,
+        scale: input.quantity.scale,
+        unit: input.quantity.unit as ConsumedLine['quantity']['unit'],
+      },
+      unitCostMinor: input.unitCostMinor === null ? null : toSafeNumber(input.unitCostMinor),
+      lineCostMinor: lineCost === null ? null : toSafeNumber(lineCost),
+    };
+  });
 }
