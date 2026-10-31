@@ -1,0 +1,41 @@
+{
+  "omitted": {
+    "commandId": "7f000000-0000-4000-8000-000000000001",
+    "idempotencyKey": "7f000000-0000-4000-8000-000000000002",
+    "inventoryItemId": "7f000000-0000-4000-8000-000000000003",
+    "displayName": "Renamed ingredient",
+    "trackingPolicy": "tracked",
+    "negativeStockPolicy": "block",
+    "expectedVersion": 1
+  },
+  "null": {
+    "commandId": "7f000000-0000-4000-8000-000000000001",
+    "idempotencyKey": "7f000000-0000-4000-8000-000000000002",
+    "inventoryItemId": "7f000000-0000-4000-8000-000000000003",
+    "displayName": "Renamed ingredient",
+    "trackingPolicy": "tracked",
+    "negativeStockPolicy": "block",
+    "expectedVersion": 1,
+    "initialUnitCostMinor": null
+  },
+  "zero": {
+    "commandId": "7f000000-0000-4000-8000-000000000001",
+    "idempotencyKey": "7f000000-0000-4000-8000-000000000002",
+    "inventoryItemId": "7f000000-0000-4000-8000-000000000003",
+    "displayName": "Renamed ingredient",
+    "trackingPolicy": "tracked",
+    "negativeStockPolicy": "block",
+    "expectedVersion": 1,
+    "initialUnitCostMinor": 0
+  },
+  "positive": {
+    "commandId": "7f000000-0000-4000-8000-000000000001",
+    "idempotencyKey": "7f000000-0000-4000-8000-000000000002",
+    "inventoryItemId": "7f000000-0000-4000-8000-000000000003",
+    "displayName": "Renamed ingredient",
+    "trackingPolicy": "tracked",
+    "negativeStockPolicy": "block",
+    "expectedVersion": 1,
+    "initialUnitCostMinor": 12000
+  }
+}

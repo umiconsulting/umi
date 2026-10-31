@@ -44,9 +44,14 @@ export const TRACKING_LABEL = {
 export const NEGATIVE_LABEL = {
   block: msg`Bloquear`,
   manager_override: msg`Con autorización`,
-  allow_and_flag: msg`Permitir y marcar`,
+  allow_and_flag: msg`Permitir saldo negativo`,
   backorder: msg`Pedido pendiente`,
   not_applicable: msg`No aplica`,
+};
+export const NEGATIVE_HINT = {
+  allow_and_flag: msg`Permite vender aunque la existencia registrada no alcance. El saldo puede quedar negativo.`,
+  block: msg`Impide la venta cuando la existencia registrada no alcanza.`,
+  manager_override: msg`Pide autorización para vender cuando la existencia registrada no alcanza.`,
 };
 export const ROUNDING_LABEL = {
   exact: msg`Exacta`,

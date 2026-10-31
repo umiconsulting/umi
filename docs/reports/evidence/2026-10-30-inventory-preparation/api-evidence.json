@@ -1,0 +1,391 @@
+{
+  "before": {
+    "output": 95,
+    "flour": 991350,
+    "nested": 25
+  },
+  "after": {
+    "output": 125,
+    "flour": 988300,
+    "nested": 30
+  },
+  "requests": [
+    {
+      "operation": "inventory.production.produce",
+      "locationId": "2f1bf9b7-5cd1-4ec0-a5b3-503fde51b8f0",
+      "targetAggregateId": "e0ab7c7c-350e-4016-9abe-2e85084722b4",
+      "targetVersion": null,
+      "commandId": "d744d7d2-b40c-4483-9afe-b98439ee219b",
+      "idempotencyKey": "859524ee-60c1-4161-ab14-e7d23a2cf5c5",
+      "parameters": {
+        "inventoryLocationId": "56e0e96c-25f9-4920-8e99-0b2ceeb743e3",
+        "quantity": {
+          "value": 5,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "plannedQuantity": {
+          "value": 5,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "recipeFingerprint": "fbd8cd56e6dff934bf3fe36565b27c344239c97fcbd755203160828ca60812e5"
+      },
+      "approvalId": null
+    },
+    {
+      "operation": "inventory.production.produce",
+      "locationId": "2f1bf9b7-5cd1-4ec0-a5b3-503fde51b8f0",
+      "targetAggregateId": "e0ab7c7c-350e-4016-9abe-2e85084722b4",
+      "targetVersion": null,
+      "commandId": "c2851c1d-bc55-4243-af72-c6e52ae67627",
+      "idempotencyKey": "966f2212-3d66-4fb1-b355-f6dd1dcfc3c3",
+      "parameters": {
+        "inventoryLocationId": "56e0e96c-25f9-4920-8e99-0b2ceeb743e3",
+        "quantity": {
+          "value": 20,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "plannedQuantity": {
+          "value": 20,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "recipeFingerprint": "998ee1fffcec62e8db7bb7cd5ae2fc86008124d66bce96a185b357ed7fbbd08f"
+      },
+      "approvalId": null
+    },
+    {
+      "operation": "inventory.production.produce",
+      "locationId": "2f1bf9b7-5cd1-4ec0-a5b3-503fde51b8f0",
+      "targetAggregateId": "c51f94a6-b602-4842-a8e0-181d43dcf394",
+      "targetVersion": null,
+      "commandId": "3fad82ef-95ac-4f63-bc09-d98344952908",
+      "idempotencyKey": "adc72189-8288-4a17-bfe2-47300891cd95",
+      "parameters": {
+        "inventoryLocationId": "56e0e96c-25f9-4920-8e99-0b2ceeb743e3",
+        "quantity": {
+          "value": 5,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "plannedQuantity": {
+          "value": 5,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "recipeFingerprint": "886b105a1a7541557358a00ce8f4a3ef4799a8139e80e71c4365f75b82d14d1f"
+      },
+      "approvalId": null
+    },
+    {
+      "operation": "inventory.production.produce",
+      "locationId": "2f1bf9b7-5cd1-4ec0-a5b3-503fde51b8f0",
+      "targetAggregateId": "e0ab7c7c-350e-4016-9abe-2e85084722b4",
+      "targetVersion": null,
+      "commandId": "07bddded-2006-49b5-8a8e-0fc24372e345",
+      "idempotencyKey": "beddbccd-f9db-4d88-88dc-dd0092a01c94",
+      "parameters": {
+        "inventoryLocationId": "56e0e96c-25f9-4920-8e99-0b2ceeb743e3",
+        "quantity": {
+          "value": 5,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "plannedQuantity": {
+          "value": 5,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "recipeFingerprint": "fbd8cd56e6dff934bf3fe36565b27c344239c97fcbd755203160828ca60812e5"
+      },
+      "approvalId": null
+    },
+    {
+      "operation": "inventory.production.produce",
+      "locationId": "2f1bf9b7-5cd1-4ec0-a5b3-503fde51b8f0",
+      "targetAggregateId": "e0ab7c7c-350e-4016-9abe-2e85084722b4",
+      "targetVersion": null,
+      "commandId": "54ee435d-8909-4db2-b944-d3ded4157b9e",
+      "idempotencyKey": "fbb600f6-b494-4ed6-944f-d4caa492f7df",
+      "parameters": {
+        "inventoryLocationId": "74fb5209-1c8c-4208-addf-f236c5b28508",
+        "quantity": {
+          "value": 5,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "plannedQuantity": {
+          "value": 5,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "recipeFingerprint": "bf2af1b0161ab949ac0d8eda28bf01558b0c55fe97f035f35ed2c330e37c0921"
+      },
+      "approvalId": null
+    },
+    {
+      "operation": "inventory.production.produce",
+      "locationId": "2f1bf9b7-5cd1-4ec0-a5b3-503fde51b8f0",
+      "targetAggregateId": "e0ab7c7c-350e-4016-9abe-2e85084722b4",
+      "targetVersion": null,
+      "commandId": "92cd8476-ee1b-41b8-aa7e-7518a27df4f3",
+      "idempotencyKey": "8dc37cc3-8085-4123-9367-56c261bc5d68",
+      "parameters": {
+        "inventoryLocationId": "56e0e96c-25f9-4920-8e99-0b2ceeb743e3",
+        "quantity": {
+          "value": 5,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "plannedQuantity": {
+          "value": 5,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "recipeFingerprint": "bf2af1b0161ab949ac0d8eda28bf01558b0c55fe97f035f35ed2c330e37c0921"
+      },
+      "approvalId": null
+    },
+    {
+      "operation": "inventory.production.produce",
+      "locationId": "2f1bf9b7-5cd1-4ec0-a5b3-503fde51b8f0",
+      "targetAggregateId": "e0ab7c7c-350e-4016-9abe-2e85084722b4",
+      "targetVersion": null,
+      "commandId": "92cd8476-ee1b-41b8-aa7e-7518a27df4f3",
+      "idempotencyKey": "8dc37cc3-8085-4123-9367-56c261bc5d68",
+      "parameters": {
+        "inventoryLocationId": "56e0e96c-25f9-4920-8e99-0b2ceeb743e3",
+        "quantity": {
+          "value": 5,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "plannedQuantity": {
+          "value": 5,
+          "scale": 0,
+          "unit": "unit"
+        },
+        "recipeFingerprint": "bf2af1b0161ab949ac0d8eda28bf01558b0c55fe97f035f35ed2c330e37c0921"
+      },
+      "approvalId": null
+    }
+  ],
+  "results": [
+    {
+      "lotId": "5307f313-2f40-4032-a2b0-cde48425648e",
+      "consumed": [
+        {
+          "quantity": {
+            "unit": "gram",
+            "scale": 0,
+            "value": 500
+          },
+          "displayName": "Harina conversión",
+          "lineCostMinor": null,
+          "unitCostMinor": null,
+          "inventoryItemId": "77de3cf4-397a-473f-adbf-5acb17b46b9a",
+          "publicReference": "HARINA-UI"
+        }
+      ],
+      "commandId": "d744d7d2-b40c-4483-9afe-b98439ee219b",
+      "expiresOn": null,
+      "lotReference": "PROD-20261030-3BBD3D4E",
+      "outputItemId": "e0ab7c7c-350e-4016-9abe-2e85084722b4",
+      "correlationId": "50181468-ca20-4ee6-abf5-a20e2678d84c",
+      "unitCostMinor": null,
+      "incompleteCost": true,
+      "totalCostMinor": null,
+      "declaredQuantity": {
+        "unit": "unit",
+        "scale": 0,
+        "value": 5
+      },
+      "producedQuantity": {
+        "unit": "unit",
+        "scale": 0,
+        "value": 5
+      },
+      "yieldLossQuantity": {
+        "unit": "unit",
+        "scale": 0,
+        "value": 0
+      }
+    },
+    {
+      "lotId": "a4d03397-7620-4b00-82e2-c7cd3b7ed89f",
+      "consumed": [
+        {
+          "quantity": {
+            "unit": "gram",
+            "scale": 0,
+            "value": 2000
+          },
+          "displayName": "Harina conversión",
+          "lineCostMinor": null,
+          "unitCostMinor": null,
+          "inventoryItemId": "77de3cf4-397a-473f-adbf-5acb17b46b9a",
+          "publicReference": "HARINA-UI"
+        }
+      ],
+      "commandId": "c2851c1d-bc55-4243-af72-c6e52ae67627",
+      "expiresOn": null,
+      "lotReference": "PROD-20261030-3937A2EA",
+      "outputItemId": "e0ab7c7c-350e-4016-9abe-2e85084722b4",
+      "correlationId": "95aa0916-5eb3-4bc2-9799-9705097b59df",
+      "unitCostMinor": null,
+      "incompleteCost": true,
+      "totalCostMinor": null,
+      "declaredQuantity": {
+        "unit": "unit",
+        "scale": 0,
+        "value": 20
+      },
+      "producedQuantity": {
+        "unit": "unit",
+        "scale": 0,
+        "value": 20
+      },
+      "yieldLossQuantity": {
+        "unit": "unit",
+        "scale": 0,
+        "value": 0
+      }
+    },
+    {
+      "lotId": "5a321a19-b1a3-44fd-9170-a4030647e392",
+      "consumed": [
+        {
+          "quantity": {
+            "unit": "gram",
+            "scale": 0,
+            "value": 50
+          },
+          "displayName": "Harina conversión",
+          "lineCostMinor": null,
+          "unitCostMinor": null,
+          "inventoryItemId": "77de3cf4-397a-473f-adbf-5acb17b46b9a",
+          "publicReference": "HARINA-UI"
+        }
+      ],
+      "commandId": "3fad82ef-95ac-4f63-bc09-d98344952908",
+      "expiresOn": null,
+      "lotReference": "PROD-20261030-61F711A0",
+      "outputItemId": "c51f94a6-b602-4842-a8e0-181d43dcf394",
+      "correlationId": "ce89d447-f2cd-4874-af39-dcfcacc42b34",
+      "unitCostMinor": null,
+      "incompleteCost": true,
+      "totalCostMinor": null,
+      "declaredQuantity": {
+        "unit": "unit",
+        "scale": 0,
+        "value": 5
+      },
+      "producedQuantity": {
+        "unit": "unit",
+        "scale": 0,
+        "value": 5
+      },
+      "yieldLossQuantity": {
+        "unit": "unit",
+        "scale": 0,
+        "value": 0
+      }
+    },
+    {
+      "lotId": "437c8d96-ee3b-4bd3-aaa4-db6808d76672",
+      "consumed": [
+        {
+          "quantity": {
+            "unit": "gram",
+            "scale": 0,
+            "value": 500
+          },
+          "displayName": "Harina conversión",
+          "lineCostMinor": null,
+          "unitCostMinor": null,
+          "inventoryItemId": "77de3cf4-397a-473f-adbf-5acb17b46b9a",
+          "publicReference": "HARINA-UI"
+        }
+      ],
+      "commandId": "92cd8476-ee1b-41b8-aa7e-7518a27df4f3",
+      "expiresOn": null,
+      "lotReference": "PROD-20261030-C0EB9BCF",
+      "outputItemId": "e0ab7c7c-350e-4016-9abe-2e85084722b4",
+      "correlationId": "f08d47a5-bebb-4fd8-b899-765460396dc6",
+      "unitCostMinor": null,
+      "incompleteCost": true,
+      "totalCostMinor": null,
+      "declaredQuantity": {
+        "unit": "unit",
+        "scale": 0,
+        "value": 5
+      },
+      "producedQuantity": {
+        "unit": "unit",
+        "scale": 0,
+        "value": 5
+      },
+      "yieldLossQuantity": {
+        "unit": "unit",
+        "scale": 0,
+        "value": 0
+      }
+    }
+  ],
+  "lostResult": {
+    "lotId": "437c8d96-ee3b-4bd3-aaa4-db6808d76672",
+    "consumed": [
+      {
+        "quantity": {
+          "unit": "gram",
+          "scale": 0,
+          "value": 500
+        },
+        "displayName": "Harina conversión",
+        "lineCostMinor": null,
+        "unitCostMinor": null,
+        "inventoryItemId": "77de3cf4-397a-473f-adbf-5acb17b46b9a",
+        "publicReference": "HARINA-UI"
+      }
+    ],
+    "commandId": "92cd8476-ee1b-41b8-aa7e-7518a27df4f3",
+    "expiresOn": null,
+    "lotReference": "PROD-20261030-C0EB9BCF",
+    "outputItemId": "e0ab7c7c-350e-4016-9abe-2e85084722b4",
+    "correlationId": "f08d47a5-bebb-4fd8-b899-765460396dc6",
+    "unitCostMinor": null,
+    "incompleteCost": true,
+    "totalCostMinor": null,
+    "declaredQuantity": {
+      "unit": "unit",
+      "scale": 0,
+      "value": 5
+    },
+    "producedQuantity": {
+      "unit": "unit",
+      "scale": 0,
+      "value": 5
+    },
+    "yieldLossQuantity": {
+      "unit": "unit",
+      "scale": 0,
+      "value": 0
+    }
+  },
+  "pagination": {
+    "itemName": "Pan de prueba 105",
+    "activeItemRecipes": 108
+  },
+  "screenshots": [
+    "recipe-half-preview.png",
+    "recipe-half-success.png",
+    "stale-recipe.png",
+    "preview-error.png",
+    "response-loss.png",
+    "mobile-320.png",
+    "mobile-390.png",
+    "stock-after.png"
+  ]
+}

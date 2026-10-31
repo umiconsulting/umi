@@ -1,3 +1,4 @@
+import InventoryProduction from './inventory-production.jsx';
 import { useMemo, useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
@@ -194,6 +195,8 @@ export default function RecipeWorkspace() {
   const [showRetired, setShowRetired] = useState(false);
   const [query, setQuery] = useState('');
   const [editor, setEditor] = useState(null);
+  const [production, setProduction] = useState(null);
+  const locationId = merchant?.selectedLocationId || merchant?.selectedLocation?.id || null;
 
   const recipesState = useInventoryRecipes({ includeRetired: showRetired }, refresh);
   const itemsState = useInventoryItems({ includeArchived: false }, refresh);
@@ -352,6 +355,15 @@ export default function RecipeWorkspace() {
                     )}
                   </td>
                   <td style={CELL}>
+                    {recipe.targetItemId && recipe.active !== false ? (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        type="button"
+                        onClick={() => setProduction(recipe)}
+                      >
+                        <Trans>Preparar</Trans>
+                      </button>
+                    ) : null}
                     <button
                       className="btn-icon"
                       type="button"
@@ -367,13 +379,22 @@ export default function RecipeWorkspace() {
           </table>
           <p className="muted" style={{ margin: '8px 0 0', fontSize: 11.5 }}>
             <Trans>
-              El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada
+              El costo es el de una unidad de rendimiento, calculado con el costo de cada
               ingrediente.
             </Trans>
           </p>
         </div>
       )}
 
+      {production ? (
+        <InventoryProduction
+          key={`${locationId}:${production.id}`}
+          recipe={production}
+          locationId={locationId}
+          onClose={() => setProduction(null)}
+          onDone={() => setRefresh((value) => value + 1)}
+        />
+      ) : null}
       {editor ? (
         <RecipeEditor
           key={editor.id}
@@ -531,7 +552,7 @@ function ExplosionPanel({ state, unitOf }) {
       </div>
       <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
         {i18n._(
-          msg`El desglose muestra los ingredientes de cada receta. Un ingrediente sin compras registradas aún no tiene precio.`,
+          msg`El desglose muestra los ingredientes de cada receta. Agrega un costo inicial o registra una compra para conocer su costo.`,
         )}
       </p>
     </section>
@@ -1133,7 +1154,7 @@ function RecipeEditor({
                                 other="Sub-receta. Se usa en # recetas."
                               />
                             ) : (
-                              <Trans>Ingrediente comprado.</Trans>
+                              <Trans>Ingrediente.</Trans>
                             )}
                           </p>
                           <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
@@ -1143,7 +1164,9 @@ function RecipeEditor({
                                 sus ingredientes.
                               </Trans>
                             ) : basis == null ? (
-                              <Trans>Registra una compra para conocer su costo.</Trans>
+                              <Trans>
+                                Agrega un costo inicial o registra una compra para conocer su costo.
+                              </Trans>
                             ) : (
                               <Trans>
                                 Costo base: {formatMoney(basis)} por {unitOf(item.baseUnit)}.
@@ -1207,7 +1230,9 @@ function RecipeEditor({
             {preview.state === 'no_cost' ? (
               <div style={{ display: 'grid', gap: 4 }}>
                 <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)' }}>
-                  <Trans>Registra una compra de estos ingredientes para conocer el costo.</Trans>
+                  <Trans>
+                    Agrega un costo inicial o registra una compra de estos ingredientes.
+                  </Trans>
                 </p>
                 <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
                   {preview.missingCost.map((inventoryItemId) => (
@@ -1249,7 +1274,9 @@ function RecipeEditor({
             ) : null}
 
             <p className="muted" style={{ margin: 0, fontSize: 11.5 }}>
-              <Trans>El costo se calcula con las compras registradas de tus ingredientes.</Trans>
+              <Trans>
+                El costo usa las compras registradas o el costo inicial de tus ingredientes.
+              </Trans>
             </p>
           </section>
         </fieldset>

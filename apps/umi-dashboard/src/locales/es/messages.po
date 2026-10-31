@@ -147,6 +147,7 @@ msgstr "Sesión expirada"
 
 #: src/data.jsx
 #: src/screens/inventory-copy.js
+#: src/screens/inventory-production.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/prep-list.jsx
@@ -447,6 +448,7 @@ msgstr "Abrir café"
 #: src/screens/inventory-filters.jsx
 #: src/screens/inventory-item-editor.jsx
 #: src/screens/inventory-item-panel.jsx
+#: src/screens/inventory-production.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
@@ -525,6 +527,7 @@ msgstr "Contraseña · 8 caracteres o más"
 #: src/screens/inventory-count.jsx
 #: src/screens/inventory-item-editor.jsx
 #: src/screens/inventory-item-panel.jsx
+#: src/screens/inventory-production.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/members.jsx
 #: src/screens/recipe-workspace.jsx
@@ -3898,6 +3901,10 @@ msgstr "Guardar ajuste"
 #~ msgstr "Las unidades no se dividen exactamente a esta escala. Elige redondear hacia abajo, hacia arriba o al más cercano."
 
 #: src/screens/inventory-copy.js
+#~ msgid "Permitir y marcar"
+#~ msgstr "Permitir y marcar"
+
+#: src/screens/inventory-copy.js
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
@@ -4024,8 +4031,8 @@ msgid "Con autorización"
 msgstr "Con autorización"
 
 #: src/screens/inventory-copy.js
-msgid "Permitir y marcar"
-msgstr "Permitir y marcar"
+msgid "Permitir saldo negativo"
+msgstr "Permitir saldo negativo"
 
 #: src/screens/inventory-copy.js
 msgid "Pedido pendiente"
@@ -4034,6 +4041,18 @@ msgstr "Pedido pendiente"
 #: src/screens/inventory-copy.js
 msgid "No aplica"
 msgstr "No aplica"
+
+#: src/screens/inventory-copy.js
+msgid "Permite vender aunque la existencia registrada no alcance. El saldo puede quedar negativo."
+msgstr "Permite vender aunque la existencia registrada no alcance. El saldo puede quedar negativo."
+
+#: src/screens/inventory-copy.js
+msgid "Impide la venta cuando la existencia registrada no alcanza."
+msgstr "Impide la venta cuando la existencia registrada no alcanza."
+
+#: src/screens/inventory-copy.js
+msgid "Pide autorización para vender cuando la existencia registrada no alcanza."
+msgstr "Pide autorización para vender cuando la existencia registrada no alcanza."
 
 #: src/screens/inventory-copy.js
 msgid "Exacta"
@@ -4090,6 +4109,32 @@ msgstr "La etiqueta ya no existe. Actualiza la lista."
 #~ msgstr "Este platillo no se puede costear. Falta el precio de {0} {1}:"
 
 #: src/screens/inventory-costing.jsx
+#~ msgid "Su insumo nunca se ha recibido, así que no hay precio"
+#~ msgstr "Su insumo nunca se ha recibido, así que no hay precio"
+
+#: src/screens/inventory-costing.jsx
+#~ msgid "Registra una recepción de compra de ese insumo."
+#~ msgstr "Registra una recepción de compra de ese insumo."
+
+#: src/screens/inventory-costing.jsx
+#~ msgid "Ningún platillo tiene costo todavía. Mientras un insumo no se reciba, su precio se desconoce, y con él el de todos los platillos que lo usan."
+#~ msgstr "Ningún platillo tiene costo todavía. Mientras un insumo no se reciba, su precio se desconoce, y con él el de todos los platillos que lo usan."
+
+#. placeholder {0}: data.basis.length
+#. placeholder {1}: data.basis.filter((item) => item.unitCostMinor == null).length
+#: src/screens/inventory-costing.jsx
+#~ msgid "{0} insumos · {1} sin recepciones"
+#~ msgstr "{0} insumos · {1} sin recepciones"
+
+#: src/screens/inventory-costing.jsx
+#~ msgid "Este negocio no tiene insumos en inventario todavía."
+#~ msgstr "Este negocio no tiene insumos en inventario todavía."
+
+#: src/screens/inventory-costing.jsx
+#~ msgid "El costo de un insumo es el promedio ponderado de lo que realmente se pagó al recibirlo, no lo que se pidió. Un insumo sin recepciones no tiene precio, y por eso no aparece como cero."
+#~ msgstr "El costo de un insumo es el promedio ponderado de lo que realmente se pagó al recibirlo, no lo que se pidió. Un insumo sin recepciones no tiene precio, y por eso no aparece como cero."
+
+#: src/screens/inventory-costing.jsx
 msgid "Nadie registró qué consume este platillo"
 msgstr "Nadie registró qué consume este platillo"
 
@@ -4098,8 +4143,8 @@ msgid "La receta existe pero no tiene componentes"
 msgstr "La receta existe pero no tiene componentes"
 
 #: src/screens/inventory-costing.jsx
-msgid "Su insumo nunca se ha recibido, así que no hay precio"
-msgstr "Su insumo nunca se ha recibido, así que no hay precio"
+msgid "El ingrediente no tiene costo inicial ni compras registradas"
+msgstr "El ingrediente no tiene costo inicial ni compras registradas"
 
 #: src/screens/inventory-costing.jsx
 msgid "No se lleva en inventario, así que su costo no se calcula"
@@ -4118,8 +4163,8 @@ msgid "Agrega los insumos y sus cantidades a la receta."
 msgstr "Agrega los insumos y sus cantidades a la receta."
 
 #: src/screens/inventory-costing.jsx
-msgid "Registra una recepción de compra de ese insumo."
-msgstr "Registra una recepción de compra de ese insumo."
+msgid "Agrega un costo inicial o registra una compra del ingrediente."
+msgstr "Agrega un costo inicial o registra una compra del ingrediente."
 
 #: src/screens/inventory-costing.jsx
 msgid "No hay nada que arreglar: este producto no se cuenta en inventario."
@@ -4135,6 +4180,7 @@ msgstr "Con costo"
 
 #: src/screens/inventory-costing.jsx
 #: src/screens/inventory-item-editor.jsx
+#: src/screens/inventory-item-panel.jsx
 #: src/screens/inventory-workspace.jsx
 #: src/screens/menu-engineering.jsx
 #: src/screens/recipe-workspace.jsx
@@ -4309,8 +4355,8 @@ msgid "Ningún platillo coincide con esa búsqueda."
 msgstr "Ningún platillo coincide con esa búsqueda."
 
 #: src/screens/inventory-costing.jsx
-msgid "Ningún platillo tiene costo todavía. Mientras un insumo no se reciba, su precio se desconoce, y con él el de todos los platillos que lo usan."
-msgstr "Ningún platillo tiene costo todavía. Mientras un insumo no se reciba, su precio se desconoce, y con él el de todos los platillos que lo usan."
+msgid "Ningún platillo tiene costo todavía. Agrega un costo inicial o registra una compra."
+msgstr "Ningún platillo tiene costo todavía. Agrega un costo inicial o registra una compra."
 
 #: src/screens/inventory-costing.jsx
 msgid "Todos los platillos del catálogo tienen costo."
@@ -4424,20 +4470,32 @@ msgstr "De dónde sale el costo"
 #. placeholder {0}: data.basis.length
 #. placeholder {1}: data.basis.filter((item) => item.unitCostMinor == null).length
 #: src/screens/inventory-costing.jsx
-msgid "{0} insumos · {1} sin recepciones"
-msgstr "{0} insumos · {1} sin recepciones"
+msgid "{0} artículos · {1} sin costo"
+msgstr "{0} artículos · {1} sin costo"
 
 #: src/screens/inventory-costing.jsx
+#: src/screens/inventory-item-editor.jsx
+#: src/screens/inventory-item-panel.jsx
 msgid "No se pudo leer la base del costo."
 msgstr "No se pudo leer la base del costo."
 
 #: src/screens/inventory-costing.jsx
-msgid "Este negocio no tiene insumos en inventario todavía."
-msgstr "Este negocio no tiene insumos en inventario todavía."
+msgid "Este negocio no tiene artículos en inventario todavía."
+msgstr "Este negocio no tiene artículos en inventario todavía."
 
 #: src/screens/inventory-costing.jsx
-msgid "El costo de un insumo es el promedio ponderado de lo que realmente se pagó al recibirlo, no lo que se pidió. Un insumo sin recepciones no tiene precio, y por eso no aparece como cero."
-msgstr "El costo de un insumo es el promedio ponderado de lo que realmente se pagó al recibirlo, no lo que se pidió. Un insumo sin recepciones no tiene precio, y por eso no aparece como cero."
+msgid "El costo usa el promedio ponderado de las compras recibidas. Si no hay compras, usa el costo inicial guardado. Sin ninguno de los dos, el artículo queda sin costo."
+msgstr "El costo usa el promedio ponderado de las compras recibidas. Si no hay compras, usa el costo inicial guardado. Sin ninguno de los dos, el artículo queda sin costo."
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Artículo"
+msgstr "Artículo"
+
+#: src/screens/inventory-costing.jsx
+msgid "Origen del costo"
+msgstr "Origen del costo"
 
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
@@ -4460,9 +4518,14 @@ msgid "Recibido"
 msgstr "Recibido"
 
 #: src/screens/inventory-costing.jsx
-#: src/screens/recipe-workspace.jsx
-msgid "Sin precio"
-msgstr "Sin precio"
+#: src/screens/inventory-item-panel.jsx
+msgid "Costo inicial"
+msgstr "Costo inicial"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-item-panel.jsx
+msgid "Calculado con compras"
+msgstr "Calculado con compras"
 
 #. placeholder {0}: item.receiptCount
 #: src/screens/inventory-costing.jsx
@@ -4530,6 +4593,7 @@ msgid "Estas porciones extra no son parte del costo de la receta; su dinero est�
 msgstr "Estas porciones extra no son parte del costo de la receta; su dinero está en el costo del día."
 
 #: src/screens/inventory-count.jsx
+#: src/screens/inventory-production.jsx
 msgid "Almacén"
 msgstr "Almacén"
 
@@ -5014,6 +5078,7 @@ msgid "Control de existencias"
 msgstr "Control de existencias"
 
 #: src/screens/inventory-item-editor.jsx
+#: src/screens/inventory-item-panel.jsx
 msgid "Si falta inventario"
 msgstr "Si falta inventario"
 
@@ -5052,6 +5117,24 @@ msgstr "Cantidad que quieres tener lista"
 msgid "En {0}. Es la cantidad que quieres tener disponible para trabajar."
 msgstr "En {0}. Es la cantidad que quieres tener disponible para trabajar."
 
+#. placeholder {0}: unitOf(baseUnit)
+#: src/screens/inventory-item-editor.jsx
+msgid "Costo inicial por {0}"
+msgstr "Costo inicial por {0}"
+
+#: src/screens/inventory-item-editor.jsx
+msgid "Se usa mientras no haya compras registradas."
+msgstr "Se usa mientras no haya compras registradas."
+
+#: src/screens/inventory-item-editor.jsx
+msgid "Escribe 0 o un costo mayor, con hasta 2 decimales. Si el costo es demasiado grande, redúcelo."
+msgstr "Escribe 0 o un costo mayor, con hasta 2 decimales. Si el costo es demasiado grande, redúcelo."
+
+#: src/screens/inventory-item-editor.jsx
+#: src/screens/inventory-item-panel.jsx
+msgid "Las compras registradas tienen prioridad sobre el costo inicial guardado."
+msgstr "Las compras registradas tienen prioridad sobre el costo inicial guardado."
+
 #: src/screens/inventory-item-editor.jsx
 msgid "Escribe 0 o una cantidad mayor, con hasta {quantityScale} decimales. Si la cantidad es demasiado grande, redúcela."
 msgstr "Escribe 0 o una cantidad mayor, con hasta {quantityScale} decimales. Si la cantidad es demasiado grande, redúcela."
@@ -5071,6 +5154,18 @@ msgstr "Confirmar archivo"
 #: src/screens/staff.jsx
 msgid "Archivar"
 msgstr "Archivar"
+
+#: src/screens/inventory-item-panel.jsx
+#~ msgid "El costo viene de las facturas recibidas."
+#~ msgstr "El costo viene de las facturas recibidas."
+
+#: src/screens/inventory-item-panel.jsx
+#~ msgid "Ningún recibo ha fijado el costo de este artículo. Los márgenes no lo incluyen."
+#~ msgstr "Ningún recibo ha fijado el costo de este artículo. Los márgenes no lo incluyen."
+
+#: src/screens/inventory-item-panel.jsx
+#~ msgid "Negativos"
+#~ msgstr "Negativos"
 
 #: src/screens/inventory-item-panel.jsx
 #: src/screens/inventory-workspace.jsx
@@ -5144,10 +5239,6 @@ msgid "Vida útil"
 msgstr "Vida útil"
 
 #: src/screens/inventory-item-panel.jsx
-msgid "Negativos"
-msgstr "Negativos"
-
-#: src/screens/inventory-item-panel.jsx
 #: src/screens/ventas-report.jsx
 msgid "Unidades"
 msgstr "Unidades"
@@ -5157,16 +5248,175 @@ msgid "No hay conversiones. El artículo se cuenta en su unidad base."
 msgstr "No hay conversiones. El artículo se cuenta en su unidad base."
 
 #: src/screens/inventory-item-panel.jsx
-msgid "El costo viene de las facturas recibidas."
-msgstr "El costo viene de las facturas recibidas."
+msgid "Costo no disponible"
+msgstr "Costo no disponible"
 
 #: src/screens/inventory-item-panel.jsx
-msgid "Ningún recibo ha fijado el costo de este artículo. Los márgenes no lo incluyen."
-msgstr "Ningún recibo ha fijado el costo de este artículo. Los márgenes no lo incluyen."
+msgid "El artículo está archivado. La fuente del costo no está disponible."
+msgstr "El artículo está archivado. La fuente del costo no está disponible."
+
+#. placeholder {0}: formatMoney(item.initialUnitCostMinor, currency)
+#: src/screens/inventory-item-panel.jsx
+msgid "Costo inicial guardado: {0} {currency} / {unit}."
+msgstr "Costo inicial guardado: {0} {currency} / {unit}."
+
+#: src/screens/inventory-item-panel.jsx
+msgid "Cargando el costo…"
+msgstr "Cargando el costo…"
+
+#: src/screens/inventory-item-panel.jsx
+msgid "Agrega un costo inicial o registra una compra."
+msgstr "Agrega un costo inicial o registra una compra."
+
+#: src/screens/inventory-item-panel.jsx
+#: src/screens/inventory-workspace.jsx
+msgid "Agregar costo"
+msgstr "Agregar costo"
+
+#: src/screens/inventory-item-panel.jsx
+msgid "Editar costo inicial"
+msgstr "Editar costo inicial"
 
 #: src/screens/inventory-item-panel.jsx
 msgid "Ninguno declarado"
 msgstr "Ninguno declarado"
+
+#: src/screens/inventory-production.jsx
+msgid "La receta cambió. Revisa de nuevo los ingredientes antes de confirmar."
+msgstr "La receta cambió. Revisa de nuevo los ingredientes antes de confirmar."
+
+#: src/screens/inventory-production.jsx
+msgid "Esta cantidad no permite medir los ingredientes con exactitud. Elige otra cantidad."
+msgstr "Esta cantidad no permite medir los ingredientes con exactitud. Elige otra cantidad."
+
+#: src/screens/inventory-production.jsx
+msgid "Revisa la cantidad que quieres preparar."
+msgstr "Revisa la cantidad que quieres preparar."
+
+#: src/screens/inventory-production.jsx
+msgid "Falta una conversión de unidades. Revisa el artículo y su receta."
+msgstr "Falta una conversión de unidades. Revisa el artículo y su receta."
+
+#: src/screens/inventory-production.jsx
+msgid "El almacén ya no está disponible. Cierra y vuelve a abrir la preparación."
+msgstr "El almacén ya no está disponible. Cierra y vuelve a abrir la preparación."
+
+#: src/screens/inventory-production.jsx
+msgid "El artículo ya no tiene una receta activa. Actualiza la lista."
+msgstr "El artículo ya no tiene una receta activa. Actualiza la lista."
+
+#: src/screens/inventory-production.jsx
+msgid "El artículo está archivado. Elige otro artículo."
+msgstr "El artículo está archivado. Elige otro artículo."
+
+#: src/screens/inventory-production.jsx
+msgid "No hay ingredientes suficientes. Registra su entrada antes de preparar."
+msgstr "No hay ingredientes suficientes. Registra su entrada antes de preparar."
+
+#: src/screens/inventory-production.jsx
+msgid "Esta preparación necesita aprobación por falta de ingredientes. Pide ayuda a la persona responsable."
+msgstr "Esta preparación necesita aprobación por falta de ingredientes. Pide ayuda a la persona responsable."
+
+#: src/screens/inventory-production.jsx
+msgid "Espera un momento antes de intentar de nuevo."
+msgstr "Espera un momento antes de intentar de nuevo."
+
+#: src/screens/inventory-production.jsx
+msgid "No tienes permiso para registrar preparaciones."
+msgstr "No tienes permiso para registrar preparaciones."
+
+#: src/screens/inventory-production.jsx
+msgid "No se pudo completar la operación. Intenta de nuevo."
+msgstr "No se pudo completar la operación. Intenta de nuevo."
+
+#: src/screens/inventory-production.jsx
+#: src/screens/prep-list.jsx
+msgid "Nueva preparación"
+msgstr "Nueva preparación"
+
+#. placeholder {0}: quantityOf(result.producedQuantity)
+#: src/screens/inventory-production.jsx
+msgid "Preparación registrada: {0}."
+msgstr "Preparación registrada: {0}."
+
+#. placeholder {0}: result.lotReference
+#: src/screens/inventory-production.jsx
+msgid "Lote: {0}"
+msgstr "Lote: {0}"
+
+#: src/screens/inventory-production.jsx
+msgid "Elige una sucursal para registrar una preparación."
+msgstr "Elige una sucursal para registrar una preparación."
+
+#: src/screens/inventory-production.jsx
+msgid "No se pudieron cargar los artículos, las recetas o los almacenes. Cierra y vuelve a intentar."
+msgstr "No se pudieron cargar los artículos, las recetas o los almacenes. Cierra y vuelve a intentar."
+
+#: src/screens/inventory-production.jsx
+#: src/screens/prep-list.jsx
+msgid "Cargando la preparación…"
+msgstr "Cargando la preparación…"
+
+#: src/screens/inventory-production.jsx
+msgid "No hay un almacén activo en esta sucursal. Pide a la persona responsable que lo configure."
+msgstr "No hay un almacén activo en esta sucursal. Pide a la persona responsable que lo configure."
+
+#: src/screens/inventory-production.jsx
+msgid "No hay artículos activos con receta para preparar. Crea una receta de artículo en Recetas."
+msgstr "No hay artículos activos con receta para preparar. Crea una receta de artículo en Recetas."
+
+#: src/screens/inventory-production.jsx
+msgid "Artículo a preparar"
+msgstr "Artículo a preparar"
+
+#: src/screens/inventory-production.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Elige un artículo"
+msgstr "Elige un artículo"
+
+#: src/screens/inventory-production.jsx
+msgid "Elige un almacén"
+msgstr "Elige un almacén"
+
+#: src/screens/inventory-production.jsx
+#: src/screens/prep-list.jsx
+msgid "Cantidad a preparar"
+msgstr "Cantidad a preparar"
+
+#. placeholder {0}: unitOf(item.baseUnit)
+#: src/screens/inventory-production.jsx
+msgid "Unidad: {0}"
+msgstr "Unidad: {0}"
+
+#: src/screens/inventory-production.jsx
+msgid "Escribe una cantidad mayor que cero con los decimales del artículo, sin redondear."
+msgstr "Escribe una cantidad mayor que cero con los decimales del artículo, sin redondear."
+
+#: src/screens/inventory-production.jsx
+msgid "Ingredientes revisados"
+msgstr "Ingredientes revisados"
+
+#. placeholder {0}: quantityOf(preview.plannedQuantity)
+#: src/screens/inventory-production.jsx
+msgid "Ingredientes para {0}"
+msgstr "Ingredientes para {0}"
+
+#: src/screens/inventory-production.jsx
+msgid "No pudimos confirmar el resultado. Reintenta para consultar la misma preparación antes de salir."
+msgstr "No pudimos confirmar el resultado. Reintenta para consultar la misma preparación antes de salir."
+
+#: src/screens/inventory-production.jsx
+msgid "Reintentar preparación"
+msgstr "Reintentar preparación"
+
+#: src/screens/inventory-production.jsx
+msgid "Confirmar preparación"
+msgstr "Confirmar preparación"
+
+#: src/screens/inventory-production.jsx
+msgid "Revisar ingredientes"
+msgstr "Revisar ingredientes"
 
 #: src/screens/inventory-workspace.jsx
 #~ msgid "Mostrar archivados"
@@ -5201,6 +5451,10 @@ msgstr "Ninguno declarado"
 #~ msgstr "Poner costo"
 
 #: src/screens/inventory-workspace.jsx
+#~ msgid "Ver costos"
+#~ msgstr "Ver costos"
+
+#: src/screens/inventory-workspace.jsx
 msgid "Todo"
 msgstr "Todo"
 
@@ -5219,10 +5473,6 @@ msgstr "Archivados"
 #: src/screens/inventory-workspace.jsx
 msgid "Revisar"
 msgstr "Revisar"
-
-#: src/screens/inventory-workspace.jsx
-msgid "Ver costos"
-msgstr "Ver costos"
 
 #: src/screens/inventory-workspace.jsx
 msgid "Activar conteo"
@@ -5425,11 +5675,6 @@ msgstr "Descripción del proveedor"
 #: src/screens/invoice-inbox.jsx
 msgid "Artículo del inventario"
 msgstr "Artículo del inventario"
-
-#: src/screens/invoice-inbox.jsx
-#: src/screens/recipe-workspace.jsx
-msgid "Elige un artículo"
-msgstr "Elige un artículo"
 
 #: src/screens/invoice-inbox.jsx
 msgid "Recordar el SKU del proveedor"
@@ -7913,10 +8158,6 @@ msgid "No puedes administrar la preparación."
 msgstr "No puedes administrar la preparación."
 
 #: src/screens/prep-list.jsx
-msgid "Cargando la preparación…"
-msgstr "Cargando la preparación…"
-
-#: src/screens/prep-list.jsx
 msgid "Mostrar también los que ya tienen suficiente"
 msgstr "Mostrar también los que ya tienen suficiente"
 
@@ -7934,21 +8175,12 @@ msgstr "Define en Inventario la cantidad que quieres tener lista para cada artí
 
 #: src/screens/prep-list.jsx
 #: src/screens/recipe-workspace.jsx
-msgid "Artículo"
-msgstr "Artículo"
-
-#: src/screens/prep-list.jsx
-#: src/screens/recipe-workspace.jsx
 msgid "Unidad"
 msgstr "Unidad"
 
 #: src/screens/prep-list.jsx
 msgid "Uso previsto"
 msgstr "Uso previsto"
-
-#: src/screens/prep-list.jsx
-msgid "Cantidad a preparar"
-msgstr "Cantidad a preparar"
 
 #. placeholder {0}: item.expiresOn
 #: src/screens/prep-list.jsx
@@ -8294,6 +8526,30 @@ msgstr "Abre un recibo para ver la venta con sus conceptos, impuestos y forma de
 #~ msgstr "No se pudo guardar la receta."
 
 #: src/screens/recipe-workspace.jsx
+#~ msgid "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada ingrediente."
+#~ msgstr "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada ingrediente."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Registra una compra para conocer su costo."
+#~ msgstr "Registra una compra para conocer su costo."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Registra una compra de estos ingredientes para conocer el costo."
+#~ msgstr "Registra una compra de estos ingredientes para conocer el costo."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "El costo se calcula con las compras registradas de tus ingredientes."
+#~ msgstr "El costo se calcula con las compras registradas de tus ingredientes."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "El desglose muestra los ingredientes de cada receta. Un ingrediente sin compras registradas aún no tiene precio."
+#~ msgstr "El desglose muestra los ingredientes de cada receta. Un ingrediente sin compras registradas aún no tiene precio."
+
+#: src/screens/recipe-workspace.jsx
+#~ msgid "Ingrediente comprado."
+#~ msgstr "Ingrediente comprado."
+
+#: src/screens/recipe-workspace.jsx
 msgid "Sub-receta"
 msgstr "Sub-receta"
 
@@ -8366,14 +8622,18 @@ msgstr "Retirada"
 msgid "{0, plural, one {Se usa en # receta} other {Se usa en # recetas}}"
 msgstr "{0, plural, one {Se usa en # receta} other {Se usa en # recetas}}"
 
+#: src/screens/recipe-workspace.jsx
+msgid "Preparar"
+msgstr "Preparar"
+
 #. placeholder {0}: recipe.targetName
 #: src/screens/recipe-workspace.jsx
 msgid "Editar {0}"
 msgstr "Editar {0}"
 
 #: src/screens/recipe-workspace.jsx
-msgid "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada ingrediente."
-msgstr "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada ingrediente."
+msgid "El costo es el de una unidad de rendimiento, calculado con el costo de cada ingrediente."
+msgstr "El costo es el de una unidad de rendimiento, calculado con el costo de cada ingrediente."
 
 #: src/screens/recipe-workspace.jsx
 msgid "Cargando el costo de ingredientes…"
@@ -8401,8 +8661,12 @@ msgid "Sí"
 msgstr "Sí"
 
 #: src/screens/recipe-workspace.jsx
-msgid "El desglose muestra los ingredientes de cada receta. Un ingrediente sin compras registradas aún no tiene precio."
-msgstr "El desglose muestra los ingredientes de cada receta. Un ingrediente sin compras registradas aún no tiene precio."
+msgid "Sin precio"
+msgstr "Sin precio"
+
+#: src/screens/recipe-workspace.jsx
+msgid "El desglose muestra los ingredientes de cada receta. Agrega un costo inicial o registra una compra para conocer su costo."
+msgstr "El desglose muestra los ingredientes de cada receta. Agrega un costo inicial o registra una compra para conocer su costo."
 
 #: src/screens/recipe-workspace.jsx
 msgid "La configuración de inventario cambió. Guarda de nuevo para revisar el estado actual."
@@ -8498,16 +8762,16 @@ msgid "La cantidad no cabe en la escala del artículo{0}"
 msgstr "La cantidad no cabe en la escala del artículo{0}"
 
 #: src/screens/recipe-workspace.jsx
-msgid "Ingrediente comprado."
-msgstr "Ingrediente comprado."
+msgid "Ingrediente."
+msgstr "Ingrediente."
 
 #: src/screens/recipe-workspace.jsx
 msgid "El costo de esta sub-receta aún no se calcula. Revisa los precios de sus ingredientes."
 msgstr "El costo de esta sub-receta aún no se calcula. Revisa los precios de sus ingredientes."
 
 #: src/screens/recipe-workspace.jsx
-msgid "Registra una compra para conocer su costo."
-msgstr "Registra una compra para conocer su costo."
+msgid "Agrega un costo inicial o registra una compra para conocer su costo."
+msgstr "Agrega un costo inicial o registra una compra para conocer su costo."
 
 #. placeholder {0}: formatMoney(basis)
 #. placeholder {1}: unitOf(item.baseUnit)
@@ -8524,8 +8788,8 @@ msgid "Una cantidad no da unidades completas del artículo. Ajusta el rendimient
 msgstr "Una cantidad no da unidades completas del artículo. Ajusta el rendimiento o la cantidad. Revisa las cantidades para conocer el costo."
 
 #: src/screens/recipe-workspace.jsx
-msgid "Registra una compra de estos ingredientes para conocer el costo."
-msgstr "Registra una compra de estos ingredientes para conocer el costo."
+msgid "Agrega un costo inicial o registra una compra de estos ingredientes."
+msgstr "Agrega un costo inicial o registra una compra de estos ingredientes."
 
 #: src/screens/recipe-workspace.jsx
 msgid "Agrega un ingrediente para calcular el costo."
@@ -8549,8 +8813,8 @@ msgid "Costo guardado: {0}. El número de arriba es el cálculo en pantalla."
 msgstr "Costo guardado: {0}. El número de arriba es el cálculo en pantalla."
 
 #: src/screens/recipe-workspace.jsx
-msgid "El costo se calcula con las compras registradas de tus ingredientes."
-msgstr "El costo se calcula con las compras registradas de tus ingredientes."
+msgid "El costo usa las compras registradas o el costo inicial de tus ingredientes."
+msgstr "El costo usa las compras registradas o el costo inicial de tus ingredientes."
 
 #: src/screens/recipe-workspace.jsx
 msgid "Las ventas descuentan un artículo de inventario."

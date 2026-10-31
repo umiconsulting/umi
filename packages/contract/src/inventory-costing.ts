@@ -9,17 +9,11 @@ import { NonNegativeScaledQuantity, ScaledQuantity, UnitOfMeasure } from './pos-
  *
  * ── where the numbers come from, and where they do not ────────────────────────
  *
- * THERE IS NO COST COLUMN. `inventory_item` carries no price, and that is not an
- * oversight in the schema: a cost is what a supplier actually charged, and the only
- * two places that fact exists are `purchase_order_line.unit_cost_minor` (what was
- * ordered) and `purchase_order_receipt_line.actual_unit_cost_minor` (what actually
- * arrived and was paid for). This module averages the RECEIPTS, never the orders: an
- * order is an intention, and an intention that was never delivered is not a cost.
- *
- * AN ITEM WITH NO RECEIPT HAS NO COST, AND THE RESPONSE SAYS SO. It does not report
- * zero. A zero cost makes every margin a hundred percent, which is worse than saying
- * "we do not know" — and a plate built from such an item is reported `incomplete`
- * and NAMES the items, rather than being priced as if the ingredient were free.
+ * Received purchase lines supply the quantity-weighted average cost.
+ * An item with no received purchases uses its saved initial amount, when present.
+ * A deliberate zero is a known cost. A missing amount remains null.
+ * Receipt counts, received quantities, and receipt price ranges describe actual purchases.
+ * A manual initial amount creates no receipt or stock movement.
  *
  * CONSUMPTION COMES FROM THE LEDGER, AND SO DOES THE MONEY. `stock_ledger_entry`
  * rows with `entry_type = 'sale_committed'` are what a sale actually took out of
@@ -29,7 +23,7 @@ import { NonNegativeScaledQuantity, ScaledQuantity, UnitOfMeasure } from './pos-
  *
  * ── what this module cannot do, stated rather than hidden ─────────────────────
  *
- * The cost basis is the CURRENT weighted average, computed when the read runs. The
+ * The cost basis uses the CURRENT receipt average or initial amount. The
  * platform does not yet store a cost per receipt per sale, so a day six weeks ago is
  * re-costed at today's average, and `costBasis.asOf` names the moment. That is a
  * real limitation, not a rounding detail, and a caller that needs an audited
@@ -57,7 +51,11 @@ const BasisPoints = z.number().int().safe();
  * to guess, and so a second basis (a moving average, a landed cost) can arrive later
  * without silently changing what the existing numbers mean.
  */
-export const CostBasisKind = z.enum(['weighted_average_of_receipts', 'no_receipts']);
+export const CostBasisKind = z.enum([
+  'weighted_average_of_receipts',
+  'manual_initial',
+  'no_receipts',
+]);
 export type CostBasisKind = z.infer<typeof CostBasisKind>;
 
 /**
@@ -66,7 +64,7 @@ export type CostBasisKind = z.infer<typeof CostBasisKind>;
  *
  *   no_inventory_mapping  nothing in the catalogue says what this product consumes
  *   no_recipe_components  the mapping points at a recipe that has no components
- *   no_cost_basis         a component has never been received, so it has no cost
+ *   no_cost_basis         a component has neither received purchases nor an initial amount
  *   non_stock_mapping     the product is deliberately not stocked; its cost is unknown
  *   unit_conversion_not_exact  the recipe does not divide into whole units of the
  *                              item at its own scale — the sale path refuses this
@@ -100,7 +98,7 @@ export type UncostedItem = z.infer<typeof UncostedItem>;
 
 export const InventoryCostBasisQuery = z
   .object({
-    /** Omitted: every tracked item. False (the default) hides items with no receipt. */
+    /** False requires actual receipts. True includes manual and missing bases. */
     includeWithoutReceipts: z.coerce.boolean().default(false),
   })
   .strict();

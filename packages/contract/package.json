@@ -46,7 +46,8 @@
     "build": "pnpm run generate && tsup",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run build",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:dart": "node scripts/test-dart.mjs"
   },
   "dependencies": {
     "zod": "^3.24.1",
