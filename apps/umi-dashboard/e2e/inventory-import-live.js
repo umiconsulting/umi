@@ -405,7 +405,12 @@ export async function verifyInventoryImportLive({
     (key) => JSON.parse(sessionStorage.getItem(key)),
     `umi:inventory-import:v1:${fixture.merchantId}:recipes`,
   );
-  expect(staleBatch.entries[0].result.code).toBe('CONFLICT');
+  expect(staleBatch.entries[0].result.code).toBe('INVENTORY_RECIPE_RETIRED');
+  await expect(
+    dialog.getByText('La receta cambió. Elige Nueva importación y revisa el archivo de nuevo.', {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.screenshot({
     path: `${evidenceDir}/recipe-stale-conflict.png`,
     animations: 'disabled',
