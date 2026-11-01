@@ -74,7 +74,7 @@ export async function verifyInventoryImport({
   await button('Cancelar').click();
   await expect(dialog).not.toBeVisible();
   expect(requests).toHaveLength(0);
-  expect(await page.evaluate((key) => localStorage.getItem(key), journalKey)).toBeNull();
+  expect(await page.evaluate((key) => sessionStorage.getItem(key), journalKey)).toBeNull();
   await page.setViewportSize({ width: 1280, height: 900 });
   await open();
   await dialog.getByLabel('Formato de descarga').selectOption('csv');
@@ -157,7 +157,7 @@ export async function verifyInventoryImport({
   });
   await button('Nueva importación').click();
   await expect(dialog.getByLabel('Elegir archivo', { exact: true })).toBeVisible();
-  expect(await page.evaluate((key) => localStorage.getItem(key), journalKey)).toBeNull();
+  expect(await page.evaluate((key) => sessionStorage.getItem(key), journalKey)).toBeNull();
   await button('Cancelar').click();
   await expect(page.getByRole('row').filter({ hasText: `SAVE-${key}` })).toBeVisible();
   await page.goto(`${base}/inventory/recetas`);
@@ -229,4 +229,122 @@ export async function verifyImportClose({ page, fixture, expect, base }) {
     await page.unroute(pattern, hold);
   }
   return { savedAfterClose: true, unsentDiscarded: true };
+}
+
+/** Command responses are controlled. This regression sends no import to the API. */
+export async function verifyImportJournalScope({ page, fixture, expect, base, evidenceDir }) {
+  const journalKey = `umi:inventory-import:v1:${fixture.merchantId}:items`;
+  const pattern = `**/api/merchants/${fixture.merchantId}/administrative-commands`;
+  const name = 'Importar artículos';
+  const dialog = (tab) => tab.getByRole('dialog', { name, exact: true });
+  const open = async (tab) => {
+    await tab.getByRole('button', { name, exact: true }).click();
+    await expect(dialog(tab)).toBeVisible();
+  };
+  const read = (tab) => tab.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), journalKey);
+  const commands = [];
+  const loseResponse = async (route) => {
+    commands.push(route.request().postDataJSON());
+    await route.abort('failed');
+  };
+  const prepare = async (tab, code) => {
+    await dialog(tab)
+      .getByLabel('Elegir archivo', { exact: true })
+      .setInputFiles({
+        name: 'scope.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from(
+          `codigo,nombre,tipo,unidad,decimales\n${code},Scope,ingredient,gram,0\n`,
+        ),
+      });
+    await dialog(tab).getByRole('button', { name: 'Revisar archivo', exact: true }).click();
+    await dialog(tab).getByRole('button', { name: 'Importar 1 artículo', exact: true }).click();
+    await expect(dialog(tab).getByText('Por confirmar', { exact: true })).toBeVisible();
+  };
+  await page.goto(`${base}/inventory`);
+  await page.route(pattern, loseResponse);
+  let other;
+  try {
+    await open(page);
+    await prepare(page, `TAB-A-${randomUUID().slice(0, 8)}`);
+    const original = await read(page);
+    expect(original?.entries[0].executionStatus).toBe('ambiguous');
+    expect(await page.evaluate((key) => localStorage.getItem(key), journalKey)).toBeNull();
+    await dialog(page).getByRole('button', { name: 'Cerrar', exact: true }).click();
+    await open(page);
+    await expect(dialog(page).getByText('Por confirmar', { exact: true })).toBeVisible();
+    expect(await read(page)).toEqual(original);
+    await page.reload();
+    await open(page);
+    await expect(dialog(page).getByText('Por confirmar', { exact: true })).toBeVisible();
+    expect(await read(page)).toEqual(original);
+
+    other = await page.context().newPage(); // Independent tab, with no opener.
+    await other.route(pattern, loseResponse);
+    await other.goto(`${base}/inventory`);
+    await open(other);
+    await expect(dialog(other).getByLabel('Elegir archivo', { exact: true })).toBeVisible();
+    expect(await read(other)).toBeNull();
+    await prepare(other, `TAB-B-${randomUUID().slice(0, 8)}`);
+    expect((await read(other)).id).not.toBe(original.id);
+    expect(await read(page)).toEqual(original);
+    await other.close();
+    other = null;
+
+    // The merchant preference belongs to localStorage, even if a session key differs.
+    await page.evaluate(() => {
+      sessionStorage.setItem('umi-dashboard-selected-merchant', 'another-merchant');
+      localStorage.setItem('umi-dashboard-selected-location', 'changed-after-confirmation');
+    });
+    let refreshReads = 0;
+    const countRefresh = (request) => {
+      const url = new URL(request.url());
+      if (
+        request.method() === 'GET' &&
+        url.pathname === `/api/merchants/${fixture.merchantId}/items` &&
+        !url.searchParams.has('includeArchived')
+      )
+        refreshReads++;
+    };
+    page.on('request', countRefresh);
+    await page.unroute(pattern, loseResponse);
+    await page.route(pattern, async (route) => {
+      const command = route.request().postDataJSON();
+      commands.push(command);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ item: { id: command.targetAggregateId, version: 1 } }),
+      });
+    });
+    await dialog(page).getByRole('button', { name: 'Reintentar pendientes', exact: true }).click();
+    await expect(dialog(page).getByText('Guardado', { exact: true })).toBeVisible();
+    expect(commands).toHaveLength(3);
+    expect(commands[2]).toEqual(commands[0]);
+    expect(commands[2].locationId).toBe(fixture.locationId);
+    await expect.poll(() => refreshReads).toBeGreaterThan(0);
+    page.off('request', countRefresh);
+    expect(await page.evaluate(() => localStorage.getItem('umi-dashboard-selected-merchant'))).toBe(
+      fixture.merchantId,
+    );
+    await page.screenshot({
+      path: `${evidenceDir}/journal-session-recovered.png`,
+      animations: 'disabled',
+      timeout: 60000,
+    });
+    await dialog(page).getByRole('button', { name: 'Nueva importación', exact: true }).click();
+    expect(await read(page)).toBeNull();
+    await dialog(page).getByRole('button', { name: 'Cancelar', exact: true }).click();
+    return {
+      sameTabReopen: true,
+      sameTabReload: true,
+      independentTabs: true,
+      exactRetry: true,
+      merchantPreferenceRefresh: true,
+      apiImportWrites: 0,
+    };
+  } finally {
+    await other?.close();
+    await page.unroute(pattern);
+  }
 }

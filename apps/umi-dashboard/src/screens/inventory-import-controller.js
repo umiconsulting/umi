@@ -45,7 +45,7 @@ export function useInventoryImportController({
     live.current = true;
     let disposed = false;
     try {
-      storage.current = window.localStorage;
+      storage.current = window.sessionStorage;
       setBatch(readImportBatch(storage.current, identity.merchantId, identity.kind));
     } catch (cause) {
       setError(cause.code || 'STORAGE_READ_FAILED');
@@ -133,7 +133,7 @@ export function useInventoryImportController({
           if (matches()) {
             setBatch(value);
           }
-          const selectedMerchant = storage.current.getItem('umi-dashboard-selected-merchant');
+          const selectedMerchant = window.localStorage.getItem('umi-dashboard-selected-merchant');
           if (
             (selectedMerchant || current.current.merchantId) === identity.merchantId &&
             value.entries.some((entry) => entry.executionStatus === 'success')

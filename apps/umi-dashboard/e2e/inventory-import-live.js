@@ -21,7 +21,6 @@ export async function loginImportOwner(page, fixture, base) {
   await page.getByLabel('Contraseña', { exact: true }).fill(fixture.password);
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await page.waitForURL((url) => url.pathname !== '/login');
-  await page.waitForLoadState('networkidle');
   await page.getByRole('navigation').first().waitFor();
 }
 
@@ -401,7 +400,7 @@ export async function verifyInventoryImportLive({
   expect(staleResponse.status()).toBe(409);
   await expect(dialog.getByRole('cell', { name: 'Error', exact: true })).toBeVisible();
   const staleBatch = await page.evaluate(
-    (key) => JSON.parse(localStorage.getItem(key)),
+    (key) => JSON.parse(sessionStorage.getItem(key)),
     `umi:inventory-import:v1:${fixture.merchantId}:recipes`,
   );
   expect(staleBatch.entries[0].result.code).toBe('CONFLICT');
@@ -634,7 +633,7 @@ export async function verifyImportBoundaries({ page, fixture, expect, base, db, 
       )
     ).rows,
   ).toHaveLength(0);
-  expect(await page.evaluate((journal) => localStorage.getItem(journal), key)).toBeNull();
+  expect(await page.evaluate((journal) => sessionStorage.getItem(journal), key)).toBeNull();
   await trigger.click();
   await expect(button('Descargar códigos')).toBeEnabled();
   const badRows = Array.from(
@@ -740,14 +739,17 @@ export async function verifyImportBoundaries({ page, fixture, expect, base, db, 
     await expect
       .poll(async () =>
         page.evaluate(
-          (journal) => JSON.parse(localStorage.getItem(journal))?.entries[0]?.executionStatus,
+          (journal) => JSON.parse(sessionStorage.getItem(journal))?.entries[0]?.executionStatus,
           key,
         ),
       )
       .toBe('success');
     expect(commands).toHaveLength(1);
     expect(commands[0].locationId).toBe(fixture.locationId);
-    const batch = await page.evaluate((journal) => JSON.parse(localStorage.getItem(journal)), key);
+    const batch = await page.evaluate(
+      (journal) => JSON.parse(sessionStorage.getItem(journal)),
+      key,
+    );
     expect(batch.entries[1].executionStatus).toBe('pending');
     expect(
       (
@@ -814,12 +816,10 @@ export async function verifyImportRestricted({ browser, fixture, expect, base, d
       base,
     );
     await page.goto(`${base}/inventory`);
-    await page.waitForLoadState('networkidle');
     await expect(page.getByRole('button', { name: 'Importar artículos', exact: true })).toHaveCount(
       0,
     );
     await page.goto(`${base}/inventory/recetas`);
-    await page.waitForLoadState('networkidle');
     await expect(page.getByRole('button', { name: 'Importar recetas', exact: true })).toHaveCount(
       0,
     );

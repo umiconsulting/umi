@@ -4,7 +4,11 @@ import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync } from 'node:fs';
 import process from 'node:process';
 import ExcelJS from 'exceljs';
-import { verifyInventoryImport, verifyImportClose } from './inventory-import-scenarios.js';
+import {
+  verifyInventoryImport,
+  verifyImportClose,
+  verifyImportJournalScope,
+} from './inventory-import-scenarios.js';
 import {
   loginImportOwner,
   verifyInventoryImportLive,
@@ -96,5 +100,26 @@ test('real API and database: exact recipes, history, checkout, pagination and ac
     await context.close();
     await browser.close(); // CDP closes this transport and preserves the shared Chromium process.
     await db.end();
+  }
+});
+
+test('journal survives the same tab and isolates independent tabs without API import writes', async () => {
+  test.skip(!process.env.UMI_IMPORT_FIXTURE, 'Requires an isolated local import fixture.');
+  const fixture = JSON.parse(readFileSync(process.env.UMI_IMPORT_FIXTURE, 'utf8'));
+  const base = process.env.UMI_IMPORT_BASE || 'http://127.0.0.1:4083';
+  const evidenceDir =
+    process.env.UMI_IMPORT_EVIDENCE_DIR || '/private/tmp/umi-import-final-fix-evidence';
+  mkdirSync(evidenceDir, { recursive: true });
+  const browser = await chromium.connectOverCDP(process.env.UX_CDP || 'http://127.0.0.1:9226', {
+    noDefaults: true,
+  });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  try {
+    const page = await context.newPage();
+    await loginImportOwner(page, fixture, base);
+    await verifyImportJournalScope({ page, fixture, expect, base, evidenceDir });
+  } finally {
+    await context.close();
+    await browser.close();
   }
 });
