@@ -578,7 +578,6 @@ export async function verifyImportedRecipeCheckout({ fixture, run, db, expect, r
       committedSale: true,
       flourGrams: '750',
       importedKilogramThousandths: '250',
-      receiptDelivery: 'display',
     };
   } finally {
     await api.dispose();

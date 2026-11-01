@@ -33,7 +33,7 @@ Los servicios anteriores permanecen activos.
 | API restringida         | HTTP403 y cero artículos creados.                                                                                |
 | Venta real              | PIN de dispositivo, sesión de operador, carrito, preparación y checkout con terminal manual.                     |
 | Consumo exacto          | Dos unidades consumen 750 gramos de harina y 250 milésimas de kilogramo del artículo importado.                  |
-| Recibo                  | Destino `display`. No se solicita entrega de notificaciones.                                                     |
+| Recibo                  | El harness no solicita entrega de notificaciones. No se comprobó el destino del recibo.                          |
 
 La creación del artículo usa XLSX. La creación de recetas usa CSV.
 La actualización y la reimportación de recetas usan XLSX.
@@ -82,8 +82,9 @@ El test combinado de Playwright quedó disponible; no se reclama una ejecución 
 ## Límites y correcciones del harness
 
 El rechazo concurrente produce `CONFLICT` con el motivo `INVENTORY_RECIPE_RETIRED`.
-El informe conserva el código `CONFLICT`, pero muestra un mensaje genérico.
-La captura permite revisar esta limitación de texto.
+La captura conserva el mensaje genérico anterior a la corrección final.
+La corrección final mapea ese motivo a un mensaje que pide elegir «Nueva importación» y revisar el archivo.
+El journal conserva solo el código permitido; descarta el payload del error.
 Una petición posterior confirmó la respuesta exacta:
 
 ```json
