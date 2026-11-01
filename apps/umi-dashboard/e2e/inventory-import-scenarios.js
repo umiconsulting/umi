@@ -390,13 +390,11 @@ export async function verifyImportTemplateDownloads({
       expect(workbook.getWorksheet('Ejemplos').rowCount).toBe(2);
       expect(workbook.getWorksheet('Ingredientes').rowCount).toBeGreaterThan(1);
       expect(workbook.getWorksheet('Productos').rowCount).toBeGreaterThan(1);
-      await dialog
-        .getByLabel('Elegir archivo', { exact: true })
-        .setInputFiles({
-          name: download.suggestedFilename(),
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          buffer: readFileSync(path),
-        });
+      await dialog.getByLabel('Elegir archivo', { exact: true }).setInputFiles({
+        name: download.suggestedFilename(),
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        buffer: readFileSync(path),
+      });
       await dialog.getByRole('button', { name: 'Revisar archivo', exact: true }).click();
       await expect(dialog.getByRole('button', { name: emptyButton, exact: true })).toBeDisabled();
       await expect(
