@@ -7,7 +7,7 @@ export const issue = (code, column, rowNumber) => ({ code, column, rowNumber });
 
 // Remove insignificant zeroes before the precision and range checks.
 export function decimal(text, maxScale, { positive = false, fixed = false } = {}) {
-  const normalized = text.trim().replace(',', '.');
+  const normalized = text.trim();
   if (!/^\d+(?:\.\d+)?$/.test(normalized)) throw fileError('INVALID_NUMBER');
   const [digits, raw = ''] = normalized.split('.');
   const whole = digits.replace(/^0+/, '') || '0';

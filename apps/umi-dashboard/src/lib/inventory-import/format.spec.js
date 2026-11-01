@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ExcelJS from 'exceljs';
 import Papa from 'papaparse';
+import { buildImportPreview } from './preview.js';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -459,4 +460,74 @@ describe('inventory worker client', () => {
       code: 'UNSUPPORTED_ACTION',
     });
   });
+});
+
+describe('point-only amounts from real files', () => {
+  const merchantId = '00000000-0000-4000-8000-000000000001';
+  const productId = '00000000-0000-4000-8000-000000000002';
+  const snapshot = {
+    merchantId,
+    targets: [{ productId, productName: 'Coffee', productActive: true }],
+    recipes: [],
+    items: ['MILK', 'WATER'].map((publicReference, index) => ({
+      id: `00000000-0000-4000-8000-00000000000${index + 3}`,
+      publicReference,
+      displayName: publicReference,
+      itemType: 'ingredient',
+      baseUnit: 'liter',
+      quantityScale: 3,
+      active: true,
+      version: 1,
+      conversions: [],
+    })),
+  };
+  async function file(kind, encoding, rows) {
+    const { parseImportFile } = await import('./format.js');
+    const format = encoding === 'xlsx' ? 'xlsx' : 'csv';
+    const bytes =
+      format === 'xlsx'
+        ? await workbookBytes(rows, kind === 'items' ? 'Articulos' : 'Recetas')
+        : encoded(Papa.unparse(rows, { delimiter: encoding === 'semicolon' ? ';' : ',' }));
+    return buildImportPreview({
+      kind,
+      snapshot,
+      parsed: await parseImportFile({ kind, format, bytes }),
+    });
+  }
+  for (const encoding of ['semicolon', 'quoted-comma', 'xlsx']) {
+    it.each(['costo_unitario', 'existencia_minima', 'cantidad_preparacion'])(
+      `rejects comma amounts in ${encoding} item %s`,
+      async (column) => {
+        const result = await file('items', encoding, [
+          [...itemHeader.split(','), column],
+          ['COMMA', 'Coma', 'ingredient', 'liter', '3', '1,000'],
+        ]);
+        expect(result.entries[0]).toMatchObject({
+          status: 'error',
+          command: null,
+          errors: expect.arrayContaining([{ code: 'INVALID_NUMBER', column, rowNumber: 2 }]),
+        });
+      },
+    );
+    it.each(['rendimiento', 'cantidad'])(
+      `rejects the whole recipe with a comma in ${encoding} %s`,
+      async (column) => {
+        const headers = recipeHeader.split(',');
+        const invalid = [productId, '1', 'unit', 'MILK', '0.250', 'liter'];
+        invalid[headers.indexOf(column)] = '1,000';
+        const result = await file('recipes', encoding, [
+          headers,
+          invalid,
+          [productId, '1', 'unit', 'WATER', '0.125', 'liter'],
+        ]);
+        expect(result.entries).toHaveLength(1);
+        expect(result.entries[0]).toMatchObject({
+          rowNumbers: [2, 3],
+          status: 'error',
+          command: null,
+          errors: expect.arrayContaining([{ code: 'INVALID_NUMBER', column, rowNumber: 2 }]),
+        });
+      },
+    );
+  }
 });
