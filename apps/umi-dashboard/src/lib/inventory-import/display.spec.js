@@ -1,5 +1,7 @@
 import { expect, it } from 'vitest';
 import { i18n } from '@lingui/core';
+import { msg } from '@lingui/core/macro';
+import { messages as englishMessages } from '@/locales/en/messages.mjs';
 import { importErrorText, importStatusText, localizeImportResultRows } from './display.js';
 i18n.load('es', {});
 i18n.activate('es');
@@ -33,4 +35,15 @@ it('directs stale recipe owners to a fresh import instead of retrying the old co
   expect(importErrorText(i18n, 'INVENTORY_RECIPE_RETIRED')).not.toMatch(
     /vuelve a intentar|reintenta/i,
   );
+});
+
+it('uses Update for imports and preserves Refresh for reload controls in English', () => {
+  i18n.load('en', englishMessages);
+  i18n.activate('en');
+  try {
+    expect(importStatusText(i18n, 'update')).toBe('Update');
+    expect(i18n._(msg`Actualizar`)).toBe('Refresh');
+  } finally {
+    i18n.activate('es');
+  }
 });

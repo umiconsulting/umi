@@ -579,10 +579,7 @@ msgid "Nuevo"
 msgstr "Nuevo"
 
 #: src/lib/inventory-import/display.js
-#: src/screens/devices.jsx
-#: src/screens/operations-workspace.jsx
-#: src/screens/orders.jsx
-#: src/screens/overview.jsx
+msgctxt "inventory import status"
 msgid "Actualizar"
 msgstr "Actualizar"
 
@@ -2700,6 +2697,13 @@ msgstr "Actualización en vivo por el canal en tiempo real."
 #: src/screens/devices.jsx
 msgid "El canal en tiempo real no responde; la lista se actualiza cada 10 s."
 msgstr "El canal en tiempo real no responde; la lista se actualiza cada 10 s."
+
+#: src/screens/devices.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/orders.jsx
+#: src/screens/overview.jsx
+msgid "Actualizar"
+msgstr "Actualizar"
 
 #: src/screens/devices.jsx
 msgid "Estaciones"

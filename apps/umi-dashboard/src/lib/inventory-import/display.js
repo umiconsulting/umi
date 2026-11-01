@@ -67,7 +67,7 @@ const ERRORS = {
 };
 const STATUSES = {
   new: msg`Nuevo`,
-  update: msg`Actualizar`,
+  update: msg({ message: 'Actualizar', context: 'inventory import status' }),
   unchanged: msg`Sin cambios`,
   duplicate: msg`Duplicado`,
   error: msg`Error`,
