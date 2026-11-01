@@ -70,7 +70,11 @@ cd apps/umi-dashboard
 env -u NO_COLOR pnpm exec playwright test --config playwright.inventory-import.config.js --grep 'real API and database'
 ```
 
-El test rechaza una base remota o un nombre de base distinto.
+El test rechaza orígenes HTTP remotos o puertos distintos antes del login o las peticiones.
+Solo acepta dashboard 4083 y API 4082 en `127.0.0.1` o `localhost`.
+También exige PostgreSQL local 55435 y la base `umi_inventory_import`.
+El operador debe configurar el proxy del dashboard hacia esa API y ambas conexiones de la API hacia esa base.
+La validación de URL no inspecciona la configuración interna del proxy ni de la API.
 La configuración reutiliza el stack existente y no inicia otro servidor.
 Cada ejecución usa códigos y productos nuevos para evitar colisiones con ejecuciones anteriores.
 El test crea datos solo en la base local indicada.

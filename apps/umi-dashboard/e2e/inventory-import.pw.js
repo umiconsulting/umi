@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync } from 'node:fs';
 import process from 'node:process';
 import ExcelJS from 'exceljs';
+import { assertImportFixtureOrigins } from './inventory-import-safety.js';
 import {
   verifyInventoryImport,
   verifyImportClose,
@@ -22,6 +23,7 @@ test('CSV and Excel import preview, cancel, lost response recovery and localized
   test.skip(!process.env.UMI_IMPORT_FIXTURE, 'Requires an isolated local import fixture.');
   const fixture = JSON.parse(readFileSync(process.env.UMI_IMPORT_FIXTURE, 'utf8'));
   const base = process.env.UMI_IMPORT_BASE || 'http://127.0.0.1:4083';
+  assertImportFixtureOrigins(fixture, base);
   const evidenceDir =
     process.env.UMI_IMPORT_EVIDENCE_DIR || '/private/tmp/umi-import-task3-evidence';
   mkdirSync(evidenceDir, { recursive: true });
@@ -62,15 +64,13 @@ test('real API and database: exact recipes, history, checkout, pagination and ac
     'Requires the isolated import fixture and its local database URL.',
   );
   const fixture = JSON.parse(readFileSync(process.env.UMI_IMPORT_FIXTURE, 'utf8'));
-  const databaseUrl = new URL(process.env.UMI_IMPORT_DATABASE_URL);
-  expect(['127.0.0.1', 'localhost']).toContain(databaseUrl.hostname);
-  expect(databaseUrl.pathname).toBe('/umi_inventory_import');
   expect(fixture.task4).toBeTruthy();
+  const base = process.env.UMI_IMPORT_BASE || 'http://127.0.0.1:4083';
+  assertImportFixtureOrigins(fixture, base, process.env.UMI_IMPORT_DATABASE_URL);
   const requireApi = createRequire(new URL('../../umi-api/package.json', import.meta.url));
   const { Client } = requireApi('pg');
   const db = new Client({ connectionString: process.env.UMI_IMPORT_DATABASE_URL });
   await db.connect();
-  const base = process.env.UMI_IMPORT_BASE || 'http://127.0.0.1:4083';
   const evidenceDir =
     process.env.UMI_IMPORT_EVIDENCE_DIR || '/private/tmp/umi-import-task4-evidence';
   mkdirSync(evidenceDir, { recursive: true });
@@ -107,6 +107,7 @@ test('journal survives the same tab and isolates independent tabs without API im
   test.skip(!process.env.UMI_IMPORT_FIXTURE, 'Requires an isolated local import fixture.');
   const fixture = JSON.parse(readFileSync(process.env.UMI_IMPORT_FIXTURE, 'utf8'));
   const base = process.env.UMI_IMPORT_BASE || 'http://127.0.0.1:4083';
+  assertImportFixtureOrigins(fixture, base);
   const evidenceDir =
     process.env.UMI_IMPORT_EVIDENCE_DIR || '/private/tmp/umi-import-final-fix-evidence';
   mkdirSync(evidenceDir, { recursive: true });

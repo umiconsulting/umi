@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { randomUUID, createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { assertImportFixtureOrigins } from './inventory-import-safety.js';
 
 const itemHeader =
   'codigo,nombre,tipo,unidad,decimales,costo_unitario,existencia_minima,cantidad_preparacion,vida_util_dias';
@@ -8,6 +9,7 @@ const recipeHeader =
   'producto_id,variante_id,rendimiento,unidad_rendimiento,ingrediente_codigo,cantidad,unidad';
 
 export async function loginImportOwner(page, fixture, base) {
+  assertImportFixtureOrigins(fixture, base);
   await page.addInitScript(
     ({ merchantId, locationId }) => {
       localStorage.setItem('umi.dashboard.locale', 'es');
@@ -458,6 +460,7 @@ export async function verifyInventoryImportLive({
 }
 
 export async function verifyImportedRecipeCheckout({ fixture, run, db, expect, request }) {
+  assertImportFixtureOrigins(fixture);
   const api = await request.newContext({ baseURL: fixture.apiBase });
   const post = async (path, body, headers = {}) => {
     const response = await api.post(path, { data: body, headers });
