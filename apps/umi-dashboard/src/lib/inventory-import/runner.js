@@ -64,7 +64,14 @@ function failure(error) {
       : status
         ? 'COMMAND_FAILED'
         : 'UNKNOWN_OUTCOME';
-  return { status, code };
+  const reason = error?.details?.error?.details?.reason ?? error?.details?.reason;
+  return {
+    status,
+    code:
+      status === 409 && code === 'CONFLICT' && reason === 'INVENTORY_RECIPE_RETIRED'
+        ? 'INVENTORY_RECIPE_RETIRED'
+        : code,
+  };
 }
 
 function success(response, operation) {

@@ -683,3 +683,48 @@ it('keeps a legacy ambiguous null-location request null on replay', async () => 
   );
   expect(sent.locationId).toBeNull();
 });
+
+describe('bounded stale recipe failures', () => {
+  it.each([
+    { reason: 'INVENTORY_RECIPE_RETIRED' },
+    {
+      error: {
+        code: 'CONFLICT',
+        details: { reason: 'INVENTORY_RECIPE_RETIRED', private: 'discard' },
+      },
+    },
+  ])('maps the observed retired reason and discards raw details %j', async (details) => {
+    const storage = memory();
+    const result = await runImportBatch(
+      options(prepare(storage), storage, async () => {
+        throw Object.assign(new Error('private message'), {
+          status: 409,
+          code: 'CONFLICT',
+          details,
+        });
+      }),
+    );
+    expect(result.entries[0]).toMatchObject({
+      executionStatus: 'error',
+      result: { status: 409, code: 'INVENTORY_RECIPE_RETIRED' },
+    });
+    expect(readImportBatch(storage, merchantId, 'items').entries[0].result).toEqual({
+      status: 409,
+      code: 'INVENTORY_RECIPE_RETIRED',
+    });
+    expect([...storage.data.values()].join('')).not.toContain('private');
+  });
+  it.each([
+    ['CONFLICT', { reason: 'UNTRUSTED_REASON' }],
+    ['CONFLICT', { error: { details: { reason: 'INVENTORY_RECIPE_RETIRED_EXTRA' } } }],
+    ['OTHER_CODE', { reason: 'INVENTORY_RECIPE_RETIRED' }],
+  ])('does not promote an unknown code or reason %s %j', async (code, details) => {
+    const storage = memory();
+    const result = await runImportBatch(
+      options(prepare(storage), storage, async () => {
+        throw { status: 409, code, details };
+      }),
+    );
+    expect(result.entries[0].result).toEqual({ status: 409, code });
+  });
+});

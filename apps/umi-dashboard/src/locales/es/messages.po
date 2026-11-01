@@ -293,9 +293,8 @@ msgid "Cantidad del ingrediente. Usa la precisión del artículo y una conversi�
 msgstr "Cantidad del ingrediente. Usa la precisión del artículo y una conversión exacta."
 
 #: src/lib/inventory-import/copy.js
-#: src/screens/operations-workspace.jsx
-msgid "Descripción"
-msgstr "Descripción"
+msgid "Campo"
+msgstr "Campo"
 
 #: src/lib/inventory-import/copy.js
 #: src/screens/operations-workspace.jsx
@@ -303,8 +302,9 @@ msgid "Obligatorio"
 msgstr "Obligatorio"
 
 #: src/lib/inventory-import/copy.js
-msgid "Campo"
-msgstr "Campo"
+#: src/screens/operations-workspace.jsx
+msgid "Descripción"
+msgstr "Descripción"
 
 #: src/lib/inventory-import/copy.js
 msgid "Ejemplo"
@@ -551,6 +551,10 @@ msgstr "Falta confirmar el resultado. Reintenta con este mismo informe para evit
 #: src/lib/inventory-import/display.js
 msgid "Otra receta usa este producto. Revisa su receta antes de volver a importar."
 msgstr "Otra receta usa este producto. Revisa su receta antes de volver a importar."
+
+#: src/lib/inventory-import/display.js
+msgid "La receta cambió. Elige Nueva importación y revisa el archivo de nuevo."
+msgstr "La receta cambió. Elige Nueva importación y revisa el archivo de nuevo."
 
 #: src/lib/inventory-import/display.js
 msgid "El registro cambió. Revisa su versión antes de crear otra importación."

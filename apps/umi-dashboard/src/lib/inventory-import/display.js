@@ -59,6 +59,7 @@ const ERRORS = {
   BATCH_EXISTS: msg`Revisa el informe guardado antes de iniciar otra importación.`,
   UNKNOWN_OUTCOME: msg`Falta confirmar el resultado. Reintenta con este mismo informe para evitar duplicados.`,
   INVENTORY_RECIPE_MAPPING_CONFLICT: msg`Otra receta usa este producto. Revisa su receta antes de volver a importar.`,
+  INVENTORY_RECIPE_RETIRED: msg`La receta cambió. Elige Nueva importación y revisa el archivo de nuevo.`,
   TARGET_VERSION_CONFLICT: msg`El registro cambió. Revisa su versión antes de crear otra importación.`,
   PERMISSION_DENIED: msg`Revisa tu permiso para administrar el negocio antes de reintentar.`,
   UNAUTHORIZED: msg`Inicia sesión de nuevo antes de reintentar.`,

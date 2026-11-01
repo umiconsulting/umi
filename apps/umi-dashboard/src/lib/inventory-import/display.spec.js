@@ -26,3 +26,11 @@ it('treats inherited property names as unknown error codes', () => {
   );
   expect(importStatusText(i18n, 'toString')).toBe(importStatusText(i18n, 'unknown'));
 });
+
+it('directs stale recipe owners to a fresh import instead of retrying the old command', () => {
+  expect(importErrorText(i18n, 'INVENTORY_RECIPE_RETIRED')).toContain('Nueva importación');
+  expect(importErrorText(i18n, 'INVENTORY_RECIPE_RETIRED')).toContain('revisa');
+  expect(importErrorText(i18n, 'INVENTORY_RECIPE_RETIRED')).not.toMatch(
+    /vuelve a intentar|reintenta/i,
+  );
+});
