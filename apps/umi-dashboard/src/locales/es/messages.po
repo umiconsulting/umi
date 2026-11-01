@@ -232,6 +232,411 @@ msgstr "El servidor no devolvió una sesión. Inténtalo otra vez."
 msgid "Código incorrecto o vencido."
 msgstr "Código incorrecto o vencido."
 
+#: src/lib/inventory-import/copy.js
+msgid "Código único del artículo. Conserva los ceros iniciales."
+msgstr "Código único del artículo. Conserva los ceros iniciales."
+
+#: src/lib/inventory-import/copy.js
+msgid "Nombre del artículo."
+msgstr "Nombre del artículo."
+
+#: src/lib/inventory-import/copy.js
+msgid "Tipo del artículo. Usa uno de los códigos indicados."
+msgstr "Tipo del artículo. Usa uno de los códigos indicados."
+
+#: src/lib/inventory-import/copy.js
+msgid "Unidad del artículo o del ingrediente. Usa uno de los códigos indicados."
+msgstr "Unidad del artículo o del ingrediente. Usa uno de los códigos indicados."
+
+#: src/lib/inventory-import/copy.js
+msgid "Cantidad de decimales para las existencias, de 0 a 6."
+msgstr "Cantidad de decimales para las existencias, de 0 a 6."
+
+#: src/lib/inventory-import/copy.js
+msgid "Costo de una unidad base en pesos, con hasta dos decimales."
+msgstr "Costo de una unidad base en pesos, con hasta dos decimales."
+
+#: src/lib/inventory-import/copy.js
+msgid "Existencia mínima en la unidad base del artículo."
+msgstr "Existencia mínima en la unidad base del artículo."
+
+#: src/lib/inventory-import/copy.js
+msgid "Cantidad que se obtiene al preparar el artículo."
+msgstr "Cantidad que se obtiene al preparar el artículo."
+
+#: src/lib/inventory-import/copy.js
+msgid "Vida útil en días enteros."
+msgstr "Vida útil en días enteros."
+
+#: src/lib/inventory-import/copy.js
+msgid "ID del producto. Cópialo del archivo de referencias."
+msgstr "ID del producto. Cópialo del archivo de referencias."
+
+#: src/lib/inventory-import/copy.js
+msgid "ID de la variante. Déjalo vacío para la receta del producto."
+msgstr "ID de la variante. Déjalo vacío para la receta del producto."
+
+#: src/lib/inventory-import/copy.js
+msgid "Cantidad que produce la receta. Debe ser mayor que cero."
+msgstr "Cantidad que produce la receta. Debe ser mayor que cero."
+
+#: src/lib/inventory-import/copy.js
+msgid "Unidad del rendimiento. Usa uno de los códigos indicados."
+msgstr "Unidad del rendimiento. Usa uno de los códigos indicados."
+
+#: src/lib/inventory-import/copy.js
+msgid "Código del ingrediente. Cópialo del archivo de referencias."
+msgstr "Código del ingrediente. Cópialo del archivo de referencias."
+
+#: src/lib/inventory-import/copy.js
+msgid "Cantidad del ingrediente. Usa la precisión del artículo y una conversión exacta."
+msgstr "Cantidad del ingrediente. Usa la precisión del artículo y una conversión exacta."
+
+#: src/lib/inventory-import/copy.js
+msgid "Campo"
+msgstr "Campo"
+
+#: src/lib/inventory-import/copy.js
+#: src/screens/operations-workspace.jsx
+msgid "Obligatorio"
+msgstr "Obligatorio"
+
+#: src/lib/inventory-import/copy.js
+#: src/screens/operations-workspace.jsx
+msgid "Descripción"
+msgstr "Descripción"
+
+#: src/lib/inventory-import/copy.js
+msgid "Ejemplo"
+msgstr "Ejemplo"
+
+#: src/lib/inventory-import/copy.js
+#: src/screens/recipe-workspace.jsx
+#: src/screens/reembolsos.jsx
+msgid "Sí"
+msgstr "Sí"
+
+#: src/lib/inventory-import/copy.js
+msgid "No"
+msgstr "No"
+
+#: src/lib/inventory-import/copy.js
+#: src/screens/inventory-import-dialog.jsx
+msgid "Usa punto decimal y celdas de texto. No uses fórmulas ni notación científica."
+msgstr "Usa punto decimal y celdas de texto. No uses fórmulas ni notación científica."
+
+#: src/lib/inventory-import/display.js
+#: src/screens/recipe-workspace.jsx
+msgid "La receta se usaría a sí misma. Quita el artículo que forma el ciclo."
+msgstr "La receta se usaría a sí misma. Quita el artículo que forma el ciclo."
+
+#: src/lib/inventory-import/display.js
+#: src/screens/recipe-workspace.jsx
+msgid "La receta pasa de 12 niveles. Acorta la cadena de sub-recetas."
+msgstr "La receta pasa de 12 niveles. Acorta la cadena de sub-recetas."
+
+#: src/lib/inventory-import/display.js
+#: src/screens/recipe-workspace.jsx
+msgid "La receta ya no existe. Actualiza la lista."
+msgstr "La receta ya no existe. Actualiza la lista."
+
+#: src/lib/inventory-import/display.js
+msgid "Tu acceso no permite guardar en la sucursal original. Revisa tus permisos antes de reintentar."
+msgstr "Tu acceso no permite guardar en la sucursal original. Revisa tus permisos antes de reintentar."
+
+#: src/lib/inventory-import/display.js
+msgid "Completa el campo obligatorio."
+msgstr "Completa el campo obligatorio."
+
+#: src/lib/inventory-import/display.js
+msgid "Usa un código válido y conserva los ceros iniciales."
+msgstr "Usa un código válido y conserva los ceros iniciales."
+
+#: src/lib/inventory-import/display.js
+msgid "Escribe un nombre válido para el artículo."
+msgstr "Escribe un nombre válido para el artículo."
+
+#: src/lib/inventory-import/display.js
+msgid "Usa uno de los códigos de la guía."
+msgstr "Usa uno de los códigos de la guía."
+
+#: src/lib/inventory-import/display.js
+msgid "Usa de 0 a 6 decimales."
+msgstr "Usa de 0 a 6 decimales."
+
+#: src/lib/inventory-import/display.js
+msgid "Usa un número entero de días."
+msgstr "Usa un número entero de días."
+
+#: src/lib/inventory-import/display.js
+msgid "El tipo, la unidad y los decimales de un artículo existente no se pueden cambiar."
+msgstr "El tipo, la unidad y los decimales de un artículo existente no se pueden cambiar."
+
+#: src/lib/inventory-import/display.js
+msgid "El código pertenece a un artículo archivado. Usa otro código o restaura el artículo."
+msgstr "El código pertenece a un artículo archivado. Usa otro código o restaura el artículo."
+
+#: src/lib/inventory-import/display.js
+msgid "El código se repite. Deja una sola fila por código."
+msgstr "El código se repite. Deja una sola fila por código."
+
+#: src/lib/inventory-import/display.js
+msgid "Hay más de un registro con esta referencia. Revisa los registros existentes."
+msgstr "Hay más de un registro con esta referencia. Revisa los registros existentes."
+
+#: src/lib/inventory-import/display.js
+msgid "Usa un número con punto decimal, sin separadores de miles."
+msgstr "Usa un número con punto decimal, sin separadores de miles."
+
+#: src/lib/inventory-import/display.js
+msgid "La cantidad tiene más decimales de los permitidos. Corrígela sin redondear."
+msgstr "La cantidad tiene más decimales de los permitidos. Corrígela sin redondear."
+
+#: src/lib/inventory-import/display.js
+msgid "La cantidad supera el límite permitido. Usa una cantidad menor."
+msgstr "La cantidad supera el límite permitido. Usa una cantidad menor."
+
+#: src/lib/inventory-import/display.js
+msgid "Completa el producto en todas las filas. Después revisa el archivo de nuevo."
+msgstr "Completa el producto en todas las filas. Después revisa el archivo de nuevo."
+
+#: src/lib/inventory-import/display.js
+msgid "Copia un producto activo del archivo de referencias."
+msgstr "Copia un producto activo del archivo de referencias."
+
+#: src/lib/inventory-import/display.js
+msgid "La variante no pertenece al producto. Revisa las referencias."
+msgstr "La variante no pertenece al producto. Revisa las referencias."
+
+#: src/lib/inventory-import/display.js
+msgid "La receta admite hasta 200 ingredientes."
+msgstr "La receta admite hasta 200 ingredientes."
+
+#: src/lib/inventory-import/display.js
+msgid "Usa el mismo rendimiento y unidad en todas las filas de la receta."
+msgstr "Usa el mismo rendimiento y unidad en todas las filas de la receta."
+
+#: src/lib/inventory-import/display.js
+msgid "El ingrediente no existe o está archivado. Revisa su código."
+msgstr "El ingrediente no existe o está archivado. Revisa su código."
+
+#: src/lib/inventory-import/display.js
+msgid "El ingrediente se repite en la receta. Deja una sola fila."
+msgstr "El ingrediente se repite en la receta. Deja una sola fila."
+
+#: src/lib/inventory-import/display.js
+msgid "Usa la unidad base del ingrediente o registra una conversión exacta."
+msgstr "Usa la unidad base del ingrediente o registra una conversión exacta."
+
+#: src/lib/inventory-import/display.js
+msgid "La cantidad por rendimiento no es exacta. Revisa la cantidad y el rendimiento."
+msgstr "La cantidad por rendimiento no es exacta. Revisa la cantidad y el rendimiento."
+
+#: src/lib/inventory-import/display.js
+msgid "Cambia la fórmula por un valor de texto."
+msgstr "Cambia la fórmula por un valor de texto."
+
+#: src/lib/inventory-import/display.js
+msgid "Escribe el valor como texto para conservar todos sus dígitos."
+msgstr "Escribe el valor como texto para conservar todos sus dígitos."
+
+#: src/lib/inventory-import/display.js
+msgid "Cambia la fecha por un valor de texto."
+msgstr "Cambia la fecha por un valor de texto."
+
+#: src/lib/inventory-import/display.js
+msgid "Usa una celda de texto con un valor válido."
+msgstr "Usa una celda de texto con un valor válido."
+
+#: src/lib/inventory-import/display.js
+msgid "El archivo debe pesar como máximo 2 MiB."
+msgstr "El archivo debe pesar como máximo 2 MiB."
+
+#: src/lib/inventory-import/display.js
+msgid "El archivo admite hasta 500 filas de datos."
+msgstr "El archivo admite hasta 500 filas de datos."
+
+#: src/lib/inventory-import/display.js
+msgid "El archivo admite hasta 100 recetas."
+msgstr "El archivo admite hasta 100 recetas."
+
+#: src/lib/inventory-import/display.js
+msgid "Elige un archivo CSV UTF-8 o Excel .xlsx."
+msgstr "Elige un archivo CSV UTF-8 o Excel .xlsx."
+
+#: src/lib/inventory-import/display.js
+msgid "Guarda el archivo CSV con codificación UTF-8."
+msgstr "Guarda el archivo CSV con codificación UTF-8."
+
+#: src/lib/inventory-import/display.js
+msgid "Revisa los separadores y las comillas del archivo CSV."
+msgstr "Revisa los separadores y las comillas del archivo CSV."
+
+#: src/lib/inventory-import/display.js
+msgid "No se pudo abrir el archivo Excel. Guárdalo como .xlsx y vuelve a intentar."
+msgstr "No se pudo abrir el archivo Excel. Guárdalo como .xlsx y vuelve a intentar."
+
+#: src/lib/inventory-import/display.js
+msgid "Conserva el nombre de la hoja de datos de la plantilla."
+msgstr "Conserva el nombre de la hoja de datos de la plantilla."
+
+#: src/lib/inventory-import/display.js
+msgid "Faltan columnas obligatorias. Usa los encabezados de la plantilla."
+msgstr "Faltan columnas obligatorias. Usa los encabezados de la plantilla."
+
+#: src/lib/inventory-import/display.js
+msgid "Usa los encabezados de texto de la plantilla."
+msgstr "Usa los encabezados de texto de la plantilla."
+
+#: src/lib/inventory-import/display.js
+msgid "Una columna se repite. Conserva una sola copia."
+msgstr "Una columna se repite. Conserva una sola copia."
+
+#: src/lib/inventory-import/display.js
+msgid "Una columna no corresponde a la plantilla. Revisa los encabezados."
+msgstr "Una columna no corresponde a la plantilla. Revisa los encabezados."
+
+#: src/lib/inventory-import/display.js
+msgid "La fila tiene más celdas que los encabezados. Revisa los separadores."
+msgstr "La fila tiene más celdas que los encabezados. Revisa los separadores."
+
+#: src/lib/inventory-import/display.js
+msgid "Quita el encabezado repetido de esta fila."
+msgstr "Quita el encabezado repetido de esta fila."
+
+#: src/lib/inventory-import/display.js
+msgid "La lectura tardó demasiado. Cierra otras tareas o usa un archivo menor."
+msgstr "La lectura tardó demasiado. Cierra otras tareas o usa un archivo menor."
+
+#: src/lib/inventory-import/display.js
+msgid "No se pudo procesar el archivo. Vuelve a elegirlo."
+msgstr "No se pudo procesar el archivo. Vuelve a elegirlo."
+
+#: src/lib/inventory-import/display.js
+msgid "La tarea se detuvo."
+msgstr "La tarea se detuvo."
+
+#: src/lib/inventory-import/display.js
+msgid "El informe guardado no se puede leer. Conserva los datos del navegador y pide ayuda."
+msgstr "El informe guardado no se puede leer. Conserva los datos del navegador y pide ayuda."
+
+#: src/lib/inventory-import/display.js
+msgid "No se pudo leer el informe guardado. Revisa el almacenamiento del navegador."
+msgstr "No se pudo leer el informe guardado. Revisa el almacenamiento del navegador."
+
+#: src/lib/inventory-import/display.js
+msgid "No se pudo guardar el avance en este navegador. Libera espacio y vuelve a intentar."
+msgstr "No se pudo guardar el avance en este navegador. Libera espacio y vuelve a intentar."
+
+#: src/lib/inventory-import/display.js
+msgid "Primero resuelve los resultados pendientes. Los registros guardados se conservan."
+msgstr "Primero resuelve los resultados pendientes. Los registros guardados se conservan."
+
+#: src/lib/inventory-import/display.js
+msgid "Espera a que termine la operación actual."
+msgstr "Espera a que termine la operación actual."
+
+#: src/lib/inventory-import/display.js
+msgid "El informe cambió en otra ventana. Cierra y vuelve a abrir la importación."
+msgstr "El informe cambió en otra ventana. Cierra y vuelve a abrir la importación."
+
+#: src/lib/inventory-import/display.js
+msgid "Revisa el informe guardado antes de iniciar otra importación."
+msgstr "Revisa el informe guardado antes de iniciar otra importación."
+
+#: src/lib/inventory-import/display.js
+msgid "Falta confirmar el resultado. Reintenta con este mismo informe para evitar duplicados."
+msgstr "Falta confirmar el resultado. Reintenta con este mismo informe para evitar duplicados."
+
+#: src/lib/inventory-import/display.js
+msgid "Otra receta usa este producto. Revisa su receta antes de volver a importar."
+msgstr "Otra receta usa este producto. Revisa su receta antes de volver a importar."
+
+#: src/lib/inventory-import/display.js
+msgid "La receta cambió. Elige Nueva importación y revisa el archivo de nuevo."
+msgstr "La receta cambió. Elige Nueva importación y revisa el archivo de nuevo."
+
+#: src/lib/inventory-import/display.js
+msgid "El registro cambió. Revisa su versión antes de crear otra importación."
+msgstr "El registro cambió. Revisa su versión antes de crear otra importación."
+
+#: src/lib/inventory-import/display.js
+msgid "Revisa tu permiso para administrar el negocio antes de reintentar."
+msgstr "Revisa tu permiso para administrar el negocio antes de reintentar."
+
+#: src/lib/inventory-import/display.js
+msgid "Inicia sesión de nuevo antes de reintentar."
+msgstr "Inicia sesión de nuevo antes de reintentar."
+
+#: src/lib/inventory-import/display.js
+msgid "Espera un momento antes de reintentar."
+msgstr "Espera un momento antes de reintentar."
+
+#: src/lib/inventory-import/display.js
+#: src/screens/customers.jsx
+#: src/screens/orders.jsx
+msgid "Nuevo"
+msgstr "Nuevo"
+
+#: src/lib/inventory-import/display.js
+msgctxt "inventory import status"
+msgid "Actualizar"
+msgstr "Actualizar"
+
+#: src/lib/inventory-import/display.js
+msgid "Sin cambios"
+msgstr "Sin cambios"
+
+#: src/lib/inventory-import/display.js
+msgid "Duplicado"
+msgstr "Duplicado"
+
+#: src/lib/inventory-import/display.js
+#: src/screens/devices.jsx
+msgid "Error"
+msgstr "Error"
+
+#: src/lib/inventory-import/display.js
+#: src/screens/caja-turnos.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Pendiente"
+msgstr "Pendiente"
+
+#: src/lib/inventory-import/display.js
+msgid "Guardando"
+msgstr "Guardando"
+
+#: src/lib/inventory-import/display.js
+msgid "Por confirmar"
+msgstr "Por confirmar"
+
+#: src/lib/inventory-import/display.js
+#: src/screens/hours.jsx
+msgid "Guardado"
+msgstr "Guardado"
+
+#: src/lib/inventory-import/display.js
+#: src/screens/floor-plan.jsx
+#: src/screens/inventory-count.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/settings.jsx
+#: src/screens/ventas-report.jsx
+msgid "Reintentar"
+msgstr "Reintentar"
+
+#: src/lib/inventory-import/display.js
+msgid "Omitido"
+msgstr "Omitido"
+
+#: src/lib/inventory-import/display.js
+msgid "No se pudo completar la operación. Revisa el archivo o vuelve a intentar."
+msgstr "No se pudo completar la operación. Revisa el archivo o vuelve a intentar."
+
+#: src/lib/inventory-import/display.js
+msgid "Por revisar"
+msgstr "Por revisar"
+
 #: src/lib/loyalty-operation.js
 msgid "{cost, plural, one {# visita} other {# visitas}}"
 msgstr "{cost, plural, one {# visita} other {# visitas}}"
@@ -446,6 +851,7 @@ msgstr "Abrir café"
 #: src/screens/inventory-adjust.jsx
 #: src/screens/inventory-count.jsx
 #: src/screens/inventory-filters.jsx
+#: src/screens/inventory-import-dialog.jsx
 #: src/screens/inventory-item-editor.jsx
 #: src/screens/inventory-item-panel.jsx
 #: src/screens/inventory-production.jsx
@@ -525,6 +931,7 @@ msgstr "Contraseña · 8 caracteres o más"
 #: src/screens/hours.jsx
 #: src/screens/inventory-adjust.jsx
 #: src/screens/inventory-count.jsx
+#: src/screens/inventory-import-dialog.jsx
 #: src/screens/inventory-item-editor.jsx
 #: src/screens/inventory-item-panel.jsx
 #: src/screens/inventory-production.jsx
@@ -885,6 +1292,7 @@ msgstr "Fecha comercial"
 #: src/screens/caja-turnos.jsx
 #: src/screens/gift-cards.jsx
 #: src/screens/inventory-costing.jsx
+#: src/screens/inventory-import-table.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/recibos.jsx
 msgid "Estado"
@@ -965,11 +1373,6 @@ msgstr "Efectivo esperado"
 #: src/screens/caja-turnos.jsx
 msgid "Efectivo contado"
 msgstr "Efectivo contado"
-
-#: src/screens/caja-turnos.jsx
-#: src/screens/operations-workspace.jsx
-msgid "Pendiente"
-msgstr "Pendiente"
 
 #: src/screens/caja-turnos.jsx
 msgid "Denominaciones de apertura"
@@ -1416,6 +1819,7 @@ msgid "Notas"
 msgstr "Notas"
 
 #: src/screens/customers.jsx
+#: src/screens/inventory-import-table.jsx
 msgid "Revisión"
 msgstr "Revisión"
 
@@ -1465,11 +1869,6 @@ msgstr "VIP"
 #: src/screens/customers.jsx
 msgid "Frecuente"
 msgstr "Frecuente"
-
-#: src/screens/customers.jsx
-#: src/screens/orders.jsx
-msgid "Nuevo"
-msgstr "Nuevo"
 
 #: src/screens/customers.jsx
 msgid "En riesgo"
@@ -2443,10 +2842,6 @@ msgid "Deshabilitado"
 msgstr "Deshabilitado"
 
 #: src/screens/devices.jsx
-msgid "Error"
-msgstr "Error"
-
-#: src/screens/devices.jsx
 #: src/screens/members.jsx
 msgid "Sin dato"
 msgstr "Sin dato"
@@ -3160,15 +3555,6 @@ msgid "No se pudo cargar el plano."
 msgstr "No se pudo cargar el plano."
 
 #: src/screens/floor-plan.jsx
-#: src/screens/inventory-count.jsx
-#: src/screens/inventory-workspace.jsx
-#: src/screens/operations-workspace.jsx
-#: src/screens/settings.jsx
-#: src/screens/ventas-report.jsx
-msgid "Reintentar"
-msgstr "Reintentar"
-
-#: src/screens/floor-plan.jsx
 msgid "Carga del plano…"
 msgstr "Carga del plano…"
 
@@ -3597,6 +3983,7 @@ msgid "ABIERTA"
 msgstr "ABIERTA"
 
 #: src/screens/gift-cards.jsx
+#: src/screens/inventory-import-table.jsx
 #: src/screens/inventory-workspace.jsx
 #: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
@@ -3605,6 +3992,7 @@ msgstr "Anterior"
 
 #: src/screens/gift-cards.jsx
 #: src/screens/inventory-count.jsx
+#: src/screens/inventory-import-table.jsx
 #: src/screens/inventory-workspace.jsx
 #: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
@@ -3709,10 +4097,6 @@ msgstr "Horas de apertura"
 #: src/screens/hours.jsx
 msgid "Cuándo abre y cierra cada día de la semana."
 msgstr "Cuándo abre y cierra cada día de la semana."
-
-#: src/screens/hours.jsx
-msgid "Guardado"
-msgstr "Guardado"
 
 #: src/screens/hours.jsx
 msgid "Error al guardar"
@@ -4825,6 +5209,203 @@ msgstr "Limpiar"
 #: src/screens/inventory-filters.jsx
 msgid "Aplicar filtros"
 msgstr "Aplicar filtros"
+
+#: src/screens/inventory-import-dialog.jsx
+#~ msgid "Revisa el archivo antes de confirmar. Los códigos existentes pueden actualizar sus registros."
+#~ msgstr "Revisa el archivo antes de confirmar. Los códigos existentes pueden actualizar sus registros."
+
+#: src/screens/inventory-import-dialog.jsx
+#~ msgid "Importar {count} artículos"
+#~ msgstr "Importar {count} artículos"
+
+#: src/screens/inventory-import-dialog.jsx
+#~ msgid "Importar {count} recetas"
+#~ msgstr "Importar {count} recetas"
+
+#: src/screens/inventory-import-dialog.jsx
+#~ msgid "Las existencias se registran con compras o ajustes. Este archivo no cambia el stock."
+#~ msgstr "Las existencias se registran con compras o ajustes. Este archivo no cambia el stock."
+
+#: src/screens/inventory-import-dialog.jsx
+#~ msgid "Usa la plantilla vacía. La guía explica cada campo y los códigos permitidos. Los ejemplos están en otro archivo."
+#~ msgstr "Usa la plantilla vacía. La guía explica cada campo y los códigos permitidos. Los ejemplos están en otro archivo."
+
+#: src/screens/inventory-import-dialog.jsx
+#: src/screens/inventory-workspace.jsx
+msgid "Importar artículos"
+msgstr "Importar artículos"
+
+#: src/screens/inventory-import-dialog.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Importar recetas"
+msgstr "Importar recetas"
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Revisa el archivo antes de confirmar."
+msgstr "Revisa el archivo antes de confirmar."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Si el código ya existe, se actualizará ese artículo."
+msgstr "Si el código ya existe, se actualizará ese artículo."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Si el producto y la variante ya tienen receta, se actualizará esa receta."
+msgstr "Si el producto y la variante ya tienen receta, se actualizará esa receta."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Registra las entradas en Compras o Ajustar existencia."
+msgstr "Registra las entradas en Compras o Ajustar existencia."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Cargando referencias…"
+msgstr "Cargando referencias…"
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "No se pudieron cargar las referencias. Cierra y vuelve a abrir la importación."
+msgstr "No se pudieron cargar las referencias. Cierra y vuelve a abrir la importación."
+
+#. placeholder {0}: batch.entries.filter((entry) => entry.command).length
+#: src/screens/inventory-import-dialog.jsx
+msgid "{successCount} registros guardados de {0}."
+msgstr "{successCount} registros guardados de {0}."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Hay un informe guardado en este navegador. Revisa sus resultados antes de elegir otro archivo."
+msgstr "Hay un informe guardado en este navegador. Revisa sus resultados antes de elegir otro archivo."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Detener pendientes conserva los registros guardados. Al cerrar, la operación actual puede terminar; las demás quedan pendientes."
+msgstr "Detener pendientes conserva los registros guardados. Al cerrar, la operación actual puede terminar; las demás quedan pendientes."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Falta confirmar una operación. Reintenta este mismo informe para consultar su resultado sin duplicar registros."
+msgstr "Falta confirmar una operación. Reintenta este mismo informe para consultar su resultado sin duplicar registros."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Nueva importación descarta las filas pendientes y conserva los registros guardados."
+msgstr "Nueva importación descarta las filas pendientes y conserva los registros guardados."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Cómo llenar el archivo"
+msgstr "Cómo llenar el archivo"
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Usa la hoja de datos vacía. Excel incluye la guía, los ejemplos y las referencias en otras hojas. En CSV se descargan por separado."
+msgstr "Usa la hoja de datos vacía. Excel incluye la guía, los ejemplos y las referencias en otras hojas. En CSV se descargan por separado."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Los campos de código distinguen mayúsculas y minúsculas. Conserva los ceros iniciales. Copia los ID y códigos de las referencias."
+msgstr "Los campos de código distinguen mayúsculas y minúsculas. Conserva los ceros iniciales. Copia los ID y códigos de las referencias."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Límite: 2 MiB, 500 filas, 100 recetas y 200 ingredientes por receta."
+msgstr "Límite: 2 MiB, 500 filas, 100 recetas y 200 ingredientes por receta."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Elegir archivo"
+msgstr "Elegir archivo"
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Ningún archivo elegido"
+msgstr "Ningún archivo elegido"
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Revisar archivo"
+msgstr "Revisar archivo"
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Revisando archivo…"
+msgstr "Revisando archivo…"
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Al actualizar una receta, todos sus ingredientes se reemplazan por los del archivo. Una receta con errores no se importa."
+msgstr "Al actualizar una receta, todos sus ingredientes se reemplazan por los del archivo. Una receta con errores no se importa."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Solo se guardarán los registros nuevos o con cambios que no tengan errores."
+msgstr "Solo se guardarán los registros nuevos o con cambios que no tengan errores."
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Detener pendientes"
+msgstr "Detener pendientes"
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Reintentar pendientes"
+msgstr "Reintentar pendientes"
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "Nueva importación"
+msgstr "Nueva importación"
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "{count, plural, one {Importar # artículo} other {Importar # artículos}}"
+msgstr "{count, plural, one {Importar # artículo} other {Importar # artículos}}"
+
+#: src/screens/inventory-import-dialog.jsx
+msgid "{count, plural, one {Importar # receta} other {Importar # recetas}}"
+msgstr "{count, plural, one {Importar # receta} other {Importar # recetas}}"
+
+#: src/screens/inventory-import-downloads.jsx
+#~ msgid "Descargar referencias"
+#~ msgstr "Descargar referencias"
+
+#: src/screens/inventory-import-downloads.jsx
+msgid "Formato de descarga"
+msgstr "Formato de descarga"
+
+#: src/screens/inventory-import-downloads.jsx
+msgid "Excel (.xlsx)"
+msgstr "Excel (.xlsx)"
+
+#: src/screens/inventory-import-downloads.jsx
+msgid "Descargar resultado"
+msgstr "Descargar resultado"
+
+#: src/screens/inventory-import-downloads.jsx
+msgid "Descargar plantilla"
+msgstr "Descargar plantilla"
+
+#: src/screens/inventory-import-downloads.jsx
+msgid "Descargar guía"
+msgstr "Descargar guía"
+
+#: src/screens/inventory-import-downloads.jsx
+msgid "Descargar ejemplos"
+msgstr "Descargar ejemplos"
+
+#: src/screens/inventory-import-downloads.jsx
+msgid "Descargar códigos"
+msgstr "Descargar códigos"
+
+#: src/screens/inventory-import-downloads.jsx
+msgid "Preparando descarga…"
+msgstr "Preparando descarga…"
+
+#: src/screens/inventory-import-table.jsx
+#~ msgid "Nombre o referencia"
+#~ msgstr "Nombre o referencia"
+
+#: src/screens/inventory-import-table.jsx
+msgid "Filas"
+msgstr "Filas"
+
+#: src/screens/inventory-import-table.jsx
+msgid "Nombre y código"
+msgstr "Nombre y código"
+
+#. placeholder {0}: error.rowNumber
+#: src/screens/inventory-import-table.jsx
+msgid "Fila {0}"
+msgstr "Fila {0}"
+
+#: src/screens/inventory-import-table.jsx
+msgid "Páginas de la revisión"
+msgstr "Páginas de la revisión"
+
+#. placeholder {0}: index + 1
+#: src/screens/inventory-import-table.jsx
+msgid "Página {0} de {pages}"
+msgstr "Página {0} de {pages}"
 
 #: src/screens/inventory-item-editor.jsx
 #~ msgid "Convierte la unidad de compra a la unidad base del artículo. Un gramo a kilogramo se escribe 1 y 1000, con escala 3."
@@ -6657,10 +7238,6 @@ msgid "Cargar datos actuales"
 msgstr "Cargar datos actuales"
 
 #: src/screens/operations-workspace.jsx
-msgid "Descripción"
-msgstr "Descripción"
-
-#: src/screens/operations-workspace.jsx
 msgid "Precio base en centavos"
 msgstr "Precio base en centavos"
 
@@ -6748,10 +7325,6 @@ msgstr "Leche, Extras, Endulzante…"
 #: src/screens/operations-workspace.jsx
 msgid "Nombre del grupo"
 msgstr "Nombre del grupo"
-
-#: src/screens/operations-workspace.jsx
-msgid "Obligatorio"
-msgstr "Obligatorio"
 
 #: src/screens/operations-workspace.jsx
 msgid "Mín."
@@ -8558,18 +9131,6 @@ msgid "Otra persona guardó una versión nueva de esta receta. Recarga para ver 
 msgstr "Otra persona guardó una versión nueva de esta receta. Recarga para ver la versión nueva."
 
 #: src/screens/recipe-workspace.jsx
-msgid "La receta se usaría a sí misma. Quita el artículo que forma el ciclo."
-msgstr "La receta se usaría a sí misma. Quita el artículo que forma el ciclo."
-
-#: src/screens/recipe-workspace.jsx
-msgid "La receta pasa de 12 niveles. Acorta la cadena de sub-recetas."
-msgstr "La receta pasa de 12 niveles. Acorta la cadena de sub-recetas."
-
-#: src/screens/recipe-workspace.jsx
-msgid "La receta ya no existe. Actualiza la lista."
-msgstr "La receta ya no existe. Actualiza la lista."
-
-#: src/screens/recipe-workspace.jsx
 msgid "Un artículo ya no existe. Actualiza la lista."
 msgstr "Un artículo ya no existe. Actualiza la lista."
 
@@ -8654,11 +9215,6 @@ msgstr "Exacto"
 #: src/screens/recipe-workspace.jsx
 msgid "No exacto"
 msgstr "No exacto"
-
-#: src/screens/recipe-workspace.jsx
-#: src/screens/reembolsos.jsx
-msgid "Sí"
-msgstr "Sí"
 
 #: src/screens/recipe-workspace.jsx
 msgid "Sin precio"

@@ -1,3 +1,4 @@
+import InventoryImportDialog from './inventory-import-dialog.jsx';
 import InventoryProduction from './inventory-production.jsx';
 import { useMemo, useState } from 'react';
 import { msg } from '@lingui/core/macro';
@@ -192,6 +193,7 @@ export default function RecipeWorkspace() {
   const capabilities = merchant?.capabilities || null;
   const canManage = hasRequiredPermission(MANAGE_GATE, capabilities);
   const [refresh, setRefresh] = useState(0);
+  const [importOpen, setImportOpen] = useState(false);
   const [showRetired, setShowRetired] = useState(false);
   const [query, setQuery] = useState('');
   const [editor, setEditor] = useState(null);
@@ -255,14 +257,19 @@ export default function RecipeWorkspace() {
           />
           <Toggle checked={showRetired} label={t`Mostrar retiradas`} onChange={setShowRetired} />
         </div>
-        <button
-          className="btn btn-primary"
-          type="button"
-          onClick={() => setEditor({ recipe: null, id: crypto.randomUUID() })}
-        >
-          <I.Plus size={16} />
-          <Trans>Nueva receta</Trans>
-        </button>
+        <div className="inventory-import-actions">
+          <button className="btn btn-secondary" type="button" onClick={() => setImportOpen(true)}>
+            <Trans>Importar recetas</Trans>
+          </button>
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={() => setEditor({ recipe: null, id: crypto.randomUUID() })}
+          >
+            <I.Plus size={16} />
+            <Trans>Nueva receta</Trans>
+          </button>
+        </div>
       </div>
 
       {recipesState.loading && !recipesState.loaded ? (
@@ -386,6 +393,13 @@ export default function RecipeWorkspace() {
         </div>
       )}
 
+      {importOpen && (
+        <InventoryImportDialog
+          kind="recipes"
+          onClose={() => setImportOpen(false)}
+          onSaved={reload}
+        />
+      )}
       {production ? (
         <InventoryProduction
           key={`${locationId}:${production.id}`}

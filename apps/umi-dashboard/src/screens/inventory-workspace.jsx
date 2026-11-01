@@ -1,3 +1,4 @@
+import InventoryImportDialog from './inventory-import-dialog.jsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -104,6 +105,7 @@ export default function InventoryWorkspace() {
   const canManage = hasRequiredPermission(MANAGE_GATE, capabilities);
 
   const [refresh, setRefresh] = useState(0);
+  const [importOpen, setImportOpen] = useState(false);
   const [view, setView] = useState('all');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
@@ -271,6 +273,7 @@ export default function InventoryWorkspace() {
   useEffect(() => {
     if (!canManage) return undefined;
     function onKey(event) {
+      if (importOpen) return;
       const target = event.target;
       const typing =
         target instanceof HTMLElement &&
@@ -334,6 +337,7 @@ export default function InventoryWorkspace() {
     return () => window.removeEventListener('keydown', onKey);
   }, [
     canManage,
+    importOpen,
     slice.rows.length,
     clearSelection,
     paletteOpen,
@@ -476,6 +480,13 @@ export default function InventoryWorkspace() {
               ))}
             </div>
             <div className="inv-toolbar-actions">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setImportOpen(true)}
+              >
+                <Trans>Importar artículos</Trans>
+              </button>
               <input
                 ref={searchRef}
                 className="input"
@@ -831,6 +842,9 @@ export default function InventoryWorkspace() {
         ) : null}
       </div>
 
+      {importOpen && (
+        <InventoryImportDialog kind="items" onClose={() => setImportOpen(false)} onSaved={reload} />
+      )}
       <AllergenLabelsPanel allergens={allergensState.data.allergens} onSaved={reload} />
 
       {editor ? (
