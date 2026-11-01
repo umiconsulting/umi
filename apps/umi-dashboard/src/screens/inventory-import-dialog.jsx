@@ -150,8 +150,8 @@ export default function InventoryImportDialog({ kind, onClose, onSaved }) {
               </summary>
               <p>
                 <Trans>
-                  Usa la plantilla vacía. La guía explica cada campo y los códigos permitidos. Los
-                  ejemplos están en otro archivo.
+                  Usa la hoja de datos vacía. Excel incluye la guía, los ejemplos y las referencias
+                  en otras hojas. En CSV se descargan por separado.
                 </Trans>
               </p>
               <p>

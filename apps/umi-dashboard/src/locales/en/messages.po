@@ -5227,6 +5227,10 @@ msgstr "Apply filters"
 #~ msgstr "Record stock through purchases or adjustments. This file does not change stock."
 
 #: src/screens/inventory-import-dialog.jsx
+#~ msgid "Usa la plantilla vacía. La guía explica cada campo y los códigos permitidos. Los ejemplos están en otro archivo."
+#~ msgstr "Use the empty template. The guide explains each field and the allowed codes. Examples are in a separate file."
+
+#: src/screens/inventory-import-dialog.jsx
 #: src/screens/inventory-workspace.jsx
 msgid "Importar artículos"
 msgstr "Import items"
@@ -5286,8 +5290,8 @@ msgid "Cómo llenar el archivo"
 msgstr "How to complete the file"
 
 #: src/screens/inventory-import-dialog.jsx
-msgid "Usa la plantilla vacía. La guía explica cada campo y los códigos permitidos. Los ejemplos están en otro archivo."
-msgstr "Use the empty template. The guide explains each field and the allowed codes. Examples are in a separate file."
+msgid "Usa la hoja de datos vacía. Excel incluye la guía, los ejemplos y las referencias en otras hojas. En CSV se descargan por separado."
+msgstr "Use the empty data sheet. Excel includes the guide, examples and references in other sheets. For CSV, download them separately."
 
 #: src/screens/inventory-import-dialog.jsx
 msgid "Los campos de código distinguen mayúsculas y minúsculas. Conserva los ceros iniciales. Copia los ID y códigos de las referencias."

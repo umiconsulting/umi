@@ -9,6 +9,7 @@ import {
   verifyInventoryImport,
   verifyImportClose,
   verifyImportJournalScope,
+  verifyImportTemplateDownloads,
 } from './inventory-import-scenarios.js';
 import {
   loginImportOwner,
@@ -119,6 +120,31 @@ test('journal survives the same tab and isolates independent tabs without API im
     const page = await context.newPage();
     await loginImportOwner(page, fixture, base);
     await verifyImportJournalScope({ page, fixture, expect, base, evidenceDir });
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+});
+
+test('XLSX template downloads include guidance and never import their example sheets', async () => {
+  test.skip(!process.env.UMI_IMPORT_FIXTURE, 'Requires an isolated local import fixture.');
+  const fixture = JSON.parse(readFileSync(process.env.UMI_IMPORT_FIXTURE, 'utf8'));
+  const base = process.env.UMI_IMPORT_BASE || 'http://127.0.0.1:4083';
+  assertImportFixtureOrigins(fixture, base);
+  const evidenceDir =
+    process.env.UMI_IMPORT_EVIDENCE_DIR || '/private/tmp/umi-import-final-fix-evidence';
+  mkdirSync(evidenceDir, { recursive: true });
+  const browser = await chromium.connectOverCDP(process.env.UX_CDP || 'http://127.0.0.1:9226', {
+    noDefaults: true,
+  });
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    acceptDownloads: true,
+  });
+  try {
+    const page = await context.newPage();
+    await loginImportOwner(page, fixture, base);
+    await verifyImportTemplateDownloads({ page, fixture, expect, base, ExcelJS, evidenceDir });
   } finally {
     await context.close();
     await browser.close();

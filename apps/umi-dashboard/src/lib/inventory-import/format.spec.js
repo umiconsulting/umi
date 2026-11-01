@@ -255,6 +255,78 @@ describe('inventory Excel import', () => {
 
 describe('inventory downloads', () => {
   it.each(['items', 'recipes'])(
+    'bundles XLSX guidance and references without importing examples for %s',
+    async (kind) => {
+      const { buildImportFile, parseImportFile } = await import('./format.js');
+      const output = await buildImportFile({
+        kind,
+        format: 'xlsx',
+        purpose: 'template',
+        labels: { headings: { field: 'Campo' }, instructions: 'Usa punto decimal.' },
+        references: {
+          items: [
+            { publicReference: '001', displayName: '=Leche', baseUnit: 'liter', quantityScale: 3 },
+          ],
+          targets: [
+            {
+              productId: 'product-1',
+              productName: 'Latte',
+              variantId: 'variant-1',
+              variantName: 'Grande',
+            },
+          ],
+        },
+      });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(output.bytes);
+      const dataName = kind === 'items' ? 'Articulos' : 'Recetas';
+      expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual([
+        dataName,
+        'Guia',
+        'Ejemplos',
+        'Ingredientes',
+        'Productos',
+      ]);
+      expect(workbook.getWorksheet(dataName).rowCount).toBe(1);
+      expect(workbook.getWorksheet('Guia').getCell('A1').value).toBe('Campo');
+      expect(workbook.getWorksheet('Guia').lastRow.getCell('C').value).toBe('Usa punto decimal.');
+      expect(workbook.getWorksheet('Ejemplos').getCell('A2').value).toBe(
+        kind === 'items' ? 'LECHE-001' : 'producto-id',
+      );
+      expect(workbook.getWorksheet('Ingredientes').getRow(2).values.slice(1)).toEqual([
+        '001',
+        '=Leche',
+        'liter',
+        '3',
+      ]);
+      expect(workbook.getWorksheet('Productos').getRow(2).values.slice(1)).toEqual([
+        'product-1',
+        'Latte',
+        'variant-1',
+        'Grande',
+      ]);
+      expect((await parseImportFile({ kind, format: 'xlsx', bytes: output.bytes })).rows).toEqual(
+        [],
+      );
+      // Put one real row only in the data sheet; the example and reference rows stay excluded.
+      workbook
+        .getWorksheet(dataName)
+        .addRow(
+          kind === 'items'
+            ? ['REAL', 'Real', 'ingredient', 'gram', '0']
+            : ['product-real', '', '1', 'unit', 'REAL', '0.25', 'gram'],
+        );
+      const buffer = await workbook.xlsx.writeBuffer();
+      const bytes = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+      const parsed = await parseImportFile({ kind, format: 'xlsx', bytes });
+      expect(parsed.rows).toHaveLength(1);
+      expect(parsed.rows[0].values[kind === 'items' ? 'codigo' : 'producto_id']).toBe(
+        kind === 'items' ? 'REAL' : 'product-real',
+      );
+    },
+  );
+
+  it.each(['items', 'recipes'])(
     'creates header-only templates for %s in both formats',
     async (kind) => {
       const { buildImportFile, parseImportFile } = await import('./format.js');

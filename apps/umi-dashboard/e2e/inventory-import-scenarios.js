@@ -348,3 +348,85 @@ export async function verifyImportJournalScope({ page, fixture, expect, base, ev
     await page.unroute(pattern);
   }
 }
+
+export async function verifyImportTemplateDownloads({
+  page,
+  fixture,
+  expect,
+  base,
+  ExcelJS,
+  evidenceDir,
+}) {
+  const commands = [];
+  const record = (request) => {
+    if (request.url().endsWith('/administrative-commands')) commands.push(request);
+  };
+  page.on('request', record);
+  try {
+    for (const [route, name, dataSheet, emptyButton] of [
+      ['/inventory', 'Importar artículos', 'Articulos', 'Importar 0 artículos'],
+      ['/inventory/recetas', 'Importar recetas', 'Recetas', 'Importar 0 recetas'],
+    ]) {
+      await page.goto(`${base}${route}`);
+      await page.getByRole('button', { name, exact: true }).click();
+      const dialog = page.getByRole('dialog', { name, exact: true });
+      await expect(dialog.getByLabel('Elegir archivo', { exact: true })).toBeEnabled();
+      await dialog.getByLabel('Formato de descarga').selectOption('xlsx');
+      const downloaded = page.waitForEvent('download');
+      await dialog.getByRole('button', { name: 'Descargar plantilla', exact: true }).click();
+      const download = await downloaded;
+      const path = await download.path();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(readFileSync(path));
+      expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual([
+        dataSheet,
+        'Guia',
+        'Ejemplos',
+        'Ingredientes',
+        'Productos',
+      ]);
+      expect(workbook.getWorksheet(dataSheet).rowCount).toBe(1);
+      expect(workbook.getWorksheet('Guia').getCell('A1').value).toBe('Campo');
+      expect(workbook.getWorksheet('Ejemplos').rowCount).toBe(2);
+      expect(workbook.getWorksheet('Ingredientes').rowCount).toBeGreaterThan(1);
+      expect(workbook.getWorksheet('Productos').rowCount).toBeGreaterThan(1);
+      await dialog
+        .getByLabel('Elegir archivo', { exact: true })
+        .setInputFiles({
+          name: download.suggestedFilename(),
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          buffer: readFileSync(path),
+        });
+      await dialog.getByRole('button', { name: 'Revisar archivo', exact: true }).click();
+      await expect(dialog.getByRole('button', { name: emptyButton, exact: true })).toBeDisabled();
+      await expect(
+        dialog.getByRole('button', { name: 'Revisar archivo', exact: true }),
+      ).toBeEnabled();
+      await page.screenshot({
+        path: `${evidenceDir}/${dataSheet}-empty-template.png`,
+        animations: 'disabled',
+        timeout: 60000,
+      });
+      await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    }
+    expect(commands).toHaveLength(0);
+    expect(
+      await page.evaluate(
+        (merchantId) =>
+          ['items', 'recipes'].map((kind) =>
+            sessionStorage.getItem(`umi:inventory-import:v1:${merchantId}:${kind}`),
+          ),
+        fixture.merchantId,
+      ),
+    ).toEqual([null, null]);
+    return {
+      actualXlsxDownloads: 2,
+      emptyDataSheets: true,
+      bundledSheets: 5,
+      examplesExcluded: true,
+      apiImportWrites: 0,
+    };
+  } finally {
+    page.off('request', record);
+  }
+}

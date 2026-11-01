@@ -218,7 +218,17 @@ function referenceSheets(references) {
 
 function downloadSheets({ kind, format, purpose, references = {}, results = [], labels = {} }) {
   const columns = columnsFor(kind);
-  if (purpose === 'template') return [{ name: SHEETS[kind], rows: [columns] }];
+  if (purpose === 'template') {
+    const data = { name: SHEETS[kind], rows: [columns] };
+    return format === 'xlsx'
+      ? [
+          data,
+          ...downloadSheets({ kind, format, purpose: 'guide', labels }),
+          ...downloadSheets({ kind, format, purpose: 'examples' }),
+          ...referenceSheets(references),
+        ]
+      : [data];
+  }
   if (purpose === 'guide') return [{ name: SHEETS.guide, rows: guideRows(kind, labels) }];
   if (purpose === 'examples')
     return [
