@@ -1640,6 +1640,14 @@ class _PosNavigationState extends State<PosNavigation> {
         if (needed > railWidth) railWidth = needed;
         painter.dispose();
       }
+      railWidth = math.max(
+        railWidth,
+        labelWidth(
+              spanish ? 'Contraer menú' : 'Collapse menu',
+              theme.textTheme.labelMedium!,
+            ) +
+            88,
+      );
     }
     return Container(
       width: rail ? (expanded ? railWidth : 64) : null,
@@ -1657,11 +1665,19 @@ class _PosNavigationState extends State<PosNavigation> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Text(
-                      'umi',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: p.onSurface,
-                        fontSize: 29,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        width: 64 * MediaQuery.textScalerOf(context).scale(1),
+                        child: Center(
+                          child: Text(
+                            'umi',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: p.onSurface,
+                              fontSize: 29,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -1671,21 +1687,49 @@ class _PosNavigationState extends State<PosNavigation> {
                     child: PosSurface(
                       color: p.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(6),
-                      child: PosIconButton(
-                        tooltip: spanish
-                            ? (expanded ? 'Contraer menú' : 'Expandir menú')
-                            : (expanded ? 'Collapse menu' : 'Expand menu'),
-                        onPressed: () =>
-                            setState(() => _railExpanded = !_railExpanded),
-                        icon: PosIcon(
-                          PosGlyph(
-                            expanded
-                                ? 'nav_panel-left-close'
-                                : 'nav_panel-left-open',
-                          ),
-                          size: 20,
-                        ),
-                      ),
+                      child: expanded
+                          ? SizedBox(
+                              width: double.infinity,
+                              child: PosTextButton.icon(
+                                onPressed: () =>
+                                    setState(() => _railExpanded = false),
+                                icon: const PosIcon(
+                                  PosGlyph('nav_panel-left-close'),
+                                  size: 20,
+                                ),
+                                label: Text(
+                                  spanish ? 'Contraer menú' : 'Collapse menu',
+                                ),
+                                style: PosTextButton.styleFrom(
+                                  alignment: Alignment.centerLeft,
+                                  textStyle: theme.textTheme.labelMedium,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  minimumSize: const Size(48, 44),
+                                ),
+                              ),
+                            )
+                          : PosIconButton(
+                              tooltip: spanish
+                                  ? (expanded
+                                        ? 'Contraer menú'
+                                        : 'Expandir menú')
+                                  : (expanded
+                                        ? 'Collapse menu'
+                                        : 'Expand menu'),
+                              onPressed: () => setState(
+                                () => _railExpanded = !_railExpanded,
+                              ),
+                              icon: PosIcon(
+                                PosGlyph(
+                                  expanded
+                                      ? 'nav_panel-left-close'
+                                      : 'nav_panel-left-open',
+                                ),
+                                size: 20,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 8),
