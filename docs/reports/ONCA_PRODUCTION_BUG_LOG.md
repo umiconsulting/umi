@@ -253,3 +253,14 @@ Informes:
 
 - [KDS](./2026-11-02-onca-kds-cancel-ack-diagnosis.md).
 - [Mesas pagadas](./2026-11-02-onca-paid-occupied-tables.md).
+
+## CI del PR 245: UUID de idempotencia
+
+El job lint falló en gitleaks, con cuatro UUID del campo idempotencyKey en evidencia histórica de inventario.
+Esos identificadores no autentican solicitudes.
+La corrección añade sólo cuatro excepciones por commit, ruta, regla y línea.
+Gitleaks 8.30.1 reprodujo cuatro hallazgos con las refs de CI y terminó sin hallazgos después de la corrección.
+El control con una credencial sintética en el mismo archivo de prueba siguió rechazado.
+La prueba usa refs remotas; el checkout de soporte conserva refs locales adicionales.
+La nueva ejecución de CI queda pendiente tras publicar la corrección.
+Evidencia: [metadatos del escaneo](./evidence/2026-11-02-onca-paid-tables/gitleaks-ci-metadata.json).
