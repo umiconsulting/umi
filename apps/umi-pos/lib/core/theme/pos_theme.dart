@@ -53,8 +53,8 @@ final class PosPalette {
   Color get onPrimaryContainer => primary;
   // Reserve a larger colour area for the main action. The blue edge separates
   // the navy fill from Midnight's black surface.
-  Color get action => midnight ? const Color(0xFF223979) : signal;
-  Color get onAction => midnight ? onSurface : onSignal;
+  Color get action => const Color(0xFF223979);
+  Color get onAction => const Color(0xFFFFFEFA);
   Color get outline => dark
       ? (midnight ? const Color(0xFF3A3A3A) : const Color(0xFF2D3854))
       : const Color(0xFF728098);

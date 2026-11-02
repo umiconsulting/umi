@@ -1061,7 +1061,9 @@ void main() {
     addTearDown(f.dispose);
     await _mount(tester, f.surface);
     final line = CartItem.fromJson(f.cart.state.cart!.items.single);
-    await tester.tap(find.byKey(ValueKey('repeat-cart-line-${line.id}')));
+    await tester.tap(find.byTooltip('Más acciones de la línea'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Repetir producto'));
     await tester.pumpAndSettle();
     expect(f.repo.additions, 1);
     expect(f.repo.lastAdd?.productId, line.productId);

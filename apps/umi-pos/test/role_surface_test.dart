@@ -1554,9 +1554,8 @@ void main() {
 
     // The pinned row shows the verb; the tooltip carries the whole phrase, so
     // the accessible name is unchanged.
-    final pending = tester.getRect(find.text('Pendiente de enviar'));
-    expect(pending.width, greaterThan(140));
-    expect(pending.height, lessThan(40));
+    expect(find.text('Pendiente de enviar'), findsNothing);
+    expect(find.text('Editar producto'), findsOneWidget);
     final service = tester.getRect(find.text('Para llevar'));
     final account = tester.getRect(
       find.byKey(const ValueKey('catalog-account')),
@@ -1866,7 +1865,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Listo'), findsOneWidget);
     expect(find.text('Enviada'), findsNothing);
-    expect(find.byType(PosSheet), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-workspace')), findsOneWidget);
+    expect(find.byType(PosSheet), findsNothing);
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
