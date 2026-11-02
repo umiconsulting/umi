@@ -147,6 +147,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   // dine-in vs takeout. Shown on the comanda; carried onto the sale note.
   String _orderType = 'dine_in';
   TillSurface? _section;
+  TillSurface? _settingsReturnSection;
   int _scanGeneration = 0;
   bool _cashVisited = false;
   bool _salesVisited = false;
@@ -1413,6 +1414,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       _scanActive && generation == _scanGeneration;
 
   void _setSection(TillSurface section) {
+    if (section == TillSurface.settings && _section != TillSurface.settings) {
+      _settingsReturnSection = _section;
+    }
     _scanGeneration += 1;
     _salesVisited =
         _salesVisited ||
@@ -2066,7 +2070,19 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   }
 
   Widget Function()? _accountService;
-  bool _showPhotos = true;
+  bool _localShowPhotos = true;
+  bool get _showPhotos =>
+      DisplayPreferencesScope.maybeOf(context)?.showProductPhotos ??
+      _localShowPhotos;
+  void _togglePhotos() {
+    final prefs = DisplayPreferencesScope.maybeOf(context);
+    if (prefs != null) {
+      unawaited(prefs.setShowProductPhotos(!_showPhotos));
+    } else {
+      setState(() => _localShowPhotos = !_localShowPhotos);
+    }
+  }
+
   bool _showFrequent = false;
   Map<String, int>? _categoryCounts;
   String? _categoryCountScope;
@@ -2666,6 +2682,24 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       onAdopted: () => setState(() => _setSection(TillSurface.order)),
     ),
     TillSurface.settings => PosSettingsWorkspace(
+      onBack: () => setState(
+        () => _setSection(
+          _settingsReturnSection ??
+              landingSurface(
+                tillSurfacesFor(
+                  OperatorActionAccess(permissions),
+                  hasFloorPlan: widget.floorPlan != null,
+                  hasKitchenBoard: widget.kitchenBoard != null,
+                  hasIncomingOrders: widget.incomingOrders != null,
+                  incomingOrdersEntitled: merchantCarriesFeature(
+                    kIncomingOrdersFeature,
+                    widget.entry.state.operator?.entitlements ?? const [],
+                  ),
+                  kdsDevice: _kdsDevice,
+                ),
+              ),
+        ),
+      ),
       hardwareBuilder:
           permissions.allows('hardware.read') && widget.hardware != null
           ? (section) => HardwareSurface(
@@ -2948,7 +2982,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           style: PosTheme.of(context).textTheme.bodySmall,
         ),
         PosTextButton(
-          onPressed: () => setState(() => _showPhotos = !_showPhotos),
+          onPressed: _togglePhotos,
           child: Text(
             spanish
                 ? (_showPhotos ? 'Ocultar fotos' : 'Mostrar fotos')
@@ -3008,6 +3042,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         ? null
         : _Detail(
             inlineDetail,
+            showPhoto: _showPhotos,
             key: _detailKey,
             cart: widget.cart,
             addProduct: _addProduct,
@@ -4174,6 +4209,7 @@ final class _Detail extends StatefulWidget {
     required this.cart,
     required this.addProduct,
     required this.canWrite,
+    this.showPhoto = true,
     this.item,
     this.onRecord,
     required this.onClose,
@@ -4192,6 +4228,7 @@ final class _Detail extends StatefulWidget {
   })
   addProduct;
   final bool canWrite;
+  final bool showPhoto;
   final CartItem? item;
   final VoidCallback? onRecord;
 
@@ -4246,11 +4283,20 @@ final class _DetailState extends State<_Detail> {
           .cast<Map<String, Object?>>();
 
   /// The "+$X" a modifier adds, shown on its card. Null when it is free.
-  String? _priceLabel(Map<String, Object?> modifier) {
+  String? _priceLabel(
+    Map<String, Object?> modifier, {
+    bool showIncluded = false,
+  }) {
     final delta = modifier['priceDelta'];
     if (delta is! Map) return null;
     final minor = (delta['minorUnits'] as num?)?.toInt() ?? 0;
-    if (minor == 0) return null;
+    if (minor == 0) {
+      return showIncluded
+          ? (Localizations.localeOf(context).languageCode == 'es'
+                ? 'Incluido'
+                : 'Included')
+          : null;
+    }
     // The plus is this row's own sign; the formatter owns the minus.
     final currency = delta['currency'] as String? ?? '';
     final amount = formatMinorUnits(minor, currency);
@@ -4462,26 +4508,28 @@ final class _DetailState extends State<_Detail> {
     final children = <Widget>[
       Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox.square(
-              dimension: 64,
-              child: photo == null
-                  ? _ProductPlaceholder(
-                      name: detail.name,
-                      category: detail.category == null
-                          ? null
-                          : CatalogCategory.fromJson(detail.category!),
-                    )
-                  : Image.network(
-                      photo,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          _ProductPlaceholder(name: detail.name),
-                    ),
+          if (widget.showPhoto)
+            ClipRRect(
+              key: const ValueKey('product-detail-photo'),
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox.square(
+                dimension: 64,
+                child: photo == null
+                    ? _ProductPlaceholder(
+                        name: detail.name,
+                        category: detail.category == null
+                            ? null
+                            : CatalogCategory.fromJson(detail.category!),
+                      )
+                    : Image.network(
+                        photo,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            _ProductPlaceholder(name: detail.name),
+                      ),
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
+          if (widget.showPhoto) const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -4539,6 +4587,7 @@ final class _DetailState extends State<_Detail> {
               .map(
                 (item) => _OptionCard(
                   label: item['name']! as String,
+                  priceLabel: _priceLabel(item, showIncluded: true),
                   selected: variantId == item['id'],
                   onTap: () =>
                       setState(() => variantId = item['id']! as String),
@@ -4567,11 +4616,6 @@ final class _DetailState extends State<_Detail> {
           ],
         ),
       const SizedBox(height: UmiSpacing.md),
-      PosField(
-        controller: note,
-        maxLength: 500,
-        decoration: PosFieldDecoration(labelText: l.cartNoteLabel),
-      ),
       // LABELLED, BECAUSE THE COURSE STEPPER SITS TWO ROWS BELOW.
       //
       // Two bare `− 1 +` rows in one pane read as the same control written twice,
@@ -4620,6 +4664,12 @@ final class _DetailState extends State<_Detail> {
         enabled: widget.canWrite,
         hint: l.cartCourseHint,
         onChanged: (value) => setState(() => course = value),
+      ),
+      const SizedBox(height: UmiSpacing.md),
+      PosField(
+        controller: note,
+        maxLength: 500,
+        decoration: PosFieldDecoration(labelText: l.cartNoteLabel),
       ),
       const SizedBox(height: 24),
       const SizedBox(height: UmiSpacing.md),

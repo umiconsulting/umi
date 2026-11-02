@@ -8,6 +8,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'display_preferences.dart';
 import 'pos_icons.dart';
 import 'pos_theme.dart';
 

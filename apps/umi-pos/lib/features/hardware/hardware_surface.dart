@@ -271,6 +271,73 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
             Text(text('No assigned hardware.', 'No hay hardware asignado.')),
           ...devices.map(_deviceCard),
         ],
+        if (widget.section == 'print') ...[
+          Text(
+            text('Receipts', 'Tickets'),
+            style: PosTheme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 12),
+          PosListRow(
+            title: Text(
+              text('Print receipt on checkout', 'Imprimir el recibo al cobrar'),
+            ),
+            subtitle: Text(
+              (snapshot?.policy?['autoPrintReceipt'] as bool? ?? true)
+                  ? text('Enabled', 'Activado')
+                  : text('Disabled', 'Desactivado'),
+            ),
+          ),
+          PosListRow(
+            title: Text(text('Copies per receipt', 'Copias por recibo')),
+            subtitle: Text(
+              '${snapshot?.policy?['receiptCopiesDefault'] as int? ?? 1}',
+            ),
+          ),
+          PosListRow(
+            title: Text(text('Primary printer', 'Impresora principal')),
+            subtitle: Text(
+              devices
+                      .where(
+                        (device) =>
+                            device.type == 'printer' &&
+                            device.primary == true &&
+                            device.enabled,
+                      )
+                      .map((device) => device.publicReference)
+                      .firstOrNull ??
+                  text(
+                    'No active primary printer.',
+                    'Sin impresora principal activa.',
+                  ),
+            ),
+          ),
+          if (widget.permissions.allows('hardware.manage'))
+            PosOutlineButton.icon(
+              key: const ValueKey('printing-preferences'),
+              onPressed: _busy ? null : _configurePrinter,
+              icon: const PosIcon(PosGlyphs.settingsOutlined),
+              label: Text(
+                text('Receipt preferences', 'Preferencias del recibo'),
+              ),
+            ),
+          const SizedBox(height: 20),
+          Text(
+            text('Receipt printers', 'Impresoras de recibos'),
+            style: PosTheme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          if (!devices.any((device) => device.type == 'printer'))
+            Text(
+              text(
+                'No receipt printer assigned.',
+                'Sin impresora de recibos asignada.',
+              ),
+            ),
+          for (final device in devices.where(
+            (device) => device.type == 'printer',
+          ))
+            _deviceCard(device),
+        ],
         if (widget.section != 'devices') ...[
           const SizedBox(height: 24),
           Semantics(

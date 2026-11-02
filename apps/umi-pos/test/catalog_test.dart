@@ -7,6 +7,7 @@ import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/network/api_client.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/storage/local_working_copy.dart';
+import 'package:umi_pos/core/theme/display_preferences.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/core/theme/umi_theme.dart';
 import 'package:umi_pos/features/catalog/catalog_controller.dart';
@@ -52,11 +53,13 @@ final class FakeCatalogRepository implements CatalogRepository {
     this.productHasVariants = false,
     this.productHasModifiers = false,
     this.productMedia,
+    this.mediumDelta = 0,
   });
 
   /// What the one seeded product is called, and the category it carries. A test that
   /// cares about the tile's colour and letters sets both; the rest keep the defaults.
   final String productName;
+  final int mediumDelta;
   final Map<String, Object?>? productMedia;
   final Map<String, Object?>? productCategory;
 
@@ -132,7 +135,7 @@ final class FakeCatalogRepository implements CatalogRepository {
     updatedAt: '2026-07-28T00:00:00Z',
     barcode: '7501000000002',
     media: const [],
-    variants: const [
+    variants: [
       {
         'id': 'small',
         'name': 'Chico',
@@ -144,7 +147,7 @@ final class FakeCatalogRepository implements CatalogRepository {
         'id': 'medium',
         'name': 'Mediano',
         'attributes': <String, Object?>{},
-        'priceDelta': {'minorUnits': 0, 'currency': 'MXN'},
+        'priceDelta': {'minorUnits': mediumDelta, 'currency': 'MXN'},
         'availability': 'enabled',
       },
       {
@@ -801,30 +804,37 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final repository = FakeCatalogRepository(
       productHasVariants: true,
+      mediumDelta: 1000,
       productHasModifiers: true,
     );
     final value = controller(repository);
     await value.open(partition);
     final root = testRoot();
+    final prefs = DisplayPreferences(TestPreferences());
+    await prefs.load();
+    addTearDown(prefs.dispose);
     await tester.pumpWidget(
-      PosApp(
-        locale: const Locale('es'),
-        supportedLocales: AppLocalizations.supportedLocales,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
+      DisplayPreferencesScope(
+        preferences: prefs,
+        child: PosApp(
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
 
-          GlobalWidgetsLocalizations.delegate,
-        ],
-        home: CatalogSurface(
-          entry: root.entry,
-          catalog: value,
-          cart: root.cart,
-          cash: root.cash,
-          checkout: root.checkout,
-          sales: root.sales,
-          exceptions: root.exceptions,
-          connectivity: root.connectivity,
-          telemetry: root.telemetry,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          home: CatalogSurface(
+            entry: root.entry,
+            catalog: value,
+            cart: root.cart,
+            cash: root.cash,
+            checkout: root.checkout,
+            sales: root.sales,
+            exceptions: root.exceptions,
+            connectivity: root.connectivity,
+            telemetry: root.telemetry,
+          ),
         ),
       ),
     );
@@ -832,6 +842,18 @@ void main() {
     await tester.tap(find.text('Café'));
     await tester.pumpAndSettle();
 
+    final variant = find
+        .ancestor(of: find.text('Mediano'), matching: find.byType(PosTapRegion))
+        .first;
+    expect(
+      find.descendant(of: variant, matching: find.text('+MXN 10.00')),
+      findsOneWidget,
+    );
+    expect(find.text('Incluido'), findsNWidgets(2));
+    expect(find.byKey(const ValueKey('product-detail-photo')), findsOneWidget);
+    await prefs.setShowProductPhotos(false);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('product-detail-photo')), findsNothing);
     expect(find.byType(RawScrollbar), findsWidgets);
     final small = tester.getCenter(find.text('Chico'));
     final medium = tester.getCenter(find.text('Mediano'));

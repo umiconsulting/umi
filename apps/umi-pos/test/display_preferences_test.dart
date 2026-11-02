@@ -35,16 +35,86 @@ void main() {
     await prefs.setLanguage('en');
     await prefs.setReduceMotion(true);
     await prefs.setKitchenSoundsMuted(true);
+    await prefs.setShowProductPhotos(false);
+    await prefs.setMenuLabels(true);
     final restored = DisplayPreferences(store);
     await restored.load();
     expect(restored.themeMode, PosThemeMode.dark);
     expect(restored.language, 'en');
     expect(restored.reduceMotion, isTrue);
     expect(restored.kitchenSoundsMuted, isTrue);
+    expect(restored.showProductPhotos, isFalse);
+    expect(restored.menuLabels, isTrue);
     expect(store.values.keys, [DisplayPreferences.storageKey]);
     prefs.dispose();
     restored.dispose();
   });
+
+  testWidgets(
+    'Settings controls the same rail preference and returns through its callback',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final prefs = DisplayPreferences(_Store());
+      await prefs.load();
+      var returned = false;
+      await tester.pumpWidget(
+        DisplayPreferencesScope(
+          preferences: prefs,
+          child: PosApp(
+            locale: const Locale('en'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
+            home: PosPage(
+              bottomNavigationBar: PosNavigation(
+                destinations: const [
+                  PosDestination(
+                    icon: PosIcon(PosGlyphs.shoppingBagOutlined),
+                    label: 'Sale',
+                  ),
+                ],
+              ),
+              body: PosSettingsWorkspace(
+                onLock: () async {},
+                onLogout: () async {},
+                onBack: () => returned = true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('settings-sections')), findsOneWidget);
+      expect(find.text('Sale'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('settings-menu-labels')));
+      await tester.pumpAndSettle();
+      expect(prefs.menuLabels, isTrue);
+      expect(find.text('Sale'), findsOneWidget);
+      await tester.tap(find.text('Collapse menu'));
+      await tester.pumpAndSettle();
+      expect(prefs.menuLabels, isFalse);
+      expect(
+        tester
+            .widget<PosSwitchRow>(
+              find.byKey(const ValueKey('settings-menu-labels')),
+            )
+            .value,
+        isFalse,
+      );
+      await tester.tap(find.byKey(const ValueKey('settings-product-photos')));
+      await tester.pumpAndSettle();
+      expect(prefs.showProductPhotos, isFalse);
+      await tester.tap(find.byKey(const ValueKey('settings-back')));
+      expect(returned, isTrue);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      prefs.dispose();
+    },
+  );
 
   test('failed write preserves the saved choice and supports retry', () async {
     final store = _Store();

@@ -81,6 +81,27 @@ final class DisplaySettingsSurface extends StatelessWidget {
                 const SizedBox(height: UmiSpacing.md),
               ],
               if (prefs != null) ...[
+                PosSwitchRow(
+                  key: const ValueKey('settings-product-photos'),
+                  title: Text(
+                    Localizations.localeOf(context).languageCode == 'es'
+                        ? 'Fotos de productos'
+                        : 'Product photos',
+                  ),
+                  value: prefs.showProductPhotos,
+                  onChanged: prefs.busy ? null : prefs.setShowProductPhotos,
+                ),
+                PosSwitchRow(
+                  key: const ValueKey('settings-menu-labels'),
+                  title: Text(
+                    Localizations.localeOf(context).languageCode == 'es'
+                        ? 'Nombres en el menú'
+                        : 'Menu labels',
+                  ),
+                  value: prefs.menuLabels,
+                  onChanged: prefs.busy ? null : prefs.setMenuLabels,
+                ),
+                const SizedBox(height: 16),
                 _Section(
                   title: l.appearanceLabel,
                   child: Wrap(
@@ -227,11 +248,13 @@ final class PosSettingsWorkspace extends StatefulWidget {
     required this.onLock,
     required this.onLogout,
     this.hardwareBuilder,
+    this.onBack,
     this.operationalActions = const [],
     super.key,
   });
   final Future<void> Function() onLock, onLogout;
   final Widget Function(String section)? hardwareBuilder;
+  final VoidCallback? onBack;
   final List<Widget> operationalActions;
   @override
   State<PosSettingsWorkspace> createState() => _PosSettingsWorkspaceState();
@@ -254,75 +277,105 @@ final class _PosSettingsWorkspaceState extends State<PosSettingsWorkspace> {
     final selected = tabs.any((tab) => tab.$1 == _selected)
         ? _selected!
         : tabs.first.$1;
+    final content = switch (selected) {
+      'devices' || 'print' => widget.hardwareBuilder!(selected),
+      'display' => DisplaySettingsSurface(
+        embedded: true,
+        sectionOnly: true,
+        onLock: widget.onLock,
+        onLogout: widget.onLogout,
+      ),
+      _ => ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          ...widget.operationalActions,
+          const SizedBox(height: 16),
+          PosOutlineButton.icon(
+            onPressed: widget.onLock,
+            icon: const PosIcon(PosGlyphs.lockOutline),
+            label: Text(AppLocalizations.of(context).lockAction),
+          ),
+          const SizedBox(height: 8),
+          PosTextButton.icon(
+            onPressed: widget.onLogout,
+            icon: const PosIcon(PosGlyphs.logout),
+            label: Text(AppLocalizations.of(context).logoutAction),
+          ),
+        ],
+      ),
+    };
+    Widget sectionButton((String, String) tab, {required bool wide}) => Padding(
+      padding: EdgeInsets.only(right: wide ? 0 : 4, bottom: wide ? 4 : 0),
+      child: PosTapRegion(
+        selected: selected == tab.$1,
+        semanticLabel: tab.$2,
+        onTap: () => setState(() => _selected = tab.$1),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48),
+          alignment: wide ? Alignment.centerLeft : Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected == tab.$1
+                ? theme.colorScheme.surfaceContainerHigh
+                : null,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(tab.$2, style: theme.textTheme.bodySmall),
+        ),
+      ),
+    );
     return PosPage(
       appBar: PosHeader(
         automaticallyImplyLeading: false,
+        leading: widget.onBack == null
+            ? null
+            : PosIconButton(
+                key: const ValueKey('settings-back'),
+                tooltip: es ? 'Volver' : 'Back',
+                onPressed: widget.onBack,
+                icon: const PosIcon(PosGlyphs.arrowBack),
+              ),
         title: StationHeading(title: es ? 'Configuración' : 'Settings'),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 800;
+          if (wide) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final tab in tabs)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: PosTapRegion(
-                      selected: selected == tab.$1,
-                      semanticLabel: tab.$2,
-                      onTap: () => setState(() => _selected = tab.$1),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        constraints: const BoxConstraints(minHeight: 48),
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: selected == tab.$1
-                              ? theme.colorScheme.surfaceContainerHigh
-                              : null,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(tab.$2, style: theme.textTheme.bodySmall),
-                      ),
-                    ),
+                SizedBox(
+                  width: 200,
+                  child: ListView(
+                    key: const ValueKey('settings-sections'),
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      for (final tab in tabs) sectionButton(tab, wide: true),
+                    ],
                   ),
+                ),
+                Expanded(child: content),
               ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: switch (selected) {
-              'devices' || 'print' => widget.hardwareBuilder!(selected),
-              'display' => DisplaySettingsSurface(
-                embedded: true,
-                sectionOnly: true,
-                onLock: widget.onLock,
-                onLogout: widget.onLogout,
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    for (final tab in tabs) sectionButton(tab, wide: false),
+                  ],
+                ),
               ),
-              _ => ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  ...widget.operationalActions,
-                  const SizedBox(height: 16),
-                  PosOutlineButton.icon(
-                    onPressed: widget.onLock,
-                    icon: const PosIcon(PosGlyphs.lockOutline),
-                    label: Text(AppLocalizations.of(context).lockAction),
-                  ),
-                  const SizedBox(height: 8),
-                  PosTextButton.icon(
-                    onPressed: widget.onLogout,
-                    icon: const PosIcon(PosGlyphs.logout),
-                    label: Text(AppLocalizations.of(context).logoutAction),
-                  ),
-                ],
-              ),
-            },
-          ),
-        ],
+              const SizedBox(height: 8),
+              Expanded(child: content),
+            ],
+          );
+        },
       ),
     );
   }

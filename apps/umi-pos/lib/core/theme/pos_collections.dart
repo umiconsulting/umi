@@ -1334,7 +1334,19 @@ class _PosNavigationState extends State<PosNavigation> {
   Set<Object> _visible = {};
   Object? _moreMeaning, _menuFocus, _collapsedFocus;
   bool _menuOpen = false;
-  bool _railExpanded = false;
+  bool _localRailExpanded = false;
+  bool get _railExpanded =>
+      DisplayPreferencesScope.maybeOf(context)?.menuLabels ??
+      _localRailExpanded;
+  void _setRailExpanded(bool value) {
+    final prefs = DisplayPreferencesScope.maybeOf(context);
+    if (prefs != null) {
+      unawaited(prefs.setMenuLabels(value));
+    } else {
+      setState(() => _localRailExpanded = value);
+    }
+  }
+
   (bool, bool, int)? _layout;
   List<Object>? _identities;
 
@@ -1691,8 +1703,7 @@ class _PosNavigationState extends State<PosNavigation> {
                           ? SizedBox(
                               width: double.infinity,
                               child: PosTextButton.icon(
-                                onPressed: () =>
-                                    setState(() => _railExpanded = false),
+                                onPressed: () => _setRailExpanded(false),
                                 icon: const PosIcon(
                                   PosGlyph('nav_panel-left-close'),
                                   size: 20,
@@ -1718,9 +1729,7 @@ class _PosNavigationState extends State<PosNavigation> {
                                   : (expanded
                                         ? 'Collapse menu'
                                         : 'Expand menu'),
-                              onPressed: () => setState(
-                                () => _railExpanded = !_railExpanded,
-                              ),
+                              onPressed: () => _setRailExpanded(!_railExpanded),
                               icon: PosIcon(
                                 PosGlyph(
                                   expanded
