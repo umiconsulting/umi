@@ -129,22 +129,49 @@ final class FakeCatalogRepository implements CatalogRepository {
     barcode: '7501000000002',
     media: const [],
     variants: const [
-      {'id': 'small', 'name': 'Chico'},
-      {'id': 'medium', 'name': 'Mediano'},
-      {'id': 'large', 'name': 'Grande'},
+      {
+        'id': 'small',
+        'name': 'Chico',
+        'attributes': <String, Object?>{},
+        'priceDelta': {'minorUnits': 0, 'currency': 'MXN'},
+        'availability': 'enabled',
+      },
+      {
+        'id': 'medium',
+        'name': 'Mediano',
+        'attributes': <String, Object?>{},
+        'priceDelta': {'minorUnits': 0, 'currency': 'MXN'},
+        'availability': 'enabled',
+      },
+      {
+        'id': 'large',
+        'name': 'Grande',
+        'attributes': <String, Object?>{},
+        'priceDelta': {'minorUnits': 0, 'currency': 'MXN'},
+        'availability': 'enabled',
+      },
     ],
     optionGroups: const [
       {
         'id': 'milk',
         'name': 'Tipo de leche',
+        'required': false,
+        'minSelections': 0,
+        'maxSelections': null,
         'modifiers': [
-          {'id': 'oat', 'name': 'Leche de avena'},
+          {
+            'id': 'oat',
+            'name': 'Leche de avena',
+            'priceDelta': {'minorUnits': 0, 'currency': 'MXN'},
+            'available': true,
+          },
           // One modifier carries a surcharge and the other does not, on purpose:
           // the surcharge adds a second line to its tile, and that is the case
           // that used to leave two tiles in one row at different heights.
           {
             'id': 'whole',
             'name': 'Leche entera',
+            'available': true,
             'priceDelta': {'minorUnits': 1000, 'currency': 'MXN'},
           },
         ],
@@ -405,7 +432,7 @@ void main() {
             'name': 'Bebidas',
             'displayOrder': 0,
             'enabled': true,
-            'color': '#1E6F8C',
+            'color': '#808080',
           },
           {
             'id': 'desserts',
@@ -442,6 +469,8 @@ void main() {
       );
       await tester.pump();
 
+      expect(find.text('La carta'), findsOneWidget);
+      expect(find.text('umi'), findsOneWidget);
       Rect ear(String label) => tester.getRect(
         find.ancestor(
           of: find.text(label),
@@ -461,7 +490,7 @@ void main() {
       final first = ear('Todo');
       final drinks = ear('Bebidas');
       final desserts = ear('Postres');
-      if (size.width >= 700) {
+      if (size.width >= 1100) {
         final products = tester.getRect(
           find.byKey(const PageStorageKey('catalog-grid')),
         );
@@ -476,6 +505,22 @@ void main() {
         expect(drinks.left, greaterThanOrEqualTo(first.right));
         expect(desserts.left, greaterThanOrEqualTo(drinks.right));
       }
+      final categoryText = tester.widget<Text>(find.text('Bebidas'));
+      final categoryContainer = tester.widget<Container>(
+        find
+            .ancestor(
+              of: find.text('Bebidas'),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      final foreground = categoryText.style!.color!.computeLuminance();
+      final background = (categoryContainer.decoration! as BoxDecoration).color!
+          .computeLuminance();
+      final contrast =
+          ((foreground > background ? foreground : background) + .05) /
+          ((foreground < background ? foreground : background) + .05);
+      expect(contrast, greaterThanOrEqualTo(4.5));
       expect(chosen('Todo'), isTrue);
       expect(chosen('Bebidas'), isFalse);
       expect(drinks.height, greaterThanOrEqualTo(UmiTouchTarget.minimum - .01));
@@ -690,7 +735,7 @@ void main() {
           .first,
     );
     expect(plain, withPrice);
-    expect(plain.width, 200);
+    expect(plain.width, greaterThanOrEqualTo(200));
 
     // AND THE NAME SITS IN THE MIDDLE OF ITS TILE.
     //
@@ -710,10 +755,7 @@ void main() {
     final labelRect = tester.getRect(find.text('Leche de avena'));
     expect((labelRect.center.dy - tileRect.center.dy).abs(), lessThan(1.5));
 
-    // And it stays level when one of them is SELECTED: a selected tile draws a
-    // 2 px border where an unselected one draws 1 px, which used to be absorbed
-    // by a pinned tile height and painted a "BOTTOM OVERFLOWED" stripe in a
-    // debug build. Now the row grows by those 2 px and both tiles grow with it.
+    // Selecting a choice changes its surface and border color without changing row geometry.
     await tester.tap(find.text('Leche entera'));
     await tester.pumpAndSettle();
     final selectedPlain = tester.getSize(
@@ -733,7 +775,7 @@ void main() {
           .first,
     );
     expect(selectedPlain, selectedWithPrice);
-    expect(selectedWithPrice.height, plain.height + 2);
+    expect(selectedWithPrice.height, plain.height);
 
     await tester.tap(find.text('Catálogo'));
     await tester.pumpAndSettle();

@@ -120,16 +120,31 @@ final class PosApp extends StatelessWidget {
               ? darkTheme ?? PosThemeData(brightness: Brightness.dark)
               : theme ?? PosThemeData(),
       };
-      return PosTheme(
-        data: data,
-        child: DefaultTextStyle(
-          style: data.textTheme.bodyMedium!,
-          child: IconTheme(
-            data: IconThemeData(color: data.colorScheme.onSurface, size: 24),
-            child:
-                builder?.call(context, child) ??
-                child ??
-                const SizedBox.shrink(),
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          statusBarColor: const Color(0x00000000),
+          statusBarIconBrightness: data.colorScheme.dark
+              ? Brightness.light
+              : Brightness.dark,
+          statusBarBrightness: data.colorScheme.dark
+              ? Brightness.dark
+              : Brightness.light,
+          systemNavigationBarColor: data.colorScheme.background,
+          systemNavigationBarIconBrightness: data.colorScheme.dark
+              ? Brightness.light
+              : Brightness.dark,
+        ),
+        child: PosTheme(
+          data: data,
+          child: DefaultTextStyle(
+            style: data.textTheme.bodyMedium!,
+            child: IconTheme(
+              data: IconThemeData(color: data.colorScheme.onSurface, size: 24),
+              child:
+                  builder?.call(context, child) ??
+                  child ??
+                  const SizedBox.shrink(),
+            ),
           ),
         ),
       );
@@ -184,7 +199,8 @@ class PosPage extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final rail =
-                    constraints.maxWidth >= 1100 &&
+                    constraints.maxWidth >= 700 &&
+                    constraints.maxHeight >= 600 &&
                     bottomNavigationBar is PosNavigation;
                 final content = Expanded(
                   key: const ValueKey('pos-page-content'),

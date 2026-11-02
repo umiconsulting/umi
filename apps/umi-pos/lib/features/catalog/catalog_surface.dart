@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show SystemChannels;
@@ -949,6 +950,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               child: SizedBox(
                 height: (media.size.height - media.viewInsets.bottom) * .82,
                 child: _CartPanel(
+                  serviceControls: _accountService?.call(),
                   controller: widget.cart,
                   restoringAccount: _restoringAccount,
                   onNewSale: () => _newSale(context),
@@ -1892,6 +1894,31 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     final selected = surfaces.contains(_section) ? _section! : landing;
     final orderVisible = selected == TillSurface.order;
     return PosPage(
+      appBar: !orderVisible && MediaQuery.sizeOf(context).width < 700
+          ? PosHeader(
+              toolbarHeight: 48,
+              automaticallyImplyLeading: false,
+              title: Row(
+                children: [
+                  Text(
+                    'umi',
+                    style: PosTheme.of(
+                      context,
+                    ).textTheme.headlineSmall?.copyWith(fontSize: 29),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      entryState.selectedBranch?.name ?? '',
+                      style: PosTheme.of(context).textTheme.bodyMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : null,
       bottomNavigationBar: _primaryNav(context, spanish, surfaces, selected),
       body: Stack(
         fit: StackFit.expand,
@@ -1953,6 +1980,11 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       ),
     );
   }
+
+  Widget Function()? _accountService;
+  bool _showPhotos = true;
+  bool _showFrequent = false;
+  Map<String, int>? _categoryCounts;
 
   Widget _orderPage(
     BuildContext context,
@@ -2115,7 +2147,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     // at the till: the segments are 48 tall, so this is the same height and half
     // again as wide, which is the room the two marks need — a person, ten pixels of
     // air, and a plus — with the pair centred in it.
-    final serviceRow = Row(
+    Widget serviceRow() => Row(
       children: [
         orderTypeSlot(),
         if (canAttachCustomer) ...[
@@ -2129,15 +2161,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     // tall and as wide as the window, and at the largest text the toggle alone fills
     // it. There the buyer's control keeps its own square and the toggle keeps what is
     // left, because a strip that cannot grow has no room to hand out.
-    final compactServiceRow = Row(
-      children: [
-        orderTypeSlot(),
-        if (canAttachCustomer) ...[
-          const SizedBox(width: UmiSpacing.sm),
-          _customerAction(context, l, room: false),
-        ],
-      ],
-    );
+    _accountService = serviceRow;
     final currentCart = widget.cart.state.cart;
     final compactTotal = currentCart == null
         ? null
@@ -2145,7 +2169,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             TotalsPreview.fromJson(currentCart.totals).grandTotal,
           );
     final orderButton =
-        MediaQuery.sizeOf(context).width < 700 &&
+        (MediaQuery.sizeOf(context).width < 700 ||
+                MediaQuery.sizeOf(context).height < 600) &&
             canWriteCart &&
             _inlineDetail == null
         ? PosOrderButton.extended(
@@ -2184,18 +2209,30 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       // the barista sets dine-in vs takeout here before building the order.
       titleSpacing: UmiSpacing.md,
       actionsInline: compactHeader && !largeText,
-      title: StationHeading(
-        title: entryState.selectedBranch?.name ?? l.cartTitle,
+      title: Row(
+        children: [
+          if (MediaQuery.sizeOf(context).width < 700 ||
+              widget.entry.state.operator == null) ...[
+            Text(
+              'umi',
+              style: PosTheme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontSize: 29),
+            ),
+            const SizedBox(width: 16),
+          ],
+          Expanded(
+            child: Text(
+              entryState.selectedBranch?.name ?? l.cartTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: PosTheme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
       ),
-      bottom: compactHeader
-          ? PreferredSize(
-              preferredSize: const Size.fromHeight(56),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: compactServiceRow,
-              ),
-            )
-          : null,
       actions: [
         // Status — connectivity, compact. Visibility of system status.
         Padding(
@@ -2422,7 +2459,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                       state,
                       permissions,
                       canWriteCart,
-                      compactHeader ? null : serviceRow,
+                      serviceRow(),
                       scrollingHeader: scrollHeader ? header : null,
                     ),
                   ),
@@ -2555,6 +2592,46 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     ),
     TillSurface.settings => DisplaySettingsSurface(
       embedded: true,
+      operationalActions: [
+        if (permissions.allows('hardware.read') && widget.hardware != null)
+          PosListRow(
+            leading: const PosIcon(PosGlyphs.devicesOtherOutlined),
+            title: const Text('Hardware'),
+            onTap: () => showHardwareCenter(
+              context,
+              entry: widget.entry,
+              service: widget.hardware!,
+              permissions: permissions,
+              registerId: widget.cash.activeRegisterId,
+            ),
+          ),
+        if (tillSurfacesFor(
+          OperatorActionAccess(permissions),
+          hasFloorPlan: widget.floorPlan != null,
+          hasKitchenBoard: widget.kitchenBoard != null,
+          hasIncomingOrders: widget.incomingOrders != null,
+          incomingOrdersEntitled: merchantCarriesFeature(
+            kIncomingOrdersFeature,
+            widget.entry.state.operator?.entitlements ?? const [],
+          ),
+          kdsDevice: _kdsDevice,
+        ).contains(TillSurface.kitchen))
+          PosListRow(
+            leading: const PosIcon(PosGlyphs.restaurantMenuOutlined),
+            title: Text(l.kitchenBoardTitle),
+            onTap: () => setState(() => _setSection(TillSurface.kitchen)),
+          ),
+        if (OperatorActionAccess(permissions).showSaleHistory && !_kdsDevice)
+          PosListRow(
+            leading: const PosIcon(PosGlyphs.receiptOutlined),
+            title: Text(
+              Localizations.localeOf(context).languageCode == 'es'
+                  ? 'Ventas'
+                  : 'Sales',
+            ),
+            onTap: () => setState(() => _setSection(TillSurface.sales)),
+          ),
+      ],
       onLock: () => _leaveOperator(lock: true),
       onLogout: () => _leaveOperator(lock: false),
     ),
@@ -2567,6 +2644,28 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     TillSurface selected,
   ) {
     if (surfaces.length < 2) return null;
+    const order = [
+      TillSurface.order,
+      TillSurface.orders,
+      TillSurface.tables,
+      TillSurface.cash,
+      TillSurface.settings,
+      TillSurface.kitchen,
+      TillSurface.sales,
+    ];
+    surfaces = [...surfaces]
+      ..sort((a, b) => order.indexOf(a).compareTo(order.indexOf(b)));
+    if (MediaQuery.sizeOf(context).width < 700 &&
+        surfaces.contains(TillSurface.settings) &&
+        surfaces.contains(TillSurface.order)) {
+      surfaces = surfaces
+          .where(
+            (surface) =>
+                surface != TillSurface.kitchen && surface != TillSurface.sales,
+          )
+          .toList();
+      if (!surfaces.contains(selected)) selected = TillSurface.settings;
+    }
     return PosNavigation(
       selectedIndex: surfaces.indexOf(selected).clamp(0, surfaces.length - 1),
       onDestinationSelected: (index) {
@@ -2586,7 +2685,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             TillSurface.order => PosDestination(
               key: ValueKey(surface),
               icon: const PosIcon(PosGlyphs.receiptLongOutlined),
-              label: spanish ? 'Comanda' : 'Order',
+              label: spanish ? 'Venta' : 'Sale',
             ),
             TillSurface.cash => PosDestination(
               key: ValueKey(surface),
@@ -2608,13 +2707,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 isLabelVisible: _openAccountCount > 0,
                 child: const PosIcon(PosGlyphs.tableRestaurantOutlined),
               ),
-              label:
-                  widget.cart.supportsOpenAccounts &&
-                      OperatorPermissions(
-                        widget.entry.state.operator?.permissions ?? const [],
-                      ).allows('cart.write')
-                  ? (spanish ? 'Cuentas' : 'Accounts')
-                  : (spanish ? 'Mesas' : 'Tables'),
+              label: spanish ? 'Mesas' : 'Tables',
             ),
             TillSurface.kitchen => PosDestination(
               key: ValueKey(surface),
@@ -2648,8 +2741,23 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     Widget? serviceType, {
     Widget? scrollingHeader,
   }) {
+    if (state.phase == CatalogPhase.ready &&
+        state.selectedCategoryId == null &&
+        state.search.isEmpty &&
+        state.nextCursor == null) {
+      _categoryCounts = <String, int>{'': 0};
+      for (final product in state.products) {
+        if (CatalogMoney.fromJson(product.price).minorUnits <= 0) continue;
+        _categoryCounts![''] = _categoryCounts!['']! + 1;
+        final id = product.category?['id'] as String?;
+        if (id != null) _categoryCounts![id] = (_categoryCounts![id] ?? 0) + 1;
+      }
+    }
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
-    final wide = MediaQuery.sizeOf(context).width >= 700;
+    final wide =
+        MediaQuery.sizeOf(context).width >= 700 &&
+        MediaQuery.sizeOf(context).height >= 600;
+    final categoryColumn = MediaQuery.sizeOf(context).width >= 1100;
     final textScale = MediaQuery.textScalerOf(context).scale(16) / 16;
     final search = Builder(
       key: _searchAnchor,
@@ -2677,18 +2785,20 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         ),
       ),
     );
-    final frequent = !keyboard && _frequentTop.isNotEmpty && canWriteCart
+    final frequent =
+        _showFrequent && !keyboard && _frequentTop.isNotEmpty && canWriteCart
         ? _FrequentRail(
             products: _frequentTop,
             onTap: (id) => _showDetail(id, canWrite: canWriteCart),
           )
         : null;
     final categories = _CategoryTabs(
-      vertical: wide,
+      vertical: categoryColumn,
       textScale: textScale,
       tabs: [
         _CategoryTab(
           label: l.allCategories,
+          count: _categoryCounts?[''],
           color: const Color(0xFFE9EAF0),
           selected: state.selectedCategoryId == null,
           onTap: () => widget.catalog.selectCategory(null),
@@ -2696,6 +2806,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         ...state.categories.map(
           (category) => _CategoryTab(
             label: category.name,
+            count: _categoryCounts == null
+                ? null
+                : (_categoryCounts![category.id] ?? 0),
             color: _ProductPlaceholder.categoryColor(category, category.name),
             selected: state.selectedCategoryId == category.id,
             onTap: category.enabled
@@ -2722,36 +2835,55 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               const SizedBox(height: 8),
             ],
           );
-    final productPane = Column(
-      children: [
-        LayoutBuilder(
-          builder: (context, box) {
-            final showHeading =
-                !keyboard && box.maxWidth >= 650 && textScale < 1.5;
-            if (!showHeading) return search;
-            return Row(
-              children: [
-                Semantics(
-                  header: true,
-                  child: Text(
-                    Localizations.localeOf(context).languageCode == 'es'
-                        ? 'La carta'
-                        : 'The menu',
-                    style: PosTheme.of(
-                      context,
-                    ).textTheme.headlineMedium!.copyWith(fontSize: 32),
-                  ),
-                ),
-                const SizedBox(width: 24),
-                Expanded(child: search),
-              ],
-            );
-          },
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
+    final catalogHeading = Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Semantics(
+        header: true,
+        child: Text(
+          spanish ? 'La carta' : 'The menu',
+          style: PosTheme.of(context).textTheme.headlineSmall?.copyWith(
+            fontSize: wide ? 30 : 24,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        const SizedBox(height: 8),
-        if (!wide) categories,
-        if (frequent != null) ...[const SizedBox(height: 12), frequent],
+      ),
+    );
+    final productTools = Row(
+      children: [
+        Expanded(
+          child: Text(
+            spanish ? 'Productos' : 'Products',
+            style: PosTheme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        PosIconButton(
+          tooltip: spanish ? 'Fotos' : 'Photos',
+          onPressed: () => setState(() => _showPhotos = !_showPhotos),
+          icon: PosIcon(
+            PosGlyphs.visibilityOutlined,
+            color: _showPhotos
+                ? PosTheme.of(context).colorScheme.primary
+                : null,
+          ),
+        ),
+        if (_frequentTop.isNotEmpty)
+          PosIconButton(
+            tooltip: spanish ? 'Frecuentes' : 'Frequent',
+            onPressed: () => setState(() => _showFrequent = !_showFrequent),
+            icon: const PosIcon(PosGlyphs.starOutline),
+          ),
+      ],
+    );
+    final productPane = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!keyboard) catalogHeading,
+        search,
         const SizedBox(height: 12),
+        if (!categoryColumn && !keyboard) categories,
+        if (frequent != null) ...[const SizedBox(height: 12), frequent],
+        productTools,
         Expanded(child: _content(context, state)),
       ],
     );
@@ -2805,26 +2937,17 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           ],
         );
       }
-      return Column(
-        children: [
-          search,
-          if (frequent != null) ...[
-            const SizedBox(height: UmiSpacing.md),
-            frequent,
-          ],
-          if (!keyboard) ...[const SizedBox(height: UmiSpacing.md), categories],
-          const SizedBox(height: UmiSpacing.sm),
-          Expanded(child: _content(context, state)),
-        ],
-      );
+      return productPane;
     }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(child: detailPane ?? scrollingProducts ?? productPane),
-        const SizedBox(width: 16),
-        SizedBox(width: 132, child: categories),
+        if (categoryColumn) ...[
+          const SizedBox(width: 16),
+          SizedBox(width: 132, child: categories),
+        ],
         const SizedBox(width: 16),
         SizedBox(
           key: const ValueKey('catalog-account'),
@@ -2832,7 +2955,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               ? 380
               : MediaQuery.sizeOf(context).width >= 1100
               ? 344
-              : 280,
+              : 300,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -3140,7 +3263,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       CatalogPhase.ready => LayoutBuilder(
         builder: (context, size) {
           final textScale = MediaQuery.textScalerOf(context).scale(16) / 16;
-          final columns = (size.maxWidth / (180 * textScale)).floor().clamp(
+          final columns = (size.maxWidth / (170 * textScale)).floor().clamp(
             1,
             7,
           );
@@ -3155,8 +3278,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               .toList(growable: false);
           final gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
             mainAxisExtent: 104 + 72 * (textScale - 1).clamp(0, 3),
           );
           Widget itemBuilder(BuildContext context, int index) =>
@@ -3164,6 +3287,18 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               ? const Center(child: PosSpinner())
               : _ProductCard(
                   product: products[index],
+                  showPhoto: _showPhotos,
+                  quantity:
+                      widget.cart.state.cart?.items
+                          .where(
+                            (item) => item['productId'] == products[index].id,
+                          )
+                          .fold<int>(
+                            0,
+                            (sum, item) =>
+                                sum + (item['quantity'] as num).toInt(),
+                          ) ??
+                      0,
                   onTap: () => products[index].availability == 'enabled'
                       ? _showDetail(
                           products[index].id,
@@ -3505,8 +3640,10 @@ final class _CategoryTab {
     required this.label,
     required this.color,
     required this.selected,
+    this.count,
     this.onTap,
   });
+  final int? count;
   final String label;
   final Color color;
   final bool selected;
@@ -3529,12 +3666,8 @@ final class _CategoryTabs extends StatelessWidget {
     final theme = PosTheme.of(context);
     final palette = theme.colorScheme;
     Widget tab(_CategoryTab item) {
-      final fill = palette.dark
-          ? Color.alphaBlend(item.color.withValues(alpha: .22), palette.surface)
-          : item.color;
-      final ink = fill.computeLuminance() > .179
-          ? const Color(0xFF17233F)
-          : PosColors.white;
+      final fill = _ProductPlaceholder.surfaceColor(context, item.color);
+      final ink = _ProductPlaceholder.contrastInk(fill);
       return PosTapRegion(
         semanticLabel: item.label,
         selected: item.selected,
@@ -3542,9 +3675,9 @@ final class _CategoryTabs extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: Container(
           constraints: BoxConstraints(
-            minHeight: vertical ? 84 : UmiTouchTarget.minimum,
+            minHeight: vertical ? 76 : UmiTouchTarget.minimum,
           ),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: fill,
             borderRadius: BorderRadius.circular(8),
@@ -3554,12 +3687,28 @@ final class _CategoryTabs extends StatelessWidget {
             ),
           ),
           alignment: vertical ? Alignment.topLeft : Alignment.center,
-          child: Text(
-            item.label,
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: ink,
-              fontWeight: FontWeight.w500,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: vertical
+                ? CrossAxisAlignment.start
+                : CrossAxisAlignment.center,
+            children: [
+              Text(
+                item.label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: ink,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (item.count != null)
+                Text(
+                  '${item.count}',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: ink,
+                    fontSize: 11,
+                  ),
+                ),
+            ],
           ),
         ),
       );
@@ -3667,9 +3816,16 @@ final class _FrequentRail extends StatelessWidget {
 }
 
 final class _ProductCard extends StatelessWidget {
-  const _ProductCard({required this.product, required this.onTap});
+  const _ProductCard({
+    required this.product,
+    required this.onTap,
+    required this.showPhoto,
+    required this.quantity,
+  });
   final CatalogProductSummary product;
   final VoidCallback onTap;
+  final bool showPhoto;
+  final int quantity;
 
   @override
   Widget build(BuildContext context) {
@@ -3681,100 +3837,128 @@ final class _ProductCard extends StatelessWidget {
     final url = product.primaryMedia?['url'] as String?;
     final theme = PosTheme.of(context);
     final palette = theme.colorScheme;
+    final fill = _ProductPlaceholder.surfaceColor(
+      context,
+      _ProductPlaceholder.categoryColor(category, product.name),
+    );
+    final ink = _ProductPlaceholder.contrastInk(fill);
     final amount = formatMinorUnits(money.minorUnits, money.currency);
     final available = product.availability == 'enabled';
-    return PosCard(
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      clipBehavior: Clip.antiAlias,
-      child: PosTapRegion(
-        semanticLabel:
-            '${product.name}, $amount${available ? '' : ', ${l.unavailableLabel}'}',
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Opacity(
-              opacity: available ? 1 : .45,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: LayoutBuilder(
-                  builder: (context, box) => Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              product.name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              amount,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: palette.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: ColoredBox(
+        color: fill,
+        child: PosTapRegion(
+          semanticLabel:
+              '${product.name}, $amount${available ? '' : ', ${l.unavailableLabel}'}',
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (showPhoto && url == null)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 72,
+                  child: Opacity(
+                    opacity: .22,
+                    child: _ProductPlaceholder(
+                      name: product.name,
+                      category: category,
+                    ),
+                  ),
+                ),
+              if (showPhoto && url != null)
+                Positioned.fill(
+                  child: ShaderMask(
+                    blendMode: BlendMode.dstIn,
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [
+                        Color(0x00000000),
+                        Color(0x33000000),
+                        Color(0xFF000000),
+                      ],
+                      stops: [0, .45, 1],
+                    ).createShader(bounds),
+                    child: Opacity(
+                      opacity: palette.dark ? .32 : .65,
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
+                        child: Image.network(
+                          url,
+                          fit: BoxFit.cover,
+                          alignment: Alignment.centerRight,
+                          errorBuilder: (_, _, _) => _ProductPlaceholder(
+                            name: product.name,
+                            category: category,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: box.maxWidth < 200 ? 48 : 72,
-                        height: 72,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: url == null
-                              ? _ProductPlaceholder(
-                                  name: product.name,
-                                  category: category,
-                                )
-                              : Image.network(
-                                  url,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) =>
-                                      _ProductPlaceholder(
-                                        name: product.name,
-                                        category: category,
-                                      ),
-                                ),
+                    ),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Opacity(
+                  opacity: available ? 1 : .45,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (category != null)
+                        Text(
+                          category.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontSize: 11,
+                            color: ink,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      const SizedBox(height: 3),
+                      Text(
+                        product.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 14,
+                          height: 1.2,
+                          fontWeight: FontWeight.w500,
+                          color: ink,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        available ? amount : l.unavailableLabel,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 12,
+                          color: ink,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
-            if (!available)
-              Positioned(
-                left: 8,
-                top: 4,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: palette.surface,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    l.unavailableLabel,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: palette.onSurface,
-                      fontWeight: FontWeight.w600,
+              if (quantity > 0)
+                Positioned(
+                  right: 12,
+                  bottom: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
                     ),
+                    decoration: BoxDecoration(
+                      color: palette.surface,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text('$quantity', style: theme.textTheme.labelSmall),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -3811,6 +3995,24 @@ final class _ProductPlaceholder extends StatelessWidget {
     }
     const colors = [Color(0xFFDCE8F2), Color(0xFFF2E3D1), Color(0xFFEFDEDA)];
     return colors[_hue(category?.id ?? fallbackSeed) % colors.length];
+  }
+
+  /// Merchant hue is preserved while its presentation uses the approved soft surface.
+  static Color surfaceColor(BuildContext context, Color color) {
+    final palette = PosTheme.of(context).colorScheme;
+    if (palette.dark) {
+      return Color.alphaBlend(color.withValues(alpha: .20), palette.surface);
+    }
+    return color.computeLuminance() >= .65
+        ? color
+        : Color.alphaBlend(color.withValues(alpha: .22), palette.surface);
+  }
+
+  static Color contrastInk(Color background) {
+    const ink = Color(0xFF172440);
+    final ratio =
+        (background.computeLuminance() + .05) / (ink.computeLuminance() + .05);
+    return ratio >= 4.5 ? ink : PosColors.white;
   }
 
   /// Keep the fallback stable across rebuilds and catalog translations.
@@ -4031,13 +4233,20 @@ final class _DetailState extends State<_Detail> {
   /// absorb the 2 px border a SELECTED tile draws where an unselected one draws
   /// 1 px - a pinned tile height has to guess that difference, and guessing it
   /// wrong paints an overflow stripe in a debug build.
-  Widget _optionRows(List<Widget> tiles) => LayoutBuilder(
+  Widget _optionRows(
+    List<Widget> tiles, {
+    bool variants = false,
+  }) => LayoutBuilder(
     builder: (context, constraints) {
       const gap = UmiSpacing.sm;
-      final perRow = math.max(
-        1,
-        ((constraints.maxWidth + gap) / (_OptionCard.width + gap)).floor(),
-      );
+      final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+      final perRow = variants && constraints.maxWidth >= 260 * scale
+          ? (constraints.maxWidth >= 600 * scale ? 3 : 2)
+          : math.max(
+              1,
+              ((constraints.maxWidth + gap) / (220 * scale + gap)).floor(),
+            );
+      final tileWidth = (constraints.maxWidth - gap * (perRow - 1)) / perRow;
       final rows = <List<Widget>>[];
       for (var start = 0; start < tiles.length; start += perRow) {
         rows.add(tiles.sublist(start, math.min(start + perRow, tiles.length)));
@@ -4053,7 +4262,7 @@ final class _DetailState extends State<_Detail> {
                 children: [
                   for (var column = 0; column < rows[row].length; column++) ...[
                     if (column > 0) const SizedBox(width: gap),
-                    rows[row][column],
+                    SizedBox(width: tileWidth, child: rows[row][column]),
                   ],
                 ],
               ),
@@ -4088,14 +4297,12 @@ final class _DetailState extends State<_Detail> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
-              Flexible(
-                child: Text(
-                  name,
-                  style: PosTheme.of(context).textTheme.titleMedium,
-                ),
-              ),
+              Text(name, style: PosTheme.of(context).textTheme.titleSmall),
               if (hint != null) ...[
                 const SizedBox(width: UmiSpacing.sm),
                 Text(
@@ -4155,20 +4362,60 @@ final class _DetailState extends State<_Detail> {
     final l = AppLocalizations.of(context);
     final detail = widget.detail;
     final money = CatalogMoney.fromJson(detail.price);
+    final photo = detail.primaryMedia?['url'] as String?;
+    final selection = ProvisionalLine.fromSelection(
+      product: detail,
+      variantId: variantId,
+      modifierQuantities: selectedModifiers,
+    );
     final children = <Widget>[
-      Text(detail.name, style: PosTheme.of(context).textTheme.headlineMedium),
-      Text(formatMinorUnits(money.minorUnits, money.currency)),
-      if (detail.description != null) Text(detail.description!),
-      if (detail.sku != null || detail.barcode != null)
-        PosDisclosure(
-          title: Text(l.productInformationLabel),
-          children: [
-            if (detail.sku != null) Text('SKU: ${detail.sku}'),
-            if (detail.barcode != null)
-              Text('${l.productBarcodeLabel}: ${detail.barcode}'),
-          ],
-        ),
-      if (detail.taxRateBasisPoints > 0) Text(l.taxIncludedLabel),
+      Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox.square(
+              dimension: 64,
+              child: photo == null
+                  ? _ProductPlaceholder(
+                      name: detail.name,
+                      category: detail.category == null
+                          ? null
+                          : CatalogCategory.fromJson(detail.category!),
+                    )
+                  : Image.network(
+                      photo,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) =>
+                          _ProductPlaceholder(name: detail.name),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  Localizations.localeOf(context).languageCode == 'es'
+                      ? 'Personaliza tu producto'
+                      : 'Customize your item',
+                  style: PosTheme.of(context).textTheme.bodySmall,
+                ),
+                Text(
+                  detail.name,
+                  style: PosTheme.of(
+                    context,
+                  ).textTheme.headlineSmall?.copyWith(fontSize: 26),
+                ),
+                Text(
+                  formatMinorUnits(money.minorUnits, money.currency),
+                  style: PosTheme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
       if (detail.variants.isNotEmpty) ...[
         const SizedBox(height: 16),
         Row(
@@ -4207,17 +4454,27 @@ final class _DetailState extends State<_Detail> {
                 ),
               )
               .toList(),
+          variants: true,
         ),
       ],
       if (detail.optionGroups.isNotEmpty) ...[
-        const SizedBox(height: UmiSpacing.xl),
-        Text(
-          l.modifiersLabel,
-          style: PosTheme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: UmiSpacing.md),
+        const SizedBox(height: UmiSpacing.lg),
         ...detail.optionGroups.map(_buildOptionGroup),
       ],
+      if (detail.description != null ||
+          detail.sku != null ||
+          detail.barcode != null ||
+          detail.taxRateBasisPoints > 0)
+        PosDisclosure(
+          title: Text(l.productInformationLabel),
+          children: [
+            if (detail.description != null) Text(detail.description!),
+            if (detail.sku != null) Text('SKU: ${detail.sku}'),
+            if (detail.barcode != null)
+              Text('${l.productBarcodeLabel}: ${detail.barcode}'),
+            if (detail.taxRateBasisPoints > 0) Text(l.taxIncludedLabel),
+          ],
+        ),
       const SizedBox(height: UmiSpacing.md),
       PosField(
         controller: note,
@@ -4337,8 +4594,19 @@ final class _DetailState extends State<_Detail> {
               }
               if (mounted) widget.onClose();
             },
-      child: Text(
-        widget.item == null ? l.addToCartAction : l.saveCartLineAction,
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        spacing: 16,
+        runSpacing: 4,
+        children: [
+          Text(widget.item == null ? l.addToCartAction : l.saveCartLineAction),
+          Text(
+            formatMinorUnits(
+              selection.unitMinorUnits * quantity,
+              selection.currency,
+            ),
+          ),
+        ],
       ),
     );
     final footer = Padding(
@@ -4374,7 +4642,9 @@ final class _DetailState extends State<_Detail> {
             thumbVisibility: true,
             child: ListView(
               controller: detailScroll,
-              padding: const EdgeInsets.all(UmiSpacing.lg),
+              padding: EdgeInsets.all(
+                MediaQuery.sizeOf(context).width < 700 ? 0 : 16,
+              ),
               children: children,
             ),
           ),
@@ -4397,90 +4667,60 @@ final class _OptionCard extends StatelessWidget {
     this.priceLabel,
     this.disabled = false,
   });
-
-  /// The one width `_optionRows` packs rows with. Height is the row's business:
-  /// see `_optionRows`.
-  static const double width = 200;
-
   final String label;
   final String? priceLabel;
-  final bool selected;
-  final bool disabled;
+  final bool selected, disabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = PosTheme.of(context).colorScheme;
-    final accent = scheme.primary;
+    final theme = PosTheme.of(context);
+    final scheme = theme.colorScheme;
     return Opacity(
       opacity: disabled ? .45 : 1,
-      child: SizedBox(
-        width: width,
-        child: PosSurface(
-          color: selected
-              ? accent.withValues(alpha: .16)
-              : scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(UmiRadius.control),
-          child: PosTapRegion(
-            onTap: disabled ? null : onTap,
-            selected: selected,
-            borderRadius: BorderRadius.circular(UmiRadius.control),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: UmiSpacing.md,
-                vertical: UmiSpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(UmiRadius.control),
-                border: Border.all(
-                  color: selected ? accent : scheme.onSurfaceVariant,
-                  width: selected ? 2 : 1,
+      child: PosTapRegion(
+        onTap: disabled ? null : onTap,
+        selected: selected,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? scheme.primaryContainer : scheme.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected ? scheme.primary : scheme.outlineVariant,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if ((priceLabel ?? '').isNotEmpty)
+                      Text(
+                        priceLabel!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              child: Row(
-                children: [
-                  PosIcon(
-                    selected
-                        ? PosGlyphs.checkCircle
-                        : PosGlyphs.radioButtonUnchecked,
-                    size: 18,
-                    color: selected ? accent : scheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: UmiSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          label,
-                          style: PosTheme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                fontWeight: selected
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                              ),
-                        ),
-                        // THE PRICE LINE ONLY EXISTS WHEN THERE IS A PRICE.
-                        //
-                        // A variant has no price of its own, and this used to draw
-                        // `Text('')` for it anyway: an empty line of `bodySmall`
-                        // height under the name, which pushed the name above the
-                        // card's centre. The owner read that as "centra el texto
-                        // verticalmente" (2026-10-12). The row centres what it is
-                        // given; it was being given a blank line.
-                        if ((priceLabel ?? '').isNotEmpty)
-                          Text(
-                            priceLabel!,
-                            style: PosTheme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: scheme.onSurfaceVariant),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+              if (selected) ...[
+                const SizedBox(width: 8),
+                PosIcon(PosGlyphs.check, size: 18, color: scheme.primary),
+              ],
+            ],
           ),
         ),
       ),
@@ -4568,7 +4808,9 @@ final class _CartPanel extends StatelessWidget {
     this.onAssignTable,
     this.beforeCheckout,
     this.beforeFire,
+    this.serviceControls,
   });
+  final Widget? serviceControls;
   final CartController controller;
   final bool restoringAccount;
   final Future<void> Function()? onNewSale;
@@ -5040,6 +5282,10 @@ final class _CartPanel extends StatelessWidget {
     // unfired, are editable, and the fire action sends them.
     final unfiredCount = items.where((item) => !item.fired).length;
     final lines = <Widget>[
+      if (serviceControls != null) ...[
+        serviceControls!,
+        const SizedBox(height: 12),
+      ],
       if (cart.accountName != null)
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
