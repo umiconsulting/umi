@@ -2200,6 +2200,8 @@ void main() {
     final firstBasis = value.requests.first.checkoutFingerprint;
 
     // The correction: the cash the customer handed over, after the preview.
+    await tester.ensureVisible(find.text('MXN 500.00'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('MXN 500.00'));
     await tester.pumpAndSettle();
     // The sheet is showing the repriced total, and the edit turns the confirm back into a charge.
@@ -2290,6 +2292,13 @@ void main() {
       repository,
       policy: CheckoutPolicy.fromJson(_policy),
     );
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('checkout-tip-disclosure')),
+        matching: find.text('Tip'),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('10%'));
     await tester.pumpAndSettle();
     // 10 % of 116.00 is 11.60, so the cash the till applies and receives is 127.60.
@@ -2342,6 +2351,13 @@ void main() {
     }
     await tester.pumpAndSettle();
 
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('checkout-tip-disclosure')),
+        matching: find.text('Tip'),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('10%'));
     await tester.pumpAndSettle();
 
@@ -2418,8 +2434,8 @@ void main() {
     // The redesigned SOTA tender screen: a hero total, the payment-method tile,
     // the cash-received flow with quick-cash notes and an on-screen keypad, the
     // colour-coded change block. Receipt delivery uses the default display path.
-    expect(find.text('Total'), findsOneWidget);
-    expect(find.text('Payment selection'), findsOneWidget);
+    expect(find.text('Remaining balance'), findsWidgets);
+    expect(find.byKey(const ValueKey('checkout-account')), findsOneWidget);
     expect(find.text('Cash'), findsWidgets);
     expect(find.text('Cash received'), findsOneWidget);
     expect(find.text('Exact amount'), findsOneWidget);
@@ -2430,6 +2446,8 @@ void main() {
     expect(find.text('MXN 116.00'), findsWidgets);
     // Changing the received cash must not add another confirmation. The
     // operator has already reviewed the visible total and tender.
+    await tester.ensureVisible(find.text('MXN 500.00'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('MXN 500.00'));
     await tester.pumpAndSettle();
     // One-tap checkout: the charge button reviews the total server-side and, when
@@ -3220,6 +3238,13 @@ void main() {
     final charge = tester.widget<PosButton>(find.byType(PosButton).last);
     expect(charge.onPressed, isNotNull);
 
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('checkout-tip-disclosure')),
+        matching: find.text('Tip'),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('10%'));
     await tester.pumpAndSettle();
     expect(
@@ -3261,6 +3286,13 @@ void main() {
     expect(find.byKey(const ValueKey('tender-tip-keypad')), findsNothing);
     expect(find.text('Receipt destination'), findsNothing);
 
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('checkout-tip-disclosure')),
+        matching: find.text('Tip'),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('custom-tip-percentage')));
     await tester.pumpAndSettle();
     final keypad = find.byKey(const ValueKey('tender-tip-keypad'));
@@ -3268,7 +3300,12 @@ void main() {
     tester.view.physicalSize = const Size(1920, 1080);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(tester.getRect(keypad).bottom, lessThan(820));
+    await tester.ensureVisible(keypad);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(keypad).bottom,
+      lessThanOrEqualTo(tester.view.physicalSize.height),
+    );
     for (final digit in ['1', '2', '.', '5']) {
       await tester.tap(find.descendant(of: keypad, matching: find.text(digit)));
       await tester.pump();
@@ -3303,6 +3340,13 @@ void main() {
       policy: CheckoutPolicy.fromJson(_policy),
     );
     await tester.tap(find.text('Manual terminal'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('checkout-tip-disclosure')),
+        matching: find.text('Tip'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('custom-tip-fixed')));
     await tester.pumpAndSettle();
@@ -3516,6 +3560,46 @@ void main() {
           reason:
               '$finder sits at $rect, outside the $canvas the till draws on',
         );
+      }
+      await sheet.dispose();
+    },
+  );
+  testWidgets(
+    'payment work stays together beside the actual account at tablet sizes',
+    (tester) async {
+      final sheet = await _openTenderSheet(
+        tester,
+        _CheckoutRepository(),
+        policy: CheckoutPolicy.fromJson(_policy),
+      );
+      for (final size in [
+        const Size(800, 1340),
+        const Size(1340, 800),
+        const Size(412, 915),
+      ]) {
+        tester.view.physicalSize = size;
+        await tester.pumpAndSettle();
+        final received = tester.getRect(find.text('Cash received'));
+        final keypad = tester.getRect(
+          find.byKey(const ValueKey('tender-cash')),
+        );
+        expect(keypad.top, greaterThan(received.bottom));
+        expect(keypad.left, lessThanOrEqualTo(received.left));
+        if (size.width >= 700) {
+          final account = tester.getRect(
+            find.byKey(const ValueKey('checkout-account')),
+          );
+          expect(keypad.right, lessThan(account.left));
+        }
+        expect(
+          find.byKey(const ValueKey('checkout-charge')).hitTestable(),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('custom-tip-percentage')),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
       }
       await sheet.dispose();
     },
