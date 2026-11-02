@@ -22,10 +22,12 @@ final class DisplaySettingsSurface extends StatelessWidget {
     required this.onLock,
     required this.onLogout,
     this.embedded = false,
+    this.operationalActions = const [],
     super.key,
   });
   final Future<void> Function() onLock, onLogout;
   final bool embedded;
+  final List<Widget> operationalActions;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +46,7 @@ final class DisplaySettingsSurface extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.all(UmiSpacing.lg),
             children: [
+              ...operationalActions,
               const StationSignature(),
               const SizedBox(height: UmiSpacing.lg),
               Text(l.displaySettingsScope, style: theme.textTheme.bodyMedium),

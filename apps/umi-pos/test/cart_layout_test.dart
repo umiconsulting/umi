@@ -471,7 +471,7 @@ void main() {
   testWidgets('the open mobile cart sheet follows authoritative cart changes', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(800, 1340);
+    tester.view.physicalSize = const Size(412, 915);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await fonts();
@@ -815,7 +815,7 @@ void main() {
   testWidgets('the cart opens on a short viewport without overflowing', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(800, 600);
+    tester.view.physicalSize = const Size(412, 600);
     tester.view.devicePixelRatio = 1.0;
     // The keyboard is up: 300 logical pixels of the bottom are gone.
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
@@ -886,19 +886,28 @@ void main() {
     await tester.pump();
 
     // The cart is behind the FAB on a narrow till.
-    await tester.tap(find.text('Comanda'));
+    await tester.tap(find.byType(PosOrderButton));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
     // An overflow is reported as a test exception; separately, nothing else blew
     // up while the cart laid out.
     expect(tester.takeException(), isNull);
-    expect(find.text('Latte 0'), findsOneWidget);
+    final sheetScroll = find
+        .descendant(of: find.byType(PosCard), matching: find.byType(Scrollable))
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('Latte 0'),
+      80,
+      scrollable: sheetScroll,
+    );
+    expect(find.text('Latte 0').hitTestable(), findsOneWidget);
     // And the actions are pinned below the panel's scroll, inside the space the
     // keyboard leaves — the point of the scroll is that they are not pushed off
     // with a debug stripe, and the point of pinning them is that they are there
     // without hunting for them.
     final fire = find.byTooltip('Enviar a cocina');
+    await tester.scrollUntilVisible(fire, 100, scrollable: sheetScroll);
     expect(fire, findsOneWidget);
     expect(
       tester.getRect(fire).bottom,
