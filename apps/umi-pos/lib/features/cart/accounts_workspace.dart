@@ -99,7 +99,7 @@ class AccountsWorkspace extends StatelessWidget {
                       tooltip: es ? 'Lista' : 'List',
                       onPressed: () => onViewChanged(true),
                       icon: PosIcon(
-                        PosGlyphs.receiptLong,
+                        PosGlyphs.list,
                         size: 20,
                         color: list
                             ? PosTheme.of(context).colorScheme.primary

@@ -1920,7 +1920,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                             : TillSurface.settings,
                       ),
                     ),
-                    icon: const PosIcon(PosGlyphs.tuneOutlined),
+                    icon: const PosIcon(PosGlyphs.settingsOutlined),
                   ),
               ],
             )
@@ -5439,7 +5439,7 @@ final class _CartPanel extends StatelessWidget {
                                 !controller.isWriting
                             ? () => controller.repeat(item)
                             : null,
-                        icon: const PosIcon(PosGlyphs.syncAlt),
+                        icon: const PosIcon(PosGlyphs.repeat),
                       ),
                       PosIconButton(
                         tooltip: l.removeFromCartAction,
@@ -5538,7 +5538,7 @@ final class _CartPanel extends StatelessWidget {
                           );
                         }
                       },
-                icon: const PosIcon(PosGlyphs.arrowUpward),
+                icon: const PosIcon(PosGlyphs.send),
                 label: Text(spanish ? 'Enviar a cocina' : 'Send to kitchen'),
               ),
             ),

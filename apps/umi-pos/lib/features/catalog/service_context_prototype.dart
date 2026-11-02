@@ -338,9 +338,7 @@ class _ServiceContextPrototypeState extends State<ServiceContextPrototype> {
               final send = PosButton.tonalIcon(
                 key: const ValueKey('send-to-kitchen'),
                 onPressed: _sendToKitchen,
-                icon: PosIcon(
-                  _sendFailed ? PosGlyphs.refresh : PosGlyphs.arrowUpward,
-                ),
+                icon: PosIcon(_sendFailed ? PosGlyphs.refresh : PosGlyphs.send),
                 label: Text(
                   _sendFailed ? 'Reintentar envío' : 'Enviar 2 a cocina',
                 ),
