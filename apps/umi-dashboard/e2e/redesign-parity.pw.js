@@ -203,6 +203,9 @@ for (const width of [1440, 402]) {
     const server = await prepareDashboard(page, { signedIn: false });
     await page.setViewportSize({ width, height: width === 1440 ? 1000 : 874 });
     await page.goto('/login');
+    const authFontSize = width === 1440 ? '14px' : '16px';
+    await expect(page.getByLabel('Correo', { exact: true })).toBeFocused();
+    await expect(page.getByLabel('Correo', { exact: true })).toHaveCSS('font-size', authFontSize);
     await expect(page.locator('.login-hero h1')).toHaveText('Tu operación,en tiempo real.');
     await expect(page.locator('.login-hero p')).toHaveText(
       'Supervisa la operación de tu negocio al momento, desde un solo panel.',
@@ -219,6 +222,7 @@ for (const width of [1440, 402]) {
     expect(imageResponse.headers()['content-type']).toContain('image/jpeg');
     await page.getByLabel('Correo', { exact: true }).fill('owner@example.invalid');
     const password = page.getByLabel('Contraseña', { exact: true });
+    await expect(password).toHaveCSS('font-size', authFontSize);
     await password.fill('SyntheticPassword!');
     await page.getByRole('button', { name: 'Mostrar contraseña', exact: true }).click();
     await expect(password).toHaveAttribute('type', 'text');
@@ -229,6 +233,7 @@ for (const width of [1440, 402]) {
     await screenshot(page, testInfo, 'login');
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Verifica que eres tú' })).toBeVisible();
+    await expect(page.getByLabel('Código', { exact: true })).toHaveCSS('font-size', authFontSize);
     await expect(
       page.getByText('Te enviamos un código de seis dígitos a tu correo.', { exact: true }),
     ).toBeVisible();
@@ -238,6 +243,7 @@ for (const width of [1440, 402]) {
     await expect(page.getByLabel('Recordarme', { exact: true })).toBeChecked();
     await expect(password).toHaveValue('');
     await page.getByRole('button', { name: '¿Olvidaste tu contraseña?', exact: true }).click();
+    await expect(page.getByLabel('Correo', { exact: true })).toHaveCSS('font-size', authFontSize);
     await page.getByLabel('Correo', { exact: true }).fill('owner@example.invalid');
     await page.getByRole('button', { name: 'Enviar enlace', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Revisa tu correo' })).toBeVisible();
@@ -279,6 +285,12 @@ test('reset validates confirmation and displays the result at phone width', asyn
   const server = await prepareDashboard(page, { signedIn: false });
   await page.setViewportSize({ width: 412, height: 915 });
   await page.goto('/reset-password?token=synthetic-reset');
+  await expect(page.getByLabel('Nueva contraseña', { exact: true })).toBeFocused();
+  await expect(page.getByLabel('Nueva contraseña', { exact: true })).toHaveCSS('font-size', '16px');
+  await expect(page.getByLabel('Confirmar contraseña', { exact: true })).toHaveCSS(
+    'font-size',
+    '16px',
+  );
   await page.getByLabel('Nueva contraseña', { exact: true }).fill('SyntheticPassword!');
   await page.getByLabel('Confirmar contraseña', { exact: true }).fill('DifferentPassword!');
   await page.getByRole('button', { name: 'Guardar contraseña', exact: true }).click();

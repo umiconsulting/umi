@@ -5,7 +5,8 @@ Base: staging commit `b3e5bf882372eeb14c3c1b2658a6947df83c5051`.
 
 ## Result
 
-The existing dashboard remains the implementation. This task changes tests and documentation only.
+The existing dashboard remains the implementation. The initial task changed tests and documentation only.
+The Safari follow-up below adds a scoped correction to the font size in mobile authentication fields.
 The original shell, routes, controllers, forms, permissions, and data hooks remain unchanged.
 The browser cases required no layout correction.
 
@@ -152,3 +153,42 @@ Representative focused artifacts:
 - `redesign-parity.pw.js-logi-e517e--email-and-recovery-at-1440/login.png`
 - `redesign-parity.pw.js-logi-0b073-d-email-and-recovery-at-402/login.png`
 - `redesign-parity.pw.js-rese-3cd0b-s-the-result-at-phone-width/reset-done.png`
+
+## Safari follow-up: mobile authentication fields
+
+Base: `f1975263`. The parent measured automatic input zoom in Safari on an iPhone 17 Pro simulator with iOS 27.
+The focused login email field used a 14 px font. The zoom clipped the horizontal edges.
+Original simulator evidence: `/private/tmp/umi-ios-visible-dashboard.png`.
+
+The existing authentication breakpoint, 840 px, now sets its text inputs to 16 px.
+The CSS selectors are `.login-wrap .input.tall` and `.login-pw .input.tall`.
+The first selector covers login email/password, recovery email, and MFA code.
+The second selector covers the shared password wrappers in login and reset.
+`login-pw` appears only in those two authentication screens.
+
+The change preserves the original fish background, copy, dimensions, labels, locale, theme, and authentication handlers.
+Autofocus remains active. The viewport settings and user zoom remain unchanged.
+Desktop fields retain their 14 px font.
+
+The existing browser cases now check the rendered font sizes and the original focus behavior.
+The first valid red run passed the desktop case and failed both mobile cases with `Expected: "16px", Received: "14px"`.
+The first attempt used an unavailable CDP endpoint, 9233. It failed before the application opened.
+A separate headed Chromium session on 9234 supplied the valid red and green runs.
+
+```sh
+export PATH='/Users/moon/.npm/_npx/c29883048cd047b6/node_modules/node/bin:/Users/moon/.npm/_npx/c29883048cd047b6/node_modules/.bin':"$PATH"
+UMI_PARITY_CDP=http://127.0.0.1:9234 pnpm --filter @umi/dashboard exec playwright test --config playwright.config.js e2e/redesign-parity.pw.js --grep 'login keeps|reset validates' --reporter=line --output=/private/tmp/umi-dashboard-safari-red
+UMI_PARITY_CDP=http://127.0.0.1:9234 pnpm --filter @umi/dashboard exec playwright test --config playwright.config.js e2e/redesign-parity.pw.js --reporter=line --output=/private/tmp/umi-dashboard-safari-green
+pnpm --filter @umi/dashboard test
+pnpm --filter @umi/dashboard exec eslint e2e/redesign-parity.pw.js
+VITE_UMI_ENVIRONMENT=test VITE_AUTH_MODE=cookie pnpm --filter @umi/dashboard build
+```
+
+Results: 11 browser cases passed in 53.0 seconds. The unit suite passed 631 tests in 43 files.
+ESLint and `git diff --check` returned exit 0. The production bundle completed in 6.26 seconds.
+The existing warning for chunks above 500 kB remains.
+Mobile login and reset screenshots were opened and read in `/private/tmp/umi-dashboard-safari-green/`.
+
+Self-review confirmed the CSS scope, unchanged handlers, unchanged viewport settings, and unchanged desktop font.
+Chromium proves the computed input sizes and existing controls. The parent owns the final Safari simulator check.
+The temporary live Playwright configuration and test-data report remain outside this change.
