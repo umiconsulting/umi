@@ -2642,6 +2642,18 @@ abstract class AppLocalizations {
   /// **'Por cobrar'**
   String get tableStateAwaitingPaymentLabel;
 
+  /// No description provided for @tableStatePaidOccupiedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Pagada y ocupada'**
+  String get tableStatePaidOccupiedLabel;
+
+  /// No description provided for @tableStateNewConsumptionAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Nuevo consumo'**
+  String get tableStateNewConsumptionAction;
+
   /// No description provided for @tableStateDirtyLabel.
   ///
   /// In es, this message translates to:

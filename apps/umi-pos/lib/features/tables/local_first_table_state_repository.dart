@@ -233,6 +233,84 @@ final class LocalFirstTableStateRepository
     return projected.map;
   }
 
+  @override
+  Future<TableStateMap> projectOpenAccount(
+    String merchantId,
+    String locationId,
+    String tableId,
+    String accountId,
+    String? accountFolio, {
+    required String? serverTime,
+  }) async {
+    final current = await _cached(merchantId, locationId);
+    if (current == null) {
+      throw const AppException(
+        category: AppErrorCategory.configuration,
+        code: 'TABLE_STATE_NOT_CACHED',
+        recoverable: true,
+      );
+    }
+    final table = current.states
+        .where((entry) => entry['tableId'] == tableId)
+        .firstOrNull;
+    final groupId = table?['groupId'];
+    final projected = TableStateMap(
+      locationId: locationId,
+      serverTime: serverTime ?? current.serverTime,
+      states: [
+        for (final entry in current.states)
+          if (table?['seatedAt'] != null &&
+              (entry['tableId'] == tableId ||
+                  (groupId != null && entry['groupId'] == groupId)))
+            {
+              ...entry,
+              'openAccountId': accountId,
+              'openAccountFolio': accountFolio,
+              'openAccountTableId': tableId,
+            }
+          else
+            entry,
+      ],
+    );
+    await _cache(merchantId, projected);
+    return projected;
+  }
+
+  @override
+  Future<TableStateMap> projectReleasedAccount(
+    String merchantId,
+    String locationId,
+    String accountId, {
+    required String? serverTime,
+  }) async {
+    final current = await _cached(merchantId, locationId);
+    if (current == null) {
+      throw const AppException(
+        category: AppErrorCategory.configuration,
+        code: 'TABLE_STATE_NOT_CACHED',
+        recoverable: true,
+      );
+    }
+    final projected = TableStateMap(
+      locationId: locationId,
+      serverTime: serverTime ?? current.serverTime,
+      states: [
+        for (final entry in current.states)
+          if (entry['openAccountId'] == accountId)
+            {
+              ...entry,
+              'openAccountId': null,
+              'openAccountFolio': null,
+              'openAccountTableId': null,
+            }
+          else
+            entry,
+      ],
+    );
+    await _cache(merchantId, projected);
+    return projected;
+  }
+
   Future<TableStateChangeResult> _command(
     String action,
     String merchantId,
@@ -267,7 +345,20 @@ final class LocalFirstTableStateRepository
     await _cache(merchantId, result.map);
     try {
       final accepted = await online();
-      await _cache(merchantId, result.map);
+      final entries = {
+        for (final entry in result.map.states)
+          entry['tableId']! as String: entry,
+        for (final entry in accepted.changed)
+          entry['tableId']! as String: entry,
+      };
+      await _cache(
+        merchantId,
+        TableStateMap(
+          locationId: accepted.locationId,
+          serverTime: accepted.serverTime,
+          states: entries.values.toList(growable: false),
+        ),
+      );
       return accepted;
     } on AppException catch (error) {
       if (error.category != AppErrorCategory.transport &&
@@ -337,6 +428,8 @@ final class LocalFirstTableStateRepository
       int? partySize,
       String? groupId,
       bool clearAccount = false,
+      String? paidAt,
+      bool newVisit = false,
     }) {
       final previous = entry(tableId);
       final next = <String, Object?>{
@@ -346,6 +439,9 @@ final class LocalFirstTableStateRepository
         'seatedAt': seatedAt,
         'partySize': partySize,
         'groupId': groupId,
+        'paidAt': seatedAt == null || newVisit
+            ? null
+            : paidAt ?? previous['paidAt'],
         if (clearAccount) 'openAccountId': null,
         if (clearAccount) 'openAccountFolio': null,
         if (clearAccount) 'openAccountTableId': null,
@@ -386,6 +482,7 @@ final class LocalFirstTableStateRepository
             state: 'seated',
             seatedAt: now,
             partySize: (request['partySize'] as num).toInt(),
+            newVisit: true,
             clearAccount: true,
           ),
         );
@@ -403,9 +500,16 @@ final class LocalFirstTableStateRepository
             state: source['state']! as String,
             seatedAt: source['seatedAt'] as String?,
             partySize: source['partySize'] as int?,
+            paidAt: source['paidAt'] as String?,
             clearAccount: true,
           ),
         );
+        final destination = entries[to]!;
+        if (source['openAccountId'] != null) {
+          destination['openAccountId'] = source['openAccountId'];
+          destination['openAccountFolio'] = source['openAccountFolio'];
+          destination['openAccountTableId'] = to;
+        }
         final released = groupId == null
             ? [from]
             : entries.values
@@ -434,6 +538,7 @@ final class LocalFirstTableStateRepository
               seatedAt: now,
               partySize: partySize,
               groupId: groupId,
+              newVisit: true,
               clearAccount: true,
             ),
           );
@@ -463,6 +568,14 @@ final class LocalFirstTableStateRepository
         final tableId = request['tableId']! as String;
         if (!present(tableId)) refuse('TABLE_NOT_OCCUPIED');
         final groupId = entry(tableId)['groupId'] as String?;
+        if (entries.values.any(
+          (member) =>
+              (member['tableId'] == tableId ||
+                  (groupId != null && member['groupId'] == groupId)) &&
+              member['openAccountId'] != null,
+        )) {
+          refuse('TABLE_HAS_OPEN_ACCOUNT');
+        }
         for (final member in entries.values.toList(growable: false)) {
           if (groupId != null && member['groupId'] != groupId) continue;
           if (groupId == null && member['tableId'] != tableId) continue;

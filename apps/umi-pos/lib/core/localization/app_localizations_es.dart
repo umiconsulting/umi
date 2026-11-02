@@ -1390,6 +1390,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get tableStateAwaitingPaymentLabel => 'Por cobrar';
 
   @override
+  String get tableStatePaidOccupiedLabel => 'Pagada y ocupada';
+
+  @override
+  String get tableStateNewConsumptionAction => 'Nuevo consumo';
+
+  @override
   String get tableStateDirtyLabel => 'Por limpiar';
 
   @override

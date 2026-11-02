@@ -24,13 +24,14 @@ type StateRow = {
   seated_at: Date | null;
   party_size: number | null;
   group_id: string | null;
+  paid_at?: Date | null;
   open_account_id?: string | null;
   open_account_folio?: string | null;
   open_account_table_id?: string | null;
 };
 
 const STATE_COLUMNS =
-  'table_id::text AS table_id,state,seated_at,party_size,group_id::text AS group_id';
+  'table_id::text AS table_id,state,seated_at,party_size,group_id::text AS group_id,paid_at';
 
 /** A state row as the contract publishes it. */
 export function tableStateEntry(row: StateRow): TableStateEntry {
@@ -40,6 +41,7 @@ export function tableStateEntry(row: StateRow): TableStateEntry {
     seatedAt: row.seated_at?.toISOString() ?? null,
     partySize: row.party_size,
     groupId: row.group_id,
+    paidAt: row.paid_at?.toISOString() ?? null,
     ...(row.open_account_id === undefined
       ? {}
       : {
@@ -173,7 +175,7 @@ export class TableMapRepository {
     states: TableStateEntry[];
   }> {
     const rows = await client.query<StateRow>(
-      `SELECT t.table_id::text,t.state,t.seated_at,t.party_size,t.group_id::text,
+      `SELECT t.table_id::text,t.state,t.seated_at,t.party_size,t.group_id::text,t.paid_at,
          account.id::text AS open_account_id,
          account.table_id::text AS open_account_table_id,
          CASE WHEN account.id IS NOT NULL THEN
@@ -274,7 +276,7 @@ export class TableMapRepository {
          (merchant_id,location_id,table_id,state,seated_at,party_size,group_id)
        VALUES ($1::uuid,$2::uuid,$3::uuid,'seated',now(),$4,NULL)
        ON CONFLICT (merchant_id,location_id,table_id) DO UPDATE
-         SET state='seated',seated_at=now(),party_size=$4,group_id=NULL,updated_at=now()
+         SET state='seated',seated_at=now(),party_size=$4,group_id=NULL,paid_at=NULL,updated_at=now()
          WHERE merchant.table_state.seated_at IS NULL
        RETURNING ${STATE_COLUMNS}`,
       [merchantId, locationId, input.tableId, input.partySize],
@@ -350,13 +352,22 @@ export class TableMapRepository {
 
     const moved = await client.query<StateRow>(
       `INSERT INTO merchant.table_state
-         (merchant_id,location_id,table_id,state,seated_at,party_size,group_id)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5::timestamptz,$6,NULL)
+         (merchant_id,location_id,table_id,state,seated_at,party_size,group_id,paid_at)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5::timestamptz,$6,NULL,$7::timestamptz)
        ON CONFLICT (merchant_id,location_id,table_id) DO UPDATE
-         SET state=$4,seated_at=$5::timestamptz,party_size=$6,group_id=NULL,updated_at=now()
+         SET state=$4,seated_at=$5::timestamptz,party_size=$6,group_id=NULL,
+             paid_at=$7::timestamptz,updated_at=now()
          WHERE merchant.table_state.seated_at IS NULL
        RETURNING ${STATE_COLUMNS}`,
-      [merchantId, locationId, input.toTableId, source.state, source.seated_at, partySize],
+      [
+        merchantId,
+        locationId,
+        input.toTableId,
+        source.state,
+        source.seated_at,
+        partySize,
+        source.paid_at ?? null,
+      ],
     );
     if (!moved.rows[0]) TableMapRepository.occupied(input.toTableId, 'toTableId');
 
@@ -440,7 +451,7 @@ export class TableMapRepository {
        FROM unnest($3::uuid[]) AS t
        ON CONFLICT (merchant_id,location_id,table_id) DO UPDATE
          SET state='seated',seated_at=now(),party_size=$4,
-             group_id=excluded.group_id,updated_at=now()
+             group_id=excluded.group_id,paid_at=NULL,updated_at=now()
          WHERE merchant.table_state.seated_at IS NULL
        RETURNING ${STATE_COLUMNS}`,
       [merchantId, locationId, input.tableIds, input.partySize, groupId],

@@ -19,11 +19,15 @@ begin
   end if;
   select os.* into s from runtime.operator_session os
     join merchant.device d on d.id=os.device_id and d.status='active'
-    join merchant.pos_cart_line l on l.merchant_id=os.merchant_id limit 1;
+    where exists (select 1 from merchant.pos_cart_line l where l.merchant_id=os.merchant_id)
+    order by os.id limit 1;
   if s.id is null then raise exception 'Fixture needs an operator and a product'; end if;
   select * into template from merchant.pos_cart_line where merchant_id=s.merchant_id limit 1;
   select id into station from merchant.station where merchant_id=s.merchant_id and location_id=s.location_id limit 1;
-  if station is null then raise exception 'Fixture needs a kitchen station'; end if;
+  if station is null then
+    insert into merchant.station(merchant_id,location_id,key,name)
+      values(s.merchant_id,s.location_id,'checkout-test','Checkout test') returning id into station;
+  end if;
   update runtime.operator_session set state='active',ended_at=null,expires_at=now()+interval '1 hour',
     permissions=array['cart.write','order.fire'],
     entitlements=entitlements || '[{"featureKey":"pos","enabled":true}]'::jsonb where id=s.id;
