@@ -1246,7 +1246,7 @@ void main() {
       );
 
       expect(find.text('Capuccino'), findsNothing);
-      expect(find.text('Plancha'), findsOneWidget);
+      expect(find.text('Plancha'), findsNWidgets(2));
       expect(find.text('Todos'), findsOneWidget);
       await tester.tap(find.text('Todos'));
       await tester.pump();
@@ -1518,7 +1518,7 @@ void main() {
       expect(find.text('Course 2'), findsOneWidget);
       // The count is portions, matching the `3×` on the line inside it.
       expect(find.text('Held · 3'), findsOneWidget);
-      expect(find.text('3×'), findsOneWidget);
+      expect(find.text('3'), findsOneWidget);
       expect(find.text('Not cooking yet'), findsOneWidget);
 
       // And it is not work: the tap asks the kitchen for nothing.
@@ -1567,11 +1567,9 @@ void main() {
     ) async {
       final harness = await pumpBoard(tester);
 
-      // The everyday sale is course 1 and already fired. Course 1 is named
-      // because the ticket is read in courses, and there is no fire control
-      // because there is nothing waiting — the step must not cost a busy café a
-      // tap per ticket.
-      expect(find.text('Course 1'), findsOneWidget);
+      // The everyday fired course has no redundant heading or fire control.
+      // Multi-course tickets retain their explicit course boundaries.
+      expect(find.text('Course 1'), findsNothing);
       expect(find.textContaining('Fire course'), findsNothing);
       expect(find.textContaining('Held'), findsNothing);
       await harness.dispose(tester);
@@ -1900,16 +1898,14 @@ void main() {
             isFalse,
             reason: 'The complete ticket identity must remain readable',
           );
-          final quantity = tester.renderObject<RenderParagraph>(
-            find.text('2×'),
-          );
+          final quantity = tester.renderObject<RenderParagraph>(find.text('2'));
           final boxes = quantity.getBoxesForSelection(
-            const TextSelection(baseOffset: 0, extentOffset: 2),
+            const TextSelection(baseOffset: 0, extentOffset: 1),
           );
           expect(
             boxes.map((b) => b.top).toSet(),
             hasLength(1),
-            reason: 'The quantity and multiplication mark form one unit',
+            reason: 'The quantity stays on one readable line',
           );
           final held = tester.renderObject<RenderParagraph>(
             find.text(l.kitchenCourseHeldNote),
@@ -2001,7 +1997,7 @@ void main() {
         ),
       );
       await _settle(tester);
-      expect(find.text('1×'), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
       expect(find.text(l.kitchenAllDayCount(7)), findsOneWidget);
       expect(find.text('×7'), findsNothing);
       expect(find.byTooltip(l.kitchenAllDayTooltip(7, 2)), findsOneWidget);

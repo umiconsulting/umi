@@ -1652,6 +1652,8 @@ void main() {
     // about when somebody looked.
     final hh = readAt!.hour.toString().padLeft(2, '0');
     final mm = readAt.minute.toString().padLeft(2, '0');
+    await tester.tap(find.text('Turno'));
+    await tester.pump();
     expect(find.text('Actualizado $hh:$mm'), findsOneWidget);
   });
 

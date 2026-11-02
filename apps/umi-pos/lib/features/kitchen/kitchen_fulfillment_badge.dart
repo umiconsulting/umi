@@ -13,42 +13,29 @@ class KitchenFulfillmentBadge extends StatelessWidget {
     final theme = PosTheme.of(context);
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final dark = scheme.dark;
-    final (label, icon, foreground, background) = switch (fulfillmentType) {
+    final (label, icon) = switch (fulfillmentType) {
       'dine_in' => (
         l10n.kitchenFulfillmentDineIn,
         PosGlyphs.tableRestaurantOutlined,
-        dark ? const Color(0xFFA8C7FA) : const Color(0xFF174EA6),
-        dark ? const Color(0xFF15325A) : const Color(0xFFE8F0FE),
       ),
       'takeout' => (
         l10n.kitchenFulfillmentTakeout,
         PosGlyphs.shoppingBagOutlined,
-        dark ? const Color(0xFFD8B4FE) : const Color(0xFF6B21A8),
-        dark ? const Color(0xFF3B1D58) : const Color(0xFFF3E8FF),
       ),
-      'delivery' => (
-        l10n.kitchenFulfillmentDelivery,
-        PosGlyphs.routeOutlined,
-        scheme.onSurfaceVariant,
-        scheme.surface,
-      ),
-      _ => (
-        l10n.kitchenFulfillmentUnknown,
-        PosGlyphs.helpOutline,
-        scheme.onSurfaceVariant,
-        scheme.surface,
-      ),
+      'delivery' => (l10n.kitchenFulfillmentDelivery, PosGlyphs.routeOutlined),
+      _ => (l10n.kitchenFulfillmentUnknown, PosGlyphs.helpOutline),
     };
+    final foreground = scheme.onSurface;
+    final background = scheme.surfaceContainerHigh;
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: UmiSpacing.sm,
-        vertical: 4,
+        vertical: 7,
       ),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: foreground.withValues(alpha: .45)),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -60,7 +47,7 @@ class KitchenFulfillmentBadge extends StatelessWidget {
               label,
               style: theme.textTheme.labelMedium?.copyWith(
                 color: foreground,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),

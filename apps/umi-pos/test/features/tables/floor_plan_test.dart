@@ -539,7 +539,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
   testWidgets(
-    'available tables use green and retain labels, dividers and seat dots',
+    'available tables retain green state, labels and capacity marks',
     (tester) async {
       final area = areaFixture('dining', 'Dining room', [
         tableElement(
@@ -575,7 +575,7 @@ void main() {
       );
       expect(
         find.byKey(const ValueKey('floor-plan-divider-big')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('floor-plan-seats-big')),

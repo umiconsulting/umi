@@ -522,8 +522,12 @@ Widget _app(
   home: child,
 );
 
-Finder _navLabel(String text) =>
-    find.descendant(of: find.byType(PosNavigation), matching: find.text(text));
+Finder _navLabel(String text) => find.descendant(
+  of: find.byWidgetPredicate(
+    (widget) => widget is PosTapRegion && widget.semanticLabel == text,
+  ),
+  matching: find.byType(PosIcon),
+);
 
 final class _HistoryRepository implements SaleRepository {
   final queries = <SaleHistoryQuery>[];
@@ -710,7 +714,7 @@ void main() {
           );
           await tester.pumpAndSettle();
           await tester.tap(
-            _navLabel(language == 'es' ? 'Ajustes' : 'Settings'),
+            _navLabel(language == 'es' ? 'Configuración' : 'Settings'),
           );
           await tester.pumpAndSettle();
           await tester.pumpWidget(
@@ -721,13 +725,13 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
-          await tester.tap(_navLabel(language == 'es' ? 'Comanda' : 'Order'));
+          await tester.tap(_navLabel(language == 'es' ? 'Venta' : 'Sale'));
           await tester.pumpAndSettle();
-          final label = language == 'es' ? 'Iniciar pedido' : 'Start order';
+          final label = language == 'es' ? 'Nuevo pedido' : 'New order';
           final icon = find
               .descendant(
                 of: find.descendant(
-                  of: find.byType(PosHeader),
+                  of: find.byType(CatalogSurface),
                   matching: find.byTooltip(label),
                 ),
                 matching: find.byType(PosIcon),
@@ -790,8 +794,8 @@ void main() {
         );
         await tester.pumpAndSettle();
         final action = find.descendant(
-          of: find.byType(PosHeader),
-          matching: find.text('Iniciar pedido'),
+          of: find.byType(CatalogSurface),
+          matching: find.text('Nuevo pedido'),
         );
         final original = Focus.of(tester.element(action));
         original.requestFocus();
@@ -800,8 +804,8 @@ void main() {
         permissions.remove('cart.write');
         tester.view.physicalSize = const Size(812, 375);
         await tester.pumpAndSettle();
-        expect(find.text('Iniciar pedido'), findsNothing);
-        expect(find.byTooltip('Iniciar pedido'), findsNothing);
+        expect(find.text('Nuevo pedido'), findsNothing);
+        expect(find.byTooltip('Nuevo pedido'), findsNothing);
         expect(FocusManager.instance.primaryFocus, isNot(same(original)));
         expect(cart.state.cart?.id, _openCart().id);
         expect(cart.state.cart?.version, 1);
@@ -817,7 +821,7 @@ void main() {
   );
 
   for (final locale in ['es', 'en']) {
-    for (final action in ['newSale', 'overflow', 'account']) {
+    for (final action in ['newSale', 'overflow']) {
       testWidgets(
         'header retains $action focus across $locale layout and text changes',
         (tester) async {
@@ -848,15 +852,15 @@ void main() {
           );
           Finder target(bool compact, String language) {
             final spanish = language == 'es';
-            final header = find.byType(PosHeader);
+            final header = find.byType(CatalogSurface);
             if (action == 'newSale' && !compact) {
               return find.descendant(
                 of: header,
-                matching: find.text(spanish ? 'Iniciar pedido' : 'Start order'),
+                matching: find.text(spanish ? 'Nuevo pedido' : 'New order'),
               );
             }
             final label = switch (action) {
-              'newSale' => spanish ? 'Iniciar pedido' : 'Start order',
+              'newSale' => spanish ? 'Nuevo pedido' : 'New order',
               'overflow' => spanish ? 'Más' : 'More',
               _ => spanish ? 'Cuenta' : 'Account',
             };
@@ -919,6 +923,30 @@ void main() {
             await tester.pumpAndSettle();
             expect(FocusManager.instance.primaryFocus, same(original));
             expect(target(true, other).hitTestable(), findsOneWidget);
+            if (action == 'overflow') {
+              for (final size in [
+                const Size(375, 812),
+                const Size(1280, 1000),
+              ]) {
+                tester.view.physicalSize = size;
+                await tester.pumpAndSettle();
+                await tester.tap(target(true, other));
+                await tester.pumpAndSettle();
+                expect(
+                  find.text(
+                    other == 'es' ? 'Bloquear operador' : 'Lock operator',
+                  ),
+                  findsOneWidget,
+                );
+                expect(
+                  find.text(other == 'es' ? 'Cerrar sesión' : 'Sign out'),
+                  findsOneWidget,
+                );
+                await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+                await tester.pumpAndSettle();
+                expect(FocusManager.instance.primaryFocus, same(original));
+              }
+            }
             expect(cart.state.cart?.id, _openCart().id);
             expect(cart.state.cart?.version, 1);
             expect(find.byType(PosAlertDialog), findsNothing);
@@ -1005,7 +1033,7 @@ void main() {
           expect(repository.barcodeCalls, 0, reason: destination);
           expect(cartRepository.addCalls, 0, reason: destination);
         }
-        await tester.tap(_navLabel('Comanda'));
+        await tester.tap(_navLabel('Venta'));
         await tester.pump();
         scanner.emit('visible-order');
         await tester.pump();
@@ -1019,7 +1047,7 @@ void main() {
         await tester.pump();
         await tester.tap(_navLabel('Ventas'));
         await tester.pump();
-        await tester.tap(_navLabel('Comanda'));
+        await tester.tap(_navLabel('Venta'));
         await tester.pump();
         repository.pending!.complete(repository.matches);
         await tester.pump();
@@ -1083,6 +1111,19 @@ void main() {
     );
     final cash = CashController(repository: _CashRepository());
     await sales.open('merchant', 'location', 'operator');
+    Future<void> openSales() async {
+      if (_navLabel('Ventas').evaluate().isNotEmpty) {
+        await tester.tap(_navLabel('Ventas'));
+      } else {
+        await tester.tap(_navLabel('Configuración'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Sesión'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Ventas'));
+      }
+      await tester.pumpAndSettle();
+    }
+
     try {
       await tester.pumpWidget(
         _app(
@@ -1120,16 +1161,17 @@ void main() {
       expect(route?.isFirst, isTrue);
       expect(
         tester.widget<PosNavigation>(find.byType(PosNavigation)).selectedIndex,
-        // The rail lists only the surfaces this composition holds — no floor plan, so
-        // no Cuentas — and after the owner's order (Comanda first, cash after sales,
-        // 2026-10-12) Ventas is the second of them.
-        1,
+        tester
+            .widget<PosNavigation>(find.byType(PosNavigation))
+            .destinations
+            .cast<PosDestination>()
+            .indexWhere((destination) => destination.label == 'Ventas'),
       );
-      expect(_navLabel('Comanda').hitTestable(), findsOneWidget);
+      expect(_navLabel('Venta').hitTestable(), findsOneWidget);
       expect(find.text('Latte'), findsNothing);
       expect(cart.state.cart?.items.single['productName'], 'Latte');
       expect(cart.state.cart?.version, 1);
-      await tester.tap(_navLabel('Comanda'));
+      await tester.tap(_navLabel('Venta'));
       await tester.pump();
       expect(find.text('Latte'), findsOneWidget);
       expect(tester.widget<EditableText>(search).controller.text, 'espresso');
@@ -1159,7 +1201,7 @@ void main() {
 
       expect(find.text('MXN 70.00'), findsOneWidget);
       expectCountedNotes();
-      await tester.tap(_navLabel('Ventas'));
+      await openSales();
       await tester.pump();
       await tester.tap(_navLabel('Caja'));
       await tester.pump();
@@ -1173,7 +1215,7 @@ void main() {
       await tester.pump();
       expect(find.text('MXN 70.00'), findsOneWidget);
       expectCountedNotes();
-      await tester.tap(_navLabel('Ventas'));
+      await openSales();
       await tester.pump();
       await tester.tap(find.text('Todas las ventas'));
       await tester.pumpAndSettle();
@@ -1298,7 +1340,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(_navLabel('Comanda'), findsOneWidget);
+      expect(_navLabel('Venta'), findsOneWidget);
       expect(_navLabel('Caja'), findsOneWidget);
       expect(_navLabel('Ventas'), findsOneWidget);
       expect(_navLabel('KDS'), findsNothing);
@@ -1350,9 +1392,9 @@ void main() {
           .embedded,
       isTrue,
     );
-    expect(_navLabel('KDS'), findsOneWidget);
-    expect(_navLabel('Ajustes'), findsOneWidget);
-    expect(_navLabel('Comanda'), findsNothing);
+    expect(find.byType(PosNavigation), findsNothing);
+    expect(find.byTooltip('Configuración'), findsOneWidget);
+    expect(_navLabel('Venta'), findsNothing);
     expect(_navLabel('Caja'), findsNothing);
     expect(_navLabel('Ventas'), findsNothing);
 
@@ -1399,8 +1441,9 @@ void main() {
     await tester.pump();
 
     expect(find.byType(KitchenBoardSurface), findsOneWidget);
-    expect(_navLabel('KDS'), findsOneWidget);
-    expect(_navLabel('Comanda'), findsNothing);
+    expect(find.byType(PosNavigation), findsNothing);
+    expect(find.byTooltip('Configuración'), findsOneWidget);
+    expect(_navLabel('Venta'), findsNothing);
     expect(_navLabel('Caja'), findsNothing);
     expect(_navLabel('Ventas'), findsNothing);
 
@@ -1416,7 +1459,7 @@ void main() {
   ) async {
     // The wide till is what shows the cart beside the grid, with the fire
     // action in the reachable band. The view API is what MediaQuery reads.
-    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.physicalSize = const Size(800, 1340);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     final root = testRoot();
@@ -1451,6 +1494,14 @@ void main() {
 
     // The pinned row shows the verb; the tooltip carries the whole phrase, so
     // the accessible name is unchanged.
+    final pending = tester.getRect(find.text('Pendiente de enviar'));
+    expect(pending.width, greaterThan(140));
+    expect(pending.height, lessThan(40));
+    final service = tester.getRect(find.text('Para llevar'));
+    final account = tester.getRect(
+      find.byKey(const ValueKey('catalog-account')),
+    );
+    expect(service.top, greaterThan(account.top));
     expect(find.byTooltip('Enviar a cocina'), findsOneWidget);
     await tester.tap(find.byTooltip('Enviar a cocina'));
     await tester.pump();
@@ -1460,6 +1511,9 @@ void main() {
     expect(cart.state.cart?.firedOrderId, isNotNull);
     expect(find.text('Enviado · Cuenta abierta'), findsOneWidget);
     expect(find.byTooltip('Enviar a cocina'), findsNothing);
+    final sent = tester.getRect(find.text('Enviada'));
+    expect(sent.height, lessThan(40));
+    expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
@@ -1527,8 +1581,15 @@ void main() {
     await tester.pumpWidget(_app(surface, textScaler: TextScaler.linear(2)));
     await tester.pumpAndSettle();
     expect(cart.state.cart?.fulfillmentType, 'takeout');
+    await tester.tap(find.byType(PosOrderButton));
+    await tester.pumpAndSettle();
     expect(find.byType(PosSelect<String>), findsOneWidget);
-    await tester.tap(find.text('Para llevar'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(PosSelect<String>),
+        matching: find.text('Para llevar'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Comer aquí'));
     await tester.pumpAndSettle();
@@ -1687,7 +1748,7 @@ void main() {
   testWidgets('opening a ready push shows the updated comanda on a phone', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(800, 1280);
+    tester.view.physicalSize = const Size(412, 915);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     final root = testRoot();

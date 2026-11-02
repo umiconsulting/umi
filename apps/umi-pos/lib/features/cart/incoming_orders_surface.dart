@@ -225,10 +225,7 @@ final class _OrderCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              [
-                _channelLabel(order.channel),
-                order.reference,
-              ].whereType<String>().join(' · '),
+              _channelLabel(order.channel),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

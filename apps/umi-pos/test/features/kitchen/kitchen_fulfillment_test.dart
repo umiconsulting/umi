@@ -149,7 +149,7 @@ void main() {
     (name: 'midnight', theme: UmiTheme.midnight()),
   ]) {
     testWidgets(
-      '${appearance.name} labels have distinct colors and readable text',
+      '${appearance.name} neutral service labels retain readable text',
       (tester) async {
         await tester.pumpWidget(
           PosApp(
@@ -186,7 +186,7 @@ void main() {
               : backgroundLuminance;
           expect((lighter + .05) / (darker + .05), greaterThanOrEqualTo(4.5));
         }
-        expect(colors.toSet(), hasLength(2));
+        expect(colors.toSet(), hasLength(1));
         expect(tester.takeException(), isNull);
       },
     );
