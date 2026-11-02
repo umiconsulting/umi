@@ -194,6 +194,12 @@ jobs:
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Read the contract version
+        run: |
+          CONTRACT_VERSION=$(sed -n "s/^export const CONTRACT_VERSION = '\(.*\)';$/\1/p" packages/contract/src/catalog.ts)
+          test -n "$CONTRACT_VERSION"
+          printf 'CONTRACT_VERSION=%s\n' "$CONTRACT_VERSION" >> "$GITHUB_ENV"
+
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: 3.44.6
@@ -208,6 +214,27 @@ jobs:
           XCODE="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
           sudo xcode-select -s "$XCODE"
           xcodebuild -version
+
+      - name: Resolve packages
+        working-directory: apps/umi-pos
+        run: flutter pub get
+
+      - name: Generate localizations
+        working-directory: apps/umi-pos
+        run: flutter gen-l10n
+
+      - name: Native POS client tests
+        working-directory: apps/umi-pos
+        run: |
+          flutter test --no-pub \
+            test/catalog_test.dart \
+            test/checkout_test.dart \
+            test/partial_checkout_test.dart \
+            test/checkout_point_tender_test.dart \
+            test/cash_center_test.dart \
+            test/incoming_orders_surface_test.dart \
+            test/operator_permissions_test.dart \
+            test/features/kitchen/
 
       # The App Store Connect key is also how Xcode authenticates when it creates
       # the signing assets, so it goes in before the build, not at upload time.
@@ -336,8 +363,6 @@ jobs:
               ) ;;
           esac
 
-          flutter pub get
-          flutter gen-l10n
           # ARCHIVE UNSIGNED, SIGN ON EXPORT — and the reason is scoping.
           #
           # Flutter forwards FLUTTER_XCODE_* to xcodebuild as a build setting for
@@ -361,7 +386,7 @@ jobs:
             --dart-define=UMIPOS_RELEASE_VERSION=0.1.0 \
             --dart-define=UMIPOS_RELEASE_GIT_COMMIT="$RELEASE_COMMIT" \
             --dart-define=UMIPOS_RELEASE_BUILD_TIMESTAMP="$RELEASE_TIMESTAMP" \
-            --dart-define=UMIPOS_CONTRACT_VERSION=2.23.0 \
+            --dart-define=UMIPOS_CONTRACT_VERSION="$CONTRACT_VERSION" \
             --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1 \
             "${DEBUG_DEFINES[@]}"
 

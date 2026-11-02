@@ -78,10 +78,37 @@ jobs:
           corepack enable
           corepack prepare pnpm@10.29.3 --activate
 
-      # Only the dashboard subtree — avoids installing sibling apps (e.g. umi-cash
-      # runs `prisma generate` on install, which this build does not need).
+      # Include the root Playwright dependency and the dashboard subtree.
+      # Umi Cash keeps its separate npm install.
       - name: Install
-        run: pnpm install --frozen-lockfile --filter @umi/dashboard...
+        run: pnpm install --frozen-lockfile --filter @umi/dashboard... --filter umi-workspace
+
+      - name: Dashboard unit tests
+        run: pnpm --filter @umi/dashboard test
+
+      - name: Install Chromium for the browser checks
+        run: pnpm --filter @umi/dashboard exec playwright install --with-deps chromium
+
+      - name: Self-contained dashboard browser checks
+        run: |
+          pnpm --filter @umi/dashboard exec playwright test --config playwright.config.js \
+            e2e/floor-plan.pw.js \
+            e2e/inventory-quantities.pw.js \
+            e2e/recipe-sales-recovery.pw.js \
+            e2e/redesign-parity.pw.js \
+            --reporter=line
+
+      - name: Identify separate live-fixture checks
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ### Dashboard client checks
+          The unit suite and the self-contained browser suite passed.
+          The following 10 live-fixture cases were NOT RUN by this workflow. They are not passes.
+          - inventory-import.pw.js: 4 cases; requires UMI_IMPORT_FIXTURE and, for the API/database case, UMI_IMPORT_DATABASE_URL.
+          - inventory-initial-cost.pw.js: 2 cases; requires UMI_INITIAL_COST_FIXTURE.
+          - inventory-mobile.pw.js: 1 case; requires UMI_MOBILE_FIXTURE.
+          - inventory-preparation.pw.js: 3 cases; requires UMI_PREPARATION_FIXTURE.
+          EOF
 
       - name: Write build env
         run: |
