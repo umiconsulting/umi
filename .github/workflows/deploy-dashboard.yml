@@ -111,6 +111,9 @@ jobs:
           EOF
 
       - name: Write build env
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          RELEASE_VERSION: ${{ github.ref_name }}
         run: |
           # The deploy target branch selects the environment. Production (main)
           # calls the API directly — it is already same-site with the dashboard.
@@ -120,7 +123,6 @@ jobs:
           # (…pages.dev and …umiconsulting.co are different sites). The preview
           # backend is chosen at runtime by the Pages "Preview" env var
           # API_ORIGIN. All values here are public build-time config.
-          BRANCH="${{ github.head_ref || github.ref_name }}"
           CONTRACT_VERSION="$(sed -n "s/^export const CONTRACT_VERSION = '\(.*\)';$/\1/p" packages/contract/src/catalog.ts)"
           test -n "$CONTRACT_VERSION" || { echo "CONTRACT_VERSION not found in packages/contract/src/catalog.ts"; exit 1; }
           if [ "$BRANCH" = "main" ]; then
@@ -151,7 +153,7 @@ jobs:
           VITE_SUPABASE_URL=https://xbudknbimkgjjgohnjgp.supabase.co
           VITE_SUPABASE_ANON_KEY=${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_CONFIG_SCHEMA_VERSION=1
-          VITE_RELEASE_VERSION=${{ github.ref_name }}
+          VITE_RELEASE_VERSION=$RELEASE_VERSION
           VITE_RELEASE_GIT_COMMIT=${{ github.sha }}
           VITE_RELEASE_BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           EOF
@@ -161,11 +163,11 @@ jobs:
 
       - name: Deploy to Cloudflare Pages
         env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 8aef562d6d0c51b70f1b83fa1d2912a4
         run: |
           # main -> production branch "main"; PR -> preview branch = head ref.
-          BRANCH="${{ github.head_ref || github.ref_name }}"
           echo "Deploying to Cloudflare Pages (branch: $BRANCH)"
           OUT=$(pnpm dlx wrangler@4.129.0 pages deploy apps/umi-dashboard/dist \
             --project-name=umi-dashboard --branch="$BRANCH" --commit-dirty=true 2>&1)
