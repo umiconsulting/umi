@@ -1217,6 +1217,13 @@ void main() {
       expectCountedNotes();
       await openSales();
       await tester.pump();
+      // Sales highlights Settings on the phone, but the destination must still
+      // open Settings when it is tapped rather than treat the highlight as active.
+      await tester.tap(_navLabel('Configuración'));
+      await tester.pumpAndSettle();
+      expect(find.text('Sesión'), findsOneWidget);
+      expect(find.byType(SaleCenterSurface), findsNothing);
+      await openSales();
       await tester.tap(find.text('Todas las ventas'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Ventas suspendidas'));

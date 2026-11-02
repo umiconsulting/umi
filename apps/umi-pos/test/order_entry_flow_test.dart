@@ -874,7 +874,7 @@ void main() {
 
       await tester.tap(find.byTooltip('Mesas'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Lista'));
+      await tester.tap(find.byTooltip('Lista'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cuenta 201').first);
       await tester.pumpAndSettle();

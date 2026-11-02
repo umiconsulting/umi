@@ -1898,15 +1898,17 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               surface == TillSurface.kitchen || surface == TillSurface.settings,
         );
     return PosPage(
-      appBar:
-          !orderVisible &&
-              (MediaQuery.sizeOf(context).width < 700 ||
-                  MediaQuery.sizeOf(context).height < 600 ||
-                  stationOnly)
+      appBar: !orderVisible
           ? PosHeader(
               toolbarHeight: 48,
               automaticallyImplyLeading: false,
-              title: _merchantHeading(context, showWordmark: true),
+              title: _merchantHeading(
+                context,
+                showWordmark:
+                    MediaQuery.sizeOf(context).width < 700 ||
+                    MediaQuery.sizeOf(context).height < 600 ||
+                    stationOnly,
+              ),
               actions: [
                 if (stationOnly)
                   PosIconButton(
@@ -2697,6 +2699,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     ];
     surfaces = [...surfaces]
       ..sort((a, b) => order.indexOf(a).compareTo(order.indexOf(b)));
+    final actualSelected = selected;
     if (MediaQuery.sizeOf(context).width < 700 &&
         surfaces.contains(TillSurface.settings) &&
         surfaces.contains(TillSurface.order)) {
@@ -2711,7 +2714,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     return PosNavigation(
       selectedIndex: surfaces.indexOf(selected).clamp(0, surfaces.length - 1),
       onDestinationSelected: (index) {
-        if (surfaces[index] == selected) return;
+        if (surfaces[index] == actualSelected) return;
         FocusManager.instance.primaryFocus?.unfocus();
         setState(() {
           _cashVisited =
@@ -3826,6 +3829,11 @@ final class _ProductCard extends StatelessWidget {
       _ProductPlaceholder.categoryColor(category, product.name),
     );
     final ink = _ProductPlaceholder.contrastInk(fill);
+    // A local fill behind the text protects long labels against both black and
+    // white image regions, while the rest of the photo keeps its reference fade.
+    final textGround = showPhoto && url != null
+        ? fill.withValues(alpha: .88)
+        : null;
     final amount = formatMinorUnits(money.minorUnits, money.currency);
     final available = product.availability == 'enabled';
     return ClipRRect(
@@ -3856,61 +3864,72 @@ final class _ProductCard extends StatelessWidget {
                 ),
               if (showPhoto && url != null)
                 Positioned.fill(
-                  child: FractionalTranslation(
-                    translation: const Offset(.08, -.04),
-                    child: FractionallySizedBox(
-                      alignment: Alignment.centerRight,
-                      widthFactor: .92,
-                      heightFactor: 1.08,
-                      child: ShaderMask(
-                        blendMode: BlendMode.dstIn,
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [Color(0x00000000), Color(0xFF000000)],
-                          stops: [0, .65],
-                        ).createShader(bounds),
-                        child: Opacity(
-                          opacity: palette.dark ? .32 : .65,
-                          child: ImageFiltered(
-                            imageFilter: ImageFilter.blur(
-                              sigmaX: 1.5,
-                              sigmaY: 1.5,
-                            ),
-                            child: ColorFiltered(
-                              colorFilter: const ColorFilter.matrix([
-                                .84252,
-                                .14304,
-                                .01444,
-                                0,
-                                0,
-                                .04252,
-                                .94304,
-                                .01444,
-                                0,
-                                0,
-                                .04252,
-                                .14304,
-                                .81444,
-                                0,
-                                0,
-                                0,
-                                0,
-                                0,
-                                1,
-                                0,
-                              ]),
-                              child: Image.network(
-                                url,
-                                fit: BoxFit.cover,
-                                alignment: Alignment.centerRight,
-                                errorBuilder: (_, _, _) => _ProductPlaceholder(
-                                  name: product.name,
-                                  category: category,
+                  child: LayoutBuilder(
+                    builder: (context, bounds) => Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Positioned(
+                          left: bounds.maxWidth * .16,
+                          right: -bounds.maxWidth * .08,
+                          top: -bounds.maxHeight * .04,
+                          bottom: -bounds.maxHeight * .04,
+                          child: Opacity(
+                            opacity: palette.dark ? .32 : .65,
+                            child: ImageFiltered(
+                              imageFilter: ImageFilter.blur(
+                                sigmaX: 1.5,
+                                sigmaY: 1.5,
+                              ),
+                              child: ColorFiltered(
+                                colorFilter: const ColorFilter.matrix([
+                                  .84252,
+                                  .14304,
+                                  .01444,
+                                  0,
+                                  0,
+                                  .04252,
+                                  .94304,
+                                  .01444,
+                                  0,
+                                  0,
+                                  .04252,
+                                  .14304,
+                                  .81444,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  1,
+                                  0,
+                                ]),
+                                child: Image.network(
+                                  url,
+                                  fit: BoxFit.cover,
+                                  alignment: Alignment.centerRight,
+                                  errorBuilder: (_, _, _) =>
+                                      _ProductPlaceholder(
+                                        name: product.name,
+                                        category: category,
+                                      ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
+                        // Fill over the image is the alpha-mask equivalent on this
+                        // solid ground, without nested offscreen shader/filter layers.
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [fill, fill, fill.withValues(alpha: 0)],
+                              stops: const [0, .16, .758],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -3929,6 +3948,7 @@ final class _ProductCard extends StatelessWidget {
                           style: theme.textTheme.labelSmall?.copyWith(
                             fontSize: 11,
                             color: ink,
+                            backgroundColor: textGround,
                             fontWeight: FontWeight.w400,
                           ),
                         ),
@@ -3942,6 +3962,7 @@ final class _ProductCard extends StatelessWidget {
                           height: 1.2,
                           fontWeight: FontWeight.w500,
                           color: ink,
+                          backgroundColor: textGround,
                         ),
                       ),
                       const Spacer(),
@@ -3950,6 +3971,7 @@ final class _ProductCard extends StatelessWidget {
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 12,
                           color: ink,
+                          backgroundColor: textGround,
                         ),
                       ),
                     ],
@@ -4012,22 +4034,29 @@ final class _ProductPlaceholder extends StatelessWidget {
     return colors[_hue(category?.id ?? fallbackSeed) % colors.length];
   }
 
-  /// Project configured hues onto the approved blue, sand and rose surfaces.
-  /// The category contract and its stored color remain unchanged.
+  /// Keep the approved tokens exact. Additional merchant hues retain their
+  /// distinction at the same restrained saturation and lightness.
   static Color surfaceColor(BuildContext context, Color color) {
-    final palette = PosTheme.of(context).colorScheme;
+    final dark = PosTheme.of(context).colorScheme.dark;
+    const lightTokens = [
+      Color(0xFFE9EAF0),
+      Color(0xFFDCE8F2),
+      Color(0xFFF2E3D1),
+      Color(0xFFEFDEDA),
+    ];
+    const darkTokens = [
+      Color(0xFF303746),
+      Color(0xFF2B4053),
+      Color(0xFF493D30),
+      Color(0xFF493638),
+    ];
+    final exact = lightTokens.indexOf(color);
+    if (exact >= 0) return dark ? darkTokens[exact] : color;
     final hsl = HSLColor.fromColor(color);
-    if (hsl.saturation < .12) {
-      return palette.dark ? const Color(0xFF303746) : const Color(0xFFE9EAF0);
-    }
-    final family = hsl.hue >= 60 && hsl.hue < 270
-        ? 0
-        : hsl.hue >= 20 && hsl.hue < 60
-        ? 1
-        : 2;
-    const light = [Color(0xFFDCE8F2), Color(0xFFF2E3D1), Color(0xFFEFDEDA)];
-    const dark = [Color(0xFF2B4053), Color(0xFF493D30), Color(0xFF493638)];
-    return (palette.dark ? dark : light)[family];
+    return hsl
+        .withSaturation(hsl.saturation.clamp(0, dark ? .26 : .28))
+        .withLightness(dark ? .22 : .90)
+        .toColor();
   }
 
   static Color contrastInk(Color background) {
@@ -5181,7 +5210,10 @@ final class _CartPanel extends StatelessWidget {
       return PosCard(
         child: Column(
           children: [
-            _heading(context, l),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: _heading(context, l),
+            ),
             Expanded(
               child: Center(
                 child: restoringAccount

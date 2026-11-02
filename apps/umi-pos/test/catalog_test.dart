@@ -24,6 +24,7 @@ CatalogProductSummary product(
   String availability = 'enabled',
   bool hasVariants = false,
   bool hasModifiers = false,
+  Map<String, Object?>? media,
 }) => CatalogProductSummary(
   id: id,
   name: name,
@@ -36,7 +37,7 @@ CatalogProductSummary product(
   saleAction: 'merchandise',
   availability: availability,
   availableFrom: null,
-  primaryMedia: null,
+  primaryMedia: media,
   hasVariants: hasVariants,
   hasModifiers: hasModifiers,
   updatedAt: '2026-07-28T00:00:00Z',
@@ -50,11 +51,13 @@ final class FakeCatalogRepository implements CatalogRepository {
     this.categoryItems = const [],
     this.productHasVariants = false,
     this.productHasModifiers = false,
+    this.productMedia,
   });
 
   /// What the one seeded product is called, and the category it carries. A test that
   /// cares about the tile's colour and letters sets both; the rest keep the defaults.
   final String productName;
+  final Map<String, Object?>? productMedia;
   final Map<String, Object?>? productCategory;
 
   /// What the branch's menu says about that product: `enabled`, or one of the four
@@ -93,6 +96,7 @@ final class FakeCatalogRepository implements CatalogRepository {
               '$calls',
               name: productName,
               category: productCategory,
+              media: productMedia,
               availability: productAvailability,
               hasVariants: productHasVariants,
               hasModifiers: productHasModifiers,
@@ -270,6 +274,96 @@ CatalogController controller(FakeCatalogRepository repository) {
 }
 
 void main() {
+  for (final dark in [false, true]) {
+    testWidgets(
+      'long photo labels retain contrast against black and white images in dark=$dark',
+      (tester) async {
+        const name = 'Una bebida con nombre largo para comprobar el contraste';
+        final repo = FakeCatalogRepository(
+          productName: name,
+          productMedia: const {'url': 'https://example.invalid/product.png'},
+          categoryItems: const [
+            {
+              'id': 'sage',
+              'name': 'Sage',
+              'displayOrder': 0,
+              'enabled': true,
+              'color': '#34d399',
+            },
+            {
+              'id': 'cyan',
+              'name': 'Cyan',
+              'displayOrder': 1,
+              'enabled': true,
+              'color': '#67e8f9',
+            },
+            {
+              'id': 'lavender',
+              'name': 'Lavender',
+              'displayOrder': 2,
+              'enabled': true,
+              'color': '#a78bfa',
+            },
+          ],
+        );
+        final catalog = controller(repo);
+        await catalog.open(partition);
+        final root = testRoot();
+        await tester.pumpWidget(
+          PosApp(
+            theme: dark ? UmiTheme.dark() : UmiTheme.light(),
+            locale: const Locale('es'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
+            home: CatalogSurface(
+              entry: root.entry,
+              catalog: catalog,
+              cart: root.cart,
+              cash: root.cash,
+              checkout: root.checkout,
+              sales: root.sales,
+              exceptions: root.exceptions,
+              connectivity: root.connectivity,
+              telemetry: root.telemetry,
+            ),
+          ),
+        );
+        await tester.pump();
+        final label = tester.widget<Text>(find.text(name));
+        final ink = label.style!.color!;
+        final ground = label.style!.backgroundColor!;
+        for (final image in [
+          const Color(0xFF000000),
+          const Color(0xFFFFFFFF),
+        ]) {
+          final actual = Color.alphaBlend(ground, image);
+          final a = ink.computeLuminance(), b = actual.computeLuminance();
+          expect(
+            ((a > b ? a : b) + .05) / ((a < b ? a : b) + .05),
+            greaterThanOrEqualTo(4.5),
+          );
+        }
+        final fills = <Color>[];
+        for (final name in ['Sage', 'Cyan', 'Lavender']) {
+          final box = tester.widget<Container>(
+            find
+                .ancestor(of: find.text(name), matching: find.byType(Container))
+                .first,
+          );
+          fills.add((box.decoration! as BoxDecoration).color!);
+        }
+        expect(fills.toSet(), hasLength(3));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        catalog.dispose();
+        root.dispose();
+      },
+    );
+  }
+
   test(
     'catalog cache is bounded and partitioned by tenant, branch and language',
     () {
@@ -514,11 +608,23 @@ void main() {
             )
             .first,
       );
+      final softened = HSLColor.fromColor(
+        (categoryContainer.decoration! as BoxDecoration).color!,
+      );
+      expect(softened.saturation, lessThan(.30));
+      expect(softened.lightness, greaterThan(.88));
       expect(
-        (categoryContainer.decoration! as BoxDecoration).color,
-        const Color(0xFFDCE8F2),
-        reason:
-            'Bright configured cyan must use the approved muted blue surface',
+        softened.hue,
+        closeTo(HSLColor.fromColor(const Color(0xFF67E8F9)).hue, 3),
+      );
+      final allContainer = tester.widget<Container>(
+        find
+            .ancestor(of: find.text('Todo'), matching: find.byType(Container))
+            .first,
+      );
+      expect(
+        (allContainer.decoration! as BoxDecoration).color,
+        const Color(0xFFE9EAF0),
       );
       final foreground = categoryText.style!.color!.computeLuminance();
       final background = (categoryContainer.decoration! as BoxDecoration).color!

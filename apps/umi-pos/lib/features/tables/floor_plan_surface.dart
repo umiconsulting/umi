@@ -95,6 +95,10 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   static const double _panelBreakpoint = 720;
 
   bool get _panelShown => MediaQuery.sizeOf(context).width >= _panelBreakpoint;
+  bool get _portraitPanel {
+    final size = MediaQuery.sizeOf(context);
+    return _panelShown && size.height > size.width;
+  }
 
   // El plano reduce las etiquetas al espacio de cada mesa. El texto al 200 %
   // necesita una lista legible en pantallas angostas.
@@ -406,13 +410,24 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                 ),
               ),
             Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: _roomView(area, visuals, l10n, es)),
-                  if (_panelShown) _detailPanel(area, l10n, es),
-                ],
-              ),
+              child: _portraitPanel
+                  ? ListView(
+                      children: [
+                        SizedBox(
+                          height: (MediaQuery.sizeOf(context).width * .62)
+                              .clamp(320.0, 450.0),
+                          child: _roomView(area, visuals, l10n, es),
+                        ),
+                        _detailPanel(area, l10n, es, stacked: true),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: _roomView(area, visuals, l10n, es)),
+                        if (_panelShown) _detailPanel(area, l10n, es),
+                      ],
+                    ),
             ),
             if (!_panelShown) _selectedSummary(area, l10n, es),
           ],
@@ -742,7 +757,12 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     );
   }
 
-  Widget _detailPanel(FloorPlanArea? area, AppLocalizations l10n, bool es) {
+  Widget _detailPanel(
+    FloorPlanArea? area,
+    AppLocalizations l10n,
+    bool es, {
+    bool stacked = false,
+  }) {
     final theme = PosTheme.of(context);
     final palette = _FloorPlanPalette.of(context);
     final room = widget.tableState;
@@ -877,8 +897,13 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
 
     return Container(
       key: const ValueKey('table-detail-panel'),
-      width: 320,
-      margin: const EdgeInsets.fromLTRB(0, 0, UmiSpacing.md, UmiSpacing.md),
+      width: stacked ? double.infinity : 320,
+      margin: EdgeInsets.fromLTRB(
+        stacked ? UmiSpacing.md : 0,
+        0,
+        UmiSpacing.md,
+        UmiSpacing.md,
+      ),
       padding: const EdgeInsets.all(UmiSpacing.md),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
