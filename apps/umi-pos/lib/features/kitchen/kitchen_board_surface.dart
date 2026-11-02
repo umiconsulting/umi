@@ -1034,14 +1034,18 @@ final class _TicketCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: KitchenFulfillmentBadge(
+                      fulfillmentType: order.fulfillmentType,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: UmiSpacing.sm,
                     runSpacing: UmiSpacing.xs,
                     children: [
-                      KitchenFulfillmentBadge(
-                        fulfillmentType: order.fulfillmentType,
-                      ),
                       // Which station owes this ticket. A till is handed one card per
                       // station for the same cuenta, so without the name two cards are
                       // the same card; a station device has one, where the label is a

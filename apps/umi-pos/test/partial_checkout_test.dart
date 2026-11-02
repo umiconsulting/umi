@@ -288,6 +288,39 @@ Future<(CartController, CheckoutController)> _pump(
 }
 
 void main() {
+  for (final size in const [
+    Size(402, 874),
+    Size(412, 915),
+    Size(820, 1180),
+    Size(800, 1340),
+    Size(1340, 800),
+    Size(1440, 1000),
+  ]) {
+    testWidgets('partial checkout keeps cash and charge reachable at $size', (
+      tester,
+    ) async {
+      final (cart, checkout) = await _pump(tester, _Repo());
+      tester.view.physicalSize = size;
+      await tester.pumpAndSettle();
+      final received = find.byKey(const ValueKey('partial-cash-received'));
+      final change = find.byKey(const ValueKey('partial-cash-change'));
+      final charge = find.byKey(const ValueKey('partial-charge'));
+      expect(charge.hitTestable(), findsOneWidget);
+      expect(
+        tester.getRect(received).overlaps(tester.getRect(change)),
+        isFalse,
+      );
+      expect(
+        (tester.getRect(received).bottom - tester.getRect(change).bottom).abs(),
+        lessThan(1),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      cart.dispose();
+      checkout.dispose();
+    });
+  }
+
   testWidgets(
     'a split terminal leg confirms without asking the operator to type a receipt folio',
     (tester) async {

@@ -1223,10 +1223,15 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              cash,
-              const SizedBox(height: UmiSpacing.sm),
-              change,
-              const SizedBox(height: UmiSpacing.sm),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(flex: 3, child: cash),
+                  const SizedBox(width: UmiSpacing.md),
+                  Expanded(flex: 2, child: change),
+                ],
+              ),
+              const SizedBox(height: UmiSpacing.md),
               action,
             ],
           );

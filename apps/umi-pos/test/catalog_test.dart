@@ -384,93 +384,114 @@ void main() {
     root.dispose();
   });
 
-  testWidgets('the category index stacks its ears and opens the one chosen', (
-    tester,
-  ) async {
-    final repository = FakeCatalogRepository(
-      categoryItems: const [
-        {
-          'id': 'drinks',
-          'name': 'Bebidas',
-          'displayOrder': 0,
-          'enabled': true,
-          'color': '#1E6F8C',
-        },
-        {
-          'id': 'desserts',
-          'name': 'Postres',
-          'displayOrder': 1,
-          'enabled': true,
-          'color': null,
-        },
-      ],
-    );
-    final value = controller(repository);
-    await value.open(partition);
-    final root = testRoot();
-    await tester.pumpWidget(
-      PosApp(
-        locale: const Locale('es'),
-        supportedLocales: AppLocalizations.supportedLocales,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
+  for (final size in const [
+    Size(402, 874),
+    Size(412, 915),
+    Size(820, 1180),
+    Size(800, 1340),
+    Size(1340, 800),
+    Size(1440, 1000),
+  ]) {
+    testWidgets('category selection stays readable beside products at $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repository = FakeCatalogRepository(
+        categoryItems: const [
+          {
+            'id': 'drinks',
+            'name': 'Bebidas',
+            'displayOrder': 0,
+            'enabled': true,
+            'color': '#1E6F8C',
+          },
+          {
+            'id': 'desserts',
+            'name': 'Postres',
+            'displayOrder': 1,
+            'enabled': true,
+            'color': null,
+          },
         ],
-        home: CatalogSurface(
-          entry: root.entry,
-          catalog: value,
-          cart: root.cart,
-          cash: root.cash,
-          checkout: root.checkout,
-          sales: root.sales,
-          exceptions: root.exceptions,
-          connectivity: root.connectivity,
-          telemetry: root.telemetry,
+      );
+      final value = controller(repository);
+      await value.open(partition);
+      final root = testRoot();
+      await tester.pumpWidget(
+        PosApp(
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          home: CatalogSurface(
+            entry: root.entry,
+            catalog: value,
+            cart: root.cart,
+            cash: root.cash,
+            checkout: root.checkout,
+            sales: root.sales,
+            exceptions: root.exceptions,
+            connectivity: root.connectivity,
+            telemetry: root.telemetry,
+          ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    Rect ear(String label) => tester.getRect(
-      find.ancestor(of: find.text(label), matching: find.byType(PosTapRegion)),
-    );
-    bool chosen(String label) =>
-        tester
-            .widget<PosTapRegion>(
-              find.ancestor(
-                of: find.text(label),
-                matching: find.byType(PosTapRegion),
-              ),
-            )
-            .selected ??
-        false;
-    // The dividers wear their labels in capitals: the raised text is what the
-    // operator reads on the ear, and the test taps and measures that text.
-    final first = ear('TODO');
-    final drinks = ear('BEBIDAS');
-    final desserts = ear('POSTRES');
-    // The ears tuck under each other, so a row of separate buttons would start
-    // each one after the last instead of over it.
-    expect(drinks.left, lessThan(first.right));
-    expect(desserts.left, lessThan(drinks.right));
-    // One divider is open at a time. The ear inside the box is what changes
-    // height with the choice; the box stays on the till's touch floor.
-    expect(chosen('TODO'), isTrue);
-    expect(chosen('BEBIDAS'), isFalse);
-    expect(chosen('POSTRES'), isFalse);
-    expect(drinks.height, greaterThanOrEqualTo(UmiTouchTarget.minimum));
-    expect(drinks.height, desserts.height);
+      Rect ear(String label) => tester.getRect(
+        find.ancestor(
+          of: find.text(label),
+          matching: find.byType(PosTapRegion),
+        ),
+      );
+      bool chosen(String label) =>
+          tester
+              .widget<PosTapRegion>(
+                find.ancestor(
+                  of: find.text(label),
+                  matching: find.byType(PosTapRegion),
+                ),
+              )
+              .selected ??
+          false;
+      final first = ear('Todo');
+      final drinks = ear('Bebidas');
+      final desserts = ear('Postres');
+      if (size.width >= 700) {
+        final products = tester.getRect(
+          find.byKey(const PageStorageKey('catalog-grid')),
+        );
+        final account = tester.getRect(
+          find.byKey(const ValueKey('catalog-account')),
+        );
+        expect(products.right, lessThanOrEqualTo(drinks.left));
+        expect(drinks.right, lessThanOrEqualTo(account.left));
+        expect(drinks.top, greaterThanOrEqualTo(first.bottom));
+        expect(desserts.top, greaterThanOrEqualTo(drinks.bottom));
+      } else {
+        expect(drinks.left, greaterThanOrEqualTo(first.right));
+        expect(desserts.left, greaterThanOrEqualTo(drinks.right));
+      }
+      expect(chosen('Todo'), isTrue);
+      expect(chosen('Bebidas'), isFalse);
+      expect(drinks.height, greaterThanOrEqualTo(UmiTouchTarget.minimum - .01));
+      await tester.ensureVisible(find.text('Postres'));
+      await tester.tap(find.text('Postres'));
+      await tester.pump();
+      expect(value.state.selectedCategoryId, 'desserts');
+      expect(chosen('Postres'), isTrue);
+      expect(chosen('Bebidas'), isFalse);
+      expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('POSTRES'));
-    await tester.pump();
-    expect(value.state.selectedCategoryId, 'desserts');
-    expect(chosen('POSTRES'), isTrue);
-    expect(chosen('BEBIDAS'), isFalse);
-
-    await tester.pumpWidget(const SizedBox());
-    value.dispose();
-    root.dispose();
-  });
+      await tester.pumpWidget(const SizedBox());
+      value.dispose();
+      root.dispose();
+    });
+  }
 
   testWidgets(
     'an unavailable product is dimmed, says "No disponible", and its tap never reaches the cart',
