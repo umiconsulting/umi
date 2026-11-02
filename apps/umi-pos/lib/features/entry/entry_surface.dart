@@ -624,16 +624,12 @@ final class _PinFrame extends StatelessWidget {
     final location = [
       state.selectedTenant?.name,
       state.selectedBranch?.name,
+      state.device?.displayName,
     ].whereType<String>().join(' · ');
     final identity = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          es ? 'Acceso al punto de venta' : 'Point of sale access',
-          style: theme.textTheme.bodySmall,
-        ),
-        const SizedBox(height: 12),
         Semantics(
           header: true,
           child: Text(
@@ -645,16 +641,6 @@ final class _PinFrame extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        if (state.device != null) ...[
-          const PosDivider(),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Text(
-              state.device!.displayName,
-              style: theme.textTheme.bodyMedium,
-            ),
-          ),
-        ],
         if (controller.operatorName != null) ...[
           Text(es ? 'Usuario' : 'User', style: theme.textTheme.bodySmall),
           const SizedBox(height: 8),

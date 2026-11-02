@@ -124,7 +124,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   Size? _lastOrderSize;
   final _newSaleFocus = FocusNode();
   final _overflowFocus = FocusNode();
-  final _accountFocus = FocusNode();
   (Size, bool, bool, bool, Locale)? _lastHeaderLayout;
   bool _initialLoadStarted = false;
   bool _initialAccountPolicyApplied = false;
@@ -1622,7 +1621,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     _searchFocus.dispose();
     _newSaleFocus.dispose();
     _overflowFocus.dispose();
-    _accountFocus.dispose();
     super.dispose();
   }
 
@@ -2043,6 +2041,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     final canWriteCart = access.canWriteCart;
     final spanish = Localizations.localeOf(context).languageCode == 'es';
     final showOverflow =
+        widget.entry.state.operator != null ||
         access.showSaleActions ||
         (permissions.allows('customer.search') &&
             widget.customerValue != null) ||
@@ -2103,7 +2102,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     // instance cannot be measured in both.
     Widget orderTypeControl() => Align(
       alignment: Alignment.centerLeft,
-      child: compactHeader && largeText
+      child: largeText
           ? PosSelect<String>(
               value: _orderType,
               items: [
@@ -2181,25 +2180,15 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     //    on its own either: given less room than its two segments need, it scales
     //    by a fraction of a percent instead of striping. On the counter till it is
     //    never asked to: the segments measure 265.7 of the column's 344.
-    Widget orderTypeSlot() => Expanded(
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerLeft,
-        child: orderTypeControl(),
-      ),
-    );
-
-    // The buyer's button closes the row on the panel's own edge. 72 logical pixels
-    // at the till: the segments are 48 tall, so this is the same height and half
-    // again as wide, which is the room the two marks need — a person, ten pixels of
-    // air, and a plus — with the pair centred in it.
-    Widget serviceRow() => Row(
+    Widget serviceRow() => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        orderTypeSlot(),
-        if (canAttachCustomer) ...[
-          const SizedBox(width: UmiSpacing.sm),
-          SizedBox(width: 72, child: _customerAction(context, l, room: true)),
-        ],
+        orderTypeControl(),
+        if (canAttachCustomer)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _customerAction(context, l, room: true),
+          ),
       ],
     );
 
@@ -2321,6 +2310,21 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         // sale — start another one, open the menu — and not a second copy of the
         // navigation (2026-10-12). `_showOpenAccounts` is what the sidebar's own
         // destination and the menu still call.
+        if (MediaQuery.sizeOf(context).width >= 700 &&
+            !largeText &&
+            widget.entry.operatorName != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 120),
+              child: Text(
+                widget.entry.operatorName!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: PosTheme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ),
         // Overflow — rare / admin actions (progressive disclosure).
         if (showOverflow)
           PosMenuButton<String>(
@@ -2329,6 +2333,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             icon: const PosIcon(PosGlyphs.moreVert),
             onSelected: (action) async {
               switch (action) {
+                case 'lock':
+                  await _leaveOperator(lock: true);
+                case 'logout':
+                  await _leaveOperator(lock: false);
                 case 'suspend':
                   if (context.mounted) {
                     await showSuspendSaleDialog(context, widget.sales);
@@ -2383,6 +2391,13 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               }
             },
             itemBuilder: (_) => [
+              if (widget.entry.operatorName != null)
+                PosMenuItem<String>(
+                  enabled: false,
+                  child: Text(widget.entry.operatorName!),
+                ),
+              _overflowItem('lock', PosGlyphs.lockOutline, l.lockAction),
+              _overflowItem('logout', PosGlyphs.logout, l.logoutAction),
               if (access.showSaleActions) ...[
                 _overflowItem(
                   'suspend',
@@ -2429,15 +2444,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 ),
             ],
           ),
-        // Account — identity + Lock + Logout, consolidated.
-        if (!compactHeader)
-          _AccountMenu(
-            focusNode: _accountFocus,
-            operatorName: widget.entry.operatorName,
-            branch: widget.entry.state.selectedBranch?.name,
-            onLock: () => _leaveOperator(lock: true),
-            onLogout: () => _leaveOperator(lock: false),
-          ),
       ],
     );
     return LayoutBuilder(
@@ -2459,7 +2465,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         );
         if (_lastHeaderLayout != headerLayout) {
           _lastHeaderLayout = headerLayout;
-          for (final node in [_newSaleFocus, _overflowFocus, _accountFocus]) {
+          for (final node in [_newSaleFocus, _overflowFocus]) {
             if (!node.hasPrimaryFocus) continue;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               final target = node.context;
@@ -2720,20 +2726,21 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           switch (surface) {
             TillSurface.order => PosDestination(
               key: ValueKey(surface),
-              icon: const PosIcon(PosGlyphs.receiptLongOutlined),
+              icon: const PosIcon(PosGlyph('nav_shopping-bag')),
               label: spanish ? 'Venta' : 'Sale',
             ),
             TillSurface.cash => PosDestination(
               key: ValueKey(surface),
               icon: PosBadge(
                 isLabelVisible: widget.cash.activeShiftId == null,
-                child: const PosIcon(PosGlyphs.pointOfSaleOutlined),
+                child: const PosIcon(PosGlyph('nav_wallet')),
               ),
               label: spanish ? 'Caja' : 'Cash',
             ),
             TillSurface.sales => PosDestination(
+              railSecondary: true,
               key: ValueKey(surface),
-              icon: const PosIcon(PosGlyphs.receiptOutlined),
+              icon: const PosIcon(PosGlyph('nav_receipt-text')),
               label: spanish ? 'Ventas' : 'Sales',
             ),
             TillSurface.tables => PosDestination(
@@ -2741,23 +2748,25 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               icon: PosBadge.count(
                 count: _openAccountCount,
                 isLabelVisible: _openAccountCount > 0,
-                child: const PosIcon(PosGlyphs.tableRestaurantOutlined),
+                child: const PosIcon(PosGlyph('nav_layout-grid')),
               ),
               label: spanish ? 'Mesas' : 'Tables',
             ),
             TillSurface.kitchen => PosDestination(
+              railSecondary: true,
               key: ValueKey(surface),
-              icon: const PosIcon(PosGlyphs.restaurantMenuOutlined),
+              icon: const PosIcon(PosGlyph('nav_chef-hat')),
               label: AppLocalizations.of(context).kitchenBoardTitle,
             ),
             TillSurface.orders => PosDestination(
               key: ValueKey(surface),
-              icon: const PosIcon(PosGlyphs.inboxOutlined),
+              icon: const PosIcon(PosGlyph('nav_inbox')),
               label: spanish ? 'Pedidos' : 'Orders',
             ),
             TillSurface.settings => PosDestination(
+              railBottom: true,
               key: ValueKey(surface),
-              icon: const PosIcon(PosGlyphs.tuneOutlined),
+              icon: const PosIcon(PosGlyph('nav_settings')),
               label: spanish ? 'Configuración' : 'Settings',
             ),
           },
@@ -3021,12 +3030,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (serviceType != null) ...[
-                serviceType,
-                const SizedBox(height: 12),
-              ],
               Expanded(
                 child: _CartPanel(
+                  serviceControls: serviceType,
                   controller: widget.cart,
                   restoringAccount: _restoringAccount,
                   onNewSale: () => _newSale(context),
@@ -3544,7 +3550,7 @@ PosMenuItem<String> _overflowItem(String value, PosGlyph icon, String label) =>
         children: [
           PosIcon(icon, size: 20),
           const SizedBox(width: UmiSpacing.md),
-          Text(label),
+          Expanded(child: Text(label)),
         ],
       ),
     );
@@ -3604,99 +3610,6 @@ final class _BarAction extends StatelessWidget {
 /// The consolidated account control (top-bar redesign): the operator identity
 /// and the Lock / Logout actions folded into one menu, so they no longer take
 /// three separate slots on the bar.
-final class _AccountMenu extends StatelessWidget {
-  const _AccountMenu({
-    required this.operatorName,
-    required this.branch,
-    required this.onLock,
-    required this.onLogout,
-    this.focusNode,
-  });
-  final String? operatorName;
-  final String? branch;
-  final VoidCallback onLock;
-  final VoidCallback onLogout;
-  final FocusNode? focusNode;
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final theme = PosTheme.of(context);
-    final spanish = Localizations.localeOf(context).languageCode == 'es';
-    return PosMenuButton<String>(
-      tooltip: spanish ? 'Cuenta' : 'Account',
-      focusNode: focusNode,
-      onSelected: (value) {
-        if (value == 'lock') {
-          onLock();
-        } else if (value == 'logout') {
-          onLogout();
-        }
-      },
-      itemBuilder: (_) => [
-        if (operatorName != null || branch != null) ...[
-          PosMenuItem<String>(
-            enabled: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (operatorName != null)
-                  Text(operatorName!, style: theme.textTheme.titleSmall),
-                if (branch != null)
-                  Text(branch!, style: theme.textTheme.bodySmall),
-              ],
-            ),
-          ),
-          const PosMenuDivider(),
-        ],
-        PosMenuItem<String>(
-          value: 'lock',
-          child: Row(
-            children: [
-              const PosIcon(PosGlyphs.lockOutline, size: 20),
-              const SizedBox(width: UmiSpacing.md),
-              Text(l.lockAction),
-            ],
-          ),
-        ),
-        PosMenuItem<String>(
-          value: 'logout',
-          child: Row(
-            children: [
-              const PosIcon(PosGlyphs.logout, size: 20),
-              const SizedBox(width: UmiSpacing.md),
-              Text(l.logoutAction),
-            ],
-          ),
-        ),
-      ],
-      // The row is what the operator aims at, so the row carries the floor.
-      // (`PosMenuButton`'s own `tapTargetSize` route drops the
-      // `aria-expanded` wrapper when it is padded, so the size lives here.)
-      child: SizedBox(
-        height: UmiTouchTarget.minimum,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.sm),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const PosIcon(PosGlyphs.accountCircleOutlined),
-              if (MediaQuery.sizeOf(context).width >= 800) ...[
-                const SizedBox(width: UmiSpacing.sm),
-                Text(
-                  operatorName ?? branch ?? '—',
-                  style: theme.textTheme.titleSmall,
-                ),
-                const PosIcon(PosGlyphs.arrowDropDown),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 final class _CategoryTab {
   const _CategoryTab({
     required this.label,
@@ -3727,6 +3640,7 @@ final class _CategoryTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = PosTheme.of(context);
     final palette = theme.colorScheme;
+    final stacked = vertical || MediaQuery.sizeOf(context).width >= 700;
     Widget tab(_CategoryTab item) {
       final fill = _ProductPlaceholder.surfaceColor(context, item.color);
       final ink = _ProductPlaceholder.contrastInk(fill);
@@ -3737,9 +3651,14 @@ final class _CategoryTabs extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: Container(
           constraints: BoxConstraints(
-            minHeight: vertical ? 76 : UmiTouchTarget.minimum,
+            minHeight: vertical
+                ? 76
+                : stacked
+                ? 70
+                : UmiTouchTarget.minimum,
+            minWidth: stacked ? 104 : 0,
           ),
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(stacked ? 12 : 8),
           decoration: BoxDecoration(
             color: fill,
             borderRadius: BorderRadius.circular(8),
@@ -3748,11 +3667,11 @@ final class _CategoryTabs extends StatelessWidget {
               width: 1.5,
             ),
           ),
-          alignment: vertical ? Alignment.topLeft : Alignment.center,
+          alignment: stacked ? Alignment.topLeft : Alignment.center,
           child: Flex(
-            direction: vertical ? Axis.vertical : Axis.horizontal,
+            direction: stacked ? Axis.vertical : Axis.horizontal,
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: vertical
+            crossAxisAlignment: stacked
                 ? CrossAxisAlignment.start
                 : CrossAxisAlignment.center,
             children: [
@@ -3764,7 +3683,7 @@ final class _CategoryTabs extends StatelessWidget {
                 ),
               ),
               if (item.count != null) ...[
-                SizedBox(width: vertical ? 0 : 8, height: vertical ? 4 : 0),
+                SizedBox(width: stacked ? 0 : 8, height: stacked ? 8 : 0),
                 Text(
                   '${item.count}',
                   style: theme.textTheme.labelSmall?.copyWith(
@@ -3937,27 +3856,58 @@ final class _ProductCard extends StatelessWidget {
                 ),
               if (showPhoto && url != null)
                 Positioned.fill(
-                  child: ShaderMask(
-                    blendMode: BlendMode.dstIn,
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [
-                        Color(0x00000000),
-                        Color(0x33000000),
-                        Color(0xFF000000),
-                      ],
-                      stops: [0, .45, 1],
-                    ).createShader(bounds),
-                    child: Opacity(
-                      opacity: palette.dark ? .32 : .65,
-                      child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
-                        child: Image.network(
-                          url,
-                          fit: BoxFit.cover,
-                          alignment: Alignment.centerRight,
-                          errorBuilder: (_, _, _) => _ProductPlaceholder(
-                            name: product.name,
-                            category: category,
+                  child: FractionalTranslation(
+                    translation: const Offset(.08, -.04),
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerRight,
+                      widthFactor: .92,
+                      heightFactor: 1.08,
+                      child: ShaderMask(
+                        blendMode: BlendMode.dstIn,
+                        shaderCallback: (bounds) => const LinearGradient(
+                          colors: [Color(0x00000000), Color(0xFF000000)],
+                          stops: [0, .65],
+                        ).createShader(bounds),
+                        child: Opacity(
+                          opacity: palette.dark ? .32 : .65,
+                          child: ImageFiltered(
+                            imageFilter: ImageFilter.blur(
+                              sigmaX: 1.5,
+                              sigmaY: 1.5,
+                            ),
+                            child: ColorFiltered(
+                              colorFilter: const ColorFilter.matrix([
+                                .84252,
+                                .14304,
+                                .01444,
+                                0,
+                                0,
+                                .04252,
+                                .94304,
+                                .01444,
+                                0,
+                                0,
+                                .04252,
+                                .14304,
+                                .81444,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1,
+                                0,
+                              ]),
+                              child: Image.network(
+                                url,
+                                fit: BoxFit.cover,
+                                alignment: Alignment.centerRight,
+                                errorBuilder: (_, _, _) => _ProductPlaceholder(
+                                  name: product.name,
+                                  category: category,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -4062,15 +4012,22 @@ final class _ProductPlaceholder extends StatelessWidget {
     return colors[_hue(category?.id ?? fallbackSeed) % colors.length];
   }
 
-  /// Merchant hue is preserved while its presentation uses the approved soft surface.
+  /// Project configured hues onto the approved blue, sand and rose surfaces.
+  /// The category contract and its stored color remain unchanged.
   static Color surfaceColor(BuildContext context, Color color) {
     final palette = PosTheme.of(context).colorScheme;
-    if (palette.dark) {
-      return Color.alphaBlend(color.withValues(alpha: .20), palette.surface);
+    final hsl = HSLColor.fromColor(color);
+    if (hsl.saturation < .12) {
+      return palette.dark ? const Color(0xFF303746) : const Color(0xFFE9EAF0);
     }
-    return color.computeLuminance() >= .65
-        ? color
-        : Color.alphaBlend(color.withValues(alpha: .22), palette.surface);
+    final family = hsl.hue >= 60 && hsl.hue < 270
+        ? 0
+        : hsl.hue >= 20 && hsl.hue < 60
+        ? 1
+        : 2;
+    const light = [Color(0xFFDCE8F2), Color(0xFFF2E3D1), Color(0xFFEFDEDA)];
+    const dark = [Color(0xFF2B4053), Color(0xFF493D30), Color(0xFF493638)];
+    return (palette.dark ? dark : light)[family];
   }
 
   static Color contrastInk(Color background) {
@@ -5166,10 +5123,6 @@ final class _CartPanel extends StatelessWidget {
   }) {
     final theme = PosTheme.of(context);
     final es = Localizations.localeOf(context).languageCode == 'es';
-    final takeout = orderType == 'takeout';
-    final label = takeout
-        ? (es ? 'Para llevar' : 'Takeout')
-        : (es ? 'Comer aquí' : 'Dine in');
     final cart = controller.state.cart;
     final title = Semantics(
       header: true,
@@ -5188,34 +5141,10 @@ final class _CartPanel extends StatelessWidget {
         ),
       ),
     );
-    final contextLabel = Semantics(
-      label: label,
-      child: ExcludeSemantics(
-        child: PosTag(
-          visualDensity: PosVisualDensity.compact,
-          avatar: PosIcon(
-            takeout
-                ? PosGlyphs.takeoutDiningOutlined
-                : PosGlyphs.restaurantOutlined,
-            size: 16,
-          ),
-          label: Text(label),
-        ),
-      ),
-    );
-    final largeText = MediaQuery.textScalerOf(context).scale(16) > 22;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: largeText
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [title, if (orderType != null) contextLabel],
-                )
-              : title,
-        ),
-        if (!largeText && orderType != null) contextLabel,
+        Expanded(child: title),
         if (permissions.allows('cart.write') &&
             controller.state.cart?.items.isNotEmpty == true &&
             controller.state.cart?.firedOrderId == null)
@@ -5424,7 +5353,22 @@ final class _CartPanel extends StatelessWidget {
                     ),
                     trailing: Text(_money(price.lineTotal)),
                   ),
-                  Row(
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      kitchenCartLineLabel(
+                        item,
+                        lineStatuses,
+                        spanish: spanish,
+                      ),
+                      style: PosTheme.of(context).textTheme.labelSmall
+                          ?.copyWith(
+                            color: PosTheme.of(context).colorScheme.primary,
+                          ),
+                    ),
+                  ),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       PosIconButton(
                         tooltip: l.decreaseQuantity,
@@ -5444,27 +5388,6 @@ final class _CartPanel extends StatelessWidget {
                             ? () => controller.quantity(item, item.quantity + 1)
                             : null,
                         icon: const PosIcon(PosGlyphs.add),
-                      ),
-                      // A line the kitchen already has: the cart says so
-                      // on the line, because that is what the operator
-                      // checks before adding a second round (plan §8.2 F6).
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: UmiSpacing.sm),
-                          child: Text(
-                            kitchenCartLineLabel(
-                              item,
-                              lineStatuses,
-                              spanish: spanish,
-                            ),
-                            style: PosTheme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: PosTheme.of(
-                                    context,
-                                  ).colorScheme.primary,
-                                ),
-                          ),
-                        ),
                       ),
                       PosIconButton(
                         tooltip: l.editCartLineAction,

@@ -432,7 +432,7 @@ void main() {
             'name': 'Bebidas',
             'displayOrder': 0,
             'enabled': true,
-            'color': '#808080',
+            'color': '#67e8f9',
           },
           {
             'id': 'desserts',
@@ -513,6 +513,12 @@ void main() {
               matching: find.byType(Container),
             )
             .first,
+      );
+      expect(
+        (categoryContainer.decoration! as BoxDecoration).color,
+        const Color(0xFFDCE8F2),
+        reason:
+            'Bright configured cyan must use the approved muted blue surface',
       );
       final foreground = categoryText.style!.color!.computeLuminance();
       final background = (categoryContainer.decoration! as BoxDecoration).color!

@@ -1,4 +1,6 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'pos_navigation_glyphs.dart';
 import 'pos_theme.dart';
 
 final class PosGlyph {
@@ -187,15 +189,25 @@ class PosIcon extends StatelessWidget {
     excludeSemantics: semanticLabel == null,
     child: SizedBox.square(
       dimension: size ?? IconTheme.of(context).size ?? 24,
-      child: CustomPaint(
-        painter: _GlyphPainter(
-          icon?.name ?? '',
-          color ??
-              IconTheme.of(context).color ??
-              PosTheme.of(context).colorScheme.onSurface,
-          strokeWidth,
-        ),
-      ),
+      child: posNavigationSvgs.containsKey(icon?.name)
+          ? SvgPicture.string(
+              posNavigationSvgs[icon!.name]!,
+              colorFilter: ColorFilter.mode(
+                color ??
+                    IconTheme.of(context).color ??
+                    PosTheme.of(context).colorScheme.onSurface,
+                BlendMode.srcIn,
+              ),
+            )
+          : CustomPaint(
+              painter: _GlyphPainter(
+                icon?.name ?? '',
+                color ??
+                    IconTheme.of(context).color ??
+                    PosTheme.of(context).colorScheme.onSurface,
+                strokeWidth,
+              ),
+            ),
     ),
   );
 }

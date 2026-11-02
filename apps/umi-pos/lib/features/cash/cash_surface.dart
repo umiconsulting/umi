@@ -122,7 +122,18 @@ final class _CashCenterState extends State<CashCenter> {
       child: PosPage(
         appBar: PosHeader(
           automaticallyImplyLeading: !widget.embedded,
-          title: StationHeading(title: l.cashCenterTitle),
+          title: StationHeading(
+            title:
+                snapshot?.currentShift != null &&
+                    MediaQuery.sizeOf(context).width < 1000
+                ? _registerName(snapshot!)
+                : l.cashCenterTitle,
+            subtitle:
+                snapshot?.currentShift != null &&
+                    MediaQuery.sizeOf(context).width < 1000
+                ? _statusHeadline(l, snapshot!)
+                : null,
+          ),
           leading: !widget.embedded && (ModalRoute.of(context)?.canPop ?? false)
               ? PosIconButton(
                   tooltip: l.closeAction,
@@ -208,17 +219,20 @@ final class _CashCenterState extends State<CashCenter> {
           ),
           const SizedBox(height: UmiSpacing.md),
         ],
-        _StatusCard(
-          title: _statusHeadline(l, snapshot),
-          register: _registerName(snapshot),
-          businessDate: snapshot.businessDate,
-          openedAt:
-              (snapshot.currentShift ?? snapshot.adoptableShift)?['openedAt']
-                  as String?,
-          closedAt: snapshot.currentShift?['closedAt'] as String?,
-          lastReadAt: widget.controller.lastReadAt,
-          policy: snapshot.policy,
-        ),
+        if (constraints.maxWidth >= 1000 ||
+            snapshot.currentShift == null ||
+            expired)
+          _StatusCard(
+            title: _statusHeadline(l, snapshot),
+            register: _registerName(snapshot),
+            businessDate: snapshot.businessDate,
+            openedAt:
+                (snapshot.currentShift ?? snapshot.adoptableShift)?['openedAt']
+                    as String?,
+            closedAt: snapshot.currentShift?['closedAt'] as String?,
+            lastReadAt: widget.controller.lastReadAt,
+            policy: snapshot.policy,
+          ),
         if (snapshot.summary != null) ...[
           const SizedBox(height: UmiSpacing.md),
           if (snapshot.currentShift?['status'] == 'closed')
@@ -1510,7 +1524,7 @@ final class _ActiveShiftSectionState extends State<_ActiveShiftSection> {
       if (actions.contains('movement') &&
           permissions.allows('cash.movement.safe_drop'))
         _Action(
-          icon: PosGlyphs.savingsOutlined,
+          icon: PosGlyphs.lockOutline,
           label: l.safeDropAction,
           tone: 'safe',
           subtitle: spanish ? 'Resguardo de efectivo' : 'Secure cash storage',
@@ -1900,6 +1914,21 @@ final class _ActiveShiftSectionState extends State<_ActiveShiftSection> {
                         if (readOnly) buildReadOnlyRail(),
                       ],
                       if (_tab == 1) ...[
+                        _StatusCard(
+                          title: l.cashCenterTitle,
+                          register:
+                              (snapshot.currentShift?['registerName']
+                                  as String?) ??
+                              '',
+                          businessDate: snapshot.businessDate,
+                          openedAt:
+                              snapshot.currentShift?['openedAt'] as String?,
+                          closedAt:
+                              snapshot.currentShift?['closedAt'] as String?,
+                          lastReadAt: controller.lastReadAt,
+                          policy: snapshot.policy,
+                        ),
+                        const SizedBox(height: 16),
                         CashEquation(
                           account: CashDrawerAccount.fromLedger(
                             snapshot.ledger,
@@ -2289,8 +2318,8 @@ final class _Action extends StatelessWidget {
         style:
             PosOutlineButton.styleFrom(
               foregroundColor: scheme.onSurface,
-              backgroundColor: scheme.surfaceContainerHighest,
-              iconColor: scheme.primary,
+              backgroundColor: scheme.surface,
+              iconColor: scheme.onSurfaceVariant,
               textStyle: theme.textTheme.labelLarge,
               minimumSize: const Size(0, UmiTouchTarget.minimum),
             ).copyWith(

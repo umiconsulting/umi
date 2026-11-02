@@ -1280,12 +1280,15 @@ class PosDestination extends StatelessWidget {
     required this.label,
     this.selectedIcon,
     this.tooltip,
+    this.railSecondary = false,
+    this.railBottom = false,
     super.key,
   });
   final Widget icon;
   final Widget? selectedIcon;
   final String label;
   final String? tooltip;
+  final bool railSecondary, railBottom;
   @override
   Widget build(BuildContext context) => icon;
 }
@@ -1506,7 +1509,7 @@ class _PosNavigationState extends State<PosNavigation> {
       );
       return rail
           ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
               child: PosTooltip(message: d.label, child: item),
             )
           : item;
@@ -1621,7 +1624,7 @@ class _PosNavigationState extends State<PosNavigation> {
       _restore(previousFocus);
     }
     var railWidth = 184.0;
-    if (rail) {
+    if (rail && MediaQuery.textScalerOf(context).scale(1) > 1.3) {
       for (final destination in destinations.cast<PosDestination>()) {
         final painter = TextPainter(
           text: TextSpan(
@@ -1662,18 +1665,59 @@ class _PosNavigationState extends State<PosNavigation> {
                       ),
                     ),
                   ),
-                  PosIconButton(
-                    tooltip: spanish
-                        ? (expanded ? 'Contraer menú' : 'Expandir menú')
-                        : (expanded ? 'Collapse menu' : 'Expand menu'),
-                    onPressed: () =>
-                        setState(() => _railExpanded = !_railExpanded),
-                    icon: PosIcon(
-                      expanded ? PosGlyphs.arrowBack : PosGlyphs.chevronRight,
+                  const PosDivider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                    child: PosSurface(
+                      color: p.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(6),
+                      child: PosIconButton(
+                        tooltip: spanish
+                            ? (expanded ? 'Contraer menú' : 'Expandir menú')
+                            : (expanded ? 'Collapse menu' : 'Expand menu'),
+                        onPressed: () =>
+                            setState(() => _railExpanded = !_railExpanded),
+                        icon: PosIcon(
+                          PosGlyph(
+                            expanded
+                                ? 'nav_panel-left-close'
+                                : 'nav_panel-left-open',
+                          ),
+                          size: 20,
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Expanded(child: ListView(children: controls)),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        for (var i = 0; i < controls.length; i++)
+                          if (!(destinations[i] as PosDestination)
+                                  .railSecondary &&
+                              !(destinations[i] as PosDestination).railBottom)
+                            controls[i],
+                        if (destinations.cast<PosDestination>().any(
+                          (d) => d.railSecondary,
+                        ))
+                          const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: PosDivider(height: 1),
+                          ),
+                        for (var i = 0; i < controls.length; i++)
+                          if ((destinations[i] as PosDestination)
+                                  .railSecondary &&
+                              !(destinations[i] as PosDestination).railBottom)
+                            controls[i],
+                      ],
+                    ),
+                  ),
+                  for (var i = 0; i < controls.length; i++)
+                    if ((destinations[i] as PosDestination).railBottom)
+                      controls[i],
                 ],
               )
             : Column(

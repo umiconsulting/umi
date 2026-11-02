@@ -71,7 +71,12 @@ void main() {
         ),
       );
       expect(
-        tester.getSemantics(find.text('Pedido')),
+        tester.getSemantics(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is PosTapRegion && widget.semanticLabel == 'Pedido',
+          ),
+        ),
         isSemantics(
           label: 'Pedido',
           isButton: true,
@@ -80,7 +85,12 @@ void main() {
         ),
       );
       expect(
-        tester.getSemantics(find.text('Caja')),
+        tester.getSemantics(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is PosTapRegion && widget.semanticLabel == 'Caja',
+          ),
+        ),
         isSemantics(
           label: 'Caja',
           isButton: true,
@@ -88,11 +98,20 @@ void main() {
           isEnabled: true,
         ),
       );
-      await tester.tap(find.text('Caja'));
+      await tester.tap(
+        find.byWidgetPredicate(
+          (widget) => widget is PosTapRegion && widget.semanticLabel == 'Caja',
+        ),
+      );
       await tester.pump();
       expect(selected, 1);
       expect(
-        tester.getSemantics(find.text('Caja')),
+        tester.getSemantics(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is PosTapRegion && widget.semanticLabel == 'Caja',
+          ),
+        ),
         isSemantics(
           label: 'Caja',
           isButton: true,

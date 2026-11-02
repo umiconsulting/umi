@@ -354,11 +354,22 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                   builder: (context, constraints) => Row(
                     children: [
                       Expanded(
-                        child: FloorPlanAreaSelector(
-                          areas: areas,
-                          selectedAreaId: area?.id,
-                          onSelect: (value) => setState(() => _areaId = value),
-                        ),
+                        child: widget.directAccounts && areas.length == 1
+                            ? Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                child: Text(
+                                  areas.single.name,
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              )
+                            : FloorPlanAreaSelector(
+                                areas: areas,
+                                selectedAreaId: area?.id,
+                                onSelect: (value) =>
+                                    setState(() => _areaId = value),
+                              ),
                       ),
                       // The hint is a nicety, so it yields to the chips: the
                       // operator needs every area on a narrow surface.
@@ -426,6 +437,39 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
             .where((visual) => visual.state == tableStateDirty)
             .length ??
         0;
+    if (widget.directAccounts && widget.embedded) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                [
+                  floorPlanTableCountLabel(tables.length, spanish: es),
+                  if (dirty > 0) es ? '$dirty por limpiar' : '$dirty to clear',
+                  if (_roomOffline) es ? 'Sin conexión' : 'Offline',
+                ].join(' · '),
+                style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+                  color: PosTheme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            if (widget.onOpenTemporaryAccount != null)
+              PosIconButton(
+                key: const ValueKey('open-temporary-table-account'),
+                tooltip: es ? 'Mesa temporal' : 'Temporary table',
+                onPressed: () => unawaited(widget.onOpenTemporaryAccount!()),
+                icon: const PosIcon(PosGlyphs.addCircleOutline, size: 20),
+              ),
+            PosIconButton(
+              tooltip: es ? 'Actualizar' : 'Refresh',
+              onPressed: widget.controller.loading ? null : _load,
+              icon: const PosIcon(PosGlyphs.refresh, size: 20),
+            ),
+          ],
+        ),
+      );
+    }
     return PosHeader(
       toolbarHeight: widget.directAccounts ? 56 : 72,
       actionsInline:
@@ -2075,11 +2119,7 @@ class _FloorPlanElement extends StatelessWidget {
     return Column(
       children: [
         Expanded(child: Center(child: label)),
-        Container(
-          key: ValueKey('floor-plan-divider-${element.id}'),
-          height: 1,
-          color: palette.divider,
-        ),
+        const SizedBox(height: 2),
         Expanded(
           child: visual != null && visual.state != tableStateOpen
               ? Padding(
@@ -2171,9 +2211,11 @@ class _FloorPlanSeatDotPainter extends CustomPainter {
       remaining -= inRow;
       var left = (size.width - (inRow * diameter + (inRow - 1) * gap)) / 2;
       for (var dot = 0; dot < inRow; dot++) {
-        canvas.drawCircle(
-          Offset(left + diameter / 2, top + diameter / 2),
-          diameter / 2,
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(left, top + diameter * .25, diameter, diameter * .5),
+            const Radius.circular(2),
+          ),
           paint,
         );
         left += pitch;
