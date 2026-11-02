@@ -238,7 +238,12 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
         automaticallyImplyLeading: false,
         toolbarHeight: 56,
         titleSpacing: 12,
-        title: StationHeading(title: l10n.kitchenBoardTitle),
+        title: StationHeading(
+          title: l10n.kitchenBoardTitle,
+          subtitle: l10n.localeName.startsWith('es')
+              ? 'Preparación de pedidos'
+              : 'Order preparation',
+        ),
         actions: [
           PosIconButton(
             onPressed: _toggleSounds,
@@ -550,7 +555,11 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
                                 const [],
                           ),
                           width:
-                              (320 * MediaQuery.textScalerOf(context).scale(1))
+                              ((MediaQuery.sizeOf(context).width < 700
+                                          ? constraints.maxWidth -
+                                                2 * UmiSpacing.md
+                                          : 320) *
+                                      MediaQuery.textScalerOf(context).scale(1))
                                   .clamp(
                                     0.0,
                                     (constraints.maxWidth - 2 * UmiSpacing.md)
@@ -573,7 +582,11 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
                       for (final order in unassignedVisible)
                         _UnassignedTicketCard(
                           width:
-                              (320 * MediaQuery.textScalerOf(context).scale(1))
+                              ((MediaQuery.sizeOf(context).width < 700
+                                          ? constraints.maxWidth -
+                                                2 * UmiSpacing.md
+                                          : 320) *
+                                      MediaQuery.textScalerOf(context).scale(1))
                                   .clamp(
                                     0.0,
                                     (constraints.maxWidth - 2 * UmiSpacing.md)
@@ -1003,13 +1016,21 @@ final class _TicketCard extends StatelessWidget {
     return SizedBox(
       width: width,
       child: PosSurface(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
+        color: scheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: urgent || high || kitchenOrderOverdue(order, now)
+                ? accent
+                : scheme.primary,
+            width: 1.5,
+          ),
+        ),
+        borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(height: 4, color: accent),
             Padding(
               padding: const EdgeInsets.all(UmiSpacing.md),
               child: Column(
@@ -1024,7 +1045,7 @@ final class _TicketCard extends StatelessWidget {
                               ? '${order.publicReference} · ${order.businessDate}'
                               : order.publicReference,
                           style: PosTheme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
                       Text(

@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
 
 abstract final class PosGeometry {
-  static const controlRadius = 10.0;
-  static const surfaceRadius = 16.0;
+  static const controlRadius = 8.0;
+  static const surfaceRadius = 12.0;
 }
 
 abstract final class PosColors {
@@ -40,7 +40,7 @@ final class PosPalette {
       : const Color(0xFFFFFEFA);
   Color get onSurface => dark
       ? (midnight ? const Color(0xFFF2F2F2) : const Color(0xFFEDF1F8))
-      : const Color(0xFF131F44);
+      : const Color(0xFF172440);
   Color get onSurfaceVariant => dark
       ? (midnight ? const Color(0xFFB0B0B0) : const Color(0xFF99A2B5))
       : const Color(0xFF59677F);

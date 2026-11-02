@@ -525,6 +525,8 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        await tester.tap(find.text('Cierre'));
+        await tester.pumpAndSettle();
         await tester.ensureVisible(find.text('Contar el cajón'));
         await tester.tap(find.text('Contar el cajón'));
         await tester.pumpAndSettle();
@@ -1127,6 +1129,8 @@ void main() {
 
     // The operator reads the drawer's account and the line that produced it, on
     // the same surface, without asking the owner's dashboard.
+    await tester.tap(find.text('Turno'));
+    await tester.pumpAndSettle();
     expect(find.text('La cuenta del cajón'), findsOneWidget);
     expect(find.text('Libro del turno'), findsOneWidget);
     expect(find.text('Fondo inicial'), findsWidgets);
@@ -1296,6 +1300,8 @@ void main() {
     await tester.pump();
     // The figures on this screen wear the same micro-label as the equation's
     // terms, so the two cards read as one ledger.
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
     expect(find.textContaining('EXPECTED CASH'), findsWidgets);
     expect(find.textContaining('COUNTED CASH'), findsWidgets);
     expect(find.text('Start recount'), findsOneWidget);
@@ -1959,6 +1965,8 @@ void main() {
 
     // The next step sits at the foot of the close card, which is below the fold
     // on this test's 800 x 600 surface: bring it into view before pressing it.
+    await tester.tap(find.text('Cierre'));
+    await tester.pumpAndSettle();
     final reasonAction = find.widgetWithText(
       PosButton,
       'Motivo de la diferencia',

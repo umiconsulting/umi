@@ -65,6 +65,8 @@ final class HardwareSurface extends StatefulWidget {
     required this.service,
     required this.permissions,
     required this.registerId,
+    this.embedded = false,
+    this.section,
     super.key,
   });
 
@@ -72,6 +74,8 @@ final class HardwareSurface extends StatefulWidget {
   final HardwareService service;
   final OperatorPermissions permissions;
   final String? registerId;
+  final bool embedded;
+  final String? section;
 
   @override
   State<HardwareSurface> createState() => _HardwareSurfaceState();
@@ -171,7 +175,14 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
     return PosPage(
       appBar: PosHeader(
         title: StationHeading(
-          title: text('Hardware center', 'Centro de hardware'),
+          title: widget.embedded
+              ? (widget.section == 'print'
+                    ? text('Printing', 'Impresión')
+                    : text(
+                        'Devices at this register',
+                        'Dispositivos de esta caja',
+                      ))
+              : text('Hardware center', 'Centro de hardware'),
         ),
         actions: [
           PosIconButton(
@@ -179,11 +190,12 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
             onPressed: _busy ? null : _load,
             icon: const PosIcon(PosGlyphs.refresh),
           ),
-          PosIconButton(
-            tooltip: text('Close', 'Cerrar'),
-            onPressed: () => Navigator.pop(context),
-            icon: const PosIcon(PosGlyphs.close),
-          ),
+          if (!widget.embedded)
+            PosIconButton(
+              tooltip: text('Close', 'Cerrar'),
+              onPressed: () => Navigator.pop(context),
+              icon: const PosIcon(PosGlyphs.close),
+            ),
         ],
       ),
       body: SafeArea(
@@ -216,63 +228,67 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Semantics(
-          header: true,
-          child: Text(
-            text('Assigned devices', 'Dispositivos asignados'),
-            style: PosTheme.of(context).textTheme.titleLarge,
+        if (widget.section != 'print') ...[
+          Semantics(
+            header: true,
+            child: Text(
+              text('Assigned devices', 'Dispositivos asignados'),
+              style: PosTheme.of(context).textTheme.titleLarge,
+            ),
           ),
-        ),
-        if (widget.permissions.allows('hardware.manage'))
-          Wrap(
-            spacing: 8,
-            children: [
-              // One tap: look on the till's own USB host port, then add whatever
-              // printer answers. The cable is the configuration, so the operator
-              // never picks a host, a port, or a transport.
-              PosButton.icon(
-                onPressed: _busy ? null : _addUsbPrinter,
-                icon: const PosIcon(PosGlyphs.usb),
-                label: Text(text('Find USB printer', 'Buscar impresora USB')),
-              ),
-              // The drawer's other cable, in one tap: the terminal is asked
-              // whether it has its own cashbox port, and a record is filed only
-              // when it answers. A tablet gets a sentence instead of a device
-              // row that could never open anything.
-              PosButton.icon(
-                onPressed: _busy ? null : _addTerminalDrawer,
-                icon: const PosIcon(PosGlyphs.pointOfSaleOutlined),
-                label: Text(
-                  text('Find terminal drawer', 'Buscar cajón de la terminal'),
+          if (widget.permissions.allows('hardware.manage'))
+            Wrap(
+              spacing: 8,
+              children: [
+                // One tap: look on the till's own USB host port, then add whatever
+                // printer answers. The cable is the configuration, so the operator
+                // never picks a host, a port, or a transport.
+                PosOutlineButton.icon(
+                  onPressed: _busy ? null : _addUsbPrinter,
+                  icon: const PosIcon(PosGlyphs.usb),
+                  label: Text(text('Find USB printer', 'Buscar impresora USB')),
                 ),
-              ),
-              PosButton.icon(
-                onPressed: _busy ? null : _register,
-                icon: const PosIcon(PosGlyphs.add),
-                label: Text(text('Register device', 'Registrar dispositivo')),
-              ),
-            ],
+                // The drawer's other cable, in one tap: the terminal is asked
+                // whether it has its own cashbox port, and a record is filed only
+                // when it answers. A tablet gets a sentence instead of a device
+                // row that could never open anything.
+                PosOutlineButton.icon(
+                  onPressed: _busy ? null : _addTerminalDrawer,
+                  icon: const PosIcon(PosGlyphs.pointOfSaleOutlined),
+                  label: Text(
+                    text('Find terminal drawer', 'Buscar cajón de la terminal'),
+                  ),
+                ),
+                PosOutlineButton.icon(
+                  onPressed: _busy ? null : _register,
+                  icon: const PosIcon(PosGlyphs.add),
+                  label: Text(text('Register device', 'Registrar dispositivo')),
+                ),
+              ],
+            ),
+          const SizedBox(height: 8),
+          if (devices.isEmpty)
+            Text(text('No assigned hardware.', 'No hay hardware asignado.')),
+          ...devices.map(_deviceCard),
+        ],
+        if (widget.section != 'devices') ...[
+          const SizedBox(height: 24),
+          Semantics(
+            header: true,
+            child: Text(
+              text('Printer queue', 'Cola de impresión'),
+              style: PosTheme.of(context).textTheme.titleLarge,
+            ),
           ),
-        const SizedBox(height: 8),
-        if (devices.isEmpty)
-          Text(text('No assigned hardware.', 'No hay hardware asignado.')),
-        ...devices.map(_deviceCard),
-        const SizedBox(height: 24),
-        Semantics(
-          header: true,
-          child: Text(
-            text('Printer queue', 'Cola de impresión'),
-            style: PosTheme.of(context).textTheme.titleLarge,
-          ),
-        ),
-        if (jobs.isEmpty)
-          Text(text('The queue is empty.', 'La cola está vacía.')),
-        // NEWEST FIRST. The API reads the queue in creation order, which is right for a
-        // dispatcher and wrong for the person who just pressed "Run test": the page they
-        // asked for landed at the bottom of a scrolling list, off screen, so a working
-        // button looked like a broken one. On the pilot till this was the second half of
-        // "Ejecutar prueba no funciona" — the first was the command being refused.
-        ...jobs.reversed.map(_jobTile),
+          if (jobs.isEmpty)
+            Text(text('The queue is empty.', 'La cola está vacía.')),
+          // NEWEST FIRST. The API reads the queue in creation order, which is right for a
+          // dispatcher and wrong for the person who just pressed "Run test": the page they
+          // asked for landed at the bottom of a scrolling list, off screen, so a working
+          // button looked like a broken one. On the pilot till this was the second half of
+          // "Ejecutar prueba no funciona" — the first was the command being refused.
+          ...jobs.reversed.map(_jobTile),
+        ],
         if ((snapshot?.unknownCommands ?? 0) > 0)
           Semantics(
             liveRegion: true,

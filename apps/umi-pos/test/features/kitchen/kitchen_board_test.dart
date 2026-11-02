@@ -310,7 +310,12 @@ void main() {
         tester.element(find.text('Tiempo vencido')),
       ).colorScheme.error;
       expect(
-        find.byWidgetPredicate((w) => w is Container && w.color == red),
+        find.byWidgetPredicate(
+          (w) =>
+              w is PosSurface &&
+              w.shape is RoundedRectangleBorder &&
+              (w.shape! as RoundedRectangleBorder).side.color == red,
+        ),
         findsWidgets,
       );
       await harness.dispose(tester);

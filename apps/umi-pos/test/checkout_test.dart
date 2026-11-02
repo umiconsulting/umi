@@ -2418,7 +2418,7 @@ void main() {
     // The redesigned SOTA tender screen: a hero total, the payment-method tile,
     // the cash-received flow with quick-cash notes and an on-screen keypad, the
     // colour-coded change block. Receipt delivery uses the default display path.
-    expect(find.text('TOTAL'), findsOneWidget);
+    expect(find.text('Total'), findsOneWidget);
     expect(find.text('Payment selection'), findsOneWidget);
     expect(find.text('Cash'), findsWidgets);
     expect(find.text('Cash received'), findsOneWidget);

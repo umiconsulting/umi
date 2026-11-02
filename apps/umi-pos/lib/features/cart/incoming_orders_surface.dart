@@ -104,7 +104,12 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
     return PosPage(
       appBar: PosHeader(
         automaticallyImplyLeading: false,
-        title: StationHeading(title: l.incomingOrdersTitle),
+        title: StationHeading(
+          title: l.incomingOrdersTitle,
+          subtitle: Localizations.localeOf(context).languageCode == 'es'
+              ? 'Menú digital'
+              : 'Digital menu',
+        ),
         leading: widget.embedded
             ? null
             : PosIconButton(
@@ -113,6 +118,14 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
                 icon: const PosIcon(PosGlyphs.arrowBack),
               ),
         actions: [
+          if (state.phase == IncomingOrdersPhase.ready)
+            PosTag(
+              label: Text(
+                Localizations.localeOf(context).languageCode == 'es'
+                    ? '${state.orders.length} por revisar'
+                    : '${state.orders.length} to review',
+              ),
+            ),
           PosIconButton(
             tooltip: l.refreshAction,
             onPressed:
@@ -125,7 +138,7 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(UmiSpacing.lg),
+          padding: const EdgeInsets.all(16),
           child: _body(l, state),
         ),
       ),
@@ -202,54 +215,77 @@ final class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final theme = PosTheme.of(context);
+    final es = Localizations.localeOf(context).languageCode == 'es';
     return PosCard(
+      margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(UmiSpacing.md),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final details = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              [
+                _channelLabel(order.channel),
+                order.reference,
+              ].whereType<String>().join(' · '),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              order.customerName ?? order.reference ?? order.orderId,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
               children: [
-                Text(
-                  order.customerName ?? order.reference ?? order.orderId,
-                  style: PosTheme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: UmiSpacing.xs),
-                Text(
-                  // The one money formatter: this row used to price the order in
-                  // dollars (`$330.00`) on a till that says `MXN` everywhere
-                  // else. The projection carries no currency of its own —
-                  // `merchant.order_total` has none — so the till names the one
-                  // it trades in, the same constant the gift-card dialog uses.
-                  '${_channelLabel(order.channel)} · ${order.itemCount} · '
-                  '${formatMinorUnits(order.totalMinorUnits, 'MXN')}',
-                  style: PosTheme.of(context).textTheme.bodySmall,
+                const PosIcon(PosGlyphs.shoppingBagOutlined, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    es
+                        ? '${order.itemCount} productos'
+                        : '${order.itemCount} items',
+                    style: theme.textTheme.bodyMedium,
+                  ),
                 ),
               ],
-            );
-            final action = PosButton(
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(l.totalLabel, style: theme.textTheme.bodySmall),
+                ),
+                Flexible(
+                  flex: 2,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      formatMinorUnits(order.totalMinorUnits, 'MXN'),
+                      style: theme.textTheme.headlineSmall,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            PosButton(
               onPressed: binding ? null : onTake,
-              child: Text(l.incomingOrdersTake),
-            );
-            if (constraints.maxWidth <
-                400 * MediaQuery.textScalerOf(context).scale(1)) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: Row(
                 children: [
-                  details,
-                  const SizedBox(height: UmiSpacing.md),
-                  action,
+                  Expanded(child: Text(l.incomingOrdersTake)),
+                  const PosIcon(PosGlyphs.arrowForward, size: 18),
                 ],
-              );
-            }
-            return Row(
-              children: [
-                Expanded(child: details),
-                const SizedBox(width: UmiSpacing.md),
-                action,
-              ],
-            );
-          },
+              ),
+            ),
+          ],
         ),
       ),
     );

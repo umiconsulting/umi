@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
@@ -169,57 +167,34 @@ void main() {
           lessThan(tester.getSize(product).height / 5),
         );
 
-        // The divider wears its label in capitals; the category above keeps the
-        // name it was seeded with.
-        final tab = find.text('PAN');
-        expect(tester.widget<Text>(tab).style!.color, _ink);
-        expect(
-          tester.getSemantics(tab),
-          isSemantics(isButton: true, isSelected: false),
+        final tab = find.descendant(
+          of: find.byKey(const ValueKey('catalog-category-index')),
+          matching: find.text('Pan'),
         );
-        final paintedTab = find
-            .ancestor(of: tab, matching: find.byType(CustomPaint))
-            .first;
-        final size = tester.getSize(paintedTab);
-        final painter = tester.widget<CustomPaint>(paintedTab).painter!;
-        final recorder = ui.PictureRecorder();
-        painter.paint(ui.Canvas(recorder), size);
-        final picture = recorder.endRecording();
-        final pixels = await tester.runAsync(() async {
-          final image = await picture.toImage(
-            size.width.ceil(),
-            size.height.ceil(),
-          );
-          final bytes = await image.toByteData(
-            format: ui.ImageByteFormat.rawRgba,
-          );
-          image.dispose();
-          return bytes!;
-        });
-        picture.dispose();
-        var orangePixels = 0;
-        var neutralPixels = 0;
-        for (var i = 0; i < pixels!.lengthInBytes; i += 4) {
-          final color = Color.fromARGB(
-            pixels.getUint8(i + 3),
-            pixels.getUint8(i),
-            pixels.getUint8(i + 1),
-            pixels.getUint8(i + 2),
-          );
-          if (color == _orange) orangePixels++;
-          if (color == _neutral) neutralPixels++;
-        }
-        final pixelCount = pixels.lengthInBytes / 4;
-        expect(orangePixels, greaterThan(0));
-        expect(orangePixels / pixelCount, lessThan(.3));
-        expect(neutralPixels / pixelCount, greaterThan(.3));
+        final tabRegion = find.ancestor(
+          of: tab,
+          matching: find.byType(PosTapRegion),
+        );
+        final surface = tester.widget<Container>(
+          find
+              .descendant(
+                of: tabRegion,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Container && widget.decoration is BoxDecoration,
+                ),
+              )
+              .first,
+        );
+        final fill = (surface.decoration! as BoxDecoration).color!;
+        final ink = tester.widget<Text>(tab).style!.color!;
+        expect(fill.computeLuminance(), lessThan(.1));
+        expect(_contrast(ink, fill), greaterThanOrEqualTo(4.5));
+        expect(tester.widget<PosTapRegion>(tabRegion).selected, isFalse);
         await tester.tap(tab);
         await tester.pump();
         expect(catalog.state.selectedCategoryId, 'bread');
-        expect(
-          tester.getSemantics(tab),
-          isSemantics(isButton: true, isSelected: true),
-        );
+        expect(tester.widget<PosTapRegion>(tabRegion).selected, isTrue);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       } finally {

@@ -822,7 +822,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     return SafeArea(
       key: const ValueKey('checkout-surface'),
       child: Padding(
-        padding: const EdgeInsets.all(UmiSpacing.lg),
+        padding: EdgeInsets.all(
+          MediaQuery.sizeOf(context).width < 700 ? 16 : 24,
+        ),
         child: switch (state.phase) {
           CheckoutPhase.completed => _receipt(
             context,
@@ -900,8 +902,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 ),
                 Text(
                   [
-                    widget.entry.state.selectedTenant?.name,
-                    widget.entry.state.selectedBranch?.name,
+                    cart.accountFolio,
+                    cart.tableName,
                     widget.entry.operatorName,
                   ].whereType<String>().where((v) => v.isNotEmpty).join(' · '),
                   style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
@@ -1004,7 +1006,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 _tenderReading(context, totals),
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final columns = constraints.maxWidth < 760 ? 2 : 4;
+                    final columns =
+                        constraints.maxWidth >= 330 &&
+                            MediaQuery.textScalerOf(context).scale(16) < 24
+                        ? 3
+                        : 2;
                     final width =
                         (constraints.maxWidth - UmiSpacing.md * (columns - 1)) /
                         columns;
@@ -4584,35 +4590,31 @@ final class _TotalHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = PosTheme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: UmiSpacing.lg,
-        vertical: UmiSpacing.md,
-      ),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
         children: [
-          Text(
-            label.toUpperCase(),
-            style: PosTheme.of(context).textTheme.labelMedium?.copyWith(
-              color: scheme.onSurfaceVariant,
-              letterSpacing: 1,
+          Expanded(
+            child: Text(
+              label,
+              style: PosTheme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ),
-          const SizedBox(height: 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              amount,
-              style: PosTheme.of(context).textTheme.displaySmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: scheme.onSurface,
+          const SizedBox(width: 12),
+          Flexible(
+            flex: 2,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                amount,
+                style: PosTheme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
+                ),
               ),
             ),
           ),
@@ -4904,21 +4906,19 @@ final class _MethodTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = PosTheme.of(context).colorScheme;
     return PosSurface(
-      color: selected
-          ? scheme.primaryContainer
-          : scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(14),
+      color: selected ? scheme.primaryContainer : scheme.surface,
+      borderRadius: BorderRadius.circular(8),
       child: PosTapRegion(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
-          height: 72,
-          padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.md),
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: selected ? scheme.primary : scheme.outlineVariant,
-              width: selected ? 2 : 1,
+              width: 1,
             ),
           ),
           child: Row(
@@ -4933,11 +4933,11 @@ final class _MethodTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: PosTheme.of(context).textTheme.titleMedium?.copyWith(
+                  style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
                     color: selected
                         ? scheme.onPrimaryContainer
                         : scheme.onSurface,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -5006,17 +5006,24 @@ final class _KeyButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = PosTheme.of(context).colorScheme;
     return PosSurface(
-      color: scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
+      color: scheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      borderRadius: BorderRadius.circular(8),
       child: PosTapRegion(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         child: Center(
           child: label == 'back'
               ? const PosIcon(PosGlyphs.backspaceOutlined)
               : Text(
                   label,
-                  style: PosTheme.of(context).textTheme.headlineSmall,
+                  style: PosTheme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
         ),
       ),
