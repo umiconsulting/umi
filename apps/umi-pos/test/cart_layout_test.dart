@@ -15,6 +15,8 @@ import 'package:umi_pos/features/cart/cart_repository.dart';
 import 'package:umi_pos/features/catalog/catalog_controller.dart';
 import 'package:umi_pos/features/catalog/catalog_repository.dart';
 import 'package:umi_pos/features/catalog/catalog_surface.dart';
+import 'package:umi_pos/features/checkout/checkout_controller.dart';
+import 'package:umi_pos/features/checkout/checkout_repository.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
 import 'package:umi_pos/features/entry/entry_gateway.dart';
 import 'package:umi_pos/features/offline/connectivity_controller.dart';
@@ -29,6 +31,33 @@ import 'support/fakes.dart';
 /// Plan §2.1 finding 8: with the keyboard up, the till overflowed the cart with a
 /// debug stripe over the sale. The reproduction is a phone-sized surface with the
 /// keyboard inset — the panel and the messages must scroll, not overflow.
+
+final class _LedgerRepo
+    implements CheckoutRepository, PartialPaymentRepository {
+  int reads = 0;
+  bool fail = false;
+  @override
+  Future<CheckoutPartialPaymentResult> partialPayments(
+    String merchantId,
+    String cartId,
+    CheckoutPartialPaymentQuery query,
+  ) async {
+    reads++;
+    if (fail) throw StateError('unavailable');
+    return CheckoutPartialPaymentResult(
+      ok: true,
+      data: {
+        'cartId': cartId,
+        'appliedAmount': {'minorUnits': 4500, 'currency': 'MXN'},
+        'remainingBalance': {'minorUnits': 9000, 'currency': 'MXN'},
+        'blockedByUnknown': false,
+      },
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
 
 final class _Gateway implements EntryGateway {
   _Gateway({this.permissions = const ['cart.write', 'order.fire']});
@@ -332,8 +361,12 @@ _fixture({
   bool waiterMode = false,
   int lines = 6,
   String? accountFolio,
+  _LedgerRepo? ledger,
 }) async {
   final root = testRoot();
+  final checkout = ledger == null
+      ? root.checkout
+      : CheckoutController(repository: ledger, telemetry: root.telemetry);
   final entry = EntryController(
     gateway: _Gateway(
       permissions: [
@@ -415,7 +448,7 @@ _fixture({
       catalog: catalog,
       cart: cart,
       cash: root.cash,
-      checkout: root.checkout,
+      checkout: checkout,
       sales: sales,
       exceptions: root.exceptions,
       connectivity: root.connectivity,
@@ -427,6 +460,7 @@ _fixture({
     connectivity: root.connectivity,
     persistedCart: () => repository.cart,
     dispose: () {
+      if (checkout != root.checkout) checkout.dispose();
       if (sales != root.sales) sales.dispose();
       catalog.dispose();
       cart.dispose();
@@ -468,6 +502,52 @@ void _completeText(WidgetTester tester, String label) {
 }
 
 void main() {
+  testWidgets(
+    'account shows authoritative paid and remaining, clears stale balance on failure',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final ledger = _LedgerRepo();
+      final fixture = await _fixture(lines: 1, ledger: ledger);
+      await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+      await tester.pumpAndSettle();
+      expect(find.text('Pagado'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('account-workspace')),
+          matching: find.text('MXN 45.00'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('MXN 90.00'), findsNWidgets(2));
+      expect(ledger.reads, 1);
+      ledger.fail = true;
+      fixture.cart.restore(
+        Cart.fromJson({...fixture.cart.state.cart!.toJson(), 'version': 2}),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('MXN 90.00'), findsNothing);
+      expect(find.textContaining('Saldo no disponible'), findsOneWidget);
+      expect(ledger.reads, 2);
+      await tester.pumpWidget(const SizedBox());
+      fixture.dispose();
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets('waiter account does not read payment ledger', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final ledger = _LedgerRepo();
+    final fixture = await _fixture(lines: 1, ledger: ledger, waiterMode: true);
+    await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+    await tester.pumpAndSettle();
+    expect(ledger.reads, 0);
+    await tester.pumpWidget(const SizedBox());
+    fixture.dispose();
+  });
+
   testWidgets('the open mobile cart sheet follows authoritative cart changes', (
     tester,
   ) async {
@@ -541,9 +621,9 @@ void main() {
         await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
         await tester.pumpAndSettle();
         expect(find.text('Cuenta 024'), findsOneWidget);
-        expect(find.text('Mesa 2'), findsOneWidget);
+        expect(find.text('Mesa 2'), findsNWidgets(2));
         expect(find.text('Ana terraza'), findsOneWidget);
-        expect(find.byTooltip('Cuenta 024 · Ana López'), findsOneWidget);
+        expect(find.textContaining('Ana López'), findsOneWidget);
         expect(find.text('Asignar mesa'), findsNothing);
         expect(find.text('Agregar mesa'), findsNothing);
         expect(tester.takeException(), isNull);
@@ -781,7 +861,7 @@ void main() {
             if (checkout.hitTestable().evaluate().isEmpty) {
               final scroll = find
                   .descendant(
-                    of: find.byType(PosCard),
+                    of: find.byKey(const ValueKey('account-workspace')),
                     matching: find.byType(Scrollable),
                   )
                   .first;
@@ -794,7 +874,26 @@ void main() {
             }
             expect(checkout.hitTestable(), findsOneWidget);
             _completeText(tester, locale == 'es' ? 'Cobrar' : 'Checkout');
-            expect(find.text('MXN 390.00').hitTestable(), findsWidgets);
+            if (find.text('MXN 390.00').evaluate().isEmpty) {
+              await tester.scrollUntilVisible(
+                find.text('MXN 390.00'),
+                -100,
+                scrollable: find
+                    .descendant(
+                      of: find.byKey(const ValueKey('account-workspace')),
+                      matching: find.byType(Scrollable),
+                    )
+                    .first,
+              );
+              await tester.pumpAndSettle();
+            }
+            expect(find.text('MXN 390.00'), findsWidgets);
+            expect(
+              find.textContaining(
+                locale == 'es' ? 'Saldo no disponible' : 'Balance unavailable',
+              ),
+              findsOneWidget,
+            );
             final close = find.byTooltip(
               locale == 'es' ? 'Cerrar comanda' : 'Close order',
             );
@@ -894,7 +993,10 @@ void main() {
     // up while the cart laid out.
     expect(tester.takeException(), isNull);
     final sheetScroll = find
-        .descendant(of: find.byType(PosCard), matching: find.byType(Scrollable))
+        .descendant(
+          of: find.byKey(const ValueKey('account-workspace')),
+          matching: find.byType(Scrollable),
+        )
         .first;
     await tester.scrollUntilVisible(
       find.text('Latte 0'),
