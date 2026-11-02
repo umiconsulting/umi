@@ -8,6 +8,7 @@ import '../../core/localization/app_localizations.dart';
 import '../../core/security/operator_permissions.dart';
 import '../../core/theme/umi_theme.dart';
 import '../../shared/widgets/station_document.dart';
+import '../cart/account_preview.dart';
 import '../entry/entry_controller.dart';
 import 'floor_plan_controller.dart';
 import 'table_state_controller.dart';
@@ -46,6 +47,8 @@ class FloorPlanSurface extends StatefulWidget {
     this.onShowAccounts,
     this.directAccounts = false,
     this.onSetUpTables,
+    this.readAccount,
+    this.readBalance,
   });
   final FloorPlanController controller;
   final EntryController entry;
@@ -61,6 +64,8 @@ class FloorPlanSurface extends StatefulWidget {
   final VoidCallback? onShowAccounts;
   final bool directAccounts;
   final VoidCallback? onSetUpTables;
+  final Future<Cart?> Function(FloorPlanElement)? readAccount;
+  final Future<Map<String, Object?>?> Function(Cart)? readBalance;
 
   /// The live room (plan section 8D steps 3 to 5). Null when this build has no
   /// client, and the surface then stays the read-only map it used to be.
@@ -845,6 +850,15 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
             ),
           ),
         ),
+        if (entry?.openAccountId != null && widget.readAccount != null) ...[
+          const SizedBox(height: 12),
+          AccountPreview(
+            key: ValueKey('table-account-${entry!.openAccountId}'),
+            load: () => widget.readAccount!(selected),
+            balance: widget.readBalance,
+          ),
+          const PosDivider(),
+        ],
         if (entry?.openAccountFolio != null)
           _panelRow(es ? 'Cuenta' : 'Account', entry!.openAccountFolio!),
         if (partySize != null)
@@ -1557,6 +1571,15 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                   l10n.tableStateGroupLabel(groupSize),
                   style: PosTheme.of(dialog).textTheme.bodySmall,
                 ),
+              if (entry.openAccountId != null &&
+                  widget.readAccount != null) ...[
+                const PosDivider(),
+                AccountPreview(
+                  key: ValueKey('table-account-${entry.openAccountId}'),
+                  load: () => widget.readAccount!(element),
+                  balance: widget.readBalance,
+                ),
+              ],
               const PosDivider(),
               ...actions.map(
                 (action) =>

@@ -56,15 +56,14 @@ final class IncomingOrdersSurface extends StatefulWidget {
 }
 
 final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
+  String? _selectedId;
   @override
   void initState() {
     super.initState();
     widget.incoming.addListener(_changed);
-    widget.incoming.load(
-      widget.merchantId,
-      widget.locationId,
-      widget.operatorSessionId,
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reload();
+    });
   }
 
   @override
@@ -189,17 +188,96 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
             ),
           );
         }
-        return ListView.separated(
-          itemCount: state.orders.length,
-          separatorBuilder: (_, _) => const SizedBox(height: UmiSpacing.sm),
-          itemBuilder: (_, index) => _OrderCard(
-            order: state.orders[index],
-            binding: state.binding,
-            onTake: () => _take(state.orders[index]),
-          ),
+        return LayoutBuilder(
+          builder: (context, box) {
+            final wide = box.maxWidth >= 720;
+            final selected = state.orders
+                .where((order) => order.orderId == _selectedId)
+                .firstOrNull;
+            final effective = selected ?? (wide ? state.orders.first : null);
+            Widget detail(PosIncomingOrder order) => SingleChildScrollView(
+              key: const ValueKey('incoming-detail'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!wide)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: PosTextButton.icon(
+                        onPressed: () => setState(() => _selectedId = null),
+                        icon: const PosIcon(PosGlyphs.arrowBack),
+                        label: Text(
+                          Localizations.localeOf(context).languageCode == 'es'
+                              ? 'Todos los pedidos'
+                              : 'All orders',
+                        ),
+                      ),
+                    ),
+                  _OrderCard(
+                    order: order,
+                    binding: state.binding,
+                    onTake: () => _take(order),
+                  ),
+                ],
+              ),
+            );
+            final list = ListView.separated(
+              key: const ValueKey('incoming-list'),
+              itemCount: state.orders.length,
+              separatorBuilder: (_, _) => const PosDivider(),
+              itemBuilder: (_, index) {
+                final order = state.orders[index];
+                return PosListRow(
+                  key: ValueKey('incoming-${order.orderId}'),
+                  contentPadding: const EdgeInsets.all(16),
+                  selected: effective?.orderId == order.orderId,
+                  title: Text(order.reference ?? order.orderId),
+                  subtitle: Text(
+                    [
+                      if (order.customerName != null) order.customerName!,
+                      _incomingStatus(order, context),
+                    ].join(' · '),
+                  ),
+                  onTap: () => setState(() => _selectedId = order.orderId),
+                  trailing: const PosIcon(PosGlyphs.chevronRight, size: 18),
+                );
+              },
+            );
+            if (!wide) return effective == null ? list : detail(effective);
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(width: 310, child: list),
+                const SizedBox(width: 24),
+                Expanded(child: detail(effective!)),
+              ],
+            );
+          },
         );
     }
   }
+}
+
+String _incomingStatus(PosIncomingOrder order, BuildContext context) {
+  final es = Localizations.localeOf(context).languageCode == 'es';
+  final status = switch (order.status) {
+    'placed' => es ? 'Recibido' : 'Received',
+    'confirmed' => es ? 'Confirmado' : 'Confirmed',
+    'preparing' => es ? 'En preparación' : 'Preparing',
+    'ready' => es ? 'Listo' : 'Ready',
+    'completed' => es ? 'Completado' : 'Completed',
+    'cancelled' => es ? 'Cancelado' : 'Cancelled',
+    _ => order.status,
+  };
+  final placed = DateTime.tryParse(order.placedAt ?? '');
+  final minutes = placed == null
+      ? null
+      : DateTime.now().difference(placed).inMinutes;
+  return [
+    status,
+    if (minutes != null && minutes >= 0)
+      es ? 'Hace $minutes min' : '$minutes min ago',
+  ].join(' · ');
 }
 
 final class _OrderCard extends StatelessWidget {
@@ -217,87 +295,56 @@ final class _OrderCard extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final theme = PosTheme.of(context);
     final es = Localizations.localeOf(context).languageCode == 'es';
-    return PosCard(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _channelLabel(order.channel),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              order.customerName ?? order.reference ?? order.orderId,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                const PosIcon(PosGlyphs.shoppingBagOutlined, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    es
-                        ? '${order.itemCount} productos'
-                        : '${order.itemCount} items',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(l.totalLabel, style: theme.textTheme.bodySmall),
-                ),
-                Flexible(
-                  flex: 2,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      formatMinorUnits(order.totalMinorUnits, 'MXN'),
-                      style: theme.textTheme.headlineSmall,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            PosButton(
-              onPressed: binding ? null : onTake,
-              child: Row(
-                children: [
-                  Expanded(child: Text(l.incomingOrdersTake)),
-                  const PosIcon(PosGlyphs.arrowForward, size: 18),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(switch (order.channel) {
+            'whatsapp' => 'WhatsApp',
+            'web' => 'Web',
+            'aggregator' => 'Delivery',
+            _ => order.channel,
+          }, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 8),
+          Text(
+            order.reference ?? order.orderId,
+            style: theme.textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            order.customerName ??
+                (es ? 'Cliente no indicado' : 'Customer not provided'),
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _incomingStatus(order, context),
+            style: theme.textTheme.bodyMedium,
+          ),
+          const PosDivider(),
+          Text(
+            es ? '${order.itemCount} productos' : '${order.itemCount} items',
+          ),
+          const SizedBox(height: 16),
+          Text(
+            es
+                ? 'El detalle de productos, notas y horario de entrega no está disponible en esta terminal. Al atender se vincula la referencia; captura y verifica los productos antes de cobrar.'
+                : 'Product details, notes and pickup time are unavailable on this terminal. Taking the order links its reference; enter and verify the items before charging.',
+          ),
+          const SizedBox(height: 24),
+          Text(l.totalLabel, style: theme.textTheme.bodySmall),
+          Text(
+            formatMinorUnits(order.totalMinorUnits, 'MXN'),
+            style: theme.textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 24),
+          PosButton(
+            onPressed: binding ? null : onTake,
+            child: Text(l.incomingOrdersTake),
+          ),
+        ],
       ),
     );
-  }
-
-  String _channelLabel(String channel) {
-    switch (channel) {
-      case 'whatsapp':
-        return 'WhatsApp';
-      case 'web':
-        return 'Web';
-      case 'aggregator':
-        return 'Delivery';
-      default:
-        return channel;
-    }
   }
 }

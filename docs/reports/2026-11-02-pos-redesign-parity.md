@@ -1,6 +1,6 @@
 # Native POS presentation review
 
-Status: **in progress; the user has not accepted the native design**. The earlier Task 3 report and widget captures do not establish visual parity. Task 3B expands the work to the actual Stageshow screen compositions and preserves the existing native workflows.
+Status: **functional checkpoints verified; native design not accepted**. The user has requested an UNSLOP/Zavo-inspired “Rediseño 2” in Stageshow, preserving UMI branding and “Rediseño 1” for comparison before further native styling. The earlier Task 3 report and widget captures do not establish visual parity. Task 3B expands the work to the actual Stageshow screen compositions and preserves the existing native workflows.
 
 ## Presentation checkpoint
 
@@ -22,23 +22,29 @@ Android execution used an isolated app and a synthetic local database/API. The p
 - Completing the Croissant at its kitchen station while the Americano remained queued at Barra.
 - Resuming account 004 from the actual account list, collecting MXN 45 with MXN 100 received, and confirming MXN 55 change through the real local API.
 
-These are functional observations. They do not establish visual acceptance. Earlier “tablet” captures used an 800×1340 logical viewport on a resized phone emulator with a 78.5-pixel cutout inset. That was an unsuitable presentation reference. The next visual review must compare the same logical geometry and screen content on a restored phone and a genuine tablet emulator profile.
+These are functional observations. They do not establish visual acceptance. Earlier “tablet” captures used an 800×1340 logical viewport on a resized phone emulator with a 78.5-pixel cutout inset. That was an unsuitable presentation reference. Subsequent Android review uses a restored phone and an independent 2560×1600/320dpi tablet profile (1280×800 logical pixels) without viewport overrides.
 
 The iOS app built and installed, but authenticated runtime remains unverified. Ordinary ad-hoc credential reads failed before entry, and the simulator rejected restricted keychain entitlements with AMFI error −424. The workstation has no valid signing identity. No authentication or credential-storage requirement was weakened.
 
+## Current functional controls
+
+- Exact Lucide control paths; actual variant price deltas and Included labels; shared persistent photo/menu-label preferences; Settings Back and real Printing policy controls.
+- Opaque phone account workspace and continuous tablet pane. Ledger-backed paid/remaining values are separate from the commercial total. Parent Android evidence confirms account 005 at MXN 135 total, MXN 45 paid and MXN 90 remaining with a persistent UMI header. The pending refresh after returning from payment still requires review correction I1.
+- Incoming list/selected detail on tablet and selection/detail navigation on phone. Reference, customer, status and known age are separate. Header and navigation counts use the existing controller with entitlement/permission gating, 30-second refresh, scope/generation protection and disposal cleanup.
+- List includes actual free physical tables separately from commercial accounts. Selected table accounts have read-only product and balance previews through existing account/ledger owners, with honest loading/unavailable states. Geometry and table operation handlers remain unchanged.
+- Full and partial payment share the same icon/label/selected method tile. Product-photo scrims fully cover the left image seam before fading. These presentation changes await native comparison and do not establish aesthetic acceptance.
+
 ## Verification
 
-The latest focused run passed **114 tests** across catalog, full checkout, partial checkout, and role/navigation coverage. This includes partial cash keypad amounts, unchanged tender amounts, payment uncertainty/retries/finalization, and phone Settings return from both Sales and KDS. Analyzer reported no issues across seven changed source/test files. `git diff --check` passed.
+The latest complete Flutter suite passed **1,240 tests**, with **five skipped** and **zero failures**, in 23 seconds using `flutter test --no-pub`. Added checks cover incoming entitlement/count/polling/disposal, free table presence without open commercial accounts, read-only account lines and deferred authoritative balance, phone incoming detail/adoption, and ledger visibility. Full checkout, partial payment uncertainty/retries/finalization, role access, map operations, and keyboard/200% text regressions remain covered.
 
-The complete Flutter suite passed **1,230 tests**, with **five skipped** and **zero failures**, in 22 seconds using `flutter test --no-pub --reporter expanded`. No missed-tap warnings appeared. Both iOS workflows now run the full `flutter test --no-pub` suite before their existing build/signing steps. Workflow YAML parsing and inspection verified that only the test commands changed; no workflow was dispatched.
-
-Reproducible commands, commit checkpoints, private log paths, native observations, and open reviewer findings are recorded in `.superpowers/sdd/2026-11-02-redesign-parity/task-3b-report.md`. Widget tests establish behavior and layout safety; actual screenshots determine visual acceptance.
+Both iOS workflows run the full `flutter test --no-pub` suite before their existing build/signing steps. No workflow was dispatched. Reproducible commands, checkpoint commits, logs and reviewer findings are recorded in `.superpowers/sdd/2026-11-02-redesign-parity/task-3b-report.md`. Widget tests establish behavior and layout safety; screenshots determine visual acceptance.
 
 ## Contract limits and remaining work
 
 Incoming-order contracts contain summaries, not product lines/options/notes or fulfillment details. Binding an incoming order does not hydrate its lines into the cart. Entry contracts do not provide the prototype's sample shift metrics or staff picker. Counts use loaded catalog data; no estimated counts, invented table geometry, or persistent favorites were added.
 
-Before acceptance: inspect the new catalog scrim and payment shell on matching native/reference geometry; run the revised partial-payment flow through native input; compare all required screens with actual content; and resolve the iOS signing/runtime limitation or record it explicitly in the final handoff. No PR or completion claim is supported by this report yet.
+Before acceptance: resolve ledger refresh I1, compare the requested Rediseño 2 prototype with Rediseño 1, obtain the user’s design selection, then compare affected native screens with actual content. The iOS signing/runtime limitation remains explicit. No PR or completion claim is supported by this report yet.
 
 ## Scoped review follow-up
 

@@ -25,6 +25,7 @@ import '../cart/accounts_workspace.dart';
 import '../cart/cart_controller.dart';
 import '../cart/cart_optimism.dart';
 import '../cart/course_control.dart';
+import '../cart/free_tables_list.dart';
 import '../cart/incoming_orders_controller.dart';
 import '../cart/incoming_orders_surface.dart';
 import '../cart/order_type_picker.dart';
@@ -757,6 +758,70 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   /// owner marked as a KDS shows the kitchen, not the till — even for an operator
   /// who may sell.
   bool get _kdsDevice => widget.entry.state.device?.type == 'kds';
+  Timer? _incomingTicker;
+  bool get _incomingAllowed {
+    final operator = widget.entry.state.operator;
+    return !_kdsDevice &&
+        widget.incomingOrders != null &&
+        operator != null &&
+        OperatorPermissions(operator.permissions).allows('cart.write') &&
+        merchantCarriesFeature(kIncomingOrdersFeature, operator.entitlements);
+  }
+
+  int? get _incomingCount {
+    final entry = widget.entry.state;
+    final incoming = widget.incomingOrders;
+    if (!_incomingAllowed ||
+        incoming == null ||
+        !incoming.matchesScope(
+          entry.selectedTenant!.id,
+          entry.selectedBranch!.id,
+          entry.operator!.id,
+        ) ||
+        incoming.state.phase != IncomingOrdersPhase.ready) {
+      return null;
+    }
+    return incoming.state.orders.length;
+  }
+
+  void _incomingEntryChanged() {
+    if (mounted) {
+      unawaited(_refreshIncoming());
+      setState(() {});
+    }
+  }
+
+  Future<void> _refreshIncoming() async {
+    if (!mounted ||
+        !_incomingAllowed ||
+        (WidgetsBinding.instance.lifecycleState != null &&
+            WidgetsBinding.instance.lifecycleState !=
+                AppLifecycleState.resumed)) {
+      return;
+    }
+    final entry = widget.entry.state;
+    if (entry.selectedTenant == null || entry.selectedBranch == null) return;
+    await widget.incomingOrders!.load(
+      entry.selectedTenant!.id,
+      entry.selectedBranch!.id,
+      entry.operator!.id,
+    );
+  }
+
+  Widget _incomingShortcut(BuildContext context) => PosIconButton(
+    key: const ValueKey('incoming-header-shortcut'),
+    tooltip: AppLocalizations.of(context).incomingOrdersTitle,
+    onPressed: () {
+      FocusManager.instance.primaryFocus?.unfocus();
+      setState(() => _setSection(TillSurface.orders));
+    },
+    icon: PosBadge.count(
+      count: _incomingCount ?? 0,
+      isLabelVisible: _incomingCount != null && _incomingCount! > 0,
+      child: const PosIcon(PosGlyph('nav_inbox')),
+    ),
+  );
+
   Timer? _readyTicker;
   final _readyTracker = KitchenReadyTracker();
   final _readyAudio = KitchenAudio();
@@ -995,6 +1060,15 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     widget.notificationOpen?.addListener(_onKitchenNotificationOpen);
     _onKitchenNotificationOpen();
     _searchFocus.addListener(_revealSearch);
+    widget.incomingOrders?.addListener(_changed);
+    widget.entry.addListener(_incomingEntryChanged);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_refreshIncoming()),
+    );
+    _incomingTicker = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => unawaited(_refreshIncoming()),
+    );
     widget.catalog.addListener(_changed);
     widget.cart.addListener(_changed);
     widget.cash.addListener(_changed);
@@ -1015,6 +1089,20 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   @override
   void didUpdateWidget(covariant CatalogSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.incomingOrders != widget.incomingOrders) {
+      oldWidget.incomingOrders?.removeListener(_changed);
+      widget.incomingOrders?.addListener(_changed);
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => unawaited(_refreshIncoming()),
+      );
+    }
+    if (oldWidget.entry != widget.entry) {
+      oldWidget.entry.removeListener(_incomingEntryChanged);
+      widget.entry.addListener(_incomingEntryChanged);
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => unawaited(_refreshIncoming()),
+      );
+    }
     if (oldWidget.notificationOpen != widget.notificationOpen) {
       oldWidget.notificationOpen?.removeListener(_onKitchenNotificationOpen);
       widget.notificationOpen?.addListener(_onKitchenNotificationOpen);
@@ -1571,6 +1659,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   @override
   void dispose() {
     _readyTicker?.cancel();
+    _incomingTicker?.cancel();
+    widget.incomingOrders?.removeListener(_changed);
+    widget.entry.removeListener(_incomingEntryChanged);
     _readyAudio.dispose();
     _lineStatuses.dispose();
     widget.notificationOpen?.removeListener(_onKitchenNotificationOpen);
@@ -1874,6 +1965,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                     stationOnly,
               ),
               actions: [
+                if (_incomingAllowed) _incomingShortcut(context),
                 if (stationOnly)
                   PosIconButton(
                     tooltip: spanish ? 'Configuración' : 'Settings',
@@ -2233,6 +2325,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             widget.entry.state.operator == null,
       ),
       actions: [
+        if (_incomingAllowed) _incomingShortcut(context),
         // Status — connectivity, compact. Visibility of system status.
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.sm),
@@ -2514,6 +2607,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     TillSurface.tables =>
       widget.cart.supportsOpenAccounts && permissions.allows('cart.write')
           ? AccountsWorkspace(
+              freeTables: FreeTablesList(
+                load: _freePhysicalTables,
+                onSelected: (table) => unawaited(_openTableAccount(table)),
+              ),
               notice: _notice,
               watchedAccount: _noticeCode == 'CART_ACCOUNT_BUSY'
                   ? _blockedAccount
@@ -2572,6 +2669,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 tableState: widget.tableState,
                 embedded: true,
                 directAccounts: true,
+                readAccount: _readTableAccount,
+                readBalance: _readAccountBalance,
                 onOpenAccount: _openTableAccount,
                 onOpenTemporaryAccount: permissions.allows('cart.write')
                     ? _openTemporaryAccount
@@ -2664,6 +2763,89 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     ),
   };
 
+  Future<List<FloorPlanElement>> _freePhysicalTables() async {
+    final entry = widget.entry.state;
+    final operator = entry.operator;
+    final floor = widget.floorPlan;
+    final room = widget.tableState;
+    if (operator == null ||
+        floor == null ||
+        room == null ||
+        !OperatorPermissions(operator.permissions).allows('cart.write')) {
+      throw StateError('TABLE_STATE_UNAVAILABLE');
+    }
+    await Future.wait([
+      floor.load(
+        entry.selectedTenant!.id,
+        PosFloorPlanQuery(
+          locationId: entry.selectedBranch!.id,
+          operatorSessionId: operator.id,
+        ),
+      ),
+      room.load(
+        entry.selectedTenant!.id,
+        entry.selectedBranch!.id,
+        operator.id,
+      ),
+    ]);
+    if (floor.failed ||
+        floor.plan?.published == null ||
+        room.stale ||
+        room.map == null) {
+      throw StateError('TABLE_STATE_UNAVAILABLE');
+    }
+    return FloorPlanDocument.fromJson(floor.plan!.published!).areas
+        .map(FloorPlanArea.fromJson)
+        .expand((area) => area.elements.map(FloorPlanElement.fromJson))
+        .where(
+          (table) =>
+              table.kind == 'table' &&
+              room.stateOf(table.id).state == tableStateOpen &&
+              room.stateOf(table.id).openAccountId == null,
+        )
+        .toList();
+  }
+
+  Future<Cart?> _readTableAccount(FloorPlanElement table) async {
+    final entry = widget.entry.state;
+    final operator = entry.operator;
+    if (operator == null ||
+        !OperatorPermissions(operator.permissions).allows('cart.write')) {
+      return null;
+    }
+    final accountId = widget.tableState?.stateOf(table.id).openAccountId;
+    final accounts = await widget.cart.openAccounts(
+      entry.selectedTenant!.id,
+      entry.selectedBranch!.id,
+      operator.id,
+    );
+    final account = accounts
+        .where(
+          (account) => accountId != null
+              ? account.id == accountId
+              : account.tableId == table.id,
+        )
+        .firstOrNull;
+    return account == null
+        ? null
+        : widget.cart.readAccount(account, operator.id);
+  }
+
+  Future<Map<String, Object?>?> _readAccountBalance(Cart account) async {
+    final operator = widget.entry.state.operator;
+    if (operator == null ||
+        !OperatorPermissions(operator.permissions).allows('checkout.commit') ||
+        !widget.checkout.supportsPartialPayments) {
+      return null;
+    }
+    return widget.checkout.partialPayments(
+      merchantId: account.merchantId,
+      cartId: account.id,
+      locationId: account.locationId,
+      operatorSessionId: operator.id,
+    );
+  }
+
   Widget? _primaryNav(
     BuildContext context,
     bool spanish,
@@ -2754,7 +2936,11 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             ),
             TillSurface.orders => PosDestination(
               key: ValueKey(surface),
-              icon: const PosIcon(PosGlyph('nav_inbox')),
+              icon: PosBadge.count(
+                count: _incomingCount ?? 0,
+                isLabelVisible: _incomingCount != null && _incomingCount! > 0,
+                child: const PosIcon(PosGlyph('nav_inbox')),
+              ),
               label: spanish ? 'Pedidos' : 'Orders',
             ),
             TillSurface.settings => PosDestination(
@@ -3926,7 +4112,7 @@ final class _ProductCard extends StatelessWidget {
                               end: Alignment.centerRight,
                               colors: [
                                 fill,
-                                fill.withValues(alpha: .88),
+                                fill,
                                 fill.withValues(alpha: .88),
                                 fill.withValues(alpha: 0),
                               ],

@@ -12,6 +12,7 @@ import 'package:umi_pos/core/theme/umi_theme.dart';
 import 'package:umi_pos/features/cart/account_details_surface.dart';
 import 'package:umi_pos/features/cart/cart_controller.dart';
 import 'package:umi_pos/features/cart/cart_repository.dart';
+import 'package:umi_pos/features/cart/incoming_orders_controller.dart';
 import 'package:umi_pos/features/catalog/catalog_controller.dart';
 import 'package:umi_pos/features/catalog/catalog_repository.dart';
 import 'package:umi_pos/features/catalog/catalog_surface.dart';
@@ -31,6 +32,34 @@ import 'support/fakes.dart';
 /// Plan §2.1 finding 8: with the keyboard up, the till overflowed the cart with a
 /// debug stripe over the sale. The reproduction is a phone-sized surface with the
 /// keyboard inset — the panel and the messages must scroll, not overflow.
+
+final class _IncomingRepo implements CartRepository {
+  int reads = 0;
+  @override
+  Future<PosIncomingOrders> incomingOrders(
+    String merchantId,
+    CartQuery query,
+  ) async {
+    reads++;
+    return const PosIncomingOrders(
+      orders: [
+        {
+          'orderId': 'order',
+          'reference': 'Web 12',
+          'customerName': 'Ana',
+          'channel': 'web',
+          'status': 'placed',
+          'placedAt': null,
+          'itemCount': 2,
+          'totalMinorUnits': 5000,
+        },
+      ],
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
 
 final class _LedgerRepo
     implements CheckoutRepository, PartialPaymentRepository {
@@ -60,7 +89,11 @@ final class _LedgerRepo
 }
 
 final class _Gateway implements EntryGateway {
-  _Gateway({this.permissions = const ['cart.write', 'order.fire']});
+  _Gateway({
+    this.permissions = const ['cart.write', 'order.fire'],
+    this.entitlements = const [],
+  });
+  final List<Map<String, Object?>> entitlements;
   final List<String> permissions;
   @override
   Future<OperatorSessionView> startOperator(
@@ -75,7 +108,7 @@ final class _Gateway implements EntryGateway {
     deviceId: 'device',
     state: 'active',
     permissions: permissions,
-    entitlements: const [],
+    entitlements: entitlements,
     startedAt: '2026-10-07T00:00:00Z',
     lastActivityAt: '2026-10-07T00:00:00Z',
     expiresAt: '2026-10-08T00:00:00Z',
@@ -362,6 +395,8 @@ _fixture({
   int lines = 6,
   String? accountFolio,
   _LedgerRepo? ledger,
+  IncomingOrdersController? incoming,
+  bool incomingEntitled = false,
 }) async {
   final root = testRoot();
   final checkout = ledger == null
@@ -369,6 +404,11 @@ _fixture({
       : CheckoutController(repository: ledger, telemetry: root.telemetry);
   final entry = EntryController(
     gateway: _Gateway(
+      entitlements: incomingEntitled
+          ? [
+              {'featureKey': 'pos.incoming_orders', 'enabled': true},
+            ]
+          : [],
       permissions: [
         'cart.write',
         'order.fire',
@@ -449,6 +489,7 @@ _fixture({
       cart: cart,
       cash: root.cash,
       checkout: checkout,
+      incomingOrders: incoming,
       sales: sales,
       exceptions: root.exceptions,
       connectivity: root.connectivity,
@@ -502,6 +543,53 @@ void _completeText(WidgetTester tester, String label) {
 }
 
 void main() {
+  for (final entitled in [false, true]) {
+    testWidgets(
+      'incoming header and polling obey entitlement $entitled and stop after disposal',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final root = testRoot();
+        final repo = _IncomingRepo();
+        final incoming = IncomingOrdersController(
+          repository: repo,
+          telemetry: root.telemetry,
+        );
+        final fixture = await _fixture(
+          lines: 1,
+          incoming: incoming,
+          incomingEntitled: entitled,
+        );
+        await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+        await tester.pumpAndSettle();
+        expect(repo.reads, entitled ? 1 : 0);
+        final shortcut = find.byKey(const ValueKey('incoming-header-shortcut'));
+        expect(shortcut, entitled ? findsOneWidget : findsNothing);
+        if (entitled) {
+          expect(
+            find.descendant(of: shortcut, matching: find.text('1')),
+            findsOneWidget,
+          );
+          await tester.pump(const Duration(seconds: 30));
+          await tester.pumpAndSettle();
+          expect(repo.reads, 2);
+          await tester.tap(shortcut);
+          await tester.pumpAndSettle();
+          expect(find.text('Web 12'), findsNWidgets(2));
+        }
+        await tester.pumpWidget(const SizedBox());
+        final reads = repo.reads;
+        await tester.pump(const Duration(seconds: 60));
+        expect(repo.reads, reads);
+        fixture.dispose();
+        incoming.dispose();
+        root.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'account shows authoritative paid and remaining, clears stale balance on failure',
     (tester) async {

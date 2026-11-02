@@ -13,6 +13,7 @@ class AccountsWorkspace extends StatelessWidget {
     required this.onSelected,
     required this.onNewAccount,
     this.tables,
+    this.freeTables,
     this.busy = false,
     this.currentBusinessDate,
     this.notice,
@@ -30,6 +31,7 @@ class AccountsWorkspace extends StatelessWidget {
   final ValueChanged<Cart> onSelected;
   final VoidCallback? onNewAccount;
   final Widget? tables;
+  final Widget? freeTables;
   final bool busy;
   final String? notice;
   final Cart? watchedAccount;
@@ -118,6 +120,7 @@ class AccountsWorkspace extends StatelessWidget {
             Expanded(
               child: list
                   ? OpenAccountsList(
+                      additionalRows: freeTables,
                       watchedAccount: watchedAccount,
                       readAccount: readAccount,
                       onAccountReleased: onAccountReleased,

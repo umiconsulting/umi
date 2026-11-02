@@ -24,6 +24,7 @@ import '../sale/sale_lifecycle_controller.dart';
 import 'checkout_controller.dart';
 import 'partial_checkout_surface.dart';
 import 'payment_account_line.dart';
+import 'payment_method_tile.dart';
 import 'tender_identity.dart';
 
 /// Name the refusal the server or the offline policy already identified.
@@ -1103,7 +1104,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       children: [
                         SizedBox(
                           width: width,
-                          child: _MethodTile(
+                          child: PaymentMethodTile(
                             icon: PosGlyphs.paymentsOutlined,
                             label: l.cashPayment,
                             selected: cashEnabled,
@@ -1113,7 +1114,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         if (policy?.manualTerminalEnabled ?? false)
                           SizedBox(
                             width: width,
-                            child: _MethodTile(
+                            child: PaymentMethodTile(
                               icon: PosGlyphs.creditCardOutlined,
                               label: l.manualTerminalLabel,
                               selected: terminalEnabled,
@@ -1124,7 +1125,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         if (widget.checkout.cardTerminalProviderId != null)
                           SizedBox(
                             width: width,
-                            child: _MethodTile(
+                            child: PaymentMethodTile(
                               key: const ValueKey('method-card-terminal'),
                               icon: PosGlyphs.contactlessOutlined,
                               label: l.cardTerminalLabel,
@@ -1135,7 +1136,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         if (_bankAvailable(policy))
                           SizedBox(
                             width: width,
-                            child: _MethodTile(
+                            child: PaymentMethodTile(
                               key: const ValueKey('method-bank-transfer'),
                               icon: PosGlyphs.bank,
                               label: l.bankTransferLabel,
@@ -1827,11 +1828,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Center(
-            child: PosIcon(
-              PosGlyphs.bank,
-              size: 56,
-              color: scheme.primary,
-            ),
+            child: PosIcon(PosGlyphs.bank, size: 56, color: scheme.primary),
           ),
           const SizedBox(height: UmiSpacing.md),
           Text(
@@ -4949,68 +4946,6 @@ final class _BankDetailRow extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-final class _MethodTile extends StatelessWidget {
-  const _MethodTile({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-  final PosGlyph icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = PosTheme.of(context).colorScheme;
-    return PosSurface(
-      color: selected ? scheme.primaryContainer : scheme.surface,
-      borderRadius: BorderRadius.circular(8),
-      child: PosTapRegion(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: selected ? scheme.primary : scheme.outlineVariant,
-              width: 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              PosIcon(
-                icon,
-                color: selected
-                    ? scheme.onPrimaryContainer
-                    : scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: UmiSpacing.sm),
-              Expanded(
-                child: Text(
-                  label,
-                  style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
-                    color: selected
-                        ? scheme.onPrimaryContainer
-                        : scheme.onSurface,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              if (selected)
-                PosIcon(PosGlyphs.checkCircle, color: scheme.primary, size: 20),
-            ],
-          ),
-        ),
       ),
     );
   }
