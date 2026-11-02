@@ -60,7 +60,7 @@ They require no new repository dependency or service.
 Actionlint remains the workflow parser. A temporary Ruby script checks repository-specific gate order and contract extraction.
 The script also compares complete Actionlint findings with the base. This narrow comparison distinguishes existing findings from regressions.
 
-## Verification
+## Initial verification
 
 Use this local PATH for Node and pnpm:
 
@@ -116,8 +116,8 @@ actionlint -shellcheck='' -ignore '"github.head_ref" is potentially untrusted' \
   .github/workflows/umi-pos-testflight.yml
 ```
 
-The complete Actionlint command exits 1 at the base and after this change.
-Its eight findings are two existing `github.head_ref` interpolation findings and six existing ShellCheck findings.
+At the initial implementation, the complete Actionlint command exited 1 at the base and after the change.
+Its eight findings were two existing `github.head_ref` interpolation findings and six existing ShellCheck findings.
 The shell findings concern `ls`, intentional splitting of `UMIPOS_DEFINES`, and an existing signing command substitution.
 The syntax command suppresses those two finding classes. The separate comparison confirms zero new complete findings.
 
@@ -142,3 +142,33 @@ Synthetic browser cases prove client behavior. They do not prove live service be
 Native unit and widget tests do not certify physical hardware or payment-provider outcomes.
 The ten live-fixture cases remain separate checks.
 No workflow was dispatched. No deployment, merge, or TestFlight release occurred.
+
+## Review fix: branch text in shell scripts
+
+The review identified two existing branch expressions inside shell source.
+Both dashboard steps now receive `BRANCH` through their step environment.
+The environment expression retains `${{ github.head_ref || github.ref_name }}`.
+The build step also receives `RELEASE_VERSION` through its environment instead of direct shell interpolation.
+The scripts read these variables as data. The branch selection, URLs, cookie authentication, and deployment arguments retain their values.
+
+Focused verification used Actionlint `1.7.12`, Ruby `4.0.9`, `bash -n`, and `git check-ref-format --branch`.
+The temporary script `/private/tmp/umi-redesign-branch-check.rb` rejected the original workflow before the fix.
+It then passed for `main`, `staging`, `feature/redesign`, and three valid branch names with shell payloads.
+These payloads use command substitution, backticks, and quotes with semicolons.
+The script checked both complete shell steps in a temporary directory.
+A local `pnpm` stub captured the exact deployment arguments. No deployment command reached Cloudflare.
+The command sentinel remained absent in all six cases.
+The checks also confirmed the expected environment, API base, public URL, cookie auth, release version, and contract version.
+
+```sh
+ruby /private/tmp/umi-redesign-branch-check.rb
+actionlint -oneline .github/workflows/deploy-dashboard.yml
+```
+
+Both commands exited 0.
+The complete three-workflow Actionlint check now reports six existing native ShellCheck findings and no dashboard findings.
+The native workflow files remain unchanged in this fix.
+The six native findings remain deferred under the review ruling.
+The earlier eight-finding count records the initial implementation, before this fix.
+The focused checks replace a repeat of the unchanged client suites.
+Prettier and `git diff --check` passed for this fix.
