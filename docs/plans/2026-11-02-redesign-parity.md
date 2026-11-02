@@ -71,12 +71,15 @@ pnpm --filter @umi/dashboard build
 - Modify: `.github/workflows/deploy-dashboard.yml`
 - Modify: `.github/workflows/umi-pos-ios.yml`
 - Modify: `.github/workflows/umi-pos-testflight.yml`
+- Modify: `apps/umi-pos/pubspec.lock` to reflect the existing local contract package version `2.50.0`.
 - Create: `docs/reports/2026-11-02-redesign-release-gates.md`
 
 **Interfaces:** Consume Task 1's browser suite and the existing native POS tests. Produce checks that must finish before the corresponding build deploys. Read the contract version from `packages/contract/src/catalog.ts`.
 
 - [ ] Add the dashboard unit suite and the self-contained browser cases before preview deployment. Live fixture tests must remain separately identified, never silently counted as passed.
 - [ ] Replace the fixed `UMIPOS_CONTRACT_VERSION=2.23.0` in both iOS workflows with the checked contract version. Fail when the source value is empty.
+
+Local setup already ran `flutter pub get --offline`. It changed only `umi_contract` from `2.47.0` to `2.50.0` in the lockfile. Include that generated change. The 289 selected Flutter tests passed with Flutter 3.47.5 and Dart 3.13.4. Keep the existing CI SDK pin unless direct evidence requires a separate correction.
 
 ```sh
 CONTRACT_VERSION=$(sed -n "s/^export const CONTRACT_VERSION = '\\(.*\\)';$/\\1/p" packages/contract/src/catalog.ts)
