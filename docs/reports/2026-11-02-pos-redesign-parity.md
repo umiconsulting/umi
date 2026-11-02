@@ -29,7 +29,7 @@ The iOS app built and installed, but authenticated runtime remains unverified. O
 ## Current functional controls
 
 - Exact Lucide control paths; actual variant price deltas and Included labels; shared persistent photo/menu-label preferences; Settings Back and real Printing policy controls.
-- Opaque phone account workspace and continuous tablet pane. Ledger-backed paid/remaining values are separate from the commercial total. Parent Android evidence confirms account 005 at MXN 135 total, MXN 45 paid and MXN 90 remaining with a persistent UMI header. The pending refresh after returning from payment still requires review correction I1.
+- Opaque phone account workspace and continuous tablet pane. Ledger-backed paid/remaining values are separate from the commercial total. Parent Android evidence confirms account 005 at MXN 135 total, MXN 45 paid and MXN 90 remaining with a persistent UMI header. After returning from payment, stale paid/remaining values are removed immediately while the new ledger query is pending; a deferred-response regression verifies replacement with the new amounts.
 - Incoming list/selected detail on tablet and selection/detail navigation on phone. Reference, customer, status and known age are separate. Header and navigation counts use the existing controller with entitlement/permission gating, 30-second refresh, scope/generation protection and disposal cleanup.
 - List includes actual free physical tables separately from commercial accounts. Selected table accounts have read-only product and balance previews through existing account/ledger owners, with honest loading/unavailable states. Geometry and table operation handlers remain unchanged.
 - Full and partial payment share the same icon/label/selected method tile. Product-photo scrims fully cover the left image seam before fading. These presentation changes await native comparison and do not establish aesthetic acceptance.
@@ -44,8 +44,12 @@ Both iOS workflows run the full `flutter test --no-pub` suite before their exist
 
 Incoming-order contracts contain summaries, not product lines/options/notes or fulfillment details. Binding an incoming order does not hydrate its lines into the cart. Entry contracts do not provide the prototype's sample shift metrics or staff picker. Counts use loaded catalog data; no estimated counts, invented table geometry, or persistent favorites were added.
 
-Before acceptance: resolve ledger refresh I1, compare the requested Rediseño 2 prototype with Rediseño 1, obtain the user’s design selection, then compare affected native screens with actual content. The iOS signing/runtime limitation remains explicit. No PR or completion claim is supported by this report yet.
+Before acceptance: compare the requested Rediseño 2 prototype with Rediseño 1, obtain the user’s design selection, then compare affected native screens with actual content. The iOS signing/runtime limitation remains explicit. No PR or completion claim is supported by this report yet.
 
 ## Scoped review follow-up
 
 Round 2 restores the UMI wordmark in the phone partial-payment header and shares one read-only account-line widget between full and partial checkout. The phone assertion reproduced the missing mark before the fix. All 97 covering full/partial/terminal/local-first checkout tests passed, and analyzer reported no issues in the four scoped files. The preceding complete-suite count belongs to checkpoint `7e80993e`; this follow-up does not establish native visual acceptance.
+
+## Ledger correctness follow-up I1
+
+The regression reproduced the old MXN 90 remaining after a successful additional MXN 45 partial payment with unchanged cart version. The fix invalidates displayed amounts on both checkout return paths before awaiting the ledger. The test verifies loading without old paid/remaining/button amounts, then MXN 90 paid and MXN 45 remaining after the delayed response. All **102 focused tests** passed; the two-file analyzer and diff check were clean. The full-suite count above belongs to checkpoint `209a6c55`. No footer restyling or further branding/KDS changes are included.
