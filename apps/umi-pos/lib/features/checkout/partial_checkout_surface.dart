@@ -8,6 +8,7 @@ import '../../core/theme/umi_theme.dart';
 import '../cart/cart_controller.dart';
 import '../cash/money_input.dart';
 import 'checkout_controller.dart';
+import 'payment_account_line.dart';
 
 // Catalog nests a page for the order header inside its navigation shell.
 // Walk through header-only pages to find the actual permitted navigation.
@@ -780,11 +781,27 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
           : PosHeader(
               automaticallyImplyLeading: false,
               toolbarHeight: 56,
-              title: Text(
-                widget.merchantLabel!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall,
+              title: Row(
+                children: [
+                  if (widget.navigation == null ||
+                      MediaQuery.sizeOf(context).width < 700) ...[
+                    Text(
+                      'umi',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontSize: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                  ],
+                  Expanded(
+                    child: Text(
+                      widget.merchantLabel!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
               ),
               actions: [
                 if (widget.operatorName != null)
@@ -1176,7 +1193,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
         }, style: theme.textTheme.bodySmall),
         const SizedBox(height: 24),
         for (final item in cart.items) ...[
-          _PartialAccountLine(item: CartItem.fromJson(item)),
+          PaymentAccountLine(item: CartItem.fromJson(item)),
           const SizedBox(height: 16),
         ],
         const PosDivider(),
@@ -1431,64 +1448,6 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
     ),
     child: Text(message),
   );
-}
-
-class _PartialAccountLine extends StatelessWidget {
-  const _PartialAccountLine({required this.item});
-  final CartItem item;
-  @override
-  Widget build(BuildContext context) {
-    final theme = PosTheme.of(context);
-    final es = Localizations.localeOf(context).languageCode == 'es';
-    final price = PriceSnapshot.fromJson(item.price);
-    final total = CatalogMoney.fromJson(price.lineTotal);
-    final details = [
-      if (item.variant != null) item.variant!['name'],
-      ...item.modifiers.map((m) => m['name']),
-      item.note,
-    ].whereType<String>().join(' · ');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text('${item.quantity}', style: theme.textTheme.bodySmall),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.productName, style: theme.textTheme.bodyMedium),
-                  if (details.isNotEmpty)
-                    Text(details, style: theme.textTheme.bodySmall),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              formatMinorUnits(total.minorUnits, total.currency),
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          item.fired
-              ? (es ? 'Enviado' : 'Sent')
-              : (es ? 'Pendiente de enviar' : 'Not sent'),
-          style: theme.textTheme.bodySmall,
-        ),
-      ],
-    );
-  }
 }
 
 String _newId() {
