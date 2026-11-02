@@ -5161,8 +5161,14 @@ final class _CartPanelState extends State<_CartPanel> {
     unawaited(_refreshLedger());
   }
 
-  Future<void> _refreshLedger() async {
+  Future<void> _refreshLedger({bool invalidate = false}) async {
     final generation = ++_ledgerGeneration;
+    if (invalidate && mounted) {
+      setState(() {
+        _ledger = null;
+        _ledgerFailed = false;
+      });
+    }
     final cart = controller.state.cart;
     final operator = entry.state.operator;
     if (cart == null ||
@@ -5207,7 +5213,7 @@ final class _CartPanelState extends State<_CartPanel> {
         entry: entry,
         sales: sales,
       );
-      if (mounted) await _refreshLedger();
+      if (mounted) await _refreshLedger(invalidate: true);
       return;
     }
     await showCheckoutSheet(
@@ -5278,7 +5284,7 @@ final class _CartPanelState extends State<_CartPanel> {
         canAdopt: permissions.allows('cash.shift.resume'),
       ),
     );
-    if (mounted) await _refreshLedger();
+    if (mounted) await _refreshLedger(invalidate: true);
   }
 
   Future<void> _cancelSentLine(BuildContext context, CartItem item) async {

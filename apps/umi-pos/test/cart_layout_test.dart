@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,6 +67,74 @@ final class _LedgerRepo
     implements CheckoutRepository, PartialPaymentRepository {
   int reads = 0;
   bool fail = false;
+  int paid = 4500;
+  int collections = 0;
+  Completer<CheckoutPartialPaymentResult>? deferredRead;
+  Map<String, Object?> snapshot(String cartId) => {
+    'cartId': cartId,
+    'cartVersion': 1,
+    'amountDue': {'minorUnits': 13500, 'currency': 'MXN'},
+    'appliedAmount': {'minorUnits': paid, 'currency': 'MXN'},
+    'remainingBalance': {'minorUnits': 13500 - paid, 'currency': 'MXN'},
+    'tipAmount': {'minorUnits': 0, 'currency': 'MXN'},
+    'tenderDrafts': [
+      {
+        'id': 'prior-payment',
+        'type': 'manual_terminal',
+        'amount': {'minorUnits': paid, 'currency': 'MXN'},
+        'status': 'confirmed_success',
+      },
+    ],
+    'blockedByUnknown': false,
+    'canFinalize': false,
+    'confirmationReferences': <String, String>{},
+  };
+  @override
+  Future<CheckoutPartialPaymentResult> collectPartialPayment(
+    String merchantId,
+    String cartId,
+    CheckoutPartialPaymentRequest request,
+  ) async {
+    collections++;
+    final tender = request.toJson()['tender']! as Map;
+    paid += ((tender['amount'] as Map)['minorUnits']! as num).toInt();
+    return CheckoutPartialPaymentResult(ok: true, data: snapshot(cartId));
+  }
+
+  @override
+  Future<CheckoutPolicy> policy(
+    String merchantId,
+    PosCheckoutPolicyQuery query,
+  ) async => CheckoutPolicy.fromJson({
+    'version': 'test',
+    'manualTerminalEnabled': true,
+    'bankTransferEnabled': false,
+    'bankTransferDetails': null,
+    'merchantLogoUrl': null,
+    'mixedTenderEnabled': false,
+    'maximumTenderLines': 8,
+    'manualTerminalApprovalThreshold': {'minorUnits': 50000, 'currency': 'MXN'},
+    'manualTerminalApprovalPermission': 'checkout.terminal.approve',
+    'tip': {
+      'enabled': false,
+      'presetBasisPoints': <int>[],
+      'customPercentageEnabled': false,
+      'customFixedEnabled': false,
+      'maximumTip': {'minorUnits': 0, 'currency': 'MXN'},
+      'requiredPermission': null,
+      'version': 'test',
+    },
+    'discount': {
+      'enabled': false,
+      'maximumBasisPoints': 0,
+      'maximumAmount': {'minorUnits': 0, 'currency': 'MXN'},
+      'cashierThreshold': {'minorUnits': 0, 'currency': 'MXN'},
+      'customRequiresApproval': false,
+      'requiredPermission': 'checkout.discount.apply',
+      'approvalPermission': 'checkout.discount.approve',
+      'version': 'test',
+    },
+  });
   @override
   Future<CheckoutPartialPaymentResult> partialPayments(
     String merchantId,
@@ -73,15 +143,8 @@ final class _LedgerRepo
   ) async {
     reads++;
     if (fail) throw StateError('unavailable');
-    return CheckoutPartialPaymentResult(
-      ok: true,
-      data: {
-        'cartId': cartId,
-        'appliedAmount': {'minorUnits': 4500, 'currency': 'MXN'},
-        'remainingBalance': {'minorUnits': 9000, 'currency': 'MXN'},
-        'blockedByUnknown': false,
-      },
-    );
+    if (deferredRead != null) return deferredRead!.future;
+    return CheckoutPartialPaymentResult(ok: true, data: snapshot(cartId));
   }
 
   @override
@@ -413,6 +476,7 @@ _fixture({
         'cart.write',
         'order.fire',
         if (!waiterMode) 'checkout.commit',
+        if (ledger != null && !waiterMode) 'checkout.terminal.confirm',
         if (!waiterMode) 'sale.lifecycle',
       ],
     ),
@@ -543,6 +607,57 @@ void _completeText(WidgetTester tester, String label) {
 }
 
 void main() {
+  testWidgets(
+    'return from partial payment clears stale balance until deferred ledger resolves',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final ledger = _LedgerRepo();
+      final fixture = await _fixture(lines: 1, ledger: ledger);
+      await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+      await tester.pumpAndSettle();
+      final account = find.byKey(const ValueKey('account-workspace'));
+      Finder amount(String value) =>
+          find.descendant(of: account, matching: find.text(value));
+      expect(amount('MXN 90.00'), findsNWidgets(2));
+      final version = fixture.cart.state.cart!.version;
+      await tester.tap(find.byKey(const ValueKey('account-split-check')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('partial-principal')),
+        '45.00',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('partial-charge')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sí, se cobró'));
+      await tester.pumpAndSettle();
+      expect(ledger.collections, 1);
+      expect(ledger.paid, 9000);
+      expect(fixture.cart.state.cart!.version, version);
+      ledger.deferredRead = Completer<CheckoutPartialPaymentResult>();
+      await tester.tap(find.text('Volver a la cuenta'));
+      await tester.pumpAndSettle();
+      expect(amount('MXN 90.00'), findsNothing);
+      expect(amount('MXN 45.00'), findsNothing);
+      expect(find.text('Consultando saldo…'), findsOneWidget);
+      ledger.deferredRead!.complete(
+        CheckoutPartialPaymentResult(
+          ok: true,
+          data: ledger.snapshot(fixture.cart.state.cart!.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(amount('MXN 90.00'), findsOneWidget);
+      expect(amount('MXN 45.00'), findsNWidgets(2));
+      expect(find.text('Consultando saldo…'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      fixture.dispose();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final entitled in [false, true]) {
     testWidgets(
       'incoming header and polling obey entitlement $entitled and stop after disposal',
