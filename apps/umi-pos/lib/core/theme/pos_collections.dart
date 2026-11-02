@@ -150,29 +150,31 @@ class PosBadge extends StatelessWidget {
   final bool isLabelVisible;
   final Color? backgroundColor;
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      ?child,
-      if (isLabelVisible)
-        Container(
-          margin: const EdgeInsets.only(left: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color:
-                backgroundColor ??
-                PosTheme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: DefaultTextStyle(
-            style: PosTheme.of(context).textTheme.labelSmall!.copyWith(
-              color: PosTheme.of(context).colorScheme.primary,
-            ),
-            child: label ?? const SizedBox(width: 4, height: 4),
-          ),
+  Widget build(BuildContext context) {
+    final palette = PosTheme.of(context).colorScheme;
+    final badge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: backgroundColor ?? palette.primary,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DefaultTextStyle(
+        style: PosTheme.of(context).textTheme.labelSmall!.copyWith(
+          color: palette.onPrimary,
+          fontSize: 10,
         ),
-    ],
-  );
+        child: label ?? const SizedBox(width: 4, height: 4),
+      ),
+    );
+    if (child == null) return isLabelVisible ? badge : const SizedBox.shrink();
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child!,
+        if (isLabelVisible) Positioned(right: -8, top: -7, child: badge),
+      ],
+    );
+  }
 }
 
 class PosSegment<T> {
@@ -1437,8 +1439,10 @@ class _PosNavigationState extends State<PosNavigation> {
     );
     final fullWidth = destinations.cast<PosDestination>().fold<double>(
       48,
-      (needed, destination) =>
-          math.max(needed, labelWidth(destination.label, style) + 16),
+      (needed, destination) => math.max(
+        needed,
+        labelWidth(destination.label, style) + (rail ? 16 : 8),
+      ),
     );
     final compact =
         !rail &&
@@ -1477,7 +1481,7 @@ class _PosNavigationState extends State<PosNavigation> {
         child: Container(
           constraints: BoxConstraints(minHeight: rail ? 52 : 48, minWidth: 48),
           padding: EdgeInsets.symmetric(
-            horizontal: rail && expanded ? 16 : 8,
+            horizontal: rail ? (expanded ? 16 : 8) : 4,
             vertical: 8,
           ),
           decoration: BoxDecoration(
@@ -1585,8 +1589,10 @@ class _PosNavigationState extends State<PosNavigation> {
           .cast<PosDestination>()
           .fold<double>(
             48,
-            (needed, destination) =>
-                math.max(needed, labelWidth(destination.label, style) + 16),
+            (needed, destination) => math.max(
+              needed,
+              labelWidth(destination.label, style) + (rail ? 16 : 8),
+            ),
           );
       // Reserve the widest secondary label so selection keeps the same rows.
       final moreStyle = theme.textTheme.labelSmall!.copyWith(

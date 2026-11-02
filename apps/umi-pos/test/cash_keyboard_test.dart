@@ -53,35 +53,64 @@ Future<void> _pumpCashCenter(WidgetTester tester) async {
   await tester.pump();
 }
 
-
-bool _hasFocusRing(WidgetTester tester, Finder region) => tester.widgetList<DecoratedBox>(find.descendant(of: region, matching: find.byType(DecoratedBox))).any((widget) {
-  final decoration = widget.decoration;
-  if (decoration is! BoxDecoration || decoration.border is! Border) return false;
-  final side = (decoration.border! as Border).top;
-  return side.width >= 2 && side.color.a == 1;
-});
+bool _hasFocusRing(WidgetTester tester, Finder region) => tester
+    .widgetList<DecoratedBox>(
+      find.descendant(of: region, matching: find.byType(DecoratedBox)),
+    )
+    .any((widget) {
+      final decoration = widget.decoration;
+      if (decoration is! BoxDecoration || decoration.border is! Border)
+        return false;
+      final side = (decoration.border! as Border).top;
+      return side.width >= 2 && side.color.a == 1;
+    });
 
 void main() {
-  testWidgets('keyboard focus draws a ring and keeps control geometry', (tester) async {
+  testWidgets('keyboard focus draws a ring and keeps control geometry', (
+    tester,
+  ) async {
     await _pumpCashCenter(tester);
-    final tile = find.widgetWithText(PosOutlineButton, 'Entrada de efectivo');
+    final tile = find
+        .ancestor(
+          of: find.text('Entrada de efectivo'),
+          matching: find.byType(PosTapRegion),
+        )
+        .first;
     final before = tester.getRect(tile);
-    FocusManager.instance.highlightStrategy = FocusHighlightStrategy.alwaysTraditional;
+    FocusManager.instance.highlightStrategy =
+        FocusHighlightStrategy.alwaysTraditional;
     var reached = false;
     for (var step = 0; step < 30; step++) {
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
-      final current = FocusManager.instance.primaryFocus?.context?.findAncestorWidgetOfExactType<PosOutlineButton>();
-      if (identical(current, tester.widget(tile))) { reached = true; break; }
+      final current = FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<PosTapRegion>();
+      if (identical(current, tester.widget(tile))) {
+        reached = true;
+        break;
+      }
     }
-    expect(reached, isTrue, reason: 'Keyboard traversal did not reach the cash action');
+    expect(
+      reached,
+      isTrue,
+      reason: 'Keyboard traversal did not reach the cash action',
+    );
     expect(_hasFocusRing(tester, tile), isTrue);
     expect(tester.getRect(tile), before);
     FocusManager.instance.highlightStrategy = FocusHighlightStrategy.automatic;
   });
-  testWidgets('a cash dialog contains keyboard focus and an editable amount', (tester) async {
+  testWidgets('a cash dialog contains keyboard focus and an editable amount', (
+    tester,
+  ) async {
     await _pumpCashCenter(tester);
-    await tester.tap(find.widgetWithText(PosOutlineButton, 'Entrada de efectivo'));
+    await tester.tap(
+      find
+          .ancestor(
+            of: find.text('Entrada de efectivo'),
+            matching: find.byType(PosTapRegion),
+          )
+          .first,
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(PosAlertDialog), findsOneWidget);
@@ -90,6 +119,12 @@ void main() {
     final focused = FocusManager.instance.primaryFocus?.context;
     expect(focused, isNotNull);
     expect(focused!.findAncestorWidgetOfExactType<PosAlertDialog>(), isNotNull);
-    expect(find.descendant(of: find.byType(PosAlertDialog), matching: find.byType(EditableText)), findsWidgets);
+    expect(
+      find.descendant(
+        of: find.byType(PosAlertDialog),
+        matching: find.byType(EditableText),
+      ),
+      findsWidgets,
+    );
   });
 }

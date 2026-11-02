@@ -1146,7 +1146,7 @@ void main() {
     await tester.pump();
 
     fixture.connectivity.networkDown();
-    await tester.tap(find.text('Iniciar pedido').first);
+    await tester.tap(find.text('Nuevo pedido').first);
     await tester.pumpAndSettle();
 
     expect((fixture.repository as _AccountCartRepo).suspends, 0);

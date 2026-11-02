@@ -1893,30 +1893,36 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         : landingSurface(surfaces);
     final selected = surfaces.contains(_section) ? _section! : landing;
     final orderVisible = selected == TillSurface.order;
+    final stationOnly =
+        surfaces.contains(TillSurface.kitchen) &&
+        surfaces.every(
+          (surface) =>
+              surface == TillSurface.kitchen || surface == TillSurface.settings,
+        );
     return PosPage(
-      appBar: !orderVisible && MediaQuery.sizeOf(context).width < 700
+      appBar:
+          !orderVisible &&
+              (MediaQuery.sizeOf(context).width < 700 ||
+                  MediaQuery.sizeOf(context).height < 600 ||
+                  stationOnly)
           ? PosHeader(
               toolbarHeight: 48,
               automaticallyImplyLeading: false,
-              title: Row(
-                children: [
-                  Text(
-                    'umi',
-                    style: PosTheme.of(
-                      context,
-                    ).textTheme.headlineSmall?.copyWith(fontSize: 29),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      entryState.selectedBranch?.name ?? '',
-                      style: PosTheme.of(context).textTheme.bodyMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              title: _merchantHeading(context, showWordmark: true),
+              actions: [
+                if (stationOnly)
+                  PosIconButton(
+                    tooltip: spanish ? 'Configuración' : 'Settings',
+                    onPressed: () => setState(
+                      () => _setSection(
+                        selected == TillSurface.settings
+                            ? TillSurface.kitchen
+                            : TillSurface.settings,
+                      ),
                     ),
+                    icon: const PosIcon(PosGlyphs.tuneOutlined),
                   ),
-                ],
-              ),
+              ],
             )
           : null,
       bottomNavigationBar: _primaryNav(context, spanish, surfaces, selected),
@@ -1981,10 +1987,51 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     );
   }
 
+  Widget _merchantHeading(BuildContext context, {required bool showWordmark}) {
+    final theme = PosTheme.of(context);
+    return Row(
+      children: [
+        if (showWordmark) ...[
+          Text(
+            'umi',
+            style: theme.textTheme.headlineSmall?.copyWith(fontSize: 22),
+          ),
+          const SizedBox(width: 16),
+        ],
+        Flexible(
+          child: Text(
+            widget.entry.state.selectedTenant?.name ??
+                widget.entry.state.selectedBranch?.name ??
+                '',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        if (widget.entry.state.selectedTenant != null &&
+            widget.entry.state.selectedBranch != null) ...[
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              widget.entry.state.selectedBranch!.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget Function()? _accountService;
   bool _showPhotos = true;
   bool _showFrequent = false;
   Map<String, int>? _categoryCounts;
+  String? _categoryCountScope;
 
   Widget _orderPage(
     BuildContext context,
@@ -1993,7 +2040,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     OperatorPermissions permissions,
     OperatorActionAccess access,
   ) {
-    final entryState = widget.entry.state;
     final canWriteCart = access.canWriteCart;
     final spanish = Localizations.localeOf(context).languageCode == 'es';
     final showOverflow =
@@ -2181,9 +2227,17 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             ),
             icon: const PosIcon(PosGlyphs.shoppingCartOutlined),
             label: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: MainAxisSize.max,
               children: [
-                Text(l.cartTitle),
+                Expanded(
+                  child: Text(
+                    currentCart == null
+                        ? l.cartTitle
+                        : accountDisplayTitle(currentCart, spanish: spanish),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 if (compactTotal != null) ...[
                   const SizedBox(width: 16),
                   Text(
@@ -2209,29 +2263,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       // the barista sets dine-in vs takeout here before building the order.
       titleSpacing: UmiSpacing.md,
       actionsInline: compactHeader && !largeText,
-      title: Row(
-        children: [
-          if (MediaQuery.sizeOf(context).width < 700 ||
-              widget.entry.state.operator == null) ...[
-            Text(
-              'umi',
-              style: PosTheme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontSize: 29),
-            ),
-            const SizedBox(width: 16),
-          ],
-          Expanded(
-            child: Text(
-              entryState.selectedBranch?.name ?? l.cartTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: PosTheme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
+      title: _merchantHeading(
+        context,
+        showWordmark:
+            MediaQuery.sizeOf(context).width < 700 ||
+            MediaQuery.sizeOf(context).height < 600 ||
+            widget.entry.state.operator == null,
       ),
       actions: [
         // Status — connectivity, compact. Visibility of system status.
@@ -2278,15 +2315,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             ),
           ),
         ),
-        // Primary, labelled, high-frequency actions (top-bar redesign).
-        if (access.canWriteCart && _canStartNewAccount)
-          _BarAction(
-            icon: PosGlyphs.addShoppingCartOutlined,
-            focusNode: access.showSaleActions ? _newSaleFocus : null,
-            compact: compactHeader,
-            label: spanish ? 'Iniciar pedido' : 'Start order',
-            onPressed: () => _newSale(context),
-          ),
         // NO ACCOUNTS BUTTON UP HERE. The accounts workspace is one of the
         // destinations the sidebar already carries on every screen, and the owner
         // asked for it off the top bar so the row is the actions that are about THIS
@@ -2402,13 +2430,14 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             ],
           ),
         // Account — identity + Lock + Logout, consolidated.
-        _AccountMenu(
-          focusNode: _accountFocus,
-          operatorName: widget.entry.operatorName,
-          branch: widget.entry.state.selectedBranch?.name,
-          onLock: () => _leaveOperator(lock: true),
-          onLogout: () => _leaveOperator(lock: false),
-        ),
+        if (!compactHeader)
+          _AccountMenu(
+            focusNode: _accountFocus,
+            operatorName: widget.entry.operatorName,
+            branch: widget.entry.state.selectedBranch?.name,
+            onLock: () => _leaveOperator(lock: true),
+            onLogout: () => _leaveOperator(lock: false),
+          ),
       ],
     );
     return LayoutBuilder(
@@ -2590,21 +2619,20 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       embedded: true,
       onAdopted: () => setState(() => _setSection(TillSurface.order)),
     ),
-    TillSurface.settings => DisplaySettingsSurface(
-      embedded: true,
-      operationalActions: [
-        if (permissions.allows('hardware.read') && widget.hardware != null)
-          PosListRow(
-            leading: const PosIcon(PosGlyphs.devicesOtherOutlined),
-            title: const Text('Hardware'),
-            onTap: () => showHardwareCenter(
-              context,
+    TillSurface.settings => PosSettingsWorkspace(
+      hardwareBuilder:
+          permissions.allows('hardware.read') && widget.hardware != null
+          ? (section) => HardwareSurface(
+              key: const ValueKey('settings-hardware'),
               entry: widget.entry,
               service: widget.hardware!,
               permissions: permissions,
               registerId: widget.cash.activeRegisterId,
-            ),
-          ),
+              embedded: true,
+              section: section,
+            )
+          : null,
+      operationalActions: [
         if (tillSurfacesFor(
           OperatorActionAccess(permissions),
           hasFloorPlan: widget.floorPlan != null,
@@ -2643,7 +2671,15 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     List<TillSurface> surfaces,
     TillSurface selected,
   ) {
-    if (surfaces.length < 2) return null;
+    if (surfaces.length < 2 ||
+        (surfaces.contains(TillSurface.kitchen) &&
+            surfaces.every(
+              (surface) =>
+                  surface == TillSurface.kitchen ||
+                  surface == TillSurface.settings,
+            ))) {
+      return null;
+    }
     const order = [
       TillSurface.order,
       TillSurface.orders,
@@ -2722,7 +2758,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             TillSurface.settings => PosDestination(
               key: ValueKey(surface),
               icon: const PosIcon(PosGlyphs.tuneOutlined),
-              label: spanish ? 'Ajustes' : 'Settings',
+              label: spanish ? 'Configuración' : 'Settings',
             ),
           },
       ],
@@ -2741,6 +2777,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     Widget? serviceType, {
     Widget? scrollingHeader,
   }) {
+    final countScope =
+        '${widget.entry.state.selectedTenant?.id}/${widget.entry.state.selectedBranch?.id}';
+    if (_categoryCountScope != countScope) {
+      _categoryCountScope = countScope;
+      _categoryCounts = null;
+    }
     if (state.phase == CatalogPhase.ready &&
         state.selectedCategoryId == null &&
         state.search.isEmpty &&
@@ -2818,6 +2860,62 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         ),
       ],
     );
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
+    final catalogHeading = Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Semantics(
+              header: true,
+              child: Text(
+                spanish ? 'La carta' : 'The menu',
+                style: PosTheme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontSize: wide ? 30 : 24,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          if (canWriteCart && _canStartNewAccount)
+            _BarAction(
+              icon: PosGlyphs.addShoppingCartOutlined,
+              focusNode: _newSaleFocus,
+              compact: textScale >= 1.5,
+              label: spanish ? 'Nuevo pedido' : 'New order',
+              onPressed: () => _newSale(context),
+            ),
+        ],
+      ),
+    );
+    final productTools = Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      children: [
+        Text(
+          spanish ? 'Productos' : 'Products',
+          style: PosTheme.of(context).textTheme.bodySmall,
+        ),
+        PosTextButton(
+          onPressed: () => setState(() => _showPhotos = !_showPhotos),
+          child: Text(
+            spanish
+                ? (_showPhotos ? 'Ocultar fotos' : 'Mostrar fotos')
+                : (_showPhotos ? 'Hide photos' : 'Show photos'),
+            style: PosTheme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        if (_frequentTop.isNotEmpty)
+          PosTextButton(
+            onPressed: () => setState(() => _showFrequent = !_showFrequent),
+            child: Text(
+              spanish ? 'Frecuentes' : 'Frequent',
+              style: PosTheme.of(context).textTheme.bodySmall,
+            ),
+          ),
+      ],
+    );
     final scrollingProducts = scrollingHeader == null
         ? null
         : _content(
@@ -2825,6 +2923,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             state,
             scrollHeaders: [
               scrollingHeader,
+              if (!keyboard) catalogHeading,
               const SizedBox(height: 8),
               search,
               if (!keyboard) ...[
@@ -2832,49 +2931,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 if (!wide) categories,
               ],
               if (frequent != null) ...[const SizedBox(height: 8), frequent],
+              productTools,
               const SizedBox(height: 8),
             ],
           );
-    final spanish = Localizations.localeOf(context).languageCode == 'es';
-    final catalogHeading = Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Semantics(
-        header: true,
-        child: Text(
-          spanish ? 'La carta' : 'The menu',
-          style: PosTheme.of(context).textTheme.headlineSmall?.copyWith(
-            fontSize: wide ? 30 : 24,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-    final productTools = Row(
-      children: [
-        Expanded(
-          child: Text(
-            spanish ? 'Productos' : 'Products',
-            style: PosTheme.of(context).textTheme.bodySmall,
-          ),
-        ),
-        PosIconButton(
-          tooltip: spanish ? 'Fotos' : 'Photos',
-          onPressed: () => setState(() => _showPhotos = !_showPhotos),
-          icon: PosIcon(
-            PosGlyphs.visibilityOutlined,
-            color: _showPhotos
-                ? PosTheme.of(context).colorScheme.primary
-                : null,
-          ),
-        ),
-        if (_frequentTop.isNotEmpty)
-          PosIconButton(
-            tooltip: spanish ? 'Frecuentes' : 'Frequent',
-            onPressed: () => setState(() => _showFrequent = !_showFrequent),
-            icon: const PosIcon(PosGlyphs.starOutline),
-          ),
-      ],
-    );
     final productPane = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -2924,6 +2984,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           context,
           state,
           scrollHeaders: [
+            if (!keyboard) catalogHeading,
             search,
             if (!keyboard) ...[
               const SizedBox(height: UmiSpacing.sm),
@@ -2933,6 +2994,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               const SizedBox(height: UmiSpacing.sm),
               frequent,
             ],
+            productTools,
             const SizedBox(height: UmiSpacing.sm),
           ],
         );
@@ -3687,7 +3749,8 @@ final class _CategoryTabs extends StatelessWidget {
             ),
           ),
           alignment: vertical ? Alignment.topLeft : Alignment.center,
-          child: Column(
+          child: Flex(
+            direction: vertical ? Axis.vertical : Axis.horizontal,
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: vertical
                 ? CrossAxisAlignment.start
@@ -3700,7 +3763,8 @@ final class _CategoryTabs extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              if (item.count != null)
+              if (item.count != null) ...[
+                SizedBox(width: vertical ? 0 : 8, height: vertical ? 4 : 0),
                 Text(
                   '${item.count}',
                   style: theme.textTheme.labelSmall?.copyWith(
@@ -3708,6 +3772,7 @@ final class _CategoryTabs extends StatelessWidget {
                     fontSize: 11,
                   ),
                 ),
+              ],
             ],
           ),
         ),

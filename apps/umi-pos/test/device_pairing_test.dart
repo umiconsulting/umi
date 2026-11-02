@@ -271,7 +271,7 @@ void main() {
             find.text('Tu PIN te identifica y carga tus permisos actuales.'),
             findsNothing,
           );
-          expect(find.text('Ingresa tu PIN de operador'), findsOneWidget);
+          expect(find.text('Iniciar sesión'), findsOneWidget);
         }
         controller.dispose();
       });
@@ -588,13 +588,11 @@ void main() {
             home: EntrySurface(controller: controller),
           ),
         );
-        final title = find.bySemanticsLabel(
-          RegExp(r'^Enter your operator PIN$'),
-        );
+        final title = find.bySemanticsLabel(RegExp(r'^Sign in$'));
         expect(title, findsOneWidget);
         expect(
           tester.getSemantics(title),
-          isSemantics(label: 'Enter your operator PIN', isHeader: true),
+          isSemantics(label: 'Sign in', isHeader: true),
         );
         final count = find.bySemanticsLabel(RegExp(r'^Operator PIN$'));
         expect(count, findsOneWidget);
@@ -658,7 +656,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Enter your operator PIN'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
     expect(find.text('Email'), findsNothing);
     expect(find.text('Use 4 to 8 digits.'), findsOneWidget);
     expect(find.text('0/8'), findsNothing);
@@ -677,7 +675,7 @@ void main() {
     expect(controller.state.operator?.permissions, contains('catalog.read'));
   });
 
-  testWidgets('the screen that verifies the PIN carries no station mark', (
+  testWidgets('the screen that verifies the PIN retains the UMI wordmark', (
     tester,
   ) async {
     final storage = MemorySecureStorage();
@@ -721,9 +719,10 @@ void main() {
     expect(controller.state.phase, EntryPhase.pinAuthenticating);
     expect(find.text('Verifying your PIN'), findsOneWidget);
     // The keypad is the PIN screen, and this loading belongs to it.
-    expect(find.byType(StationSignature), findsNothing);
+    expect(find.byType(StationSignature), findsOneWidget);
+    expect(find.text('umi'), findsOneWidget);
     expect(find.text('Station'), findsNothing);
-    expect(find.text('Enter your operator PIN'), findsNothing);
+    expect(find.text('Sign in'), findsNothing);
 
     gateway.pinHold!.complete();
     await tester.pumpAndSettle();

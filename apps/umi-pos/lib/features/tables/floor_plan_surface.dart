@@ -2018,7 +2018,7 @@ class _FloorPlanElement extends StatelessWidget {
     final band = detailed ? height / 2 : height;
     final style = TextStyle(
       color: palette.labelFor(element.kind),
-      fontWeight: FontWeight.w700,
+      fontWeight: FontWeight.w500,
       fontSize: math.min(band * 0.55, width * 0.4).clamp(7.0, 26.0),
       height: 1.1,
     );
@@ -2251,18 +2251,21 @@ class _FloorPlanPalette {
     return _FloorPlanPalette(
       dark: dark,
       scheme: theme.colorScheme,
-      canvas: dark ? const Color(0xff15161a) : const Color(0xffededf2),
-      tableFill: dark ? const Color(0xff25272e) : PosColors.white,
-      tableBorder: dark ? const Color(0xff3b3e47) : const Color(0xffdfdfe7),
+      canvas: theme.colorScheme.background,
+      tableFill: dark ? const Color(0xff17382d) : const Color(0xffe7f2eb),
+      tableBorder: dark ? const Color(0xff7fd0a6) : const Color(0xff93b4a2),
       divider: dark ? const Color(0xff3b3e47) : const Color(0xffe6e6ec),
       seat: dark ? const Color(0xffa7adb8) : const Color(0xff9ba1ab),
       label: theme.colorScheme.onSurface,
-      tableElevation: dark ? 0 : 1.5,
+      tableElevation: 0,
       shadow: const Color(0x1a101828),
       groupFill: dark ? const Color(0x332f6f4f) : const Color(0x141b7f4b),
       groupBorder: dark ? const Color(0xff7fd0a6) : const Color(0xff1b7f4b),
       stateTint: dark ? const Color(0x221f9e63) : const Color(0x0f1b7f4b),
       stateAccents: {
+        tableStateOpen: dark
+            ? const Color(0xff7fd0a6)
+            : const Color(0xff286653),
         tableStateSeated: dark
             ? const Color(0xff7fd0a6)
             : const Color(0xff1b7f4b),
@@ -2310,7 +2313,10 @@ class _FloorPlanPalette {
         _ => scheme.surfaceContainerHighest,
       };
     }
-    return Color.alphaBlend(stateTint, tableFill);
+    return Color.alphaBlend(
+      stateAccent(state).withValues(alpha: dark ? .18 : .10),
+      scheme.surface,
+    );
   }
 
   Color borderFor(String kind) => switch (kind) {

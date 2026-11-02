@@ -755,7 +755,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(UmiSpacing.lg),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1327,19 +1327,24 @@ final class _BalanceTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = PosTheme.of(context);
     return Container(
-      constraints: const BoxConstraints(minWidth: 180),
+      constraints: const BoxConstraints(minWidth: 150),
       padding: const EdgeInsets.all(UmiSpacing.md),
       decoration: BoxDecoration(
         color: emphasized
             ? theme.colorScheme.primaryContainer
-            : theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(UmiRadius.control),
+            : theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: theme.textTheme.labelMedium),
-          Text(value, style: theme.textTheme.headlineSmall),
+          Text(
+            value,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );

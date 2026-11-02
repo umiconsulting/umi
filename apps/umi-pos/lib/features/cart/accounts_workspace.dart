@@ -61,7 +61,9 @@ class AccountsWorkspace extends StatelessWidget {
                   runSpacing: 12,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    StationHeading(title: es ? 'Cuentas' : 'Accounts'),
+                    StationHeading(
+                      title: es ? 'Mesas y cuentas' : 'Tables and accounts',
+                    ),
                     if (tables != null)
                       PosSegmented<bool>(
                         showSelectedIcon: false,

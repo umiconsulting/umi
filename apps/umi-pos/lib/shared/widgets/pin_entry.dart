@@ -155,13 +155,32 @@ final class _PinKey extends StatelessWidget {
   Widget build(BuildContext context) {
     final child = icon != null
         ? PosIcon(icon, size: 26)
-        : Text(label!, style: PosTheme.of(context).textTheme.headlineSmall);
+        : Text(
+            label!,
+            style: PosTheme.of(context).textTheme.bodyLarge?.copyWith(
+              fontSize: 22,
+              fontWeight: FontWeight.w500,
+            ),
+          );
     return Semantics(
       button: true,
       label: semanticLabel ?? label,
       child: SizedBox.expand(
         child: emphasized
-            ? PosButton.tonal(onPressed: onTap, child: child)
+            ? PosButton.tonal(
+                onPressed: onTap,
+                style: PosButton.styleFrom(
+                  backgroundColor: PosTheme.of(context).colorScheme.surface,
+                  foregroundColor: PosTheme.of(context).colorScheme.onSurface,
+                  side: BorderSide(
+                    color: PosTheme.of(context).colorScheme.outlineVariant,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: child,
+              )
             : PosOutlineButton(onPressed: onTap, child: child),
       ),
     );

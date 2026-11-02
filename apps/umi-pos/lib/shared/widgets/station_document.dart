@@ -77,7 +77,12 @@ class StationHeading extends StatelessWidget {
           // below, and the rail already carries the café's identity. Removed at the
           // owner's request (2026-10-12); the widget stays because the title and its
           // optional subtitle are what the screens actually share.
-          Text(title, style: theme.textTheme.titleLarge),
+          Text(
+            title,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           if (subtitle != null)
             Text(
               subtitle!,

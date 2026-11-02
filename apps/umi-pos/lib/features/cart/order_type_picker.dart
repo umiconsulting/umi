@@ -32,7 +32,9 @@ Future<String?> showOrderTypePicker(BuildContext context) {
                       children: [
                         Text(es ? 'Comer aquí' : 'Dine in'),
                         Text(
-                          es ? 'Elegir una mesa' : 'Choose a table',
+                          es
+                              ? 'Servicio en el local'
+                              : 'Service at this location',
                           style: PosTheme.of(dialog).textTheme.bodySmall,
                         ),
                       ],

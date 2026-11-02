@@ -872,7 +872,7 @@ void main() {
       addTearDown(f.dispose);
       await _mount(tester, f.surface, size: const Size(1920, 1014));
 
-      await tester.tap(find.text('Cuentas').first);
+      await tester.tap(find.byTooltip('Mesas'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Lista'));
       await tester.pumpAndSettle();

@@ -148,7 +148,7 @@ final class _CashCenterState extends State<CashCenter> {
         ),
         body: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(UmiSpacing.lg),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1456,7 +1456,7 @@ final class _OpenShiftSectionState extends State<_OpenShiftSection> {
   }
 }
 
-final class _ActiveShiftSection extends StatelessWidget {
+final class _ActiveShiftSection extends StatefulWidget {
   const _ActiveShiftSection({
     required this.controller,
     required this.permissions,
@@ -1466,6 +1466,15 @@ final class _ActiveShiftSection extends StatelessWidget {
   final CashController controller;
   final OperatorPermissions permissions;
   final Future<void> Function()? onHandoffCompleted;
+  @override
+  State<_ActiveShiftSection> createState() => _ActiveShiftSectionState();
+}
+
+final class _ActiveShiftSectionState extends State<_ActiveShiftSection> {
+  int _tab = 0;
+  CashController get controller => widget.controller;
+  OperatorPermissions get permissions => widget.permissions;
+  Future<void> Function()? get onHandoffCompleted => widget.onHandoffCompleted;
 
   @override
   Widget build(BuildContext context) {
@@ -1485,6 +1494,8 @@ final class _ActiveShiftSection extends StatelessWidget {
         _Action(
           icon: PosGlyphs.addCircleOutline,
           label: l.paidInAction,
+          tone: 'in',
+          subtitle: spanish ? 'Suma al efectivo' : 'Adds to cash',
           onPressed: () => _movement(context, controller, 'paid_in'),
         ),
       if (actions.contains('movement') &&
@@ -1492,6 +1503,8 @@ final class _ActiveShiftSection extends StatelessWidget {
         _Action(
           icon: PosGlyphs.removeCircleOutline,
           label: l.paidOutAction,
+          tone: 'out',
+          subtitle: spanish ? 'Resta del efectivo' : 'Subtracts from cash',
           onPressed: () => _movement(context, controller, 'paid_out'),
         ),
       if (actions.contains('movement') &&
@@ -1499,6 +1512,8 @@ final class _ActiveShiftSection extends StatelessWidget {
         _Action(
           icon: PosGlyphs.savingsOutlined,
           label: l.safeDropAction,
+          tone: 'safe',
+          subtitle: spanish ? 'Resguardo de efectivo' : 'Secure cash storage',
           onPressed: () => _movement(context, controller, 'safe_drop'),
         ),
       if (actions.contains('no_sale') &&
@@ -1815,21 +1830,111 @@ final class _ActiveShiftSection extends StatelessWidget {
             operations.isEmpty && lifecycle.isEmpty && !showCloseFlow;
         final showShiftRail = showCloseFlow || lifecycle.isNotEmpty;
         if (!roomForTwoColumns) {
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                buildDrawer(expanded: false),
-                if (readOnly) ...[
-                  const SizedBox(height: UmiSpacing.lg),
-                  buildReadOnlyRail(),
+          final labels = spanish
+              ? ['Movimientos', 'Turno', 'Cierre']
+              : ['Movements', 'Shift', 'Close'];
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  for (var index = 0; index < labels.length; index++)
+                    Expanded(
+                      child: PosTapRegion(
+                        selected: _tab == index,
+                        semanticLabel: labels[index],
+                        onTap: () => setState(() => _tab = index),
+                        child: Container(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: _tab == index
+                                    ? PosTheme.of(context).colorScheme.primary
+                                    : PosTheme.of(
+                                        context,
+                                      ).colorScheme.outlineVariant,
+                                width: _tab == index ? 2 : 1,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            labels[index],
+                            style: PosTheme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(fontSize: 14),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
-                if (showShiftRail) ...[
-                  const SizedBox(height: UmiSpacing.lg),
-                  buildClose(),
-                ],
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_tab == 0) ...[
+                        Text(
+                          l.expectedCashLabel,
+                          style: PosTheme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          snapshot.expectedCash == null
+                              ? (spanish
+                                    ? 'Disponible al enviar el conteo'
+                                    : 'Available after submitting the count')
+                              : _money(snapshot.expectedCash!),
+                          style: PosTheme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        const PosDivider(),
+                        const SizedBox(height: 16),
+                        for (final operation in operations) ...[
+                          operation,
+                          const SizedBox(height: 8),
+                        ],
+                        if (readOnly) buildReadOnlyRail(),
+                      ],
+                      if (_tab == 1) ...[
+                        CashEquation(
+                          account: CashDrawerAccount.fromLedger(
+                            snapshot.ledger,
+                            currency:
+                                (snapshot.currentShift?['currency']
+                                    as String?) ??
+                                'MXN',
+                          ),
+                          expectedCash: snapshot.expectedCash,
+                        ),
+                        const SizedBox(height: 16),
+                        CashJournal(lines: snapshot.ledger, expand: false),
+                        if (lifecycle.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          _ActionGrid(actions: lifecycle),
+                        ],
+                        const SizedBox(height: 16),
+                        _SectionCard(
+                          title: l.cashPolicyLabel,
+                          child: CashPolicyTable(policy: snapshot.policy),
+                        ),
+                      ],
+                      if (_tab == 2) ...[
+                        if (count != null && snapshot.summary == null)
+                          _VarianceCard(
+                            variance: variance!,
+                            count: count.count,
+                          ),
+                        if (showCloseFlow) closeCard() else buildReadOnlyRail(),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
           );
         }
         // A tall rail lets the journal take the slack and stay put. On a short
@@ -2102,16 +2207,74 @@ final class _Action extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.tone,
+    this.subtitle,
   });
 
   final PosGlyph icon;
   final String label;
+  final String? tone, subtitle;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final theme = PosTheme.of(context);
     final scheme = theme.colorScheme;
+    if (tone != null) {
+      final accent = switch (tone) {
+        'in' => const Color(0xff286653),
+        'out' => const Color(0xff95682c),
+        _ => scheme.primary,
+      };
+      final fill = scheme.dark
+          ? Color.alphaBlend(accent.withValues(alpha: .22), scheme.surface)
+          : switch (tone) {
+              'in' => const Color(0xffe7f2eb),
+              'out' => const Color(0xfff8edda),
+              _ => scheme.primaryContainer,
+            };
+      final ink = scheme.dark ? scheme.onSurface : accent;
+      return PosTapRegion(
+        onTap: onPressed,
+        semanticLabel: label,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 72),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              PosIcon(icon, size: 20, color: ink),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: ink,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle!,
+                        style: theme.textTheme.bodySmall?.copyWith(color: ink),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     // A till is read in a hurry and in low light. A bare outline on a near-black
     // surface is a shape the eye files as a panel, not as a control — the tiles
     // that move the drawer were the least button-like thing on the screen. A
