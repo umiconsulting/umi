@@ -448,6 +448,8 @@
   "tableStateOrderedLabel": "Order taken",
   "tableStateServedLabel": "Served",
   "tableStateAwaitingPaymentLabel": "Awaiting payment",
+  "tableStatePaidOccupiedLabel": "Paid and occupied",
+  "tableStateNewConsumptionAction": "New consumption",
   "tableStateDirtyLabel": "Needs cleaning",
   "tableStatePartySizeLabel": "{count} guests",
   "@tableStatePartySizeLabel": {

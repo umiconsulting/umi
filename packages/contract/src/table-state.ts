@@ -51,6 +51,8 @@ export const TableStateEntry = z
     partySize: PartySize.nullable(),
     /** The merge identity: the tables of one party share it. */
     groupId: Uuid.nullable(),
+    /** Pago confirmado de esta visita. Una cuenta abierta puede añadir saldo nuevo. */
+    paidAt: IsoTimestamp.nullable().optional(),
     /** An open account on this table or another table in its group. */
     openAccountId: Uuid.nullable().optional(),
     openAccountFolio: z.string().min(1).max(64).nullable().optional(),
@@ -66,6 +68,7 @@ export const TableStateEntry = z
     if (present !== (entry.partySize !== null))
       issue('A party is present exactly when partySize is set.');
     if (entry.groupId !== null && !present) issue('A merged group needs a party on the table.');
+    if (entry.paidAt != null && !present) issue('A paid visit still needs a party on the table.');
   });
 export type TableStateEntry = z.infer<typeof TableStateEntry>;
 

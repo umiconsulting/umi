@@ -469,6 +469,8 @@
   "tableStateOrderedLabel": "Pedido tomado",
   "tableStateServedLabel": "Servido",
   "tableStateAwaitingPaymentLabel": "Por cobrar",
+  "tableStatePaidOccupiedLabel": "Pagada y ocupada",
+  "tableStateNewConsumptionAction": "Nuevo consumo",
   "tableStateDirtyLabel": "Por limpiar",
   "tableStatePartySizeLabel": "{count} personas",
   "@tableStatePartySizeLabel": {

@@ -100,6 +100,13 @@ final class TableStateController extends ChangeNotifier {
   bool partyPresent(String tableId) =>
       tablePartyStates.contains(stateOf(tableId).state);
 
+  bool isPaidAndOccupied(String tableId) {
+    final entry = stateOf(tableId);
+    return tablePartyStates.contains(entry.state) &&
+        entry.paidAt != null &&
+        entry.openAccountId == null;
+  }
+
   /// The server's clock, advanced by however long this device has held the
   /// snapshot. A till whose own clock is wrong still shows the true turn time,
   /// because the origin travels with the map and only the *delta* is local.
@@ -237,6 +244,129 @@ final class TableStateController extends ChangeNotifier {
       partySize,
     );
     if (_disposed) return;
+    _install(map);
+    notifyListeners();
+  }
+
+  String? _accountProjectionKey;
+  Future<void> _accountProjectionTail = Future<void>.value();
+
+  Future<void> reconcileAccount(
+    String accountId, {
+    String? tableId,
+    String? accountFolio,
+    bool closed = false,
+    String? merchantId,
+    String? locationId,
+  }) {
+    final repository = _repository;
+    final merchant = merchantId ?? _merchantId;
+    final location = locationId ?? _locationId;
+    if (_disposed ||
+        repository is! TableSeatProjectionRepository ||
+        merchant == null ||
+        location == null) {
+      return Future<void>.value();
+    }
+    final projector = repository as TableSeatProjectionRepository;
+    final key = '$merchant|$location|$accountId|$tableId|$closed|$accountFolio';
+    if (_accountProjectionKey == key) return _accountProjectionTail;
+    _accountProjectionKey = key;
+    Future<void> apply() async {
+      if (_disposed) return;
+      final projectedTime = _merchantId == merchant && _locationId == location
+          ? serverNow?.toUtc().toIso8601String()
+          : null;
+      final TableStateMap map;
+      try {
+        map = closed || tableId == null
+            ? await projector.projectReleasedAccount(
+                merchant,
+                location,
+                accountId,
+                serverTime: projectedTime,
+              )
+            : await projector.projectOpenAccount(
+                merchant,
+                location,
+                tableId,
+                accountId,
+                accountFolio,
+                serverTime: projectedTime,
+              );
+      } on AppException catch (error) {
+        if (error.code == 'TABLE_STATE_NOT_CACHED') return;
+        rethrow;
+      }
+      if (_disposed ||
+          _merchantId != merchant ||
+          _locationId != location ||
+          _scope == null) {
+        return;
+      }
+      _install(map);
+      notifyListeners();
+    }
+
+    final next = _accountProjectionTail.then<void>(
+      (_) => apply(),
+      onError: (Object _, StackTrace _) => apply(),
+    );
+    _accountProjectionTail = next;
+    return next;
+  }
+
+  Future<void> adoptOpenAccount(
+    String tableId,
+    String accountId,
+    String? accountFolio,
+  ) async {
+    final repository = _repository;
+    final merchantId = _merchantId;
+    final locationId = _locationId;
+    final scope = _scope;
+    final projectedTime = serverNow?.toUtc().toIso8601String();
+    if (repository is! TableSeatProjectionRepository ||
+        merchantId == null ||
+        locationId == null ||
+        projectedTime == null) {
+      return;
+    }
+    final map = await (repository as TableSeatProjectionRepository)
+        .projectOpenAccount(
+          merchantId,
+          locationId,
+          tableId,
+          accountId,
+          accountFolio,
+          serverTime: projectedTime,
+        );
+    if (_disposed || _scope != scope) return;
+    _install(map);
+    notifyListeners();
+  }
+
+  Future<void> releaseAccount(String accountId) async {
+    final repository = _repository;
+    final merchantId = _merchantId;
+    final locationId = _locationId;
+    final scope = _scope;
+    final projectedTime = serverNow?.toUtc().toIso8601String();
+    if (repository is! TableSeatProjectionRepository ||
+        merchantId == null ||
+        locationId == null ||
+        projectedTime == null ||
+        !_entries.values.any((entry) => entry.openAccountId == accountId)) {
+      return;
+    }
+    final map = await (repository as TableSeatProjectionRepository)
+        .projectReleasedAccount(
+          merchantId,
+          locationId,
+          accountId,
+          serverTime: projectedTime,
+        );
+    if (_disposed || _scope != scope) return;
     _install(map);
     notifyListeners();
   }

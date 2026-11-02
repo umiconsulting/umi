@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "8b0590414aa86049aefcad7072510722fa2db7fb26d7932961ab3824c91b776d",
-  "contractVersion": "2.48.0",
+  "contentHash": "450d343a606788d06c330850499fa5055119bf840ef9b3a28fcd0e762b73f09e",
+  "contractVersion": "2.49.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -99899,6 +99899,17 @@
                   }
                 ]
               },
+              "paidAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "partySize": {
                 "anyOf": [
                   {
@@ -100020,6 +100031,17 @@
             }
           ]
         },
+        "paidAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "partySize": {
           "anyOf": [
             {
@@ -100121,6 +100143,17 @@
                 "anyOf": [
                   {
                     "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "paidAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
                     "type": "string"
                   },
                   {
