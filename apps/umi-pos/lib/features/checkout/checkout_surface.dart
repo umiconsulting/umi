@@ -23,6 +23,7 @@ import '../offline/offline_policy.dart';
 import '../sale/sale_lifecycle_controller.dart';
 import 'checkout_controller.dart';
 import 'partial_checkout_surface.dart';
+import 'payment_account_line.dart';
 import 'tender_identity.dart';
 
 /// Name the refusal the server or the offline policy already identified.
@@ -963,7 +964,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 ),
                 const SizedBox(height: 24),
                 for (final raw in cart.items) ...[
-                  _CheckoutLine(item: CartItem.fromJson(raw)),
+                  PaymentAccountLine(item: CartItem.fromJson(raw)),
                   const PosDivider(height: 28),
                 ],
                 const SizedBox(height: 16),
@@ -5189,62 +5190,4 @@ class _CheckoutLayout extends StatelessWidget {
       );
     },
   );
-}
-
-class _CheckoutLine extends StatelessWidget {
-  const _CheckoutLine({required this.item});
-  final CartItem item;
-  @override
-  Widget build(BuildContext context) {
-    final theme = PosTheme.of(context);
-    final es = Localizations.localeOf(context).languageCode == 'es';
-    final price = PriceSnapshot.fromJson(item.price);
-    final total = CatalogMoney.fromJson(price.lineTotal);
-    final details = [
-      if (item.variant != null) item.variant!['name'],
-      ...item.modifiers.map((m) => m['name']),
-      item.note,
-    ].whereType<String>().join(' · ');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text('${item.quantity}', style: theme.textTheme.bodySmall),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.productName, style: theme.textTheme.bodyMedium),
-                  if (details.isNotEmpty)
-                    Text(details, style: theme.textTheme.bodySmall),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              formatMinorUnits(total.minorUnits, total.currency),
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          item.fired
-              ? (es ? 'Enviado' : 'Sent')
-              : (es ? 'Pendiente de enviar' : 'Not sent'),
-          style: theme.textTheme.bodySmall,
-        ),
-      ],
-    );
-  }
 }

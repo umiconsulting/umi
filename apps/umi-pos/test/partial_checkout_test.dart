@@ -237,6 +237,7 @@ Future<(CartController, CheckoutController)> _pump(
   WidgetTester tester,
   _Repo repository, {
   bool canConfirmManualTerminal = false,
+  String? merchantLabel,
   Future<bool?> Function(int amountMinor, bool selected)?
   onShowBankTransferDetails,
 }) async {
@@ -276,6 +277,7 @@ Future<(CartController, CheckoutController)> _pump(
         checkout: checkout,
         cart: cart,
         operatorSessionId: _operator,
+        merchantLabel: merchantLabel,
         canConfirmManualTerminal: canConfirmManualTerminal,
         cashShiftId: _shift,
         onShowBankTransferDetails:
@@ -288,6 +290,36 @@ Future<(CartController, CheckoutController)> _pump(
 }
 
 void main() {
+  testWidgets('phone partial checkout retains UMI beside the real merchant', (
+    tester,
+  ) async {
+    final (cart, checkout) = await _pump(
+      tester,
+      _Repo(),
+      merchantLabel: 'Café Norte · Centro',
+    );
+    tester.view.physicalSize = const Size(402, 874);
+    await tester.pumpAndSettle();
+    final header = find.byType(PosHeader);
+    expect(
+      find.descendant(of: header, matching: find.text('umi')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: header, matching: find.text('Café Norte · Centro')),
+      findsOneWidget,
+    );
+    expect(find.byType(PosNavigation), findsNothing);
+    expect(
+      find.byKey(const ValueKey('partial-charge')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    cart.dispose();
+    checkout.dispose();
+  });
+
   testWidgets(
     'payment shell finds permitted navigation past an inner header page',
     (tester) async {

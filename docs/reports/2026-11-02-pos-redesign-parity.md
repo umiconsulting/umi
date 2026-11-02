@@ -39,3 +39,7 @@ Reproducible commands, commit checkpoints, private log paths, native observation
 Incoming-order contracts contain summaries, not product lines/options/notes or fulfillment details. Binding an incoming order does not hydrate its lines into the cart. Entry contracts do not provide the prototype's sample shift metrics or staff picker. Counts use loaded catalog data; no estimated counts, invented table geometry, or persistent favorites were added.
 
 Before acceptance: inspect the new catalog scrim and payment shell on matching native/reference geometry; run the revised partial-payment flow through native input; compare all required screens with actual content; and resolve the iOS signing/runtime limitation or record it explicitly in the final handoff. No PR or completion claim is supported by this report yet.
+
+## Scoped review follow-up
+
+Round 2 restores the UMI wordmark in the phone partial-payment header and shares one read-only account-line widget between full and partial checkout. The phone assertion reproduced the missing mark before the fix. All 97 covering full/partial/terminal/local-first checkout tests passed, and analyzer reported no issues in the four scoped files. The preceding complete-suite count belongs to checkpoint `7e80993e`; this follow-up does not establish native visual acceptance.
