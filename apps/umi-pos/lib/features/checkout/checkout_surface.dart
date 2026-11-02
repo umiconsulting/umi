@@ -124,6 +124,10 @@ Future<void> showSplitCheckout(
     operatorSessionId:
         entry.state.operator?.id ?? cart.state.cart!.operatorSessionId,
     operatorName: entry.operatorName,
+    merchantLabel: [
+      entry.state.selectedTenant?.name,
+      entry.state.selectedBranch?.name,
+    ].whereType<String>().join(' · '),
     canConfirmManualTerminal:
         entry.state.operator?.permissions.contains(
           'checkout.terminal.confirm',
@@ -214,12 +218,7 @@ Future<void> showCheckoutSheet(
   // bound without spending a minute of real time; the till passes the real one.
   DateTime Function() now = DateTime.now,
 }) async {
-  final inheritedNavigation = context
-      .findAncestorWidgetOfExactType<PosPage>()
-      ?.bottomNavigationBar;
-  final navigation = inheritedNavigation is PosNavigation
-      ? inheritedNavigation
-      : null;
+  final navigation = checkoutNavigationOf(context);
   await Navigator.of(context).push(
     // PoloTab pays on a full screen, not a sheet — a focused, low-light surface.
     PosPageRoute<void>(
@@ -597,6 +596,10 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
             widget.entry.state.operator?.id ??
             widget.cart.state.cart!.operatorSessionId,
         operatorName: widget.entry.operatorName,
+        merchantLabel: [
+          widget.entry.state.selectedTenant?.name,
+          widget.entry.state.selectedBranch?.name,
+        ].whereType<String>().join(' · '),
         canConfirmManualTerminal:
             widget.entry.state.operator?.permissions.contains(
               'checkout.terminal.confirm',

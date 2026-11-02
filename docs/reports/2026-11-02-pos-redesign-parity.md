@@ -1,75 +1,41 @@
-# Native POS presentation parity
+# Native POS presentation review
 
-## Approved mapping before edits
+Status: **in progress; the user has not accepted the native design**. The earlier Task 3 report and widget captures do not establish visual parity. Task 3B expands the work to the actual Stageshow screen compositions and preserves the existing native workflows.
 
-| Approved presentation | Native widget | Existing callback or state |
-| --- | --- | --- |
-| Products left, categories middle, account right | `_catalogBody`, `_CategoryTabs`, `_CartPanel` | `catalog.selectCategory`, `_showDetail`, existing cart callbacks |
-| Restrained product rows and clear photos | `_content`, `_ProductCard` | Product availability, `_showDetail`, original options and extras |
-| Category colors and readable labels | `_CategoryTabs`, `_ProductPlaceholder` | Explicit merchant colors, category name, selected category |
-| Narrow checkout with fixed confirmation | `CheckoutSurface.build` | Existing tender fields, `_review`, `_confirm`, approval and unknown state paths |
-| Partial payment with fixed charge and change | `PartialCheckoutSurface._checkoutBar` | Existing ledger, `_collect`, `_finalize` |
-| Separate service tags on KDS | `_TicketCard` | Existing `fulfillmentType`, station filter, preparation callbacks |
+## Presentation checkpoint
 
-## Visual direction
+The current native implementation covers the shared navigation and merchant header, catalog/categories/photos, product modifiers, entry/PIN, tables and accounts, incoming summaries, KDS, cash, settings, full checkout, and partial checkout. This coverage describes implemented surfaces, not accepted design.
 
-- Product: a native till for restaurant operators.
-- Character: calm, exact, readable.
-- World: a café counter and its account document.
-- Moments: category colors and actual product photos.
-- Signature: the account remains beside the menu on tablets.
+The changes use restrained category colors, existing merchant/product data, Lucide navigation glyphs, tablet account panes, phone disclosures, and fixed payment actions. Full and partial checkout display actual account items, options, notes, sent state, totals, and the payment ledger. Tip controls remain governed by the existing policy. Collection, retry, finalization, and unknown-payment guards retain their original handlers.
 
-Keep all original cash, table editor, hardware, domain, and API code unchanged.
+The user rejected earlier installed results, including category saturation, menu hierarchy, and the overall portrait composition. Actual Android captures also exposed individual text background rectangles on products and a missing checkout rail. The latest checkpoint replaces the text rectangles with a continuous category-colored scrim, confines product labels to its protected region, and searches past nested header pages for the permitted checkout navigation. These corrections require another native comparison.
 
-## Implementation
+## Native workflow evidence
 
-The menu now uses three columns from 700 logical pixels. Products remain left, categories occupy 132 pixels, and the account remains right.
-The account uses 280, 344, or 380 pixels according to the viewport width.
-Phones retain their account action and horizontal category list.
+Android execution used an isolated app and a synthetic local database/API. The parent recorded:
 
-Category labels retain their natural case. Independent 84-pixel category buttons replace overlapping folder shapes.
-Merchant colors remain authoritative. Categories without colors use the approved pastel palette with a stable category-ID hash.
-The palette contains `#dce8f2`, `#f2e3d1`, and `#efdeda`. The all-categories button uses `#e9eaf0`.
-Dark mode blends category color into the native surface. Text contrast determines the foreground.
+- Native enrollment and PIN authentication.
+- Seating two guests at M2 and receiving a public digital Americano/Croissant order for MXN 93. Replay produced exactly one order and one table link.
+- Opening a cash shift with MXN 1,000 through the denomination counter.
+- Blocking Latte addition without its required variant, then adding the medium/oat selection for MXN 87 and paying with MXN 100, change MXN 13.
+- Respecting the cashier's absent order-fire permission. A supervisor sent takeaway account 004; sent-line quantity and edit actions remained disabled.
+- Completing the Croissant at its kitchen station while the Americano remained queued at Barra.
+- Resuming account 004 from the actual account list, collecting MXN 45 with MXN 100 received, and confirming MXN 55 change through the real local API.
 
-Product rows use 104 pixels at normal text size. Text scaling increases their height and reduces the column count.
-Photos remain clear beside the product name and price. Missing photos retain the original initials fallback.
-Unavailable products retain their warning, opacity, and refusal callback.
+These are functional observations. They do not establish visual acceptance. Earlier “tablet” captures used an 800×1340 logical viewport on a resized phone emulator with a 78.5-pixel cutout inset. That was an unsuitable presentation reference. The next visual review must compare the same logical geometry and screen content on a restored phone and a genuine tablet emulator profile.
 
-Checkout fields scroll above the confirmation action on phones. Larger screens retain the two-column payment layout.
-Cash change wraps when labels and amounts exceed the available width.
-Partial checkout places received cash and change together above its fixed charge action.
-KDS service tags occupy a separate row above station and preparation status.
-
-## Preservation
-
-No controller, API command, permission, persistent-state rule, or hardware integration changed.
-Options, extras, incoming orders, immutable sent lines, split payments, tips, and provider uncertainty retain their existing handlers.
-The complete cash and table editor surfaces remain unchanged.
+The iOS app built and installed, but authenticated runtime remains unverified. Ordinary ad-hoc credential reads failed before entry, and the simulator rejected restricted keychain entitlements with AMFI error −424. The workstation has no valid signing identity. No authentication or credential-storage requirement was weakened.
 
 ## Verification
 
-- The selected native suite passed 312 tests. Its baseline contained 289 tests.
-- The added geometry coverage checks six sizes: 402×874, 412×915, 820×1180, 800×1340, 1340×800, and 1440×1000.
-- Analyzer output reported no issues for the changed source and test files.
-- The macOS debug application built successfully with Flutter 3.47.5 and Dart 3.13.4.
-- Native release configuration matched local API environment `test`, release `0.1.0`, and contract `2.50.0`.
-- Local native instrumentation used a separate bundle, secure-storage namespace, and classic keychain account.
-- The normal source configuration and generated platform files were restored after the build.
+The latest focused run passed **114 tests** across catalog, full checkout, partial checkout, and role/navigation coverage. This includes partial cash keypad amounts, unchanged tender amounts, payment uncertainty/retries/finalization, and phone Settings return from both Sales and KDS. Analyzer reported no issues across seven changed source/test files. `git diff --check` passed.
 
-Full commands, artifacts, and native input limitations appear in `.superpowers/sdd/2026-11-02-redesign-parity/task-3-report.md`.
+The complete Flutter suite passed **1,230 tests**, with **five skipped** and **zero failures**, in 22 seconds using `flutter test --no-pub --reporter expanded`. No missed-tap warnings appeared. Both iOS workflows now run the full `flutter test --no-pub` suite before their existing build/signing steps. Workflow YAML parsing and inspection verified that only the test commands changed; no workflow was dispatched.
 
-## Native input limitation
+Reproducible commands, commit checkpoints, private log paths, native observations, and open reviewer findings are recorded in `.superpowers/sdd/2026-11-02-redesign-parity/task-3b-report.md`. Widget tests establish behavior and layout safety; actual screenshots determine visual acceptance.
 
-The macOS app reached its enrollment form. Flutter Driver commands returned success without a visible field-state change.
-The OS input fallback was denied Accessibility access. No alternative path bypassed that denial.
-Native operator workflows remain unverified here. The parent will complete this evidence with Android emulator input before final integration.
+## Contract limits and remaining work
 
-## Captures
+Incoming-order contracts contain summaries, not product lines/options/notes or fulfillment details. Binding an incoming order does not hydrate its lines into the cart. Entry contracts do not provide the prototype's sample shift metrics or staff picker. Counts use loaded catalog data; no estimated counts, invented table geometry, or persistent favorites were added.
 
-![Native widget render in landscape](assets/2026-11-02-pos-redesign-parity/catalog-landscape.png)
-
-![Native widget render in portrait](assets/2026-11-02-pos-redesign-parity/catalog-portrait.png)
-
-The catalog captures use the existing widget render harness. They show fixture initials because its products have no photos.
-The actual macOS runtime capture is [native enrollment](assets/2026-11-02-pos-redesign-parity/native-enrollment.png).
+Before acceptance: inspect the new catalog scrim and payment shell on matching native/reference geometry; run the revised partial-payment flow through native input; compare all required screens with actual content; and resolve the iOS signing/runtime limitation or record it explicitly in the final handoff. No PR or completion claim is supported by this report yet.

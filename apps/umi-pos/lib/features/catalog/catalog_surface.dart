@@ -3829,11 +3829,6 @@ final class _ProductCard extends StatelessWidget {
       _ProductPlaceholder.categoryColor(category, product.name),
     );
     final ink = _ProductPlaceholder.contrastInk(fill);
-    // A local fill behind the text protects long labels against both black and
-    // white image regions, while the rest of the photo keeps its reference fade.
-    final textGround = showPhoto && url != null
-        ? fill.withValues(alpha: .88)
-        : null;
     final amount = formatMinorUnits(money.minorUnits, money.currency);
     final available = product.availability == 'enabled';
     return ClipRRect(
@@ -3920,12 +3915,18 @@ final class _ProductCard extends StatelessWidget {
                         // Fill over the image is the alpha-mask equivalent on this
                         // solid ground, without nested offscreen shader/filter layers.
                         DecoratedBox(
+                          key: ValueKey('product-photo-scrim-${product.id}'),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
-                              colors: [fill, fill, fill.withValues(alpha: 0)],
-                              stops: const [0, .16, .758],
+                              colors: [
+                                fill,
+                                fill.withValues(alpha: .88),
+                                fill.withValues(alpha: .88),
+                                fill.withValues(alpha: 0),
+                              ],
+                              stops: const [0, .16, .66, 1],
                             ),
                           ),
                         ),
@@ -3933,48 +3934,49 @@ final class _ProductCard extends StatelessWidget {
                     ),
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Opacity(
-                  opacity: available ? 1 : .45,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (category != null)
+              FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: showPhoto && url != null ? .66 : 1,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Opacity(
+                    opacity: available ? 1 : .45,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (category != null)
+                          Text(
+                            category.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontSize: 11,
+                              color: ink,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        const SizedBox(height: 3),
                         Text(
-                          category.name,
-                          maxLines: 1,
+                          product.name,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            fontSize: 11,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 14,
+                            height: 1.2,
+                            fontWeight: FontWeight.w500,
                             color: ink,
-                            backgroundColor: textGround,
-                            fontWeight: FontWeight.w400,
                           ),
                         ),
-                      const SizedBox(height: 3),
-                      Text(
-                        product.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 14,
-                          height: 1.2,
-                          fontWeight: FontWeight.w500,
-                          color: ink,
-                          backgroundColor: textGround,
+                        const Spacer(),
+                        Text(
+                          available ? amount : l.unavailableLabel,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 12,
+                            color: ink,
+                          ),
                         ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        available ? amount : l.unavailableLabel,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 12,
-                          color: ink,
-                          backgroundColor: textGround,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

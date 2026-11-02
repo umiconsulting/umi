@@ -288,6 +288,70 @@ Future<(CartController, CheckoutController)> _pump(
 }
 
 void main() {
+  testWidgets(
+    'payment shell finds permitted navigation past an inner header page',
+    (tester) async {
+      PosNavigation? found;
+      await tester.pumpWidget(
+        PosApp(
+          home: PosPage(
+            bottomNavigationBar: PosNavigation(
+              destinations: const [
+                PosDestination(
+                  icon: PosIcon(PosGlyphs.receiptOutlined),
+                  label: 'Sale',
+                ),
+              ],
+            ),
+            body: PosPage(
+              body: Builder(
+                builder: (context) {
+                  found = checkoutNavigationOf(context);
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(found, isNotNull);
+      expect((found!.destinations.single as PosDestination).label, 'Sale');
+    },
+  );
+
+  testWidgets(
+    'cash keypad changes only received amount and preserves exact principal',
+    (tester) async {
+      final repository = _Repo();
+      final (cart, checkout) = await _pump(tester, repository);
+      await tester.tap(find.byKey(const ValueKey('partial-cash-clear')));
+      await tester.pump();
+      for (final digit in ['2', '0', '0']) {
+        await tester.tap(find.byKey(ValueKey('partial-cash-key-$digit')));
+        await tester.pump();
+      }
+      final field = tester.widget<PosField>(
+        find.byKey(const ValueKey('partial-cash-received')),
+      );
+      expect(field.controller!.text, '200');
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('partial-cash-change')),
+          matching: find.text('MXN 84.00'),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('partial-charge')));
+      await tester.pumpAndSettle();
+      final tender = repository.commands.single['tender'] as Map;
+      expect((tender['amount'] as Map)['minorUnits'], 11600);
+      expect((tender['amountReceived'] as Map)['minorUnits'], 20000);
+      await tester.pumpWidget(const SizedBox());
+      cart.dispose();
+      checkout.dispose();
+    },
+  );
+
   for (final size in const [
     Size(402, 874),
     Size(412, 915),
@@ -306,13 +370,14 @@ void main() {
       final change = find.byKey(const ValueKey('partial-cash-change'));
       final charge = find.byKey(const ValueKey('partial-charge'));
       expect(charge.hitTestable(), findsOneWidget);
+      await tester.ensureVisible(received);
+      await tester.pumpAndSettle();
+      expect(received.hitTestable(), findsOneWidget);
+      expect(tester.getRect(change).bottom, lessThan(size.height));
+      expect(charge.hitTestable(), findsOneWidget);
       expect(
-        tester.getRect(received).overlaps(tester.getRect(change)),
-        isFalse,
-      );
-      expect(
-        (tester.getRect(received).bottom - tester.getRect(change).bottom).abs(),
-        lessThan(1),
+        tester.getRect(received).bottom,
+        lessThan(tester.getRect(change).top),
       );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
@@ -401,6 +466,8 @@ void main() {
       find.byKey(const ValueKey('partial-principal')),
       '40.00',
     );
+    await tester.tap(find.byKey(const ValueKey('partial-tip-disclosure')));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('partial-tip')), '5.00');
     await tester.pumpAndSettle();
 
@@ -638,7 +705,7 @@ void main() {
     (tester) async {
       final repository = _Repo();
       final (cart, checkout) = await _pump(tester, repository);
-      expect(find.text('Cuenta 104'), findsOneWidget);
+      expect(find.text('Cuenta 104'), findsNWidgets(2));
       expect(find.text('Remaining'), findsOneWidget);
       expect(find.text('MXN 116.00'), findsWidgets);
       expect(
@@ -662,6 +729,8 @@ void main() {
       expect(find.text('MXN 76.00'), findsWidgets);
       expect(find.byKey(const ValueKey('partial-payment-0')), findsOneWidget);
 
+      await tester.tap(find.byKey(const ValueKey('partial-tip-disclosure')));
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('partial-tip')),
         '10.00',

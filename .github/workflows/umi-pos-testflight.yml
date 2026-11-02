@@ -225,16 +225,7 @@ jobs:
 
       - name: Native POS client tests
         working-directory: apps/umi-pos
-        run: |
-          flutter test --no-pub \
-            test/catalog_test.dart \
-            test/checkout_test.dart \
-            test/partial_checkout_test.dart \
-            test/checkout_point_tender_test.dart \
-            test/cash_center_test.dart \
-            test/incoming_orders_surface_test.dart \
-            test/operator_permissions_test.dart \
-            test/features/kitchen/
+        run: flutter test --no-pub
 
       # The App Store Connect key is also how Xcode authenticates when it creates
       # the signing assets, so it goes in before the build, not at upload time.
