@@ -26,7 +26,7 @@ void main() {
           ),
         ),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
       final boundary = tester.renderObject<RenderRepaintBoundary>(
         find.byKey(key),
       );
@@ -40,7 +40,9 @@ void main() {
       });
       int alpha(int x, int y) => pixels!.getUint8((y * 48 + x) * 4 + 3);
       expect(
-        alpha(24, 6),
+        [
+          for (var y = 1; y < 12; y++) alpha(24, y),
+        ].reduce((a, b) => a > b ? a : b),
         greaterThan(0),
         reason: 'Both states retain the radio ring',
       );

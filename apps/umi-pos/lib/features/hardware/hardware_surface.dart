@@ -254,7 +254,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
                 // row that could never open anything.
                 PosOutlineButton.icon(
                   onPressed: _busy ? null : _addTerminalDrawer,
-                  icon: const PosIcon(PosGlyphs.pointOfSaleOutlined),
+                  icon: const PosIcon(PosGlyphs.cashDrawer),
                   label: Text(
                     text('Find terminal drawer', 'Buscar cajón de la terminal'),
                   ),
@@ -310,7 +310,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
                       (device) => device.type == 'cash_drawer',
                     ),
                   ),
-            icon: const PosIcon(PosGlyphs.pointOfSaleOutlined),
+            icon: const PosIcon(PosGlyphs.cashDrawer),
             label: Text(
               text(
                 'Issue authorized second open',
@@ -366,7 +366,11 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
               if (_canTest(device))
                 PosOutlineButton.icon(
                   onPressed: _busy ? null : () => _diagnostic(device),
-                  icon: const PosIcon(PosGlyphs.healthAndSafetyOutlined),
+                  icon: PosIcon(
+                    device.type == 'printer'
+                        ? PosGlyphs.printOutlined
+                        : PosGlyphs.healthAndSafetyOutlined,
+                  ),
                   label: Text(text('Run test', 'Ejecutar prueba')),
                 ),
               if (widget.permissions.allows('hardware.manage'))

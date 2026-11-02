@@ -1137,7 +1137,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                             width: width,
                             child: _MethodTile(
                               key: const ValueKey('method-bank-transfer'),
-                              icon: PosGlyphs.accountBalanceWalletOutlined,
+                              icon: PosGlyphs.bank,
                               label: l.bankTransferLabel,
                               selected: bankEnabled,
                               onTap: () => _chooseBank(policy!, totals),
@@ -1828,7 +1828,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         children: [
           Center(
             child: PosIcon(
-              PosGlyphs.accountBalanceWalletOutlined,
+              PosGlyphs.bank,
               size: 56,
               color: scheme.primary,
             ),

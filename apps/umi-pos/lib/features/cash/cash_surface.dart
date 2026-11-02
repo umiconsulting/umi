@@ -1533,7 +1533,7 @@ final class _ActiveShiftSectionState extends State<_ActiveShiftSection> {
       if (actions.contains('no_sale') &&
           permissions.allows('cash.drawer.no_sale'))
         _Action(
-          icon: PosGlyphs.pointOfSaleOutlined,
+          icon: PosGlyphs.cashDrawer,
           label: l.noSaleDrawerAction,
           onPressed: () => _noSale(context, controller),
         ),
