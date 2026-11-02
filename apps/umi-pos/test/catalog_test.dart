@@ -334,7 +334,20 @@ void main() {
         await tester.pump();
         final label = tester.widget<Text>(find.text(name));
         final ink = label.style!.color!;
-        final ground = label.style!.backgroundColor!;
+        expect(label.style!.backgroundColor, isNull);
+        final scrim = tester.widget<DecoratedBox>(
+          find
+              .byWidgetPredicate(
+                (w) =>
+                    w is DecoratedBox &&
+                    w.key.toString().contains('product-photo-scrim-'),
+              )
+              .first,
+        );
+        final gradient =
+            (scrim.decoration as BoxDecoration).gradient! as LinearGradient;
+        final ground = gradient.colors[2];
+        expect(gradient.stops![2], .66);
         for (final image in [
           const Color(0xFF000000),
           const Color(0xFFFFFFFF),

@@ -1803,9 +1803,12 @@ void main() {
 
     expect(find.byType(PartialCheckoutSurface), findsOneWidget);
     expect(find.text('MXN 116.00'), findsWidgets);
-    expect(find.text('This portion'), findsOneWidget);
-    expect(find.text('Tip'), findsOneWidget);
-    expect(find.text('Charge now'), findsOneWidget);
+    expect(find.byKey(const ValueKey('partial-principal')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('partial-tip-disclosure')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('partial-exact-charge')), findsOneWidget);
     expect(find.text('Remaining'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
@@ -1890,8 +1893,14 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byKey(const ValueKey('partial-tip-disclosure')));
+    await tester.pumpAndSettle();
     expect(find.text('Tip for the account owner'), findsOneWidget);
     expect(find.text('Suggested base · MXN 100.00 before tax'), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('partial-tip-bp-1000')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('partial-tip-bp-1000')));
     await tester.pumpAndSettle();
 
@@ -1910,10 +1919,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(tipField().controller?.text, '5.00');
 
+    await tester.ensureVisible(find.byKey(const ValueKey('partial-tip-zero')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('partial-tip-zero')));
     await tester.pumpAndSettle();
     expect(tipField().controller?.text, '0.00');
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('partial-tip-bp-1500')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('partial-tip-bp-1500')));
     await tester.pumpAndSettle();
     expect(tipField().controller?.text, '7.50');
@@ -2027,7 +2042,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(PartialCheckoutSurface), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Close'));
+    await tester.tap(find.text('Back to account'));
     await tester.pumpAndSettle();
 
     expect(find.byType(PartialCheckoutSurface), findsNothing);

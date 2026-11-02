@@ -1275,6 +1275,59 @@ void main() {
     }
   });
 
+  testWidgets('phone Settings remains reachable from the kitchen workspace', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final root = testRoot();
+    final entry = await _readyEntry(const [
+      'cart.write',
+      'kitchen.read',
+      'kitchen.prepare',
+    ]);
+    final board = KitchenBoardController(
+      _BoardRepository(),
+      commands: _CommandRepository(),
+      connectivity: root.connectivity,
+    );
+    await tester.pumpWidget(
+      _app(
+        CatalogSurface(
+          entry: entry,
+          catalog: _catalog(),
+          cart: root.cart,
+          cash: root.cash,
+          checkout: root.checkout,
+          sales: root.sales,
+          exceptions: root.exceptions,
+          connectivity: root.connectivity,
+          telemetry: root.telemetry,
+          kitchenBoard: board,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(_navLabel('Configuración'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sesión'));
+    await tester.pumpAndSettle();
+    final l = AppLocalizations.of(tester.element(find.byType(CatalogSurface)));
+    await tester.tap(find.text(l.kitchenBoardTitle));
+    await tester.pumpAndSettle();
+    expect(find.byType(KitchenBoardSurface), findsOneWidget);
+    await tester.tap(_navLabel('Configuración'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sesión'), findsOneWidget);
+    expect(find.byType(KitchenBoardSurface), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    board.dispose();
+    entry.dispose();
+    root.dispose();
+  });
+
   testWidgets('mobile overflow names the current destination', (tester) async {
     tester.view.physicalSize = const Size(375, 812);
     tester.view.devicePixelRatio = 1;
