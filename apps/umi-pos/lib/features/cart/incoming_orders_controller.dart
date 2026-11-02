@@ -41,12 +41,38 @@ final class IncomingOrdersController extends ChangeNotifier {
   String? _merchantId;
   String? _locationId;
   String? _operatorSessionId;
+  bool _disposed = false;
+  int _loadGeneration = 0;
+
+  bool matchesScope(
+    String merchantId,
+    String locationId,
+    String operatorSessionId,
+  ) =>
+      _merchantId == merchantId &&
+      _locationId == locationId &&
+      _operatorSessionId == operatorSessionId;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _loadGeneration++;
+    super.dispose();
+  }
 
   Future<void> load(
     String merchantId,
     String locationId,
     String operatorSessionId,
   ) async {
+    if (_disposed ||
+        (_state.binding &&
+            matchesScope(merchantId, locationId, operatorSessionId)) ||
+        (_state.phase == IncomingOrdersPhase.loading &&
+            matchesScope(merchantId, locationId, operatorSessionId))) {
+      return;
+    }
+    final generation = ++_loadGeneration;
     _merchantId = merchantId;
     _locationId = locationId;
     _operatorSessionId = operatorSessionId;
@@ -56,6 +82,7 @@ final class IncomingOrdersController extends ChangeNotifier {
         merchantId,
         CartQuery(locationId: locationId, operatorSessionId: operatorSessionId),
       );
+      if (_disposed || generation != _loadGeneration) return;
       _set(
         IncomingOrdersState(
           phase: IncomingOrdersPhase.ready,
@@ -65,6 +92,7 @@ final class IncomingOrdersController extends ChangeNotifier {
       );
       _event('incoming_orders_loaded');
     } on AppException catch (error) {
+      if (_disposed || generation != _loadGeneration) return;
       _failure(error);
     }
   }
@@ -125,6 +153,7 @@ final class IncomingOrdersController extends ChangeNotifier {
       _telemetry.event(ClientEvent(name: name, values: const {}));
 
   void _set(IncomingOrdersState value) {
+    if (_disposed) return;
     _state = value;
     notifyListeners();
   }

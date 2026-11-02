@@ -172,7 +172,10 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Ana'), findsOneWidget);
+    expect(find.textContaining('Ana'), findsWidgets);
+    expect(find.text('wa-1'), findsNWidgets(2));
+    expect(find.textContaining('Recibido'), findsWidgets);
+    expect(find.textContaining('Al atender se vincula'), findsOneWidget);
     expect(find.text('Atender'), findsOneWidget);
 
     await tester.tap(find.text('Atender'));
@@ -241,9 +244,13 @@ void main() {
         await tester.ensureVisible(find.text('Reintentar'));
         await tester.tap(find.text('Reintentar'));
         await tester.pumpAndSettle();
-        expect(find.text('Ana'), findsOneWidget);
+        expect(find.textContaining('Ana'), findsWidgets);
         expect(cart.state.cart, same(original));
         expect(repo.lastBind, isNull);
+        await tester.tap(find.text('wa-1'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('incoming-list')), findsNothing);
+        expect(find.textContaining('Al atender se vincula'), findsOneWidget);
         await tester.ensureVisible(find.text('Atender'));
         final rect = tester.getRect(find.text('Atender'));
         expect(rect.right, lessThanOrEqualTo(375));

@@ -9,6 +9,7 @@ import '../cart/cart_controller.dart';
 import '../cash/money_input.dart';
 import 'checkout_controller.dart';
 import 'payment_account_line.dart';
+import 'payment_method_tile.dart';
 
 // Catalog nests a page for the order header inside its navigation shell.
 // Walk through header-only pages to find the actual permitted navigation.
@@ -1387,27 +1388,35 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
     );
   }
 
-  Widget _methodButton(String value, String title) => PosButton.tonal(
-    key: ValueKey('partial-method-$value'),
-    selected: method == value,
-    onPressed: (busy && !_ledgerLoading) || pendingCommand != null
-        ? null
-        : () async {
-            if (value == 'bank_transfer') {
-              final accepted = await widget.onShowBankTransferDetails(
-                charge,
-                method == value,
-              );
-              if (accepted != true || !mounted) return;
-            }
-            setState(() {
-              method = value;
-              if (value == 'cash' && cashReceived.text.isEmpty) {
-                cashReceived.text = (charge / 100).toStringAsFixed(2);
+  Widget _methodButton(String value, String title) => SizedBox(
+    width: 180,
+    child: PaymentMethodTile(
+      key: ValueKey('partial-method-$value'),
+      icon: switch (value) {
+        'cash' => PosGlyphs.paymentsOutlined,
+        'manual_terminal' => PosGlyphs.creditCardOutlined,
+        _ => PosGlyphs.bank,
+      },
+      label: title,
+      selected: method == value,
+      onTap: (busy && !_ledgerLoading) || pendingCommand != null
+          ? null
+          : () async {
+              if (value == 'bank_transfer') {
+                final accepted = await widget.onShowBankTransferDetails(
+                  charge,
+                  method == value,
+                );
+                if (accepted != true || !mounted) return;
               }
-            });
-          },
-    child: Text(title),
+              setState(() {
+                method = value;
+                if (value == 'cash' && cashReceived.text.isEmpty) {
+                  cashReceived.text = (charge / 100).toStringAsFixed(2);
+                }
+              });
+            },
+    ),
   );
 
   Widget _history(PosThemeData theme) => Column(
