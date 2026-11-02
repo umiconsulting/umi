@@ -920,7 +920,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     await _pollReadyItems();
     if (!mounted) return;
     final permissions = OperatorPermissions(operator.permissions);
-    if (MediaQuery.sizeOf(context).width < 900 &&
+    if (MediaQuery.sizeOf(context).width < 700 &&
         permissions.allows('cart.write')) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -2145,7 +2145,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             TotalsPreview.fromJson(currentCart.totals).grandTotal,
           );
     final orderButton =
-        MediaQuery.sizeOf(context).width < 900 &&
+        MediaQuery.sizeOf(context).width < 700 &&
             canWriteCart &&
             _inlineDetail == null
         ? PosOrderButton.extended(
@@ -2649,7 +2649,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     Widget? scrollingHeader,
   }) {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
-    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final wide = MediaQuery.sizeOf(context).width >= 700;
     final textScale = MediaQuery.textScalerOf(context).scale(16) / 16;
     final search = Builder(
       key: _searchAnchor,
@@ -2684,11 +2684,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           )
         : null;
     final categories = _CategoryTabs(
+      vertical: wide,
       textScale: textScale,
       tabs: [
         _CategoryTab(
           label: l.allCategories,
-          color: PosTheme.of(context).colorScheme.primary,
+          color: const Color(0xFFE9EAF0),
           selected: state.selectedCategoryId == null,
           onTap: () => widget.catalog.selectCategory(null),
         ),
@@ -2713,7 +2714,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               scrollingHeader,
               const SizedBox(height: 8),
               search,
-              if (!keyboard) ...[const SizedBox(height: 8), categories],
+              if (!keyboard) ...[
+                const SizedBox(height: 8),
+                if (!wide) categories,
+              ],
               if (frequent != null) ...[const SizedBox(height: 8), frequent],
               const SizedBox(height: 8),
             ],
@@ -2745,7 +2749,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           },
         ),
         const SizedBox(height: 8),
-        categories,
+        if (!wide) categories,
         if (frequent != null) ...[const SizedBox(height: 12), frequent],
         const SizedBox(height: 12),
         Expanded(child: _content(context, state)),
@@ -2819,9 +2823,16 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(child: detailPane ?? scrollingProducts ?? productPane),
-        const SizedBox(width: 24),
+        const SizedBox(width: 16),
+        SizedBox(width: 132, child: categories),
+        const SizedBox(width: 16),
         SizedBox(
-          width: MediaQuery.sizeOf(context).width >= 1440 ? 380 : 344,
+          key: const ValueKey('catalog-account'),
+          width: MediaQuery.sizeOf(context).width >= 1440
+              ? 380
+              : MediaQuery.sizeOf(context).width >= 1100
+              ? 344
+              : 280,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -3129,14 +3140,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       CatalogPhase.ready => LayoutBuilder(
         builder: (context, size) {
           final textScale = MediaQuery.textScalerOf(context).scale(16) / 16;
-          final window = MediaQuery.sizeOf(context);
-          final shortLandscape = window.width >= 900 && window.height < 650;
-          final columns = textScale < 1.5
-              ? (size.maxWidth / (shortLandscape ? 240 : 180)).floor().clamp(
-                  2,
-                  7,
-                )
-              : (size.maxWidth / (180 * textScale)).floor().clamp(1, 7);
+          final columns = (size.maxWidth / (180 * textScale)).floor().clamp(
+            1,
+            7,
+          );
           // Keep the barista's fast path to sellable café items (audit F8):
           // a zero-price product (space rental, placeholders) cannot be
           // charged, so it does not belong in the sale grid.
@@ -3150,19 +3157,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             crossAxisCount: columns,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
-            mainAxisExtent:
-                (shortLandscape
-                    ? 108
-                    : window.shortestSide < 650
-                    ? 168
-                    : 206) +
-                124 * (textScale - 1).clamp(0, 3),
+            mainAxisExtent: 104 + 72 * (textScale - 1).clamp(0, 3),
           );
           Widget itemBuilder(BuildContext context, int index) =>
               index == products.length
               ? const Center(child: PosSpinner())
               : _ProductCard(
-                  compact: shortLandscape,
                   product: products[index],
                   onTap: () => products[index].availability == 'enabled'
                       ? _showDetail(
@@ -3500,66 +3500,6 @@ final class _AccountMenu extends StatelessWidget {
   }
 }
 
-/// The slant of a folder ear's side, in logical pixels.
-const _folderSlant = 10.0;
-
-/// The radius of the ear's top corners.
-const _folderRadius = 7.0;
-
-/// The owner's proportions for the category tabs: 20% wider and 20% shorter than
-/// the first pass, so the row reads as a flatter strip of dividers across the top
-/// of the menu.
-///
-/// Two named factors rather than new numbers, because these are a proportion of a
-/// shape the operator reads — the next adjustment is a conversation about the
-/// proportion, not about a magic `45.6`. The label keeps its own size (the design
-/// system owns type) and gains the room the wider ear gives it.
-const _folderWidthFactor = 1.2;
-const _folderHeightFactor = 0.8;
-
-/// The extra height of the open ear, which stands in front of the others.
-const _folderFront = 5.0 * _folderHeightFactor;
-
-/// How far an ear tucks under the ear before it. This is what stacks the row.
-const _folderOverlap = 18.0;
-
-/// The room a label keeps to its left and to its right. The room on the left
-/// clears the ear in front of it, so a covered label stays readable.
-const _folderLead = 36.0;
-const _folderTrail = 24.0;
-
-/// The height of an ear. It grows with the text. The ear is the shape an
-/// operator reads; the finger gets the taller box behind it, so the ear can
-/// stay low without taking the till's touch floor with it.
-double _folderEar(double textScale) =>
-    (38 + 20 * (textScale - 1).clamp(0, 3)) * _folderHeightFactor;
-
-/// HOW FAR A DIVIDER LIFTS OFF THE ONE BEHIND IT, in logical pixels.
-///
-/// The folder illusion is a stack, and a stack with no shadow reads as flat
-/// colour: every divider covers its right-hand neighbour edge to edge, so nothing
-/// says which one is in front except the overlap itself. A short shadow under each
-/// ear — drawn from the same path it fills, so it follows the trapezoid and its
-/// rounded corners — is what the metaphor was missing, and it is also what makes
-/// the OPEN divider read as lifted out of the row.
-const _folderShadowLift = 3.0;
-
-/// THE BAND ACROSS THE TOP OF THE OPEN DIVIDER, in logical pixels.
-///
-/// The open divider has been marked three ways before this one: a 2 px outline in its
-/// colour (a frame, not a divider), then a glow of the same colour behind it (light
-/// that also fell onto the menu), and now a band along its own top edge. The band
-/// says which one is open in the place a person looks for it — the edge — and it
-/// costs the menu nothing: it is painted inside the shape, so it cannot spill.
-const _folderStripHeight = 4.0;
-
-/// The room a label keeps inside the ear it is drawn in, at the owner's wider
-/// proportion. The shape is stretched as a whole — insets and box together — so
-/// the label sits in it exactly where it sat before, with more ear around it.
-const _folderLeadWide = _folderLead * _folderWidthFactor;
-const _folderTrailWide = _folderTrail * _folderWidthFactor;
-
-/// One divider of the folder: the category an operator can open.
 final class _CategoryTab {
   const _CategoryTab({
     required this.label,
@@ -3571,366 +3511,92 @@ final class _CategoryTab {
   final Color color;
   final bool selected;
   final VoidCallback? onTap;
-
-  /// The label as the operator reads it on the divider.
-  ///
-  /// The owner asked for the category index in capitals: the row is an index of
-  /// dividers, not a sentence, and capitals are what a folder tab wears. The
-  /// category keeps the name it arrived with, so the screen reader still reads
-  /// the word as it was written and every lookup by name still matches.
-  String get displayLabel => label.toUpperCase();
 }
 
-/// The category index, drawn as the stacked tabs of a file folder.
-///
-/// Every ear is a trapezoid that tucks under the ear before it, so the row
-/// reads as one divider behind another instead of a line of separate buttons.
-/// Each ear keeps its category's own colour at full strength. The open one is
-/// the divider the menu is open at, and it shows that by standing in front of
-/// its neighbours, taller, on the paper of the panel: the fold line runs under
-/// every other ear and stops where the menu is open.
+/// The category index stays between products and the account on tablets.
 final class _CategoryTabs extends StatelessWidget {
-  const _CategoryTabs({required this.tabs, required this.textScale});
+  const _CategoryTabs({
+    required this.tabs,
+    required this.textScale,
+    this.vertical = false,
+  });
   final List<_CategoryTab> tabs;
   final double textScale;
+  final bool vertical;
 
   @override
   Widget build(BuildContext context) {
     final theme = PosTheme.of(context);
-    final p = theme.colorScheme;
-    final ear = _folderEar(textScale);
-    // The finger aims at the box, which keeps the till's touch floor whatever
-    // the ear measures. The strip gives the tallest box its room.
-    final touch = math.max(UmiTouchTarget.minimum, ear + _folderFront);
-    final strip = touch + 1;
-    // A stack has to know where each ear starts, and a position needs a width.
-    // The label is measured in the style it is drawn in — the open one is bold
-    // — so no label is ever cut short by its own ear.
-    final widths = [
-      for (final tab in tabs)
-        // A tab is 20% wider than the label needs: the label keeps its size and the
-        // ear gains the room, which is what makes the row read as wider dividers
-        // rather than as more text.
-        (_labelWidth(context, theme.textTheme.labelLarge!, tab) +
-                _folderLead +
-                _folderTrail) *
-            _folderWidthFactor,
-    ];
-    final starts = <double>[];
-    var travelled = 0.0;
-    for (final width in widths) {
-      starts.add(travelled);
-      travelled += width - _folderOverlap;
-    }
-    final content = tabs.isEmpty ? 0.0 : travelled + _folderOverlap;
-    // Every ear covers the ear to its right, so the stack recedes to the right
-    // the way a folder does. The open one paints last: it stands in front of
-    // both of its neighbours, and the menu reads as open at that divider.
-    final order = [
-      for (var index = tabs.length - 1; index >= 0; index--)
-        if (!tabs[index].selected) index,
-      for (var index = tabs.length - 1; index >= 0; index--)
-        if (tabs[index].selected) index,
-    ];
-    return LayoutBuilder(
-      builder: (context, box) {
-        final viewport = box.maxWidth.isFinite ? box.maxWidth : content;
-        return SizedBox(
-          height: strip,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: math.max(content, viewport),
-              height: strip,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  for (final index in order)
-                    Positioned(
-                      left: starts[index],
-                      // Half a pixel puts the ear's own base line on the same
-                      // pixel row as the line that follows the last ear.
-                      bottom: .5,
-                      child: _CategoryEar(
-                        tab: tabs[index],
-                        width: widths[index],
-                        box: touch,
-                        ear: ear + (tabs[index].selected ? _folderFront : 0),
-                      ),
-                    ),
-                  // The edge of the folder, from the last ear to the end of the
-                  // panel. The open ear covers its own part of this line.
-                  Positioned(
-                    left: content,
-                    right: 0,
-                    bottom: 0,
-                    height: 1,
-                    child: ColoredBox(color: p.outlineVariant),
-                  ),
-                ],
-              ),
+    final palette = theme.colorScheme;
+    Widget tab(_CategoryTab item) {
+      final fill = palette.dark
+          ? Color.alphaBlend(item.color.withValues(alpha: .22), palette.surface)
+          : item.color;
+      final ink = fill.computeLuminance() > .179
+          ? const Color(0xFF17233F)
+          : PosColors.white;
+      return PosTapRegion(
+        semanticLabel: item.label,
+        selected: item.selected,
+        onTap: item.onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          constraints: BoxConstraints(
+            minHeight: vertical ? 84 : UmiTouchTarget.minimum,
+          ),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: item.selected ? palette.onSurface : PosColors.transparent,
+              width: 1.5,
             ),
           ),
-        );
-      },
-    );
-  }
-
-  /// The width a label needs in the style it is drawn in.
-  static double _labelWidth(
-    BuildContext context,
-    TextStyle style,
-    _CategoryTab tab,
-  ) {
-    final painter = TextPainter(
-      text: TextSpan(
-        text: tab.displayLabel,
-        style: style.copyWith(fontWeight: FontWeight.w700),
-      ),
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-      maxLines: 1,
-    )..layout();
-    final width = painter.width;
-    painter.dispose();
-    // A pixel of slack absorbs a rounding difference, so the label is never
-    // elided by its own ear.
-    return width.ceilToDouble() + 2;
-  }
-}
-
-/// The ear of one divider.
-final class _CategoryEar extends StatelessWidget {
-  const _CategoryEar({
-    required this.tab,
-    required this.width,
-    required this.box,
-    required this.ear,
-  });
-  final _CategoryTab tab;
-  final double width;
-
-  /// The room the finger gets.
-  final double box;
-
-  /// The height of the shape itself, measured from the fold line up.
-  final double ear;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = PosTheme.of(context);
-    final p = theme.colorScheme;
-    final open = tab.selected;
-    final enabled = tab.onTap != null;
-    // THE COLOUR AT FULL STRENGTH, AND THE OPEN DIVIDER IS THE PANEL'S PAPER.
-    //
-    // A closed divider used to be the category's colour blended 20% toward white,
-    // and that tint is what made dark ink the only readable choice — a tint cannot
-    // carry white. The owner asked for white labels, and the two go together: the
-    // fill has to be the colour the owner chose (which is also what this class has
-    // claimed all along: "each ear keeps its category's own colour at full
-    // strength"). The dark palette already used the full colour, so this also makes
-    // the two palettes agree.
-    //
-    // Midnight keeps the exact category colour in a band. Neutral surfaces carry
-    // the text. The open divider still joins the panel below it.
-    final fill = !enabled
-        ? p.surfaceContainerHighest
-        : open
-        ? p.background
-        : p.midnight
-        ? p.surfaceContainerHighest
-        : tab.color;
-    final ink = !enabled
-        ? p.onSurfaceVariant
-        : open || p.midnight
-        ? p.onSurface
-        : PosColors.white;
-    return PosTapRegion(
-      selected: open,
-      semanticLabel: tab.label,
-      onTap: tab.onTap,
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(_folderRadius),
-      ),
-      child: SizedBox(
-        width: width,
-        height: box,
-        child: CustomPaint(
-          painter: _FolderEarPainter(
-            fill: fill,
-            // The ink of the theme at low alpha: a shadow is a darker version of
-            // what it falls on, and the palette owns both the paper and the ink.
-            shadow: p.midnight
-                ? PosColors.transparent
-                : p.onSurface.withValues(alpha: p.dark ? .34 : .20),
-            // Midnight shows the category band on each enabled divider.
-            strip: (open || p.midnight) && enabled ? tab.color : null,
-            line: p.outlineVariant,
-            // The shape stands on the fold line, in the lower part of the box.
-            height: ear,
-            // The open ear is the divider the menu is open at: it covers the
-            // fold line and joins the panel, and the others keep the line
-            // under them.
-            base: !open,
-            merge: open ? 2 : 0,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.only(
-              // The wider insets, so the label keeps its place in a tab that grew.
-              left: _folderLeadWide,
-              right: _folderTrailWide,
-              bottom: 7,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  tab.displayLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelLarge!.copyWith(
-                    color: ink,
-                    // 600 × 1.15 rounds to the bundled Bold face (700).
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+          alignment: vertical ? Alignment.topLeft : Alignment.center,
+          child: Text(
+            item.label,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: ink,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
+      );
+    }
+
+    if (vertical) {
+      return ListView(
+        key: const ValueKey('catalog-category-index'),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+            child: Text(
+              Localizations.localeOf(context).languageCode == 'es'
+                  ? 'Categorías'
+                  : 'Categories',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          for (final item in tabs)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: tab(item),
+            ),
+        ],
+      );
+    }
+    return SingleChildScrollView(
+      key: const ValueKey('catalog-category-index'),
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final item in tabs)
+            Padding(padding: const EdgeInsets.only(right: 8), child: tab(item)),
+        ],
       ),
     );
   }
-}
-
-/// The shape of one ear: a trapezoid that is narrower at its top, with the
-/// slanted sides of a folder divider and rounded top corners.
-final class _FolderEarPainter extends CustomPainter {
-  const _FolderEarPainter({
-    required this.fill,
-    required this.shadow,
-    required this.strip,
-    required this.line,
-    required this.height,
-    required this.base,
-    required this.merge,
-  });
-  final Color fill;
-
-  /// The colour the ear casts on whatever is behind it. See `_folderShadowLift`.
-  final Color shadow;
-
-  /// The open divider's own colour, as the band along its top edge. Null for every
-  /// closed ear. See `_folderStripHeight`.
-  final Color? strip;
-
-  /// The colour of the folder's own edge.
-  final Color line;
-
-  /// The height of the shape, measured from the bottom of the box up.
-  final double height;
-
-  /// True while the ear keeps the fold line under it.
-  final bool base;
-
-  /// How far the fill reaches below the ear, to cover the fold line.
-  final double merge;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // LIGHT AROUND THE DIVIDER, AND NOTHING BELOW THE FOLD.
-    //
-    // The shadow and the glow go down first, from the SAME path the fill uses, so
-    // both follow the trapezoid and its rounded corners — and the divider that
-    // paints later (the open one, last of all) drops its own light on the
-    // neighbours it covers on both sides.
-    //
-    // BOTH ARE CUT AT THE FOLD LINE, and that is the point of the clip. A blur of
-    // the whole path bleeds downward past the divider's own base, where it is no
-    // longer depth or a halo: it is a dark smudge or a coloured one lying ON the
-    // menu the divider has just opened. The one edge of this shape that has to meet
-    // the panel cleanly is the bottom one, so the clip ends exactly where the panel
-    // begins; the top and both slants keep their shadow and their glow.
-    canvas.save();
-    canvas.clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
-    canvas.drawShadow(
-      _ear(size, merge: merge),
-      shadow,
-      _folderShadowLift,
-      false,
-    );
-    canvas.restore();
-    // The fill is NOT clipped: the shape reaches below the fold line by `merge` so
-    // it covers its own part of the line, and that is the divider joining the panel.
-    canvas.drawPath(
-      _ear(size, merge: merge),
-      Paint()
-        ..style = PaintingStyle.fill
-        ..color = fill,
-    );
-    // THE BAND IS PAINTED INSIDE THE SHAPE, so it follows the trapezoid's top edge
-    // and its rounded corners exactly, and it stops at the slants instead of
-    // running past them. Clipping is the whole trick: a rectangle drawn on top would
-    // be a rectangle.
-    if (strip case final Color colour) {
-      canvas.save();
-      canvas.clipPath(_ear(size, merge: merge));
-      canvas.drawRect(
-        Rect.fromLTWH(0, size.height - height, size.width, _folderStripHeight),
-        Paint()
-          ..style = PaintingStyle.fill
-          ..color = colour,
-      );
-      canvas.restore();
-    }
-    if (base) {
-      canvas.drawLine(
-        Offset(0, size.height),
-        Offset(size.width, size.height),
-        Paint()
-          ..color = line
-          ..strokeWidth = 1,
-      );
-    }
-  }
-
-  /// The divider's shape: a trapezoid with rounded top corners, standing on the
-  /// fold line and, for the open one, reaching [merge] below it.
-  ///
-  /// One path for everything that touches this divider — the shadow, the glow and
-  /// the fill — so the three can never disagree about where the shape is. It used
-  /// to take a `closed` flag as well, for an outline that was inset by half its own
-  /// stroke width; the outline is gone.
-  Path _ear(Size size, {double merge = 0}) {
-    final base = size.height + merge;
-    final top = size.height - height;
-    final path = Path()
-      ..moveTo(0, base)
-      ..lineTo(_folderSlant, top + _folderRadius)
-      ..arcToPoint(
-        Offset(_folderSlant + _folderRadius, top),
-        radius: const Radius.circular(_folderRadius),
-      )
-      ..lineTo(size.width - _folderSlant - _folderRadius, top)
-      ..arcToPoint(
-        Offset(size.width - _folderSlant, top + _folderRadius),
-        radius: const Radius.circular(_folderRadius),
-      )
-      ..lineTo(size.width, base);
-    return path..close();
-  }
-
-  @override
-  bool shouldRepaint(_FolderEarPainter old) =>
-      old.fill != fill ||
-      old.shadow != shadow ||
-      old.strip != strip ||
-      old.line != line ||
-      old.height != height ||
-      old.base != base ||
-      old.merge != merge;
 }
 
 /// A quick-add rail of the register's most-added products (audit F9), so the
@@ -4001,14 +3667,10 @@ final class _FrequentRail extends StatelessWidget {
 }
 
 final class _ProductCard extends StatelessWidget {
-  const _ProductCard({
-    required this.product,
-    required this.onTap,
-    this.compact = false,
-  });
+  const _ProductCard({required this.product, required this.onTap});
   final CatalogProductSummary product;
   final VoidCallback onTap;
-  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -4020,141 +3682,80 @@ final class _ProductCard extends StatelessWidget {
     final theme = PosTheme.of(context);
     final palette = theme.colorScheme;
     final amount = formatMinorUnits(money.minorUnits, money.currency);
-    // A product the café marked unavailable (no stock, off the menu, not on sale yet)
-    // still belongs on the grid: the barista has to RECOGNISE it to answer "no hay".
-    // So the card dims and carries the words, and the words stay at full contrast —
-    // they are the answer, not the decoration.
     final available = product.availability == 'enabled';
-    if (compact) {
-      return PosCard(
-        margin: EdgeInsets.zero,
-        child: PosTapRegion(
-          semanticLabel:
-              '${product.name}, $amount${available ? '' : ', ${l.unavailableLabel}'}',
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: url == null
-                        ? _ProductPlaceholder(
-                            name: product.name,
-                            category: category,
-                          )
-                        : Image.network(
-                            url,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => _ProductPlaceholder(
-                              name: product.name,
-                              category: category,
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium!.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        available ? amount : '${l.unavailableLabel} · $amount',
-                        style: theme.textTheme.bodySmall!.copyWith(
-                          color: palette.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
     return PosCard(
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       clipBehavior: Clip.antiAlias,
       child: PosTapRegion(
         semanticLabel:
-            '${product.name}, $amount${product.availability == 'enabled' ? '' : ', ${l.unavailableLabel}'}',
+            '${product.name}, $amount${available ? '' : ', ${l.unavailableLabel}'}',
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(10),
         child: Stack(
           fit: StackFit.expand,
           children: [
             Opacity(
               opacity: available ? 1 : .45,
               child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: url == null
-                            ? _ProductPlaceholder(
-                                name: product.name,
-                                category: category,
-                              )
-                            : Image.network(
-                                url,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => _ProductPlaceholder(
+                padding: const EdgeInsets.all(12),
+                child: LayoutBuilder(
+                  builder: (context, box) => Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              product.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              amount,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: palette.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: box.maxWidth < 200 ? 48 : 72,
+                        height: 72,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: url == null
+                              ? _ProductPlaceholder(
                                   name: product.name,
                                   category: category,
+                                )
+                              : Image.network(
+                                  url,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) =>
+                                      _ProductPlaceholder(
+                                        name: product.name,
+                                        category: category,
+                                      ),
                                 ),
-                              ),
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 10, 4, 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            product.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium!.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            amount,
-                            style: theme.textTheme.bodySmall!.copyWith(
-                              color: palette.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
             if (!available)
               Positioned(
                 left: 8,
-                top: 8,
+                top: 4,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -4163,7 +3764,6 @@ final class _ProductCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: palette.surface,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: palette.outlineVariant),
                   ),
                   child: Text(
                     l.unavailableLabel,
@@ -4181,19 +3781,8 @@ final class _ProductCard extends StatelessWidget {
   }
 }
 
-/// A product with no photo gets a solid block of its category's colour with its
-/// own initials on top, so the barista recognizes it at a glance (audit F7).
-///
-/// The tile carries no drawing. An earlier revision painted a product sketch
-/// behind the initials, and it was removed on the owner's instruction: the block
-/// and the letters answer "which product" faster than a line drawing does, and
-/// the drawing read as noise behind a name that is already on the card. This is
-/// the previous design's behaviour, kept as one rule for every catalogue view.
-///
-/// The colour groups the tile by CATEGORY: the owner sets it in the dashboard
-/// (`Categorías`), and when unset the terminal derives a stable hue from the
-/// category name so a category still reads as one block. A product with no
-/// category falls back to its own name.
+/// Missing photos retain product initials and the category color.
+/// Configured colors take priority. Other categories use a stable pastel color.
 final class _ProductPlaceholder extends StatelessWidget {
   const _ProductPlaceholder({required this.name, this.category});
   final String name;
@@ -4213,22 +3802,18 @@ final class _ProductPlaceholder extends StatelessWidget {
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 
-  /// The background a category paints behind photo-less products. Shared with the
-  /// dashboard (see `categoryColor` in the dashboard's categories view) so the
-  /// owner's preview matches the terminal.
+  /// Use the merchant color or a stable category-ID palette entry.
   static Color categoryColor(CatalogCategory? category, String fallbackSeed) {
     final explicit = category?.color;
     if (explicit != null) {
       final parsed = _parseHex(explicit);
       if (parsed != null) return parsed;
     }
-    final seed = category?.name ?? fallbackSeed;
-    return HSLColor.fromAHSL(1, _hue(seed).toDouble(), .42, .32).toColor();
+    const colors = [Color(0xFFDCE8F2), Color(0xFFF2E3D1), Color(0xFFEFDEDA)];
+    return colors[_hue(category?.id ?? fallbackSeed) % colors.length];
   }
 
-  /// djb2 over the lowercased seed, wrapped to 32 bits. `<<5 + self == *33` and the
-  /// mask equals `% 2^32`, which the dashboard mirrors with `(*33) % 4294967296` so
-  /// both derive the identical hue. Deterministic: a category is always one colour.
+  /// Keep the fallback stable across rebuilds and catalog translations.
   static int _hue(String seed) {
     var hash = 5381;
     for (final unit in seed.toLowerCase().codeUnits) {

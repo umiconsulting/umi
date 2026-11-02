@@ -874,751 +874,661 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
               ),
             ),
           ),
-          // The bill on the left, the money the customer put down on the right.
-          //
-          // This was one scrolling column, and the screen the cashier stands in
-          // front of when a customer hands over cash was the one that suffered:
-          // the keypad and the "Cobrar · MXN 55.00" button sat below the fold, so
-          // taking money meant scrolling a live sale with the customer waiting.
-          // The two halves are what the job actually is - read the bill, count
-          // the cash - and they fit side by side on the counter terminal with
-          // nothing to scroll. The left side keeps a scroll view only because
-          // the policy can add tip, discount and receipt sections to it.
-          _ => Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                flex: 6,
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+          // Phones share one scroll. Larger screens keep the bill beside the tender.
+          // The final action remains outside both scroll areas.
+          _ => _CheckoutLayout(
+            summary: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Compact header: the title and a close affordance, with the where
+                // and who folded into one muted line — the amount, not the chrome,
+                // is what the cashier reads first.
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l.checkoutTitle,
+                        style: PosTheme.of(context).textTheme.headlineSmall,
+                      ),
+                    ),
+                    PosIconButton(
+                      tooltip: l.closeAction,
+                      onPressed: () => _closeCheckout(context),
+                      icon: const PosIcon(PosGlyphs.close),
+                    ),
+                  ],
+                ),
+                Text(
+                  [
+                    widget.entry.state.selectedTenant?.name,
+                    widget.entry.state.selectedBranch?.name,
+                    widget.entry.operatorName,
+                  ].whereType<String>().where((v) => v.isNotEmpty).join(' · '),
+                  style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+                    color: PosTheme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: UmiSpacing.lg),
+                // The amount due, extra-large — the number the cashier verifies at a
+                // glance and the star of the tender screen (SOTA POS convention).
+                _TotalHero(
+                  label: l.totalLabel,
+                  amount: _money({
+                    'currency': totals.grandTotal['currency'],
+                    'minorUnits': grandTotal,
+                  }),
+                ),
+                const SizedBox(height: UmiSpacing.md),
+                _AmountRow(
+                  label: l.subtotalLabel,
+                  value: _money(totals.subtotal),
+                ),
+                _AmountRow(label: l.taxLabel, value: _money(totals.tax)),
+                if (paymentSummary != null) ...[
+                  _AmountRow(
+                    label: l.appliedAmountLabel,
+                    value: _money(paymentSummary.appliedAmount),
+                  ),
+                  _AmountRow(
+                    label: l.remainingBalanceLabel,
+                    value: _money(paymentSummary.remainingBalance),
+                  ),
+                  _AmountRow(
+                    label: l.changeDueLabel,
+                    value: _money(paymentSummary.change),
+                  ),
+                ],
+                Text(
+                  '${l.businessDateLabel}: ${totals.businessDate}',
+                  style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+                    color: PosTheme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                // Loyalty and stored value only apply when a customer is
+                // attached. An anonymous sale showed a permanent "Consulta en
+                // curso." block and fired a lookup for a customer that does not
+                // exist — hide the block and skip the lookup (see also
+                // `_loadCustomerValuePreview`).
+                if (widget.customerValue != null && _hasCustomer)
+                  _customerValueSection(totals),
+                const SizedBox(height: UmiSpacing.lg),
+                // What the terminal said about the card attempt, in its
+                // own words where it has any. It stays on screen after the
+                // tile is deselected (a refusal leaves the sale open, and
+                // the operator must be able to read why).
+                if (cardMessage != null) ...[
+                  _cardTerminalNotice(context, cardMessage!),
+                  const SizedBox(height: UmiSpacing.lg),
+                ],
+                // The split control rides on the heading, so the choice to
+                // divide a check is made BEFORE a second tile is tapped
+                // rather than inferred from it.
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l.tenderSelectionTitle,
+                        style: PosTheme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    if (_partialControlOffered(policy))
+                      PosTextButton.icon(
+                        key: const ValueKey('partial-checkout-open'),
+                        onPressed: _openPartialCheckout,
+                        icon: const PosIcon(PosGlyphs.callSplit),
+                        label: Text(l.splitTenderAction),
+                      )
+                    else if (!widget.checkout.supportsPartialPayments &&
+                        _splitControlOffered(policy))
+                      PosTextButton.icon(
+                        key: ValueKey(
+                          splitArmed
+                              ? 'tender-split-disarm'
+                              : 'tender-split-arm',
+                        ),
+                        onPressed: () => _toggleSplit(!splitArmed, totals),
+                        icon: PosIcon(
+                          splitArmed
+                              ? PosGlyphs.mergeType
+                              : PosGlyphs.callSplit,
+                        ),
+                        label: Text(
+                          splitArmed
+                              ? l.splitTenderCancelAction
+                              : l.splitTenderAction,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: UmiSpacing.sm),
+                _tenderReading(context, totals),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = constraints.maxWidth < 760 ? 2 : 4;
+                    final width =
+                        (constraints.maxWidth - UmiSpacing.md * (columns - 1)) /
+                        columns;
+                    return Wrap(
+                      spacing: UmiSpacing.md,
+                      runSpacing: UmiSpacing.md,
+                      children: [
+                        SizedBox(
+                          width: width,
+                          child: _MethodTile(
+                            icon: PosGlyphs.paymentsOutlined,
+                            label: l.cashPayment,
+                            selected: cashEnabled,
+                            onTap: () => _setCash(!cashEnabled, totals),
+                          ),
+                        ),
+                        if (policy?.manualTerminalEnabled ?? false)
+                          SizedBox(
+                            width: width,
+                            child: _MethodTile(
+                              icon: PosGlyphs.creditCardOutlined,
+                              label: l.manualTerminalLabel,
+                              selected: terminalEnabled,
+                              onTap: () =>
+                                  _setTerminal(!terminalEnabled, totals),
+                            ),
+                          ),
+                        if (widget.checkout.cardTerminalProviderId != null)
+                          SizedBox(
+                            width: width,
+                            child: _MethodTile(
+                              key: const ValueKey('method-card-terminal'),
+                              icon: PosGlyphs.contactlessOutlined,
+                              label: l.cardTerminalLabel,
+                              selected: cardEnabled,
+                              onTap: () => _setCard(!cardEnabled, totals),
+                            ),
+                          ),
+                        if (_bankAvailable(policy))
+                          SizedBox(
+                            width: width,
+                            child: _MethodTile(
+                              key: const ValueKey('method-bank-transfer'),
+                              icon: PosGlyphs.accountBalanceWalletOutlined,
+                              label: l.bankTransferLabel,
+                              selected: bankEnabled,
+                              onTap: () => _chooseBank(policy!, totals),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+                // One method per sale here, and more than one way to pay:
+                // say so under the tiles rather than let a tap on a second
+                // tile be read as a choice the location does not allow.
+                if (!_mixedTenderAllowed && _methodsOffered(policy) > 1) ...[
+                  const SizedBox(height: UmiSpacing.xs),
+                  Text(
+                    l.singleMethodOnlyNote,
+                    style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+                      color: PosTheme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                if (cashEnabled) ...[
+                  const SizedBox(height: UmiSpacing.lg),
+                  // Split tender only: how much of the bill goes on cash (the rest
+                  // is charged to the card, whichever card tile is on). A
+                  // single-method cash sale collects the whole total, so this field
+                  // is hidden and the total stands.
+                  if (terminalEnabled || cardEnabled || bankEnabled) ...[
+                    PosField(
+                      controller: cashApplied,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: cashAmountFormatters,
+                      decoration: PosFieldDecoration(
+                        labelText: l.cashTenderTitle,
+                        errorText: parseMinorUnits(cashApplied.text) == null
+                            ? l.invalidAmountMessage
+                            : null,
+                      ),
+                      onChanged: (_) => _editSplitAmount('cash'),
+                    ),
+                    const SizedBox(height: UmiSpacing.md),
+                  ],
+                  // Cash received: a big right-aligned amount the keypad and the
+                  // quick-cash notes both drive, so a barista never hunts for the
+                  // decimal key on a busy till.
+                  PosField(
+                    controller: cashReceived,
+                    // No system keyboard: the keypad below is the input, and it is
+                    // the one the till has. `readOnly` also keeps the caret out of a
+                    // field the operator only reads.
+                    readOnly: true,
+                    showCursor: false,
+                    inputFormatters: cashAmountFormatters,
+                    textAlign: TextAlign.right,
+                    style: PosTheme.of(context).textTheme.headlineSmall,
+                    decoration: PosFieldDecoration(
+                      labelText: l.cashReceivedLabel,
+                      errorText: parseMinorUnits(cashReceived.text) == null
+                          ? l.invalidAmountMessage
+                          : null,
+                    ),
+                    // A tap points the keypad here and selects the seeded figure, so
+                    // the first digit the operator types REPLACES it. Without the
+                    // selection the amount they hand over is appended to the total
+                    // (55.00 → 55.00500) and the checkout refuses it.
+                    onTap: () {
+                      setState(() {
+                        _padTarget = 'cash';
+                        cashReceived.selection = TextSelection(
+                          baseOffset: 0,
+                          extentOffset: cashReceived.text.length,
+                        );
+                      });
+                    },
+                    onChanged: (_) => setState(() {
+                      dirty = true;
+                      tenderEdited = true;
+                      cashReceivedEdited = true;
+                    }),
+                  ),
+                  const SizedBox(height: UmiSpacing.sm),
+                  Row(
                     children: [
-                      // Compact header: the title and a close affordance, with the where
-                      // and who folded into one muted line — the amount, not the chrome,
-                      // is what the cashier reads first.
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              l.checkoutTitle,
-                              style: PosTheme.of(
-                                context,
-                              ).textTheme.headlineSmall,
-                            ),
+                      Expanded(
+                        child: _QuickCashButton(
+                          label: l.exactAmountAction,
+                          onTap: () => _setCashReceived(
+                            (totals.grandTotal['minorUnits']! as num).toInt(),
                           ),
-                          PosIconButton(
-                            tooltip: l.closeAction,
-                            onPressed: () => _closeCheckout(context),
-                            icon: const PosIcon(PosGlyphs.close),
-                          ),
-                        ],
+                        ),
                       ),
-                      Text(
-                        [
-                              widget.entry.state.selectedTenant?.name,
-                              widget.entry.state.selectedBranch?.name,
-                              widget.entry.operatorName,
-                            ]
-                            .whereType<String>()
-                            .where((v) => v.isNotEmpty)
-                            .join(' · '),
-                        style: PosTheme.of(context).textTheme.bodySmall
-                            ?.copyWith(
-                              color: PosTheme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                      const SizedBox(height: UmiSpacing.lg),
-                      // The amount due, extra-large — the number the cashier verifies at a
-                      // glance and the star of the tender screen (SOTA POS convention).
-                      _TotalHero(
-                        label: l.totalLabel,
-                        amount: _money({
-                          'currency': totals.grandTotal['currency'],
-                          'minorUnits': grandTotal,
-                        }),
-                      ),
-                      const SizedBox(height: UmiSpacing.md),
-                      _AmountRow(
-                        label: l.subtotalLabel,
-                        value: _money(totals.subtotal),
-                      ),
-                      _AmountRow(label: l.taxLabel, value: _money(totals.tax)),
-                      if (paymentSummary != null) ...[
-                        _AmountRow(
-                          label: l.appliedAmountLabel,
-                          value: _money(paymentSummary.appliedAmount),
-                        ),
-                        _AmountRow(
-                          label: l.remainingBalanceLabel,
-                          value: _money(paymentSummary.remainingBalance),
-                        ),
-                        _AmountRow(
-                          label: l.changeDueLabel,
-                          value: _money(paymentSummary.change),
-                        ),
-                      ],
-                      Text(
-                        '${l.businessDateLabel}: ${totals.businessDate}',
-                        style: PosTheme.of(context).textTheme.bodySmall
-                            ?.copyWith(
-                              color: PosTheme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                      // Loyalty and stored value only apply when a customer is
-                      // attached. An anonymous sale showed a permanent "Consulta en
-                      // curso." block and fired a lookup for a customer that does not
-                      // exist — hide the block and skip the lookup (see also
-                      // `_loadCustomerValuePreview`).
-                      if (widget.customerValue != null && _hasCustomer)
-                        _customerValueSection(totals),
-                      const SizedBox(height: UmiSpacing.lg),
-                      // What the terminal said about the card attempt, in its
-                      // own words where it has any. It stays on screen after the
-                      // tile is deselected (a refusal leaves the sale open, and
-                      // the operator must be able to read why).
-                      if (cardMessage != null) ...[
-                        _cardTerminalNotice(context, cardMessage!),
-                        const SizedBox(height: UmiSpacing.lg),
-                      ],
-                      // The split control rides on the heading, so the choice to
-                      // divide a check is made BEFORE a second tile is tapped
-                      // rather than inferred from it.
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              l.tenderSelectionTitle,
-                              style: PosTheme.of(context).textTheme.titleMedium,
-                            ),
+                      for (final value in const [10000, 20000, 50000]) ...[
+                        const SizedBox(width: UmiSpacing.sm),
+                        Expanded(
+                          child: _QuickCashButton(
+                            label: _money({
+                              'currency': totals.grandTotal['currency'],
+                              'minorUnits': value,
+                            }),
+                            onTap: () => _setCashReceived(value),
                           ),
-                          if (_partialControlOffered(policy))
-                            PosTextButton.icon(
-                              key: const ValueKey('partial-checkout-open'),
-                              onPressed: _openPartialCheckout,
-                              icon: const PosIcon(PosGlyphs.callSplit),
-                              label: Text(l.splitTenderAction),
-                            )
-                          else if (!widget.checkout.supportsPartialPayments &&
-                              _splitControlOffered(policy))
-                            PosTextButton.icon(
-                              key: ValueKey(
-                                splitArmed
-                                    ? 'tender-split-disarm'
-                                    : 'tender-split-arm',
-                              ),
-                              onPressed: () =>
-                                  _toggleSplit(!splitArmed, totals),
-                              icon: PosIcon(
-                                splitArmed
-                                    ? PosGlyphs.mergeType
-                                    : PosGlyphs.callSplit,
-                              ),
-                              label: Text(
-                                splitArmed
-                                    ? l.splitTenderCancelAction
-                                    : l.splitTenderAction,
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: UmiSpacing.sm),
-                      _tenderReading(context, totals),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final columns = constraints.maxWidth < 760 ? 2 : 4;
-                          final width =
-                              (constraints.maxWidth -
-                                  UmiSpacing.md * (columns - 1)) /
-                              columns;
-                          return Wrap(
-                            spacing: UmiSpacing.md,
-                            runSpacing: UmiSpacing.md,
-                            children: [
-                              SizedBox(
-                                width: width,
-                                child: _MethodTile(
-                                  icon: PosGlyphs.paymentsOutlined,
-                                  label: l.cashPayment,
-                                  selected: cashEnabled,
-                                  onTap: () => _setCash(!cashEnabled, totals),
-                                ),
-                              ),
-                              if (policy?.manualTerminalEnabled ?? false)
-                                SizedBox(
-                                  width: width,
-                                  child: _MethodTile(
-                                    icon: PosGlyphs.creditCardOutlined,
-                                    label: l.manualTerminalLabel,
-                                    selected: terminalEnabled,
-                                    onTap: () =>
-                                        _setTerminal(!terminalEnabled, totals),
-                                  ),
-                                ),
-                              if (widget.checkout.cardTerminalProviderId !=
-                                  null)
-                                SizedBox(
-                                  width: width,
-                                  child: _MethodTile(
-                                    key: const ValueKey('method-card-terminal'),
-                                    icon: PosGlyphs.contactlessOutlined,
-                                    label: l.cardTerminalLabel,
-                                    selected: cardEnabled,
-                                    onTap: () => _setCard(!cardEnabled, totals),
-                                  ),
-                                ),
-                              if (_bankAvailable(policy))
-                                SizedBox(
-                                  width: width,
-                                  child: _MethodTile(
-                                    key: const ValueKey('method-bank-transfer'),
-                                    icon:
-                                        PosGlyphs.accountBalanceWalletOutlined,
-                                    label: l.bankTransferLabel,
-                                    selected: bankEnabled,
-                                    onTap: () => _chooseBank(policy!, totals),
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-                      // One method per sale here, and more than one way to pay:
-                      // say so under the tiles rather than let a tap on a second
-                      // tile be read as a choice the location does not allow.
-                      if (!_mixedTenderAllowed &&
-                          _methodsOffered(policy) > 1) ...[
-                        const SizedBox(height: UmiSpacing.xs),
-                        Text(
-                          l.singleMethodOnlyNote,
-                          style: PosTheme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: PosTheme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                      ],
-                      if (cashEnabled) ...[
-                        const SizedBox(height: UmiSpacing.lg),
-                        // Split tender only: how much of the bill goes on cash (the rest
-                        // is charged to the card, whichever card tile is on). A
-                        // single-method cash sale collects the whole total, so this field
-                        // is hidden and the total stands.
-                        if (terminalEnabled || cardEnabled || bankEnabled) ...[
-                          PosField(
-                            controller: cashApplied,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            inputFormatters: cashAmountFormatters,
-                            decoration: PosFieldDecoration(
-                              labelText: l.cashTenderTitle,
-                              errorText:
-                                  parseMinorUnits(cashApplied.text) == null
-                                  ? l.invalidAmountMessage
-                                  : null,
-                            ),
-                            onChanged: (_) => _editSplitAmount('cash'),
-                          ),
-                          const SizedBox(height: UmiSpacing.md),
-                        ],
-                        // Cash received: a big right-aligned amount the keypad and the
-                        // quick-cash notes both drive, so a barista never hunts for the
-                        // decimal key on a busy till.
-                        PosField(
-                          controller: cashReceived,
-                          // No system keyboard: the keypad below is the input, and it is
-                          // the one the till has. `readOnly` also keeps the caret out of a
-                          // field the operator only reads.
-                          readOnly: true,
-                          showCursor: false,
-                          inputFormatters: cashAmountFormatters,
-                          textAlign: TextAlign.right,
-                          style: PosTheme.of(context).textTheme.headlineSmall,
-                          decoration: PosFieldDecoration(
-                            labelText: l.cashReceivedLabel,
-                            errorText:
-                                parseMinorUnits(cashReceived.text) == null
-                                ? l.invalidAmountMessage
-                                : null,
-                          ),
-                          // A tap points the keypad here and selects the seeded figure, so
-                          // the first digit the operator types REPLACES it. Without the
-                          // selection the amount they hand over is appended to the total
-                          // (55.00 → 55.00500) and the checkout refuses it.
-                          onTap: () {
-                            setState(() {
-                              _padTarget = 'cash';
-                              cashReceived.selection = TextSelection(
-                                baseOffset: 0,
-                                extentOffset: cashReceived.text.length,
-                              );
-                            });
-                          },
-                          onChanged: (_) => setState(() {
-                            dirty = true;
-                            tenderEdited = true;
-                            cashReceivedEdited = true;
-                          }),
-                        ),
-                        const SizedBox(height: UmiSpacing.sm),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _QuickCashButton(
-                                label: l.exactAmountAction,
-                                onTap: () => _setCashReceived(
-                                  (totals.grandTotal['minorUnits']! as num)
-                                      .toInt(),
-                                ),
-                              ),
-                            ),
-                            for (final value in const [
-                              10000,
-                              20000,
-                              50000,
-                            ]) ...[
-                              const SizedBox(width: UmiSpacing.sm),
-                              Expanded(
-                                child: _QuickCashButton(
-                                  label: _money({
-                                    'currency': totals.grandTotal['currency'],
-                                    'minorUnits': value,
-                                  }),
-                                  onTap: () => _setCashReceived(value),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: UmiSpacing.md),
-                      ],
-                      if (terminalEnabled) ...[
-                        const SizedBox(height: UmiSpacing.lg),
-                        Text(
-                          l.manualTerminalLabel,
-                          style: PosTheme.of(context).textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: UmiSpacing.sm),
-                        PosField(
-                          controller: terminalAmount,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: cashAmountFormatters,
-                          decoration: PosFieldDecoration(
-                            labelText: l.tenderAmountLabel,
-                            errorText:
-                                parseMinorUnits(terminalAmount.text) == null
-                                ? l.invalidAmountMessage
-                                : null,
-                          ),
-                          onChanged: (_) => _editSplitAmount('terminal'),
-                        ),
-                        const SizedBox(height: UmiSpacing.sm),
-                        Wrap(
-                          spacing: UmiSpacing.sm,
-                          runSpacing: UmiSpacing.sm,
-                          children: [
-                            PosChoice(
-                              label: Text(l.terminalProcessingAction),
-                              selected:
-                                  terminalStatus ==
-                                  'operator_processing_externally',
-                              onSelected: (_) => _terminalOutcome(
-                                'operator_processing_externally',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      // The card terminal's panel. The operator declares
-                      // NOTHING here: the terminal is the witness, and the till
-                      // follows its attempt until it answers.
-                      if (cardEnabled) ...[
-                        const SizedBox(height: UmiSpacing.lg),
-                        Text(
-                          l.cardTerminalLabel,
-                          style: PosTheme.of(context).textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: UmiSpacing.sm),
-                        PosField(
-                          controller: cardAmount,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: cashAmountFormatters,
-                          decoration: PosFieldDecoration(
-                            labelText: l.tenderAmountLabel,
-                            errorText: parseMinorUnits(cardAmount.text) == null
-                                ? l.invalidAmountMessage
-                                : null,
-                          ),
-                          onChanged: (_) => _editSplitAmount('card'),
-                        ),
-                        const SizedBox(height: UmiSpacing.sm),
-                        _cardTerminalProgress(context),
-                        // The card FACE owns this action when the card has the
-                        // whole screen; the panel owns it only on a split, where
-                        // the cash keypad keeps the right column.
-                        if (cardWaiting && cashEnabled) ...[
-                          const SizedBox(height: UmiSpacing.sm),
-                          PosTextButton(
-                            onPressed: _stopWaitingForCardTerminal,
-                            child: Text(l.terminalStopWaitingAction),
-                          ),
-                        ],
-                      ],
-                      if (bankEnabled) ...[
-                        const SizedBox(height: UmiSpacing.lg),
-                        Text(
-                          l.bankTransferLabel,
-                          style: PosTheme.of(context).textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: UmiSpacing.sm),
-                        PosField(
-                          key: const ValueKey('bank-transfer-amount'),
-                          controller: bankAmount,
-                          readOnly: true,
-                          decoration: PosFieldDecoration(
-                            labelText: l.tenderAmountLabel,
-                          ),
-                        ),
-                        const SizedBox(height: UmiSpacing.xs),
-                        Text(
-                          l.bankTransferPendingNote,
-                          style: PosTheme.of(context).textTheme.bodySmall,
-                        ),
-                        PosTextButton(
-                          onPressed: () =>
-                              _showBankInstructions(policy!, totals),
-                          child: Text(l.bankTransferViewDetails),
-                        ),
-                      ],
-                      if (policy?.tip['enabled'] == true) ...[
-                        const SizedBox(height: UmiSpacing.lg),
-                        Text(
-                          l.tipLabel,
-                          style: PosTheme.of(context).textTheme.titleMedium,
-                        ),
-                        Wrap(
-                          spacing: UmiSpacing.sm,
-                          children: [
-                            PosChoice(
-                              label: Text(l.noTipAction),
-                              selected: tipKind == 'none',
-                              onSelected: (_) => _clearTip(),
-                            ),
-                            for (final raw
-                                in policy!.tip['presetBasisPoints']!
-                                    as List<Object?>)
-                              PosChoice(
-                                label: Text('${(raw as num).toInt() ~/ 100}%'),
-                                selected:
-                                    tipKind == 'percentage' &&
-                                    tipBasisPoints == raw.toInt(),
-                                onSelected: (_) =>
-                                    _setTipPercentage(raw.toInt()),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: UmiSpacing.sm),
-                        Row(
-                          children: [
-                            if (policy.tip['customPercentageEnabled'] == true)
-                              Expanded(
-                                child: PosField(
-                                  key: const ValueKey('custom-tip-percentage'),
-                                  controller: customTipPercent,
-                                  // Same rule as the cash received: the keypad writes, the
-                                  // field shows. Tapping it is what moves the keypad here.
-                                  readOnly: true,
-                                  showCursor: false,
-                                  decoration: PosFieldDecoration(
-                                    labelText: l.customTipPercentLabel,
-                                  ),
-                                  // Tapping the field is how the operator says "I am typing
-                                  // this number now": it takes the keypad and starts a fresh
-                                  // percentage, so a preset they had chosen is not appended
-                                  // to (15 + 5 is not 155 %).
-                                  onTap: () {
-                                    FocusManager.instance.primaryFocus
-                                        ?.unfocus();
-                                    setState(() {
-                                      _padTarget = 'tip_percent';
-                                      customTipPercent.text = '';
-                                      tipKind = 'percentage';
-                                      tipBasisPoints = 0;
-                                      dirty = true;
-                                    });
-                                  },
-                                ),
-                              ),
-                            if (policy.tip['customPercentageEnabled'] == true &&
-                                policy.tip['customFixedEnabled'] == true)
-                              const SizedBox(width: UmiSpacing.md),
-                            if (policy.tip['customFixedEnabled'] == true)
-                              Expanded(
-                                child: PosField(
-                                  key: const ValueKey('custom-tip-fixed'),
-                                  controller: customTipFixed,
-                                  readOnly: true,
-                                  showCursor: false,
-                                  decoration: PosFieldDecoration(
-                                    labelText: l.customTipFixedLabel,
-                                  ),
-                                  onTap: () {
-                                    FocusManager.instance.primaryFocus
-                                        ?.unfocus();
-                                    setState(() {
-                                      _padTarget = 'tip_fixed';
-                                      customTipFixed.clear();
-                                      tipKind = 'fixed';
-                                      dirty = true;
-                                    });
-                                  },
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                      if (policy?.discount['enabled'] == true) ...[
-                        const SizedBox(height: UmiSpacing.lg),
-                        Text(
-                          l.discountLabel,
-                          style: PosTheme.of(context).textTheme.titleMedium,
-                        ),
-                        Wrap(
-                          spacing: UmiSpacing.sm,
-                          children: [
-                            PosChoice(
-                              label: Text(l.percentageDiscountAction),
-                              selected: discountType == 'order_percentage',
-                              onSelected: (_) =>
-                                  _setDiscountType('order_percentage'),
-                            ),
-                            PosChoice(
-                              label: Text(l.fixedDiscountAction),
-                              selected: discountType == 'order_fixed',
-                              onSelected: (_) =>
-                                  _setDiscountType('order_fixed'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: UmiSpacing.sm),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: PosField(
-                                controller: discountPercent,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: false,
-                                    ),
-                                decoration: PosFieldDecoration(
-                                  labelText: discountType == 'order_fixed'
-                                      ? l.discountAmountLabel
-                                      : l.discountPercentLabel,
-                                ),
-                                // A discount moves the amount due (and the base the tip is
-                                // computed on), so the tenders are re-seeded with it.
-                                onChanged: (_) {
-                                  setState(() => dirty = true);
-                                  _rebalanceForDraftChange();
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: UmiSpacing.md),
-                            Expanded(
-                              child: PosField(
-                                controller: discountReason,
-                                decoration: PosFieldDecoration(
-                                  labelText: l.discountReasonLabel,
-                                ),
-                                // The reason is what makes the discount travel (`_discountDrafts`
-                                // drops one without it), so it can turn the discount on and off.
-                                onChanged: (_) {
-                                  setState(() => dirty = true);
-                                  _rebalanceForDraftChange();
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      // One message at a time. A recovered conflict already says
-                      // what happened and what to do; the draft's own stale error
-                      // underneath it is the second, contradictory sentence the
-                      // owner read on this screen.
-                      if (state.errorCode != null &&
-                          !recoveredTenderConflict) ...[
-                        const SizedBox(height: UmiSpacing.md),
-                        Semantics(
-                          liveRegion: true,
-                          child: Text(
-                            checkoutFailureMessage(l, state.errorCode!),
-                            style: TextStyle(
-                              color: PosTheme.of(context).colorScheme.error,
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (state.phase == CheckoutPhase.confirmationRequired &&
-                          !_chargeInFlight) ...[
-                        const SizedBox(height: UmiSpacing.lg),
-                        Semantics(
-                          liveRegion: true,
-                          child: Text(l.totalsConfirmedBody),
                         ),
                       ],
                     ],
                   ),
-                ),
-              ),
-              const SizedBox(width: UmiSpacing.lg),
-              Expanded(
-                flex: 5,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // THE CARD FACE CENTRES; THE OTHERS READ TOP-DOWN. A tender
-                    // that is waiting on a terminal is not a form — it is one
-                    // fact ("the terminal has not answered yet") and the operator
-                    // stands there watching it. Left at the top of a 5/11 column
-                    // it was a small card with ~700 px of empty panel under it
-                    // and the charge button stranded at the bottom, which reads
-                    // as a half-drawn screen rather than as a wait. So, and only
-                    // while the card face is the one on screen, the switch takes
-                    // the column's free space and centres what it draws.
-                    // A card face is a full-column statement because a tender
-                    // waiting on a terminal IS the whole job — unless the card is
-                    // only part of a divided check. On a cash + card split the
-                    // cashier still has to take the cash and read the change, so
-                    // the keypad keeps the column and the card's own amount and
-                    // progress stay in the bill column, where they already are.
-                    //
-                    // Both card faces sit in the free space rather than at the
-                    // top of it: whichever terminal owns the sale, the panel is
-                    // one fact to watch, and left at the top it stranded ~400 px
-                    // of empty panel under itself on a 1080-tall till.
-                    if (!cashEnabled)
-                      Expanded(
-                        child: Center(
-                          child: AnimatedSwitcher(
-                            duration:
-                                (MediaQuery.maybeDisableAnimationsOf(context) ??
-                                    false)
-                                ? Duration.zero
-                                : UmiMotion.standard,
-                            transitionBuilder: (child, animation) =>
-                                FadeTransition(
-                                  opacity: animation,
-                                  child: SlideTransition(
-                                    position: Tween<Offset>(
-                                      begin: const Offset(0, 0.04),
-                                      end: Offset.zero,
-                                    ).animate(animation),
-                                    child: child,
-                                  ),
-                                ),
-                            child: _padTarget.startsWith('tip_')
-                                ? _tipKeypadFace(context)
-                                : cardEnabled
-                                ? _cardTerminalFace(context, totals)
-                                : bankEnabled
-                                ? _bankTransferFace(context, totals, policy)
-                                : _terminalTenderFace(context, totals),
-                          ),
-                        ),
-                      )
-                    else
-                      AnimatedSwitcher(
-                        // The keypad belongs to cash. A short slide makes the
-                        // surface read as a swap rather than as a redraw.
-                        duration:
-                            (MediaQuery.maybeDisableAnimationsOf(context) ??
-                                false)
-                            ? Duration.zero
-                            : UmiMotion.standard,
-                        transitionBuilder: (child, animation) => FadeTransition(
-                          opacity: animation,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 0.04),
-                              end: Offset.zero,
-                            ).animate(animation),
-                            child: child,
-                          ),
-                        ),
-                        // Cash on the sale keeps the cash face — on a divided
-                        // check too, because the keypad is what takes the cash.
-                        child: _cashTenderFace(totals, grandTotal),
-                      ),
-                    // The terminal faces already took the free space (above),
-                    // so the spacer belongs to the keypad, which keeps its own
-                    // height and must not drift away from the charge button.
-                    if (cashEnabled) const Spacer(),
-                    PosButton(
-                      // An unreadable amount never leaves the terminal. Sending it
-                      // meant tendering a number the cashier did not type.
-                      style: PosButton.styleFrom(
-                        minimumSize: const Size.fromHeight(64),
-                        textStyle: PosTheme.of(context).textTheme.titleLarge,
-                      ),
-                      // While a charge is at the terminal the button is inert:
-                      // pressing it again must never ask for a second charge.
-                      // Once the wait is over (approved, or unresolved) it is
-                      // live again, because those are decisions.
-                      onPressed:
-                          !_amountsReadable ||
-                              _chargeInFlight ||
-                              (cashEnabled &&
-                                  _minorUnits(cashReceived.text) <
-                                      ((terminalEnabled ||
-                                              cardEnabled ||
-                                              bankEnabled)
-                                          ? _minorUnits(cashApplied.text)
-                                          : grandTotal)) ||
-                              // A recovered combination this location cannot take
-                              // cannot be charged either, and offering a live
-                              // button for it is the contradiction itself.
-                              recoveredTenderConflict ||
-                              cardCaptureInFlight ||
-                              cardWaiting ||
-                              // Never send an external payment for a different
-                              // amount than the bill, even with one tender.
-                              ((terminalEnabled ||
-                                      cardEnabled ||
-                                      bankEnabled) &&
-                                  _tenderedLegsMinorUnits != grandTotal)
-                          ? null
-                          : state.phase == CheckoutPhase.awaitingApproval
-                          ? () => _requestApproval(context)
-                          : state.phase == CheckoutPhase.confirmationRequired &&
-                                !dirty
-                          ? () => _confirm(totals)
-                          : () => _review(totals),
-                      child: Text(
-                        state.phase == CheckoutPhase.awaitingApproval
-                            ? l.managerApprovalAction
-                            // The total rides on the button, so the cashier confirms
-                            // the amount at the moment of the tap (SOTA convention).
-                            : '${l.checkoutAction} · ${_money({'currency': totals.grandTotal['currency'], 'minorUnits': grandTotal})}',
-                      ),
+                  const SizedBox(height: UmiSpacing.md),
+                ],
+                if (terminalEnabled) ...[
+                  const SizedBox(height: UmiSpacing.lg),
+                  Text(
+                    l.manualTerminalLabel,
+                    style: PosTheme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: UmiSpacing.sm),
+                  PosField(
+                    controller: terminalAmount,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
                     ),
+                    inputFormatters: cashAmountFormatters,
+                    decoration: PosFieldDecoration(
+                      labelText: l.tenderAmountLabel,
+                      errorText: parseMinorUnits(terminalAmount.text) == null
+                          ? l.invalidAmountMessage
+                          : null,
+                    ),
+                    onChanged: (_) => _editSplitAmount('terminal'),
+                  ),
+                  const SizedBox(height: UmiSpacing.sm),
+                  Wrap(
+                    spacing: UmiSpacing.sm,
+                    runSpacing: UmiSpacing.sm,
+                    children: [
+                      PosChoice(
+                        label: Text(l.terminalProcessingAction),
+                        selected:
+                            terminalStatus == 'operator_processing_externally',
+                        onSelected: (_) =>
+                            _terminalOutcome('operator_processing_externally'),
+                      ),
+                    ],
+                  ),
+                ],
+                // The card terminal's panel. The operator declares
+                // NOTHING here: the terminal is the witness, and the till
+                // follows its attempt until it answers.
+                if (cardEnabled) ...[
+                  const SizedBox(height: UmiSpacing.lg),
+                  Text(
+                    l.cardTerminalLabel,
+                    style: PosTheme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: UmiSpacing.sm),
+                  PosField(
+                    controller: cardAmount,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: cashAmountFormatters,
+                    decoration: PosFieldDecoration(
+                      labelText: l.tenderAmountLabel,
+                      errorText: parseMinorUnits(cardAmount.text) == null
+                          ? l.invalidAmountMessage
+                          : null,
+                    ),
+                    onChanged: (_) => _editSplitAmount('card'),
+                  ),
+                  const SizedBox(height: UmiSpacing.sm),
+                  _cardTerminalProgress(context),
+                  // The card FACE owns this action when the card has the
+                  // whole screen; the panel owns it only on a split, where
+                  // the cash keypad keeps the right column.
+                  if (cardWaiting && cashEnabled) ...[
                     const SizedBox(height: UmiSpacing.sm),
                     PosTextButton(
-                      onPressed: () => _closeCheckout(context),
-                      child: Text(l.closeAction),
+                      onPressed: _stopWaitingForCardTerminal,
+                      child: Text(l.terminalStopWaitingAction),
                     ),
                   ],
+                ],
+                if (bankEnabled) ...[
+                  const SizedBox(height: UmiSpacing.lg),
+                  Text(
+                    l.bankTransferLabel,
+                    style: PosTheme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: UmiSpacing.sm),
+                  PosField(
+                    key: const ValueKey('bank-transfer-amount'),
+                    controller: bankAmount,
+                    readOnly: true,
+                    decoration: PosFieldDecoration(
+                      labelText: l.tenderAmountLabel,
+                    ),
+                  ),
+                  const SizedBox(height: UmiSpacing.xs),
+                  Text(
+                    l.bankTransferPendingNote,
+                    style: PosTheme.of(context).textTheme.bodySmall,
+                  ),
+                  PosTextButton(
+                    onPressed: () => _showBankInstructions(policy!, totals),
+                    child: Text(l.bankTransferViewDetails),
+                  ),
+                ],
+                if (policy?.tip['enabled'] == true) ...[
+                  const SizedBox(height: UmiSpacing.lg),
+                  Text(
+                    l.tipLabel,
+                    style: PosTheme.of(context).textTheme.titleMedium,
+                  ),
+                  Wrap(
+                    spacing: UmiSpacing.sm,
+                    children: [
+                      PosChoice(
+                        label: Text(l.noTipAction),
+                        selected: tipKind == 'none',
+                        onSelected: (_) => _clearTip(),
+                      ),
+                      for (final raw
+                          in policy!.tip['presetBasisPoints']! as List<Object?>)
+                        PosChoice(
+                          label: Text('${(raw as num).toInt() ~/ 100}%'),
+                          selected:
+                              tipKind == 'percentage' &&
+                              tipBasisPoints == raw.toInt(),
+                          onSelected: (_) => _setTipPercentage(raw.toInt()),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: UmiSpacing.sm),
+                  Row(
+                    children: [
+                      if (policy.tip['customPercentageEnabled'] == true)
+                        Expanded(
+                          child: PosField(
+                            key: const ValueKey('custom-tip-percentage'),
+                            controller: customTipPercent,
+                            // Same rule as the cash received: the keypad writes, the
+                            // field shows. Tapping it is what moves the keypad here.
+                            readOnly: true,
+                            showCursor: false,
+                            decoration: PosFieldDecoration(
+                              labelText: l.customTipPercentLabel,
+                            ),
+                            // Tapping the field is how the operator says "I am typing
+                            // this number now": it takes the keypad and starts a fresh
+                            // percentage, so a preset they had chosen is not appended
+                            // to (15 + 5 is not 155 %).
+                            onTap: () {
+                              FocusManager.instance.primaryFocus?.unfocus();
+                              setState(() {
+                                _padTarget = 'tip_percent';
+                                customTipPercent.text = '';
+                                tipKind = 'percentage';
+                                tipBasisPoints = 0;
+                                dirty = true;
+                              });
+                            },
+                          ),
+                        ),
+                      if (policy.tip['customPercentageEnabled'] == true &&
+                          policy.tip['customFixedEnabled'] == true)
+                        const SizedBox(width: UmiSpacing.md),
+                      if (policy.tip['customFixedEnabled'] == true)
+                        Expanded(
+                          child: PosField(
+                            key: const ValueKey('custom-tip-fixed'),
+                            controller: customTipFixed,
+                            readOnly: true,
+                            showCursor: false,
+                            decoration: PosFieldDecoration(
+                              labelText: l.customTipFixedLabel,
+                            ),
+                            onTap: () {
+                              FocusManager.instance.primaryFocus?.unfocus();
+                              setState(() {
+                                _padTarget = 'tip_fixed';
+                                customTipFixed.clear();
+                                tipKind = 'fixed';
+                                dirty = true;
+                              });
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                if (policy?.discount['enabled'] == true) ...[
+                  const SizedBox(height: UmiSpacing.lg),
+                  Text(
+                    l.discountLabel,
+                    style: PosTheme.of(context).textTheme.titleMedium,
+                  ),
+                  Wrap(
+                    spacing: UmiSpacing.sm,
+                    children: [
+                      PosChoice(
+                        label: Text(l.percentageDiscountAction),
+                        selected: discountType == 'order_percentage',
+                        onSelected: (_) => _setDiscountType('order_percentage'),
+                      ),
+                      PosChoice(
+                        label: Text(l.fixedDiscountAction),
+                        selected: discountType == 'order_fixed',
+                        onSelected: (_) => _setDiscountType('order_fixed'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: UmiSpacing.sm),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: PosField(
+                          controller: discountPercent,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: false,
+                          ),
+                          decoration: PosFieldDecoration(
+                            labelText: discountType == 'order_fixed'
+                                ? l.discountAmountLabel
+                                : l.discountPercentLabel,
+                          ),
+                          // A discount moves the amount due (and the base the tip is
+                          // computed on), so the tenders are re-seeded with it.
+                          onChanged: (_) {
+                            setState(() => dirty = true);
+                            _rebalanceForDraftChange();
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: UmiSpacing.md),
+                      Expanded(
+                        child: PosField(
+                          controller: discountReason,
+                          decoration: PosFieldDecoration(
+                            labelText: l.discountReasonLabel,
+                          ),
+                          // The reason is what makes the discount travel (`_discountDrafts`
+                          // drops one without it), so it can turn the discount on and off.
+                          onChanged: (_) {
+                            setState(() => dirty = true);
+                            _rebalanceForDraftChange();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                // One message at a time. A recovered conflict already says
+                // what happened and what to do; the draft's own stale error
+                // underneath it is the second, contradictory sentence the
+                // owner read on this screen.
+                if (state.errorCode != null && !recoveredTenderConflict) ...[
+                  const SizedBox(height: UmiSpacing.md),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      checkoutFailureMessage(l, state.errorCode!),
+                      style: TextStyle(
+                        color: PosTheme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
+                if (state.phase == CheckoutPhase.confirmationRequired &&
+                    !_chargeInFlight) ...[
+                  const SizedBox(height: UmiSpacing.lg),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(l.totalsConfirmedBody),
+                  ),
+                ],
+              ],
+            ),
+            tender: !cashEnabled
+                ? AnimatedSwitcher(
+                    duration:
+                        (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
+                        ? Duration.zero
+                        : UmiMotion.standard,
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.04),
+                          end: Offset.zero,
+                        ).animate(animation),
+                        child: child,
+                      ),
+                    ),
+                    child: _padTarget.startsWith('tip_')
+                        ? _tipKeypadFace(context)
+                        : cardEnabled
+                        ? _cardTerminalFace(context, totals)
+                        : bankEnabled
+                        ? _bankTransferFace(context, totals, policy)
+                        : _terminalTenderFace(context, totals),
+                  )
+                : AnimatedSwitcher(
+                    // The keypad belongs to cash. A short slide makes the
+                    // surface read as a swap rather than as a redraw.
+                    duration:
+                        (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
+                        ? Duration.zero
+                        : UmiMotion.standard,
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.04),
+                          end: Offset.zero,
+                        ).animate(animation),
+                        child: child,
+                      ),
+                    ),
+                    // Cash on the sale keeps the cash face — on a divided
+                    // check too, because the keypad is what takes the cash.
+                    child: _cashTenderFace(totals, grandTotal),
+                  ),
+            actions: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                PosButton(
+                  key: const ValueKey('checkout-charge'),
+                  // An unreadable amount never leaves the terminal. Sending it
+                  // meant tendering a number the cashier did not type.
+                  style: PosButton.styleFrom(
+                    minimumSize: const Size.fromHeight(64),
+                    textStyle: PosTheme.of(context).textTheme.titleLarge,
+                  ),
+                  // While a charge is at the terminal the button is inert:
+                  // pressing it again must never ask for a second charge.
+                  // Once the wait is over (approved, or unresolved) it is
+                  // live again, because those are decisions.
+                  onPressed:
+                      !_amountsReadable ||
+                          _chargeInFlight ||
+                          (cashEnabled &&
+                              _minorUnits(cashReceived.text) <
+                                  ((terminalEnabled ||
+                                          cardEnabled ||
+                                          bankEnabled)
+                                      ? _minorUnits(cashApplied.text)
+                                      : grandTotal)) ||
+                          // A recovered combination this location cannot take
+                          // cannot be charged either, and offering a live
+                          // button for it is the contradiction itself.
+                          recoveredTenderConflict ||
+                          cardCaptureInFlight ||
+                          cardWaiting ||
+                          // Never send an external payment for a different
+                          // amount than the bill, even with one tender.
+                          ((terminalEnabled || cardEnabled || bankEnabled) &&
+                              _tenderedLegsMinorUnits != grandTotal)
+                      ? null
+                      : state.phase == CheckoutPhase.awaitingApproval
+                      ? () => _requestApproval(context)
+                      : state.phase == CheckoutPhase.confirmationRequired &&
+                            !dirty
+                      ? () => _confirm(totals)
+                      : () => _review(totals),
+                  child: Text(
+                    state.phase == CheckoutPhase.awaitingApproval
+                        ? l.managerApprovalAction
+                        // The total rides on the button, so the cashier confirms
+                        // the amount at the moment of the tap (SOTA convention).
+                        : '${l.checkoutAction} · ${_money({'currency': totals.grandTotal['currency'], 'minorUnits': grandTotal})}',
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: UmiSpacing.sm),
+                PosTextButton(
+                  onPressed: () => _closeCheckout(context),
+                  child: Text(l.closeAction),
+                ),
+              ],
+            ),
           ),
         },
       ),
@@ -1749,8 +1659,10 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
               color: tone,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 16,
+              runSpacing: 8,
               children: [
                 Text(
                   owes
@@ -5128,5 +5040,63 @@ final class _AmountRow extends StatelessWidget {
         Flexible(child: Text(value, textAlign: TextAlign.right)),
       ],
     ),
+  );
+}
+
+/// Payment fields scroll independently from the final confirmation action.
+class _CheckoutLayout extends StatelessWidget {
+  const _CheckoutLayout({
+    required this.summary,
+    required this.tender,
+    required this.actions,
+  });
+  final Widget summary;
+  final Widget tender;
+  final Widget actions;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      if (box.maxWidth < 700) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    summary,
+                    const SizedBox(height: 24),
+                    tender,
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+            const PosDivider(height: 16),
+            actions,
+          ],
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(flex: 6, child: SingleChildScrollView(child: summary)),
+          const SizedBox(width: 24),
+          Expanded(
+            flex: 5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: SingleChildScrollView(child: tender)),
+                const SizedBox(height: 16),
+                actions,
+              ],
+            ),
+          ),
+        ],
+      );
+    },
   );
 }

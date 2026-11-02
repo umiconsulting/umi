@@ -1068,6 +1068,40 @@ Future<_ValueSheet> _openValueSheet(
 }
 
 void main() {
+  for (final size in const [
+    Size(402, 874),
+    Size(412, 915),
+    Size(820, 1180),
+    Size(800, 1340),
+    Size(1340, 800),
+    Size(1440, 1000),
+  ]) {
+    testWidgets(
+      'checkout keeps charge reachable while fields scroll at $size',
+      (tester) async {
+        final sheet = await _openTenderSheet(
+          tester,
+          _CheckoutRepository(),
+          policy: CheckoutPolicy.fromJson(_policy),
+        );
+        tester.view.physicalSize = size;
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final charge = find.byKey(const ValueKey('checkout-charge'));
+        expect(charge.hitTestable(), findsOneWidget);
+        final before = tester.getRect(charge);
+        await tester.drag(
+          find.byType(SingleChildScrollView).first,
+          const Offset(0, -250),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getRect(charge), before);
+        expect(charge.hitTestable(), findsOneWidget);
+        await sheet.dispose();
+      },
+    );
+  }
+
   test('known checkout refusals keep their actionable message', () {
     final l = AppLocalizationsEs();
     expect(
@@ -1628,11 +1662,11 @@ void main() {
       await controller.confirm();
 
       expect(controller.state.phase, CheckoutPhase.failure);
+      expect(controller.state.errorCode, 'EXTERNAL_PAYMENT_NOT_COMMITTED');
       expect(
-        controller.state.errorCode,
-        'EXTERNAL_PAYMENT_NOT_COMMITTED',
+        controller.state.failureDetails?['causeCode'],
+        'CHECKOUT_CART_CHANGED',
       );
-      expect(controller.state.failureDetails?['causeCode'], 'CHECKOUT_CART_CHANGED');
       expect(repository.captures, hasLength(1));
       expect(repository.settlements, hasLength(1));
     },
