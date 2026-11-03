@@ -78,6 +78,7 @@ export interface StaffInput {
 }
 
 export interface StaffAuthority {
+  membershipId?: string | null;
   roles: string[];
   permissions: string[];
 }
@@ -177,7 +178,10 @@ export class StaffService {
   ): Promise<StaffDto> {
     if (authority && !this.canManageAdmin(authority)) {
       const targetRole = await this.repo.findRoleKey(merchantId, staffId);
-      if (targetRole === 'owner' || targetRole === 'admin') {
+      if (
+        targetRole === 'owner' ||
+        (targetRole === 'admin' && !this.canSelfManageAdmin(staffId, body, authority))
+      ) {
         throw new ForbiddenException('Only an owner can manage an ADMIN account');
       }
     }
@@ -300,6 +304,16 @@ export class StaffService {
       authority?.roles.includes('owner') === true ||
       authority?.roles.includes('super_admin') === true
     );
+  }
+
+  private canSelfManageAdmin(
+    staffId: string,
+    body: StaffInput,
+    authority?: StaffAuthority,
+  ): boolean {
+    if (!authority?.membershipId || authority.membershipId !== staffId) return false;
+    if (!authority.roles.includes('admin')) return false;
+    return !has(body, 'role') && !has(body, 'roleId') && !has(body, 'status');
   }
 }
 

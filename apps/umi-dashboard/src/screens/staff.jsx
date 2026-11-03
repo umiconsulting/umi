@@ -19,7 +19,7 @@ import {
 } from '@/data.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { PERMISSION_LABELS } from './permission-labels.js';
-import { visibleStaffForRoster } from './staff-roster.js';
+import { staffRowAccess, visibleStaffForRoster } from './staff-roster.js';
 
 // THE PLATFORM'S WORD, NOT ONE BUSINESS'S. `STAFF` was labelled "Barista" — a
 // word from one café's trade, shown to every business on the platform. The
@@ -263,8 +263,10 @@ const StaffScreen = () => {
             ) : (
               filtered.map((person) => {
                 const hue = nameToHue(person.name || 'X');
-                const isAdmin = person.role === 'ADMIN';
-                const locked = isAdmin && !canAssignAdmin;
+                const { isAdmin, locked, canEditAccess } = staffRowAccess(person, {
+                  canAssignAdmin,
+                  membershipId: membership?.id,
+                });
                 const roleLabel =
                   person.roleName ||
                   (ROLE_LABELS[person.role] && i18n._(ROLE_LABELS[person.role])) ||
@@ -337,7 +339,7 @@ const StaffScreen = () => {
                           key: 'access',
                           label: t`Administrar acceso al POS`,
                           icon: I.Edit,
-                          disabled: locked,
+                          disabled: !canEditAccess,
                           onSelect: () => setSelectedStaff(person),
                         },
                         person.status === 'disabled'
@@ -365,9 +367,9 @@ const StaffScreen = () => {
                           ref={ref}
                           className="btn btn-ghost btn-sm"
                           aria-label={t`Acciones de ${person.name}`}
-                          disabled={locked}
+                          disabled={!canEditAccess}
                           title={
-                            locked
+                            !canEditAccess
                               ? t`Solo el propietario puede administrar un acceso Admin.`
                               : t`Administrar rol y PIN`
                           }
@@ -854,7 +856,14 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
   );
 }
 
-function RolePicker({ roles, roleId, setRoleId, canAssignAdmin, currentRoleId }) {
+function RolePicker({
+  roles,
+  roleId,
+  setRoleId,
+  canAssignAdmin,
+  currentRoleId,
+  roleLocked = false,
+}) {
   const { t } = useLingui();
   const selected = roles.find((role) => role.id === roleId);
   return (
@@ -865,7 +874,8 @@ function RolePicker({ roles, roleId, setRoleId, canAssignAdmin, currentRoleId })
       <div className="role-tabs" role="tablist" aria-label={t`Seleccionar el rol`}>
         {roles.map((role) => {
           const protectedRole = role.key === 'owner' || role.key === 'admin';
-          const disabled = protectedRole && !canAssignAdmin && currentRoleId !== role.id;
+          const disabled =
+            (roleLocked || (protectedRole && !canAssignAdmin)) && currentRoleId !== role.id;
           return (
             <button
               key={role.id}
@@ -1144,6 +1154,7 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
           setRoleId={setRoleId}
           canAssignAdmin={canAssignAdmin}
           currentRoleId={person.roleId}
+          roleLocked={person.role === 'ADMIN' && !canAssignAdmin}
         />
       }
     >
