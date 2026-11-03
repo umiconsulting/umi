@@ -202,7 +202,7 @@ describe('StaffService.update / remove', () => {
     await h.svc.update(
       't1',
       's1',
-      { operatorPin: '2468' },
+      { roleId: '', operatorPin: '2468' },
       { membershipId: 's1', roles: ['admin'], permissions: ['merchant.manage'] },
     );
     expect(h.repo.update).toHaveBeenCalledWith('t1', 's1', {

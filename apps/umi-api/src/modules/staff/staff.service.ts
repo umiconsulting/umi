@@ -202,7 +202,7 @@ export class StaffService {
         ? (body.status as string)
         : null;
     }
-    if (has(body, 'roleId') || has(body, 'role')) {
+    if (hasRolePatch(body)) {
       const selectedRole = await this.resolveRole(merchantId, body.roleId, body.role);
       patch.roleId = selectedRole.id;
       patch.roleKey = this.compatibilityRoleKey(selectedRole.key);
@@ -313,8 +313,14 @@ export class StaffService {
   ): boolean {
     if (!authority?.membershipId || authority.membershipId !== staffId) return false;
     if (!authority.roles.includes('admin')) return false;
-    return !has(body, 'role') && !has(body, 'roleId') && !has(body, 'status');
+    return !hasRolePatch(body) && !has(body, 'status');
   }
+}
+
+function hasRolePatch(body: StaffInput): boolean {
+  const roleId = has(body, 'roleId') ? String(body.roleId ?? '').trim() : '';
+  const role = has(body, 'role') ? String(body.role ?? '').trim() : '';
+  return Boolean(roleId || role);
 }
 
 /**

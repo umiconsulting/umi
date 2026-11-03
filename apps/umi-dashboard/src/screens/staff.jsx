@@ -1090,9 +1090,11 @@ const InvitePanel = ({ roles, canAssignAdmin, onClose, onCreate }) => {
 const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
   const { t } = useLingui();
   const uid = useId();
+  const initialRoleId =
+    person.roleId || roles.find((role) => role.key === person.roleKey)?.id || '';
   const [name, setName] = useState(person.name);
   const [email, setEmail] = useState(person.email || '');
-  const [roleId, setRoleId] = useState(person.roleId || '');
+  const [roleId, setRoleId] = useState(initialRoleId);
   const [pin, setPin] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [saving, setSaving] = useState(false);
@@ -1105,7 +1107,7 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
   const changed =
     name.trim() !== person.name ||
     cleanEmail !== (person.email || '') ||
-    roleId !== person.roleId ||
+    roleId !== initialRoleId ||
     Boolean(pin);
   const save = async () => {
     if (!changed || !validPin || !validName || !validEmail || !hasPinEmail || saving) return;
@@ -1115,7 +1117,7 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
       await onUpdate({
         ...(name.trim() !== person.name ? { name: name.trim() } : {}),
         ...(cleanEmail !== (person.email || '') ? { email: cleanEmail } : {}),
-        ...(roleId !== person.roleId ? { roleId } : {}),
+        ...(roleId !== initialRoleId ? { roleId } : {}),
         ...(pin ? { operatorPin: pin } : {}),
       });
     } catch (submitError) {
@@ -1153,7 +1155,7 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
           roleId={roleId}
           setRoleId={setRoleId}
           canAssignAdmin={canAssignAdmin}
-          currentRoleId={person.roleId}
+          currentRoleId={initialRoleId}
           roleLocked={person.role === 'ADMIN' && !canAssignAdmin}
         />
       }
