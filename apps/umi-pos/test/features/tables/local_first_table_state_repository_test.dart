@@ -16,6 +16,29 @@ const _device = '00000000-0000-4000-8000-000000000004';
 const _table = '00000000-0000-4000-8000-000000000005';
 
 void main() {
+  test('a failed account projection can retry the same account', () async {
+    final local = _MemoryLocal();
+    final controller = TableStateController(
+      _repository(
+        local,
+        _Cloud(
+          _room('served', seatedAt: '2026-10-18T09:00:00.000Z', partySize: 2),
+        ),
+      ),
+    );
+    addTearDown(controller.dispose);
+    await controller.load(_merchant, _location, _operator);
+    local.failWrites = true;
+    await expectLater(
+      controller.reconcileAccount(_uuid(70), tableId: _table),
+      throwsStateError,
+    );
+    expect(controller.stateOf(_table).openAccountId, isNull);
+    local.failWrites = false;
+    await controller.reconcileAccount(_uuid(70), tableId: _table);
+    expect(controller.stateOf(_table).openAccountId, _uuid(70));
+  });
+
   test(
     'a cart without a cached room does not invent a table projection',
     () async {
@@ -628,6 +651,7 @@ final class _Cloud implements TableStateRepository {
 
 final class _MemoryLocal implements LocalWorkingCopy {
   final Map<String, Map<String, Object?>> _documents = {};
+  bool failWrites = false;
 
   @override
   Future<Map<String, Object?>?> readDocument(
@@ -649,6 +673,7 @@ final class _MemoryLocal implements LocalWorkingCopy {
     required Map<String, Object?> payload,
     String syncState = 'synced',
   }) async {
+    if (failWrites) throw StateError('storage unavailable');
     _documents['$namespace|$scopeKey|$id'] =
         jsonDecode(jsonEncode(payload)) as Map<String, Object?>;
   }

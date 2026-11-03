@@ -308,9 +308,18 @@ final class TableStateController extends ChangeNotifier {
       notifyListeners();
     }
 
+    Future<void> applyAndResetOnFailure() async {
+      try {
+        await apply();
+      } catch (_) {
+        if (_accountProjectionKey == key) _accountProjectionKey = null;
+        rethrow;
+      }
+    }
+
     final next = _accountProjectionTail.then<void>(
-      (_) => apply(),
-      onError: (Object _, StackTrace _) => apply(),
+      (_) => applyAndResetOnFailure(),
+      onError: (Object _, StackTrace _) => applyAndResetOnFailure(),
     );
     _accountProjectionTail = next;
     return next;

@@ -26,6 +26,8 @@ import 'package:umi_pos/features/sale/sale_lifecycle_controller.dart';
 import 'package:umi_pos/features/sale/sale_repository.dart';
 import 'package:umi_pos/features/tables/floor_plan_controller.dart';
 import 'package:umi_pos/features/tables/order_table_picker.dart';
+import 'package:umi_pos/features/tables/table_state_controller.dart';
+import 'package:umi_pos/features/tables/table_state_repository.dart';
 
 import 'support/fakes.dart';
 
@@ -617,6 +619,38 @@ class _Plan implements FloorPlanRepository {
   }
 }
 
+final class _FailingTableProjection
+    implements TableStateRepository, TableSeatProjectionRepository {
+  int attempts = 0;
+
+  @override
+  Future<TableStateMap> read(
+    String merchantId,
+    PosTableStateQuery query,
+  ) async => const TableStateMap(
+    locationId: 'location',
+    serverTime: '2026-10-18T09:00:00.000Z',
+    states: [],
+  );
+
+  @override
+  Future<TableStateMap> projectOpenAccount(
+    String merchantId,
+    String locationId,
+    String tableId,
+    String accountId,
+    String? accountFolio, {
+    required String? serverTime,
+  }) async {
+    attempts++;
+    throw StateError('storage unavailable');
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError(invocation.memberName.toString());
+}
+
 final class _EmptyPlan extends _Plan implements BootstrapFloorPlanRepository {
   final requests = <InitializePosTablesRequest>[];
   PublishedFloorPlan persisted = PublishedFloorPlan.fromJson({
@@ -696,6 +730,7 @@ _fixture({
   bool withProduct = false,
   bool partialPayments = true,
   _DeferredRecoveryStore? lateRecovery,
+  TableStateController? tableState,
 }) async {
   final root = testRoot();
   final exceptions = lateRecovery == null
@@ -771,6 +806,7 @@ _fixture({
       connectivity: root.connectivity,
       telemetry: root.telemetry,
       floorPlan: floorPlan,
+      tableState: tableState,
     ),
     cart: cart,
     repo: repo,
@@ -819,6 +855,50 @@ Future<void> _mount(
 }
 
 void main() {
+  testWidgets('a projection failure keeps the opened table account usable', (
+    tester,
+  ) async {
+    final repository = _FailingTableProjection();
+    final tableState = TableStateController(repository);
+    addTearDown(tableState.dispose);
+    await tableState.load('merchant', 'location', 'operator');
+    final f = await _fixture(startWithoutCart: true, tableState: tableState);
+    addTearDown(f.dispose);
+    await _mount(tester, f.surface);
+    await tester.tap(find.text('Cuentas').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('floor-plan-element-table')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Abrir cuenta').last);
+    await tester.pumpAndSettle();
+    expect(f.repo.tableOpens, 1);
+    expect(f.cart.state.cart?.id, 'table-account');
+    expect(find.textContaining('La cuenta se abrió'), findsOneWidget);
+    expect(repository.attempts, greaterThanOrEqualTo(1));
+  });
+
+  testWidgets('a projection failure does not block checkout table assignment', (
+    tester,
+  ) async {
+    final repository = _FailingTableProjection();
+    final tableState = TableStateController(repository);
+    addTearDown(tableState.dispose);
+    await tableState.load('merchant', 'location', 'operator');
+    final f = await _fixture(lines: 1, tableState: tableState);
+    addTearDown(f.dispose);
+    await _mount(tester, f.surface);
+    await tester.tap(find.text('Cobrar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('floor-plan-element-table')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('confirm-table')));
+    await tester.pumpAndSettle();
+    expect(f.repo.assignments, 1);
+    expect(f.cart.state.cart?.tableId, 'table');
+    expect(f.checkoutRepo.recoveries, 1);
+    expect(repository.attempts, greaterThanOrEqualTo(1));
+  });
+
   testWidgets('fresh mobile account asks for type immediately and once', (
     tester,
   ) async {
