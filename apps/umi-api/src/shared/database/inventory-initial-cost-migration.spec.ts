@@ -21,8 +21,8 @@ describe('initial inventory cost migration', () => {
     expect(migration).toContain('initial_unit_cost_minor BETWEEN 0 AND 9007199254740991');
     expect(migration).not.toMatch(/DEFAULT|UPDATE|stock_ledger|stock_balance/i);
   });
-  it('runs in fresh CI and twice after populated CI data via the unified migrations loop', () => {
-    expect(ci.match(/for f in db\/migrations\/\*\.sql/g)).toHaveLength(2);
+  it('runs in fresh CI and verifies delta ledger skip after populated CI data via db/migrate.sh', () => {
+    expect(ci.match(/bash db\/migrate\.sh "\$GATE_DB"/g)).toHaveLength(2);
     expect(ci).not.toContain('supabase/migrations');
   });
 });
