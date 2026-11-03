@@ -1117,7 +1117,11 @@ final class KitchenBoardController extends ChangeNotifier {
         result.status == 'completed' ||
         result.status == 'cancelled') {
       _serverOrders = _serverOrders
-          .where((order) => order.id != base.id)
+          .where((order) => _cardKey(order) != baseKey)
+          .map(
+            (order) =>
+                order.id == base.id ? _withServerVersion(order, result) : order,
+          )
           .toList(growable: false);
       return;
     }
