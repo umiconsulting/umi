@@ -45,11 +45,8 @@ comment on function umi.current_device() is
 
 -- ---- No ambient authority: lock schema public (CVE-2018-1058) and our schemas ----
 revoke create on schema public from public;
-revoke all on all tables in schema umi, merchant, runtime, kds from public;
-revoke all on schema kds from public, api;
+revoke all on all tables in schema umi, merchant, runtime from public;
 grant usage on schema umi, merchant, runtime to api, worker, readonly;
-grant usage on schema kds to worker, readonly;
-grant select on all tables in schema kds to worker, readonly;
 
 -- ===========================================================================
 -- GRANTS — least privilege per role

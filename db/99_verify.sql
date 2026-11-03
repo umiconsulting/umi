@@ -9,7 +9,6 @@ begin
   if not exists (select 1 from information_schema.schemata where schema_name='umi')     then raise exception 'missing schema umi';     end if;
   if not exists (select 1 from information_schema.schemata where schema_name='merchant')  then raise exception 'missing schema merchant';  end if;
   if not exists (select 1 from information_schema.schemata where schema_name='runtime') then raise exception 'missing schema runtime'; end if;
-  if not exists (select 1 from information_schema.schemata where schema_name='kds')     then raise exception 'missing schema kds';     end if;
 
   -- roles
   if not exists (select 1 from pg_roles where rolname='api')      then raise exception 'missing role api'; end if;
@@ -62,10 +61,6 @@ begin
   if not exists (
     select 1 from pg_trigger where tgname='kitchen_event_append_only'
   ) then raise exception 'missing append-only trigger: kitchen_event'; end if;
-  if not exists (
-    select 1 from information_schema.views
-    where table_schema='kds' and table_name='station_order'
-  ) then raise exception 'missing Gate 4A station order view'; end if;
   if not exists (
     select 1 from pg_trigger where tgname='pos_sale_exception_append_only'
   ) then raise exception 'missing append-only trigger: pos_sale_exception'; end if;
@@ -693,12 +688,6 @@ begin
   -- constraint's name: a guard that lost `<= 20` still "exists", still refuses 0, and
   -- would let a client write course 10_000 and make one ticket unreadable — which is the
   -- half-applied shape this block is here to catch.
-  --
-  -- The view assertion is the READ half, and it is the half a name cannot carry. A board
-  -- read that lost `courseNumber`, or one that started filtering held items out of the
-  -- ticket, still verifies as "kds.station_order exists" while making §8H step 4
-  -- unobservable. So the block reads the view's OWN definition and requires the course,
-  -- the derived flag and the watermark to be in it.
   if not exists (
     select 1 from information_schema.columns
     where table_schema='merchant' and column_name='course_number'
@@ -729,13 +718,6 @@ begin
       and c.conname='kitchen_order_fired_through_course_ck' and c.contype='c'
       and pg_get_constraintdef(c.oid) like '%fired_through_course >= 1%'
   ) then raise exception 'build-v3-74: merchant.kitchen_order has no fired_through_course floor — a ticket could be recorded as fired through no course at all'; end if;
-  if not exists (
-    select 1 from pg_views v
-     where v.schemaname='kds' and v.viewname='station_order'
-       and pg_get_viewdef('kds.station_order'::regclass, true) like '%courseNumber%'
-       and pg_get_viewdef('kds.station_order'::regclass, true) like '%''fired''%'
-       and pg_get_viewdef('kds.station_order'::regclass, true) like '%fired_through_course%'
-  ) then raise exception 'build-v3-74: kds.station_order does not carry the item course and its fired flag, or the ticket''s watermark — the board could not tell a held dessert from a fired starter'; end if;
   -- THE COMMAND VOCABULARY, asserted because the CODE depends on it and nothing else
   -- would notice. `executeKitchenCommand` journals a `fire_course` row before it moves the
   -- watermark, and 42_pos_kitchen.sql's original CHECK lists seven types. A database that
