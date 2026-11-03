@@ -78,6 +78,7 @@ SaleSnapshot sale({
 final class _Sales implements SaleRepository, CarriedOverSaleRepository {
   SaleSnapshot? currentSale = sale();
   Completer<SaleSnapshot>? currentGate;
+  Completer<SaleSnapshot>? suspendGate;
   int currentReads = 0;
   int starts = 0;
   int suspends = 0;
@@ -137,6 +138,7 @@ final class _Sales implements SaleRepository, CarriedOverSaleRepository {
     String saleId,
     SuspendSaleRequest request,
   ) async {
+    if (suspendGate != null) return suspendGate!.future;
     if (suspendFailure != null) throw suspendFailure!;
     suspends++;
     lastSuspend = request;
@@ -425,15 +427,32 @@ SaleLifecycleController _controller(
 final class _JournalStore implements JournalCipherStore {
   String? value;
   String? key;
+  bool holdAfterNextWrite = false;
+  Completer<void>? heldRead;
+  Completer<void>? readStarted;
 
   @override
-  Future<String?> readCiphertext() async => value;
+  Future<String?> readCiphertext() async {
+    final gate = heldRead;
+    if (gate != null && !gate.isCompleted) {
+      if (!readStarted!.isCompleted) readStarted!.complete();
+      await gate.future;
+    }
+    return value;
+  }
 
   @override
   Future<String?> readKey() async => key;
 
   @override
-  Future<void> writeCiphertext(String next) async => value = next;
+  Future<void> writeCiphertext(String next) async {
+    value = next;
+    if (holdAfterNextWrite) {
+      holdAfterNextWrite = false;
+      heldRead = Completer<void>();
+      readStarted = Completer<void>();
+    }
+  }
 
   @override
   Future<void> writeKey(String next) async => key = next;
@@ -529,6 +548,233 @@ Widget _scaledHistoryApp(
 );
 
 void main() {
+  test(
+    'replayed checkout releases a paid account after an in-flight save',
+    () async {
+      final value = await _replayedCashFixture();
+      addTearDown(value.lifecycle.dispose);
+      addTearDown(value.cart.dispose);
+      final command = await _appendReplayedCash(value.journal);
+      value.sales.suspendGate = Completer<SaleSnapshot>();
+      final saving = value.lifecycle.suspend(null);
+
+      await value.journal.apply(_officialCashResult(command));
+      await _waitForReplay(() => false);
+      expect(value.cart.state.cart?.id, saleId);
+      value.sales.suspendGate!.complete(sale(state: 'suspended'));
+      await saving;
+      await _waitForReplay(() => value.cart.state.cart == null);
+
+      expect(value.cart.state.cart, isNull);
+      expect(value.lifecycle.state.sale, isNull);
+      expect(value.lifecycle.state.readyForNextCustomer, isTrue);
+    },
+  );
+
+  test(
+    'replayed checkout already accepted releases a restored paid account',
+    () async {
+      final value = await _replayedCashFixture(open: false);
+      addTearDown(value.lifecycle.dispose);
+      addTearDown(value.cart.dispose);
+      final command = await _appendReplayedCash(value.journal);
+      await value.journal.apply(_officialCashResult(command));
+
+      await value.lifecycle.open(merchantId, locationId, operatorId);
+      await _waitForReplay(() => value.cart.state.cart == null);
+
+      expect(value.cart.state.cart, isNull);
+      expect(value.lifecycle.state.sale, isNull);
+      expect(value.lifecycle.state.readyForNextCustomer, isTrue);
+    },
+  );
+
+  test(
+    'replayed checkout resolves a provisional cart before releasing it',
+    () async {
+      final value = await _replayedCashFixture();
+      addTearDown(value.lifecycle.dispose);
+      addTearDown(value.cart.dispose);
+      const localId = '00000000-0000-4000-8000-000000000070';
+      final opened = await value.journal.append(
+        commandId: '00000000-0000-4000-8000-000000000090',
+        deviceId: '00000000-0000-4000-8000-000000000010',
+        credentialVersion: 1,
+        merchantId: merchantId,
+        locationId: locationId,
+        operatorSessionId: operatorId,
+        idempotencyKey: '00000000-0000-4000-8000-000000000091',
+        provisionalId: localId,
+        commandType: 'pos.cart.open',
+        payload: {
+          'cartId': localId,
+          'locationId': locationId,
+          'operatorSessionId': operatorId,
+        },
+      );
+      await value.journal.apply(
+        ReplayResult(
+          commandId: opened.commandId,
+          deviceSequence: opened.deviceSequence,
+          status: 'accepted',
+          officialId: saleId,
+          officialCommit: null,
+          serverConflictReference: null,
+          failure: null,
+        ),
+      );
+      final command = await _appendReplayedCash(value.journal, cartId: localId);
+
+      await value.journal.apply(_officialCashResult(command));
+      await _waitForReplay(() => value.cart.state.cart == null);
+
+      expect(value.cart.state.cart, isNull);
+      expect(value.lifecycle.state.sale, isNull);
+      expect((await value.journal.load()).mappings[localId], saleId);
+    },
+  );
+
+  test(
+    'replayed checkout cannot clear a newer selection during a journal read',
+    () async {
+      final store = _JournalStore();
+      final value = await _replayedCashFixture(store: store);
+      addTearDown(value.lifecycle.dispose);
+      addTearDown(value.cart.dispose);
+      final command = await _appendReplayedCash(value.journal);
+      store.holdAfterNextWrite = true;
+      await value.journal.apply(_officialCashResult(command));
+      await store.readStarted!.future;
+      const nextId = '00000000-0000-4000-8000-000000000071';
+      value.sales.currentSale = sale(id: nextId);
+      expect(
+        await value.lifecycle.refreshCurrent(expectedCartId: nextId),
+        isTrue,
+      );
+
+      store.heldRead!.complete();
+      await _waitForReplay(() => false);
+
+      expect(value.cart.state.cart?.id, nextId);
+      expect(value.lifecycle.state.sale?.id, nextId);
+      expect(value.lifecycle.state.readyForNextCustomer, isFalse);
+    },
+  );
+
+  test(
+    'replayed checkout releases the old panel after leaving checkout',
+    () async {
+      final value = await _replayedCashFixture();
+      addTearDown(value.lifecycle.dispose);
+      addTearDown(value.cart.dispose);
+      final command = await _appendReplayedCash(value.journal);
+      value.lifecycle.checkoutStarted();
+      await value.journal.apply(_officialCashResult(command));
+      await _waitForReplay(() => false);
+
+      value.lifecycle.checkoutStopped();
+
+      expect(value.cart.state.cart, isNull);
+      expect(value.lifecycle.state.readyForNextCustomer, isTrue);
+    },
+  );
+
+  for (final status in ['accepted', 'duplicate']) {
+    test(
+      'replayed checkout $status releases the paid account for a new sale',
+      () async {
+        final value = await _replayedCashFixture();
+        addTearDown(value.lifecycle.dispose);
+        addTearDown(value.cart.dispose);
+        final command = await _appendReplayedCash(value.journal);
+
+        await value.journal.apply(_officialCashResult(command, status: status));
+        await _waitForReplay(() => value.cart.state.cart == null);
+
+        expect(value.cart.state.cart, isNull);
+        expect(value.lifecycle.state.sale, isNull);
+        expect(value.lifecycle.state.readyForNextCustomer, isTrue);
+        expect(await value.lifecycle.newSale(), isTrue);
+        expect(
+          value.cart.state.cart?.id,
+          '00000000-0000-4000-8000-000000000010',
+        );
+        expect(value.sales.cancels, 0);
+        final stored = (await value.journal.load()).entries.single;
+        expect(stored.command.commandId, command.commandId);
+        expect(stored.officialId, '00000000-0000-4000-8000-000000000081');
+        expect(stored.officialCommit?['officialReceiptNumber'], '0002');
+      },
+    );
+  }
+
+  test(
+    'replayed checkout for another account preserves the active order',
+    () async {
+      final value = await _replayedCashFixture();
+      addTearDown(value.lifecycle.dispose);
+      addTearDown(value.cart.dispose);
+      final command = await _appendReplayedCash(
+        value.journal,
+        cartId: '00000000-0000-4000-8000-000000000070',
+      );
+
+      await value.journal.apply(_officialCashResult(command));
+      await _waitForReplay(() => false);
+
+      expect(value.cart.state.cart?.id, saleId);
+      expect(value.cart.state.cart?.items, hasLength(1));
+      expect(value.lifecycle.state.sale?.id, saleId);
+    },
+  );
+
+  test(
+    'replayed checkout without an official receipt preserves the active order',
+    () async {
+      final value = await _replayedCashFixture();
+      addTearDown(value.lifecycle.dispose);
+      addTearDown(value.cart.dispose);
+      final command = await _appendReplayedCash(value.journal);
+
+      await value.journal.apply(
+        ReplayResult(
+          commandId: command.commandId,
+          deviceSequence: command.deviceSequence,
+          status: 'accepted',
+          officialId: null,
+          officialCommit: null,
+          serverConflictReference: null,
+          failure: null,
+        ),
+      );
+      await _waitForReplay(() => false);
+
+      expect(value.cart.state.cart?.id, saleId);
+      expect(value.lifecycle.state.sale?.id, saleId);
+    },
+  );
+
+  test(
+    'replayed checkout keeps the cart while the checkout receipt is open',
+    () async {
+      final value = await _replayedCashFixture();
+      addTearDown(value.lifecycle.dispose);
+      addTearDown(value.cart.dispose);
+      final command = await _appendReplayedCash(value.journal);
+      value.lifecycle.checkoutStarted();
+
+      await value.journal.apply(_officialCashResult(command));
+      await _waitForReplay(() => false);
+
+      expect(value.cart.state.cart?.id, saleId);
+      expect(value.lifecycle.state.phase, SalePhase.checkingOut);
+      await value.lifecycle.checkoutCommitted();
+      value.lifecycle.finishCheckoutPresentation();
+      expect(value.cart.state.cart, isNull);
+      expect(value.lifecycle.state.readyForNextCustomer, isTrue);
+    },
+  );
+
   for (final state in ['suspended', 'cancelled']) {
     testWidgets('$state uses a thick plain glyph inside its history tile', (
       tester,
@@ -2328,3 +2574,190 @@ void main() {
     semantics.dispose();
   });
 }
+
+Future<void> _waitForReplay(bool Function() done) async {
+  for (var attempt = 0; attempt < 30 && !done(); attempt++) {
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+  }
+}
+
+Cart _cashReplayCart(String id) => Cart.fromJson({
+  ...cart(id: id).toJson(),
+  'items': [
+    {
+      'id': '00000000-0000-4000-8000-000000000030',
+      'productId': '00000000-0000-4000-8000-000000000031',
+      'productName': 'Danesa',
+      'saleAction': 'merchandise',
+      'quantity': 1,
+      'courseNumber': 1,
+      'variant': null,
+      'modifiers': <Object?>[],
+      'note': null,
+      'fired': false,
+      'price': {
+        'unitPrice': {'minorUnits': 5000, 'currency': 'MXN'},
+        'lineSubtotal': {'minorUnits': 5000, 'currency': 'MXN'},
+        'tax': {'minorUnits': 690, 'currency': 'MXN'},
+        'lineTotal': {'minorUnits': 5000, 'currency': 'MXN'},
+        'taxRateBasisPoints': 1600,
+      },
+    },
+  ],
+  'totals': {
+    'subtotal': {'minorUnits': 5000, 'currency': 'MXN'},
+    'tax': {'minorUnits': 690, 'currency': 'MXN'},
+    'discounts': {
+      'total': {'minorUnits': 0, 'currency': 'MXN'},
+      'entries': <Object?>[],
+    },
+    'grandTotal': {'minorUnits': 5000, 'currency': 'MXN'},
+    'businessDate': '2026-07-29',
+  },
+});
+
+Future<
+  ({
+    EncryptedOfflineJournal journal,
+    CartController cart,
+    SaleLifecycleController lifecycle,
+    _Sales sales,
+  })
+>
+_replayedCashFixture({_JournalStore? store, bool open = true}) async {
+  final journal = EncryptedOfflineJournal(store ?? _JournalStore(), web: false);
+  final selected = _cashReplayCart(saleId);
+  final cartController = CartController(
+    repository: _Carts(),
+    offlineJournal: journal,
+    deviceIdentity: () => const CartDeviceIdentity(
+      deviceId: '00000000-0000-4000-8000-000000000010',
+      credentialVersion: 1,
+    ),
+    telemetry: const SafeTelemetry(
+      enabled: false,
+      context: TelemetryContext(
+        environment: 'test',
+        appVersion: 'test',
+        platform: 'test',
+      ),
+      exporter: NoopTelemetryExporter(),
+    ),
+  );
+  final sales = _Sales()
+    ..currentSale = SaleSnapshot.fromJson({
+      ...sale().toJson(),
+      'cart': selected.toJson(),
+    });
+  final lifecycle = _controller(sales, cartController: cartController);
+  if (open) await lifecycle.open(merchantId, locationId, operatorId);
+  return (
+    journal: journal,
+    cart: cartController,
+    lifecycle: lifecycle,
+    sales: sales,
+  );
+}
+
+Future<OfflineCommand> _appendReplayedCash(
+  EncryptedOfflineJournal journal, {
+  String cartId = saleId,
+}) {
+  final selected = _cashReplayCart(cartId);
+  final at = '2026-07-29T12:00:00.000Z';
+  return journal.append(
+    commandId: '00000000-0000-4000-8000-000000000080',
+    deviceId: '00000000-0000-4000-8000-000000000010',
+    credentialVersion: 1,
+    merchantId: merchantId,
+    locationId: locationId,
+    operatorSessionId: operatorId,
+    idempotencyKey: '00000000-0000-4000-8000-000000000084',
+    provisionalId: '00000000-0000-4000-8000-000000000083',
+    commandType: 'pos.checkout.cash',
+    cashAmountMinorUnits: 5000,
+    maxPendingCashCount: 3,
+    maxPendingCashMinorUnits: 30000,
+    payload: {
+      'policyVersion': 'policy-1',
+      'policyFingerprint': List.filled(64, 'a').join(),
+      'checkoutIdentity': List.filled(64, 'b').join(),
+      'snapshot': {
+        'checkoutCommand': {
+          'cartId': cartId,
+          'locationId': locationId,
+          'operatorSessionId': operatorId,
+          'expectedCartVersion': 1,
+          'paymentMethod': 'cash',
+          'totalsFingerprint': List.filled(64, 'c').join(),
+          'idempotencyKey': '00000000-0000-4000-8000-000000000085',
+          'tenderDrafts': <Object?>[],
+          'tipDraft': null,
+          'discountDrafts': <Object?>[],
+          'approvalIds': <Object?>[],
+          'receiptDelivery': {
+            'destination': 'display',
+            'channel': null,
+            'customerContactId': null,
+          },
+          'cashShiftId': '00000000-0000-4000-8000-000000000086',
+          'customerValue': null,
+        },
+        'cartSnapshot': selected.toJson(),
+        'totals': {
+          'cartVersion': 1,
+          'fingerprint': List.filled(64, 'c').join(),
+          'totals': selected.totals,
+          'taxes': {
+            'total': {'minorUnits': 690, 'currency': 'MXN'},
+            'entries': <Object?>[],
+          },
+          'discounts': {
+            'total': {'minorUnits': 0, 'currency': 'MXN'},
+            'entries': <Object?>[],
+          },
+          'catalogVersion': 'catalog-1',
+          'pricingVersion': 'pricing-1',
+          'taxVersion': 'tax-1',
+          'snapshotAt': at,
+          'confirmedAt': at,
+        },
+        'catalogVersion': 'catalog-1',
+        'pricingVersion': 'pricing-1',
+        'taxVersion': 'tax-1',
+        'catalogSnapshotAt': at,
+        'pricingSnapshotAt': at,
+        'taxSnapshotAt': at,
+        'currency': 'MXN',
+        'amountDueMinorUnits': 5000,
+        'amountReceivedMinorUnits': 5000,
+        'changeDueMinorUnits': 0,
+        'businessDate': '2026-07-29',
+      },
+    },
+  );
+}
+
+ReplayResult _officialCashResult(
+  OfflineCommand command, {
+  String status = 'accepted',
+}) => ReplayResult(
+  commandId: command.commandId,
+  deviceSequence: command.deviceSequence,
+  status: status,
+  officialId: '00000000-0000-4000-8000-000000000081',
+  officialCommit: {
+    'provisionalSaleId': '00000000-0000-4000-8000-000000000083',
+    'officialSaleId': '00000000-0000-4000-8000-000000000081',
+    'officialReceiptId': '00000000-0000-4000-8000-000000000082',
+    'officialReceiptNumber': '0002',
+    'committedTotals':
+        (command.payload['snapshot'] as Map<String, Object?>)['totals'],
+    'businessDate': '2026-07-29',
+    'acceptedAt': '2026-07-29T12:05:00.000Z',
+    'paymentSummary': {'state': 'completed'},
+    'reconciliationReference': '00000000-0000-4000-8000-000000000087',
+  },
+  serverConflictReference: null,
+  failure: null,
+);

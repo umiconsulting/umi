@@ -72,8 +72,9 @@ Future<PrepList> requestPrepList(
   };
   // The server coerces any query text to a boolean, so a false flag stays out
   // of the request: its default is already false.
-  if (query.includeAbovePar == true)
+  if (query.includeAbovePar == true) {
     queryParameters['includeAbovePar'] = 'true';
+  }
   return PrepList.fromJson(
     await api.request(
       method: ApiMethod.get,
