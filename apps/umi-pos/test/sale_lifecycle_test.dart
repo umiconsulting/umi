@@ -549,6 +549,108 @@ Widget _scaledHistoryApp(
 
 void main() {
   test(
+    'replayed checkout releases a sale that still has its provisional identity',
+    () async {
+      final value = await _replayedCashFixture();
+      addTearDown(value.lifecycle.dispose);
+      addTearDown(value.cart.dispose);
+      const officialCartId = '00000000-0000-4000-8000-000000000070';
+      final opened = await value.journal.append(
+        commandId: '00000000-0000-4000-8000-000000000090',
+        deviceId: '00000000-0000-4000-8000-000000000010',
+        credentialVersion: 1,
+        merchantId: merchantId,
+        locationId: locationId,
+        operatorSessionId: operatorId,
+        idempotencyKey: '00000000-0000-4000-8000-000000000091',
+        provisionalId: saleId,
+        commandType: 'pos.cart.open',
+        payload: {
+          'cartId': saleId,
+          'locationId': locationId,
+          'operatorSessionId': operatorId,
+        },
+      );
+      await value.journal.apply(
+        ReplayResult(
+          commandId: opened.commandId,
+          deviceSequence: opened.deviceSequence,
+          status: 'accepted',
+          officialId: officialCartId,
+          officialCommit: null,
+          serverConflictReference: null,
+          failure: null,
+        ),
+      );
+      value.cart.restore(_cashReplayCart(officialCartId));
+      expect(value.lifecycle.state.sale?.id, saleId);
+      final command = await _appendReplayedCash(value.journal);
+
+      await value.journal.apply(_officialCashResult(command));
+      await _waitForReplay(() => value.cart.state.cart == null);
+
+      expect(value.cart.state.cart, isNull);
+      expect(value.lifecycle.state.sale, isNull);
+      expect(await value.lifecycle.newSale(), isTrue);
+    },
+  );
+
+  test(
+    'replayed checkout refresh cannot reinstall a sale after releasing its cart',
+    () async {
+      final value = await _replayedCashFixture();
+      addTearDown(value.lifecycle.dispose);
+      addTearDown(value.cart.dispose);
+      final command = await _appendReplayedCash(value.journal);
+      value.lifecycle.checkoutStarted();
+      await value.journal.apply(_officialCashResult(command));
+      await _waitForReplay(() => false);
+      value.lifecycle.accountSaved();
+
+      expect(
+        await value.lifecycle.refreshCurrent(expectedCartId: saleId),
+        isTrue,
+      );
+      await _waitForReplay(() => value.lifecycle.state.sale == null);
+
+      expect(value.cart.state.cart, isNull);
+      expect(value.lifecycle.state.sale, isNull);
+      expect(await value.lifecycle.newSale(), isTrue);
+    },
+  );
+
+  test(
+    'replayed checkout refresh releases a paid selection after another account',
+    () async {
+      final value = await _replayedCashFixture();
+      addTearDown(value.lifecycle.dispose);
+      addTearDown(value.cart.dispose);
+      final command = await _appendReplayedCash(value.journal);
+      value.lifecycle.checkoutStarted();
+      await value.journal.apply(_officialCashResult(command));
+      await _waitForReplay(() => false);
+      const other = '00000000-0000-4000-8000-000000000071';
+      value.sales.currentSale = sale(id: other);
+      expect(
+        await value.lifecycle.refreshCurrent(expectedCartId: other),
+        isTrue,
+      );
+      expect(value.cart.state.cart?.id, other);
+      value.sales.currentSale = sale();
+
+      expect(
+        await value.lifecycle.refreshCurrent(expectedCartId: saleId),
+        isTrue,
+      );
+      await _waitForReplay(() => value.cart.state.cart == null);
+
+      expect(value.cart.state.cart, isNull);
+      expect(value.lifecycle.state.sale, isNull);
+      expect(await value.lifecycle.newSale(), isTrue);
+    },
+  );
+
+  test(
     'replayed checkout releases a paid account after an in-flight save',
     () async {
       final value = await _replayedCashFixture();

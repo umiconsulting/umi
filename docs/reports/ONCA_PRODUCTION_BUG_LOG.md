@@ -281,3 +281,11 @@ La validación de esta corrección en tablets requiere aprobar el PR y entregar 
 Las ventas conciliadas de MXN 50 y MXN 270 se conservan; esta corrección no solicita otro pago.
 
 Detalle: [liberación de la cuenta tras el replay](./2026-11-03-onca-replay-paid-account-fix.md).
+
+
+## ONCA, 3 de noviembre: revisión de la liberación del panel
+
+La revisión reprodujo dos casos adicionales: ID provisional en el ciclo y restauración con una confirmación retenida.
+Las identidades provisional y oficial quedan vinculadas. La restauración completa ambos estados antes de liberar la cuenta pagada.
+Las tres regresiones adicionales fallaron antes de la corrección; las 137 pruebas relacionadas pasan después.
+El análisis, el formato y git diff --check pasan. La entrega en tablets sigue pendiente de aprobar el PR y generar otra build.

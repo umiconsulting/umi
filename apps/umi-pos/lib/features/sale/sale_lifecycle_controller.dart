@@ -102,11 +102,14 @@ final class SaleLifecycleController extends ChangeNotifier {
   String _historySort = 'newest';
 
   void _cartChanged() {
-    final committedId = _cart.replayedCheckoutCartId;
+    final confirmed = _cart.replayedCheckout;
+    final saleId = _state.sale?.id;
     if (_disposed ||
-        committedId == null ||
-        _cart.state.cart?.id != committedId ||
-        (_state.sale != null && _state.sale!.id != committedId) ||
+        confirmed == null ||
+        _cart.state.cart?.id != confirmed.cartId ||
+        (saleId != null &&
+            saleId != confirmed.cartId &&
+            saleId != confirmed.sourceCartId) ||
         _opening ||
         _mutationActive ||
         _state.phase == SalePhase.checkingOut ||
@@ -205,6 +208,8 @@ final class SaleLifecycleController extends ChangeNotifier {
   /// Refresh the lifecycle after the server selects an account for this operator.
   Future<bool> refreshCurrent({required String expectedCartId}) async {
     if (_merchantId == null || _opening || _mutationActive) return false;
+    _opening = true;
+    notifyListeners();
     try {
       final sale = await _repository.current(_merchantId!, _query());
       if (sale.id != expectedCartId) {
@@ -219,6 +224,10 @@ final class SaleLifecycleController extends ChangeNotifier {
     } on AppException catch (error) {
       _failure(error);
       return false;
+    } finally {
+      _opening = false;
+      _cartChanged();
+      if (!_disposed) notifyListeners();
     }
   }
 

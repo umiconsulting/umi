@@ -195,8 +195,9 @@ final class CartController extends ChangeNotifier {
     unawaited(_reconcileReplayedCheckout());
   }
 
-  String? _replayedCheckoutCartId;
-  String? get replayedCheckoutCartId => _replayedCheckoutCartId;
+  ({String cartId, String sourceCartId})? _replayedCheckout;
+  ({String cartId, String sourceCartId})? get replayedCheckout =>
+      _replayedCheckout;
 
   Future<void> _reconcileReplayedCheckout() async {
     final journal = _journal;
@@ -210,14 +211,14 @@ final class CartController extends ChangeNotifier {
           _state.cart?.locationId != selected.locationId) {
         return;
       }
-      final confirmed = snapshot.entries.any((entry) {
+      for (final entry in snapshot.entries) {
         final command = entry.command;
         if (command.commandType != 'pos.checkout.cash' ||
             command.merchantId != selected.merchantId ||
             command.locationId != selected.locationId ||
             (entry.status != JournalStatus.accepted &&
                 entry.status != JournalStatus.duplicate)) {
-          return false;
+          continue;
         }
         final commit = entry.officialCommit;
         final receiptId = commit?['officialReceiptId'];
@@ -233,19 +234,24 @@ final class CartController extends ChangeNotifier {
                 (provisionalId.startsWith('prov-')
                     ? provisionalId.substring(5)
                     : provisionalId)) {
-          return false;
+          continue;
         }
         final payload = command.payload['snapshot'];
-        if (payload is! Map<String, Object?>) return false;
+        if (payload is! Map<String, Object?>) continue;
         final checkout = payload['checkoutCommand'];
-        if (checkout is! Map<String, Object?>) return false;
+        if (checkout is! Map<String, Object?>) continue;
         final cartId = checkout['cartId'];
-        return cartId == selected.id ||
-            snapshot.mappings[cartId] == selected.id;
-      });
-      if (!confirmed || _replayedCheckoutCartId == selected.id) return;
-      _replayedCheckoutCartId = selected.id;
-      notifyListeners();
+        if (cartId is! String ||
+            (cartId != selected.id &&
+                snapshot.mappings[cartId] != selected.id)) {
+          continue;
+        }
+        final confirmed = (cartId: selected.id, sourceCartId: cartId);
+        if (_replayedCheckout == confirmed) return;
+        _replayedCheckout = confirmed;
+        notifyListeners();
+        return;
+      }
     } catch (_) {
       // Un fallo de lectura del diario no confirma el pago de la cuenta seleccionada.
     }
@@ -1420,7 +1426,7 @@ final class CartController extends ChangeNotifier {
     _merchantId = null;
     _locationId = null;
     _operatorSessionId = null;
-    _replayedCheckoutCartId = null;
+    _replayedCheckout = null;
     _queue?.clearLocal();
     _state = const CartState();
     notifyListeners();
