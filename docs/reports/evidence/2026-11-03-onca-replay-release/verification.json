@@ -1,0 +1,33 @@
+{
+  "baseCommit": "f4c868676d11941fabd318a00849e0fff9c7113d",
+  "flutterVersion": "3.47.5",
+  "dartVersion": "3.13.4",
+  "testCount": 139,
+  "testExit": 0,
+  "analysisExit": 0,
+  "formatExit": 0,
+  "diffCheckExit": 0,
+  "productionApkChanged": false,
+  "logs": {
+    "baseline.log": "fe3c8f59c1fbb63aac09ba0a4f799e2e0d5ab98052f1f88d5f32697af67e54f2",
+    "replay-release-red.log": "c25fd74cc7878a734a50db8f3aa92a60adebfe0fa73a94dfbc756db79bbf96f7",
+    "replay-in-flight-save-red.log": "7e00463af92e9cbc3bad4634899d3e666d41f31cd6e8d19d531d3c438f48b1df",
+    "related-tests.log": "abe8fe7125757c7a891d4d2d81f78ecf34649b66eacb77642688f298c72e8103",
+    "analysis.log": "b56335d46b14667a0289c03c9aaae13c290054695381eeb37601cf1fd8104156",
+    "format-check.log": "82f9b6d44abe9019c4ef72d3e300c473ba76393f81efdf7076ee7f7a648a23fd",
+    "diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fleet-after-pairing.json": "ee1d9f5a4afb198e22081983c0b827212c113777321defba18317680653ccd7f",
+    "review-regressions-red.log": "24dea43931aa36c8c05c4ba62b5200692daee41ab9edb6fc5a3f60d287ab4ed6",
+    "review-alias-green.log": "56f1fa9eff6533e194cb4563ad33448ac6cefae6a926690fbe2e37a44498946f",
+    "official-cart-alias-red.log": "5f0d00f7264e7041360a6462bc200f0117b617f3a011ea9c6dd17095bd1e71e1",
+    "prettier-final.log": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+  },
+  "newRegressionCount": 15,
+  "reviewCorrections": [
+    "provisional_lifecycle_identity",
+    "coherent_current_sale_restore",
+    "official_checkout_with_provisional_lifecycle"
+  ],
+  "prettierVersion": "3.9.4",
+  "prettierExit": 0
+}

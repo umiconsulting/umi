@@ -264,3 +264,32 @@ El control con una credencial sintética en el mismo archivo de prueba siguió r
 La prueba usa refs remotas; el checkout de soporte conserva refs locales adicionales.
 La nueva ejecución de CI queda pendiente tras publicar la corrección.
 Evidencia: [metadatos del escaneo](./evidence/2026-11-02-onca-paid-tables/gitleaks-ci-metadata.json).
+
+## ONCA, 3 de noviembre: flota ADB recuperada y corrección del panel preparada
+
+Barra y Cocina quedaron vinculadas de nuevo con Juan-PC.
+Caja, Barra, Cocina y Mesero tienen ADB y conservan build 335.
+El doctor 335 terminó con código 0 después de la recuperación.
+Los códigos temporales de vinculación no se guardaron en la bitácora.
+
+El fallo del panel de la cuenta 001 quedó reproducido con los controladores reales y el diario cifrado.
+La corrección reconoce la venta oficial, protege otra cuenta seleccionada y retira la cuenta pagada al terminar cualquier operación en curso.
+Las 134 pruebas relacionadas pasaron. El análisis y el formato también pasaron.
+El código está en `/home/juan/umi-onca-replay-paid-account-20261103`.
+La validación de esta corrección en tablets requiere aprobar el PR y entregar otra build.
+Las ventas conciliadas de MXN 50 y MXN 270 se conservan; esta corrección no solicita otro pago.
+
+Detalle: [liberación de la cuenta tras el replay](./2026-11-03-onca-replay-paid-account-fix.md).
+
+## ONCA, 3 de noviembre: revisión de la liberación del panel
+
+La revisión reprodujo dos casos adicionales: ID provisional en el ciclo y restauración con una confirmación retenida.
+Las identidades provisional y oficial quedan vinculadas. La restauración completa ambos estados antes de liberar la cuenta pagada.
+Las tres regresiones adicionales fallaron antes de la corrección; las 137 pruebas relacionadas pasan después.
+El análisis, el formato y git diff --check pasan. La entrega en tablets sigue pendiente de aprobar el PR y generar otra build.
+
+## ONCA, 3 de noviembre: identidad confirmada del carrito
+
+La identidad del checkout también reconoce los alias de creación aceptados cuando el cobro ya usa el ID oficial.
+Un mapping de otra operación no permite liberar una venta distinta. Las 139 pruebas relacionadas pasan.
+El análisis, el formato y git diff --check pasan. La corrección sigue pendiente de entrega por APK tras aprobar el PR.

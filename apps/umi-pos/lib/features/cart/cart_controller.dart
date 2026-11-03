@@ -192,6 +192,89 @@ final class CartController extends ChangeNotifier {
 
   void _journalCountChanged() {
     if (!_disposed) notifyListeners();
+    unawaited(_reconcileReplayedCheckout());
+  }
+
+  ({String cartId, Set<String> cartIds})? _replayedCheckout;
+  ({String cartId, Set<String> cartIds})? get replayedCheckout =>
+      _replayedCheckout;
+
+  Future<void> _reconcileReplayedCheckout() async {
+    final journal = _journal;
+    final selected = _state.cart;
+    if (_disposed || journal == null || selected == null) return;
+    try {
+      final snapshot = await journal.load();
+      if (_disposed ||
+          _state.cart?.id != selected.id ||
+          _state.cart?.merchantId != selected.merchantId ||
+          _state.cart?.locationId != selected.locationId) {
+        return;
+      }
+      for (final entry in snapshot.entries) {
+        final command = entry.command;
+        if (command.commandType != 'pos.checkout.cash' ||
+            command.merchantId != selected.merchantId ||
+            command.locationId != selected.locationId ||
+            (entry.status != JournalStatus.accepted &&
+                entry.status != JournalStatus.duplicate)) {
+          continue;
+        }
+        final commit = entry.officialCommit;
+        final receiptId = commit?['officialReceiptId'];
+        final officialSaleId = commit?['officialSaleId'];
+        final provisionalId = command.provisionalId;
+        if (receiptId is! String ||
+            receiptId.isEmpty ||
+            officialSaleId is! String ||
+            officialSaleId.isEmpty ||
+            officialSaleId != entry.officialId ||
+            provisionalId == null ||
+            commit?['provisionalSaleId'] !=
+                (provisionalId.startsWith('prov-')
+                    ? provisionalId.substring(5)
+                    : provisionalId)) {
+          continue;
+        }
+        final payload = command.payload['snapshot'];
+        if (payload is! Map<String, Object?>) continue;
+        final checkout = payload['checkoutCommand'];
+        if (checkout is! Map<String, Object?>) continue;
+        final cartId = checkout['cartId'];
+        if (cartId is! String ||
+            (cartId != selected.id &&
+                snapshot.mappings[cartId] != selected.id)) {
+          continue;
+        }
+        final cartIds = <String>{selected.id, cartId};
+        for (final creation in snapshot.entries) {
+          final created = creation.command;
+          if ((created.commandType == 'pos.cart.open' ||
+                  created.commandType == 'pos.command.group') &&
+              created.merchantId == selected.merchantId &&
+              created.locationId == selected.locationId &&
+              (creation.status == JournalStatus.accepted ||
+                  creation.status == JournalStatus.duplicate)) {
+            final alias = created.provisionalId;
+            if (alias != null && snapshot.mappings[alias] == selected.id) {
+              cartIds.add(alias);
+            }
+          }
+        }
+        if (_replayedCheckout?.cartId == selected.id &&
+            setEquals(_replayedCheckout?.cartIds, cartIds)) {
+          return;
+        }
+        _replayedCheckout = (
+          cartId: selected.id,
+          cartIds: Set<String>.unmodifiable(cartIds),
+        );
+        notifyListeners();
+        return;
+      }
+    } catch (_) {
+      // Un fallo de lectura del diario no confirma el pago de la cuenta seleccionada.
+    }
   }
 
   /// Idle means neither a write on the wire nor an account being opened.
@@ -1363,6 +1446,7 @@ final class CartController extends ChangeNotifier {
     _merchantId = null;
     _locationId = null;
     _operatorSessionId = null;
+    _replayedCheckout = null;
     _queue?.clearLocal();
     _state = const CartState();
     notifyListeners();
@@ -1671,8 +1755,12 @@ final class CartController extends ChangeNotifier {
 
   void _set(CartState value) {
     if (_disposed) return;
+    final previousCartId = _state.cart?.id;
     _state = value;
     notifyListeners();
+    if (value.cart?.id != previousCartId) {
+      unawaited(_reconcileReplayedCheckout());
+    }
   }
 
   Cart _emptyLocalCart(
