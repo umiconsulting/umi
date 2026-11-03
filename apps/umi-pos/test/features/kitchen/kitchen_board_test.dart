@@ -503,6 +503,92 @@ void main() {
       expect(harness.room.reads, 1);
     });
 
+    for (final commandType in ['complete', 'cancel_ack']) {
+      test(
+        'late $commandType retains newer sibling snapshot and next version',
+        () async {
+          final cancelled = commandType == 'cancel_ack';
+          final selected = order(
+            status: cancelled ? 'cancelled' : 'ready',
+            items: [
+              itemJson(
+                itemToast,
+                'Toast',
+                status: cancelled ? 'cancelled' : 'ready',
+              ),
+            ],
+          );
+          final sibling = order(
+            status: cancelled ? 'cancelled' : 'queued',
+            station: '00000000-0000-4000-8000-0000000000e2',
+            items: [
+              itemJson(
+                itemLatte,
+                'Latte',
+                status: cancelled ? 'cancelled' : 'queued',
+              ),
+            ],
+          );
+          final harness = await loadedBoard(orders: [selected, sibling]);
+          addTearDown(harness.board.dispose);
+          addTearDown(harness.connectivity.dispose);
+          final gate = Completer<void>();
+          harness.kitchen
+            ..gate = gate
+            ..responseStatus = cancelled ? 'cancelled' : 'partially_ready'
+            ..responseUpdatedAt = '2026-09-16T18:01:00.000Z';
+          final pending = cancelled
+              ? harness.board.discard(selected)
+              : harness.board.complete(selected);
+
+          expect(harness.board.state.orders.single.toJson(), sibling.toJson());
+          expect(harness.kitchen.sent.single.expectedVersion, 1);
+
+          final newerSibling = KitchenOrderProjection.fromJson({
+            ...sibling.toJson(),
+            'version': 3,
+            'updatedAt': '2026-09-16T18:02:00.000Z',
+            'status': cancelled ? 'cancelled' : 'in_preparation',
+            'items': [
+              itemJson(
+                itemLatte,
+                'Latte',
+                status: cancelled ? 'cancelled' : 'preparing',
+              ),
+            ],
+          });
+          harness.room.orders = [newerSibling];
+          await harness.board.load(merchantId, query);
+          expect(
+            harness.board.state.orders.single.toJson(),
+            newerSibling.toJson(),
+          );
+
+          gate.complete();
+          expect(await pending, isTrue);
+
+          final retained = harness.board.state.orders.single;
+          expect(retained.version, 3);
+          expect(retained.toJson(), newerSibling.toJson());
+          expect(harness.board.pendingCommandCount, 0);
+          expect(harness.room.reads, 2);
+
+          final next = cancelled
+              ? harness.board.discard(retained)
+              : harness.board.markItemReady(retained, itemLatte);
+          expect(await next, isTrue);
+          expect(harness.kitchen.sent, hasLength(2));
+          expect(
+            harness.kitchen.sent.last.commandType,
+            cancelled ? 'cancel_ack' : 'mark_item_ready',
+          );
+          expect(harness.kitchen.sent.last.itemIds, [itemLatte]);
+          expect(harness.kitchen.sent.last.expectedVersion, 3);
+          expect(harness.room.reads, 2);
+        },
+      );
+    }
+
     test('a recall carries the reason the cook gave', () async {
       final harness = await loadedBoard(orders: [order(status: 'ready')]);
       final ticket = harness.board.state.orders.single;

@@ -1153,6 +1153,7 @@ final class KitchenBoardController extends ChangeNotifier {
     KitchenOrderProjection order,
     KitchenCommandResult result,
   ) {
+    if (order.version > result.version) return order;
     final raw = order.toJson()
       ..['version'] = result.version
       ..['updatedAt'] = result.updatedAt;
