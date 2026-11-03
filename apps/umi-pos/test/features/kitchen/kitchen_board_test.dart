@@ -230,6 +230,8 @@ final class FakeCommandRepository implements KitchenCommandRepository {
   final List<PosKitchenCommandRequest> sent = [];
   String? lastMerchantId;
   Object? failure;
+  String responseStatus = 'ready';
+  String responseUpdatedAt = serverClock;
 
   /// Held commands wait on this, so a test can look at the board mid-flight.
   Completer<void>? gate;
@@ -247,10 +249,10 @@ final class FakeCommandRepository implements KitchenCommandRepository {
     if (failure != null) throw failure;
     return KitchenCommandResult(
       kitchenOrderId: request.kitchenOrderId,
-      status: 'ready',
+      status: responseStatus,
       version: request.expectedVersion + 1,
       sequence: 4,
-      updatedAt: serverClock,
+      updatedAt: responseUpdatedAt,
     );
   }
 }
@@ -381,6 +383,125 @@ void main() {
         expect(harness.kitchen.sent.last.kitchenOrderId, orderId);
       },
     );
+
+    test(
+      'station completion retains sibling work and its next version',
+      () async {
+        final completedStation = order(
+          status: 'ready',
+          stationName: 'Cocina',
+          items: [itemJson(itemToast, 'Toast', status: 'ready')],
+        );
+        final sibling = order(
+          station: '00000000-0000-4000-8000-0000000000e2',
+          stationName: 'Barra',
+          items: [itemJson(itemLatte, 'Latte')],
+        );
+        final harness = await loadedBoard(orders: [completedStation, sibling]);
+        addTearDown(harness.board.dispose);
+        addTearDown(harness.connectivity.dispose);
+        final gate = Completer<void>();
+        harness.kitchen
+          ..gate = gate
+          ..responseStatus = 'partially_ready'
+          ..responseUpdatedAt = '2026-09-16T18:01:00.000Z';
+
+        final completion = harness.board.complete(completedStation);
+
+        expect(harness.board.state.orders.single.toJson(), sibling.toJson());
+        expect(harness.board.pendingCommandCount, 1);
+        expect(harness.kitchen.sent.single.commandType, 'complete');
+        expect(harness.kitchen.sent.single.itemIds, [itemToast]);
+        expect(harness.kitchen.sent.single.expectedVersion, 1);
+
+        gate.complete();
+        expect(await completion, isTrue);
+
+        expect(harness.board.state.orders, hasLength(1));
+        final retained = harness.board.state.orders.single;
+        expect(retained.toJson(), {
+          ...sibling.toJson(),
+          'version': 2,
+          'updatedAt': '2026-09-16T18:01:00.000Z',
+        });
+        expect(harness.board.pendingCommandCount, 0);
+        expect(harness.room.reads, 1);
+
+        expect(await harness.board.startPreparation(retained), isTrue);
+        expect(harness.kitchen.sent, hasLength(2));
+        expect(harness.kitchen.sent.last.commandType, 'start_preparation');
+        expect(harness.kitchen.sent.last.itemIds, [itemLatte]);
+        expect(harness.kitchen.sent.last.expectedVersion, 2);
+        expect(harness.board.state.orders.single.stationId, sibling.stationId);
+        expect(harness.board.state.orders.single.version, 3);
+        expect(
+          KitchenOrderItem.fromJson(
+            harness.board.state.orders.single.items.single,
+          ).status,
+          'preparing',
+        );
+        expect(harness.room.reads, 1);
+      },
+    );
+
+    test('station cancel acknowledgement retains the sibling notice', () async {
+      final acknowledgedStation = order(
+        status: 'cancelled',
+        stationName: 'Cocina',
+        items: [itemJson(itemToast, 'Toast', status: 'cancelled')],
+      );
+      final sibling = order(
+        status: 'cancelled',
+        station: '00000000-0000-4000-8000-0000000000e2',
+        stationName: 'Barra',
+        items: [itemJson(itemLatte, 'Latte', status: 'cancelled')],
+      );
+      final harness = await loadedBoard(orders: [acknowledgedStation, sibling]);
+      addTearDown(harness.board.dispose);
+      addTearDown(harness.connectivity.dispose);
+      final gate = Completer<void>();
+      harness.kitchen
+        ..gate = gate
+        ..responseStatus = 'cancelled'
+        ..responseUpdatedAt = '2026-09-16T18:01:00.000Z';
+
+      final acknowledgement = harness.board.discard(acknowledgedStation);
+
+      expect(harness.board.state.orders.single.toJson(), sibling.toJson());
+      expect(harness.board.pendingCommandCount, 1);
+      expect(harness.kitchen.sent.single.commandType, 'cancel_ack');
+      expect(harness.kitchen.sent.single.itemIds, [itemToast]);
+      expect(harness.kitchen.sent.single.expectedVersion, 1);
+
+      gate.complete();
+      expect(await acknowledgement, isTrue);
+
+      expect(harness.board.state.orders, hasLength(1));
+      final retained = harness.board.state.orders.single;
+      expect(retained.toJson(), {
+        ...sibling.toJson(),
+        'version': 2,
+        'updatedAt': '2026-09-16T18:01:00.000Z',
+      });
+      expect(harness.board.pendingCommandCount, 0);
+      expect(harness.room.reads, 1);
+
+      harness.kitchen.gate = Completer<void>();
+      final siblingAcknowledgement = harness.board.discard(retained);
+
+      expect(harness.board.state.orders, isEmpty);
+      expect(harness.board.pendingCommandCount, 1);
+      expect(harness.kitchen.sent, hasLength(2));
+      expect(harness.kitchen.sent.last.commandType, 'cancel_ack');
+      expect(harness.kitchen.sent.last.itemIds, [itemLatte]);
+      expect(harness.kitchen.sent.last.expectedVersion, 2);
+
+      harness.kitchen.gate!.complete();
+      expect(await siblingAcknowledgement, isTrue);
+      expect(harness.board.state.orders, isEmpty);
+      expect(harness.board.pendingCommandCount, 0);
+      expect(harness.room.reads, 1);
+    });
 
     test('a recall carries the reason the cook gave', () async {
       final harness = await loadedBoard(orders: [order(status: 'ready')]);
