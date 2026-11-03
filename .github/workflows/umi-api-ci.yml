@@ -204,6 +204,9 @@ jobs:
       - name: Apply the forward migrations
         run: bash db/migrate.sh "$GATE_DB"
 
+      - name: Apply paid table visits
+        run: psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f supabase/migrations/20261102000000_table_paid_visit.sql
+
       - name: Schema instruments (preflight · check-values · parity · carry · stamps · seals · logout · login · creds)
         working-directory: apps/umi-api
         env:
@@ -271,6 +274,9 @@ jobs:
             echo "Expected 0 applied migrations on second run, got: $output" >&2
             exit 1
           }
+
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f supabase/migrations/20261102000000_table_paid_visit.sql
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f supabase/migrations/20261102000000_table_paid_visit.sql
 
           # A guarded re-apply REPLACES every policy and LOSES none.
           after=$(psql -At -d "$GATE_DB" -c "select count(*) from pg_policies")

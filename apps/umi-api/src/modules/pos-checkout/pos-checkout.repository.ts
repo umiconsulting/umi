@@ -1930,10 +1930,8 @@ export class PosCheckoutRepository {
        WHERE id=$1::uuid AND version=$2`,
       [cart.id, cart.version],
     );
-    // A paid table visit ends with the sale. The cart remains committed as the
-    // commercial record, while the floor must become dirty and free for the next
-    // party. Joining the visit prevents a delayed commit from clearing a newer
-    // party that has already reused the physical table.
+    // El cobro conserva la visita hasta la salida explícita del cliente.
+    // La identidad de visita protege a otra parte ante una confirmación tardía.
     await client.query(
       `WITH sold AS (
          SELECT c.table_id,c.table_visit_id,t.group_id
@@ -1946,9 +1944,10 @@ export class PosCheckoutRepository {
           WHERE c.merchant_id=$1::uuid
             AND c.location_id=$2::uuid
             AND c.id=$3::uuid
-       ), released AS (
+            AND c.fulfillment_type='dine_in'
+       ), paid AS (
          UPDATE merchant.table_state t
-            SET state='dirty',seated_at=NULL,party_size=NULL,group_id=NULL,updated_at=now()
+            SET paid_at=now(),updated_at=now()
            FROM sold
           WHERE t.merchant_id=$1::uuid
             AND t.location_id=$2::uuid
@@ -1959,7 +1958,7 @@ export class PosCheckoutRepository {
             )
           RETURNING t.table_id
        )
-       SELECT count(*)::int AS released FROM released`,
+       SELECT count(*)::int AS paid FROM paid`,
       [cart.merchantId, cart.locationId, cart.id],
     );
     return {

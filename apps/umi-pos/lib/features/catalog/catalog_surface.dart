@@ -379,12 +379,19 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   Future<bool> _confirmTableRelease(Cart cart) async {
     final spanish = Localizations.localeOf(context).languageCode == 'es';
     final table = cart.tableName ?? (spanish ? 'La mesa' : 'The table');
+    final paidVisit =
+        cart.tableId != null &&
+        widget.tableState?.stateOf(cart.tableId!).paidAt != null;
     final answer = await showPosDialog<bool>(
       context: context,
       builder: (dialogContext) => PosAlertDialog(
         title: Text(spanish ? 'Cambiar a para llevar' : 'Change to takeout'),
         content: Text(
-          spanish
+          paidVisit
+              ? (spanish
+                    ? 'Se quitará $table de esta cuenta. La visita pagada seguirá ocupada hasta que liberes la mesa.'
+                    : '$table will be removed from this account. The paid visit stays occupied until you clear the table.')
+              : spanish
               ? 'Se quitará $table de esta cuenta y la mesa quedará vacía. '
                     'La cuenta conserva sus productos, su folio y su cliente.'
               : '$table will be removed from this account and left empty. '
@@ -531,6 +538,16 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     }
   }
 
+  Future<void> _adoptTableAccount(Cart cart) async {
+    await widget.tableState?.reconcileAccount(
+      cart.id,
+      tableId: cart.tableId,
+      accountFolio: cart.accountFolio,
+      merchantId: cart.merchantId,
+      locationId: cart.locationId,
+    );
+  }
+
   Future<bool> _openTableAccount(
     FloorPlanElement table, {
     int? partySize,
@@ -593,6 +610,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         return false;
       }
       widget.sales.accountSaved();
+      await _adoptTableAccount(widget.cart.state.cart!);
       // The local account already has the table. A cloud refresh here is what
       // turned a successful offline seating into a red "operation failed"
       // banner: it asked the API again after the journal had done its job.
@@ -762,6 +780,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       }
       final selected = widget.cart.state.cart!;
       widget.sales.accountSaved();
+      await _adoptTableAccount(selected);
       widget.checkout.reset();
       await widget.sales.refreshCurrent(expectedCartId: selected.id);
       if (mounted) setState(() => _orderType = selected.fulfillmentType);
@@ -1440,6 +1459,20 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
 
   void _changed() {
     if (!mounted) return;
+    final cart = widget.cart.state.cart;
+    final room = widget.tableState;
+    if (cart != null && room != null) {
+      unawaited(
+        room.reconcileAccount(
+          cart.id,
+          tableId: cart.tableId,
+          accountFolio: cart.accountFolio,
+          closed: const {'committed', 'abandoned'}.contains(cart.status),
+          merchantId: cart.merchantId,
+          locationId: cart.locationId,
+        ),
+      );
+    }
     final cartType = widget.cart.state.cart?.fulfillmentType;
     if (!_orderTypeTouched && cartType != null) {
       _orderType = cartType;

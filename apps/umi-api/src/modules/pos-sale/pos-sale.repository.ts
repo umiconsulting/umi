@@ -339,6 +339,7 @@ export class PosSaleRepository {
          SET state='dirty',seated_at=NULL,party_size=NULL,group_id=NULL,updated_at=now()
          WHERE state.merchant_id=$1::uuid AND state.location_id=$2::uuid
            AND state.table_id=ANY($3::uuid[])
+           AND state.paid_at IS NULL
            AND NOT EXISTS (SELECT 1 FROM merchant.pos_cart active
              WHERE active.merchant_id=state.merchant_id
                AND active.location_id=state.location_id

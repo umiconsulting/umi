@@ -226,3 +226,41 @@ el dato oficial frente a carritos antiguos. Pasaron 99 pruebas del contrato,
 El cambio se entrega por PR. La instalación y la prueba real quedan pendientes;
 Juan-PC está desconectada. El informe y el procedimiento de validación están en
 [`2026-10-29-onca-kds-fulfillment.md`](./2026-10-29-onca-kds-fulfillment.md).
+
+## ONCA, 2 de noviembre: KDS y mesas pagadas
+
+Admin canceló las comandas, según el propietario.
+La cancelación comercial y el descarte KDS son operaciones distintas.
+Cocinero y Barista ya tienen kitchen.cancel_ack.
+La foto coincide con sesiones Mesero sin ese permiso. Falta observar un caso seguro con un perfil KDS.
+No se ampliaron permisos ni se descartaron comandas de producción durante la investigación.
+
+El cobro liberaba la mesa mediante PosCheckoutRepository.commit.
+La corrección conserva visita, personas, tiempo y grupo y muestra Pagada y ocupada.
+Liberar mesa confirma la salida; después siguen Por limpiar y Libre.
+Otro consumo, su cancelación y un cambio a takeout conservan la visita pagada.
+La caché conserva la respuesta de API, el reloj y la restauración de un takeout rechazado.
+
+El código está en /home/juan/umi-onca-paid-occupied-tables-20261102.
+Como juan, pasaron 99 pruebas Flutter y la prueba nativa Linux con adaptador de prueba.
+La build 335 es compatible con la ocupación en API. La categoría nueva necesita otra build.
+El PR y la aceptación en tablets reales quedan pendientes de aprobación.
+
+El doctor 335 devuelve 1: Caja, Cocina y Mesero tienen ADB; Barra sólo aparece en Tailscale.
+El soporte no modificó pagos, ventas, saldos ni comandas de producción.
+
+Informes:
+
+- [KDS](./2026-11-02-onca-kds-cancel-ack-diagnosis.md).
+- [Mesas pagadas](./2026-11-02-onca-paid-occupied-tables.md).
+
+## CI del PR 245: UUID de idempotencia
+
+El job lint falló en gitleaks, con cuatro UUID del campo idempotencyKey en evidencia histórica de inventario.
+Esos identificadores no autentican solicitudes.
+La corrección añade sólo cuatro excepciones por commit, ruta, regla y línea.
+Gitleaks 8.30.1 reprodujo cuatro hallazgos con las refs de CI y terminó sin hallazgos después de la corrección.
+El control con una credencial sintética en el mismo archivo de prueba siguió rechazado.
+La prueba usa refs remotas; el checkout de soporte conserva refs locales adicionales.
+La nueva ejecución de CI queda pendiente tras publicar la corrección.
+Evidencia: [metadatos del escaneo](./evidence/2026-11-02-onca-paid-tables/gitleaks-ci-metadata.json).

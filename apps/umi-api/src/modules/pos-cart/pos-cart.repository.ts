@@ -265,6 +265,7 @@ export class PosCartRepository {
             `UPDATE merchant.table_state
                 SET state='dirty',seated_at=NULL,party_size=NULL,group_id=NULL,updated_at=now()
               WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND table_id=ANY($3::uuid[])
+                AND paid_at IS NULL
                 AND NOT EXISTS (
                   SELECT 1 FROM merchant.pos_cart active
                    WHERE active.merchant_id=table_state.merchant_id
@@ -1351,7 +1352,8 @@ export class PosCartRepository {
       await client.query(
         `UPDATE merchant.table_state
             SET state='dirty',seated_at=NULL,party_size=NULL,group_id=NULL,updated_at=now()
-          WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND table_id=$3::uuid`,
+          WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND table_id=$3::uuid
+            AND paid_at IS NULL`,
         [merchantId, row.locationId, row.tableId],
       );
     }
