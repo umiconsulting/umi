@@ -2,14 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const sql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/40_pos_hardware_runtime.sql'),
-  'utf8',
-);
-const pilotSql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/41_pos_hardware_pilot.sql'),
-  'utf8',
-);
+const sql = readFileSync(resolve(process.cwd(), '../../db/40_pos_hardware_runtime.sql'), 'utf8');
+const pilotSql = readFileSync(resolve(process.cwd(), '../../db/41_pos_hardware_pilot.sql'), 'utf8');
 const hardwareRepository = readFileSync(
   resolve(process.cwd(), 'src/modules/pos-hardware/pos-hardware.repository.ts'),
   'utf8',

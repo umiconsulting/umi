@@ -34,7 +34,7 @@ cleanup() {
 }
 trap cleanup EXIT
 psql -q -c "create database $DB;" >/dev/null
-bash "$ROOT/docs/migration/build-v3/00_run.sh" "$DB" >/dev/null
+bash "$ROOT/db/00_run.sh" "$DB" >/dev/null
 
 psql -X -q -v ON_ERROR_STOP=1 -d "$DB" <<'SQL'
 insert into merchant.merchant(id,name)

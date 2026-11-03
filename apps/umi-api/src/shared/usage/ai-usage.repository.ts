@@ -7,7 +7,7 @@ import { estimateCostUsd } from './model-prices';
 
 /**
  * The LLM call kinds `umi.ai_usage` accepts. The database CHECK constraint
- * in `docs/migration/build-v3/77_ai_usage.sql` holds the same list.
+ * in `db/77_ai_usage.sql` holds the same list.
  */
 export type AiUsageKind = 'reply' | 'intent' | 'facts' | 'summary' | 'portrait' | 'narrative';
 

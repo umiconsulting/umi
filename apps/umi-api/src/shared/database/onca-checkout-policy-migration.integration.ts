@@ -4,7 +4,7 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const sql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/migrations/040_onca_checkout_policy.sql'),
+  resolve(process.cwd(), '../../db/migrations/040_onca_checkout_policy.sql'),
   'utf8',
 );
 

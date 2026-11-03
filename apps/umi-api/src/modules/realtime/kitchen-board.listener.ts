@@ -8,7 +8,7 @@ import { KitchenBoardEvents } from './kitchen-board.events';
  * WHO EMITS IT, AND WHY THAT IS NOT A TRIGGER. The tender nudge is raised by a database trigger
  * because the write that resolves an attempt happens in the WORKER process, which has no HTTP
  * listener. Kitchen tickets are the opposite case: the projector, the KDS commands and every other
- * write run in the WEB process, and `supabase/README.md` makes the API the only business write
+ * write run in the WEB process, and `AGENTS.md` makes the API the only business write
  * boundary. So the notification is raised by the writes themselves, with `pg_notify` inside their
  * own transaction — which is also what makes it correct: Postgres delivers a transaction's
  * notifications at COMMIT, so a wake-up can never arrive before the row it is about is visible, and

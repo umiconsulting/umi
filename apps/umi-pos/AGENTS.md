@@ -41,8 +41,8 @@ Start what it talks to before the app:
 
 The compose stack needs two seed files it does not ship — `deploy/local/seed/roles.sql` and
 `deploy/local/seed/<db>.dump`. Supply them, or start the two services yourself. The database must
-already carry the build-v3 schema, and the API connects as `api_login` (RLS-enforced) and
-`worker_login` (BYPASSRLS); its boot guard refuses a superuser pool. See `docs/migration/build-v3/`
+already carry the PostgreSQL schema, and the API connects as `api_login` (RLS-enforced) and
+`worker_login` (BYPASSRLS); its boot guard refuses a superuser pool. See `db/`
 and `apps/umi-api/.env.example`.
 
 ## Run

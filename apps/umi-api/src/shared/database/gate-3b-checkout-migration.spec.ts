@@ -2,10 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const sql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/32_pos_checkout.sql'),
-  'utf8',
-);
+const sql = readFileSync(resolve(process.cwd(), '../../db/32_pos_checkout.sql'), 'utf8');
 const repository = readFileSync(
   resolve(process.cwd(), 'src/modules/pos-checkout/pos-checkout.repository.ts'),
   'utf8',

@@ -22,7 +22,7 @@ import base from './vitest.config';
  * called it a regression when it was 89 customers who never installed a pass.
  *
  * Prereqs (see test/integration/harness-roles.sql):
- *   1. Build the DB:  PGPORT=5233 docs/migration/build-v3/backfill/00_run_backfill.sh
+ *   1. Build the DB:  PGPORT=5233 db/backfill/00_run_backfill.sh
  *   2. Provision the login roles ONCE (superuser):
  *        psql -p 5233 -d umi_backfill_v3 -f apps/umi-api/test/integration/harness-roles.sql
  *

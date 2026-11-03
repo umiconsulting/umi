@@ -265,8 +265,7 @@ A typo cannot silently disable a flag. `booleanFromEnv` accepts only
 `PGSSLROOTCERT` — a path to, or an inline PEM of, the Postgres server's root CA —
 puts **both** pools on `verify-full` (CA + hostname + `rejectUnauthorized`). Unset
 means plaintext, which is right for local dev against localhost and wrong here. Do
-**not** put `sslmode` in the connection URLs; this variable governs TLS. It is an
-open item on the build-v3 deploy gate (see `docs/migration/build-v3/SECURITY_GATE.md`).
+**not** put `sslmode` in the connection URLs; this variable governs TLS.
 
 ### Ad-hoc prod SQL
 

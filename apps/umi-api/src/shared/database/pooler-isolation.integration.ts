@@ -65,7 +65,7 @@ describe('D3 · merchant scope never survives a pooled connection', () => {
     } catch (err) {
       throw new Error(
         `Cannot reach the build-v3 harness DB. Build it and provision roles first:\n` +
-          `  PGPORT=5233 docs/migration/build-v3/backfill/00_run_backfill.sh\n` +
+          `  PGPORT=5233 db/backfill/00_run_backfill.sh\n` +
           `  psql -p 5233 -d umi_backfill_v3 -f apps/umi-api/test/integration/harness-roles.sql\n` +
           `Underlying error: ${err instanceof Error ? err.message : String(err)}`,
         { cause: err },

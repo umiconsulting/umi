@@ -3,7 +3,7 @@
 # WHY THIS EXISTS. GitHub gives PUBLIC repositories secret scanning and push
 # protection for free; PRIVATE repositories on the free plan get neither. This
 # repository is going private, which is right — it carries the platform
-# architecture, the build-v3 DDL and the security gate — but it means the safety
+# architecture, the PostgreSQL DDL and the security gate — but it means the safety
 # net that would BLOCK a credential at push time disappears on the same day.
 # So the scan moves in here.
 #

@@ -1,12 +1,11 @@
-# deploy/staging/compose.yml — the build-v3 QA stack on the VPS.
+# deploy/staging/compose.yml — the staging QA stack on the VPS.
 #
-# This is the version-controlled home of a stack that until now existed only as
-# a hand-maintained ~/umi-api-test/docker-compose.yml on the box. It is deployed
+# This is the version-controlled home of the staging stack on the box. It is deployed
 # by .github/workflows/umi-api-deploy-staging.yml, which builds the image in CI,
 # pushes it to GHCR, then runs apps/umi-api/deploy/deploy.sh on the VPS with:
 #
-#   UMI_REPO_DIR=/home/juan/umi-buildv3      (the build-v3 checkout)
-#   UMI_DEPLOY_BRANCH=build-v3
+#   UMI_REPO_DIR=/home/juan/umi-staging      (the staging checkout)
+#   UMI_DEPLOY_BRANCH=staging
 #   UMI_COMPOSE_FILE=deploy/staging/compose.yml
 #   UMI_PROJECT_DIR=/home/juan/umi-api-test
 #   UMI_API_TAG=sha-<commit>

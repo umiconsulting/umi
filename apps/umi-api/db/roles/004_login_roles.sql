@@ -1,9 +1,9 @@
 -- ============================================================================
--- build-v3 LOGIN roles — the file the cutover runs (D1, D5, D10)
+-- PostgreSQL LOGIN roles — D1, D5, D10
 --
--- Run ONCE against the build-v3 target, as the operator role:
+-- Run ONCE against the target database, as the operator role:
 --
---     psql -v ON_ERROR_STOP=1 -d "$TARGET" -f apps/umi-api/db/roles/004_buildv3_login_roles.sql
+--     psql -v ON_ERROR_STOP=1 -d "$TARGET" -f apps/umi-api/db/roles/004_login_roles.sql
 --
 -- ⚠️ Set the passwords SEPARATELY, and never in this repository:
 --
@@ -17,10 +17,9 @@
 -- ── Why the earlier files do not serve ──
 --
 --   `001_api_roles.sql` provisions `umi_app` / `umi_worker` / `umi_readonly`
---   with `noinherit` and with `CHANGE_ME_*` passwords. That is the v2 model.
---   build-v3 ships `api` / `worker` / `readonly` as NOLOGIN GROUP roles
---   (`00_foundation.sql:12`), and `noinherit` breaks every grant. Do not run it
---   against a build-v3 target.
+--   with `noinherit` and with `CHANGE_ME_*` passwords. That is the legacy model.
+--   The current schema ships `api` / `worker` / `readonly` as NOLOGIN GROUP roles
+--   (`00_foundation.sql:12`), and `noinherit` breaks every grant.
 --
 --   `harness-roles.sql` is the local test cluster only. It carries literal
 --   passwords and it names the local port 5233.

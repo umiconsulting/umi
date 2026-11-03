@@ -84,7 +84,7 @@ IFS='|' read -r staff_salt staff_hash staff_lookup <<<"$(pin_material 6666)"
 
 node "$ROOT/scripts/umipos-pilot-rbac.mjs" check
 docker exec -i "$container" psql -v ON_ERROR_STOP=1 -U postgres -d "$database" \
-  <"$ROOT/docs/migration/build-v3/35_pos_pilot_rbac.sql"
+  <"$ROOT/db/35_pos_pilot_rbac.sql"
 
 docker exec -i "$container" psql -v ON_ERROR_STOP=1 -U postgres -d "$database" \
   -v merchant_id="$merchant_id" \

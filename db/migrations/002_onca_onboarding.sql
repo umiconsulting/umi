@@ -64,7 +64,7 @@
 --
 -- HOW TO RUN. Same as every forward migration — no `--single-transaction`
 -- needed, because every statement is guarded:
---   psql -v ON_ERROR_STOP=1 -f docs/migration/build-v3/migrations/002_onca_onboarding.sql
+--   psql -v ON_ERROR_STOP=1 -f db/migrations/002_onca_onboarding.sql
 --
 -- IT IS RE-RUNNABLE. The café is found by `handle = 'onca'` (a UNIQUE column),
 -- every child insert is guarded by "not exists / on conflict do nothing", and a

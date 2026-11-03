@@ -4,12 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 const root = resolve(process.cwd(), '../..');
 const migration = [
-  readFileSync(resolve(root, 'docs/migration/build-v3/37_pos_customer_value.sql'), 'utf8'),
-  readFileSync(resolve(root, 'docs/migration/build-v3/38_pos_customer_value_closeout.sql'), 'utf8'),
-  readFileSync(
-    resolve(root, 'docs/migration/build-v3/39_pos_customer_value_final_closeout.sql'),
-    'utf8',
-  ),
+  readFileSync(resolve(root, 'db/37_pos_customer_value.sql'), 'utf8'),
+  readFileSync(resolve(root, 'db/38_pos_customer_value_closeout.sql'), 'utf8'),
+  readFileSync(resolve(root, 'db/39_pos_customer_value_final_closeout.sql'), 'utf8'),
 ].join('\n');
 const realHarness = readFileSync(
   resolve(root, 'scripts/umi-pos-customer-value-concurrency-check.sh'),

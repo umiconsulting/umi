@@ -5,7 +5,7 @@ set -euo pipefail
 : "${UMIPOS_DB_APP_PASSWORD:?UMIPOS_DB_APP_PASSWORD is required}"
 : "${UMIPOS_DB_WORKER_PASSWORD:?UMIPOS_DB_WORKER_PASSWORD is required}"
 
-bash /workspace/docs/migration/build-v3/00_run.sh "$POSTGRES_DB"
+bash /workspace/db/00_run.sh "$POSTGRES_DB"
 
 psql -X -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
   --set app_password="$UMIPOS_DB_APP_PASSWORD" \

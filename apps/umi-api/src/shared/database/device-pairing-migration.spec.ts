@@ -2,10 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const sql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/30_device_pairing.sql'),
-  'utf8',
-);
+const sql = readFileSync(resolve(process.cwd(), '../../db/30_device_pairing.sql'), 'utf8');
 
 describe('UmiPOS device pairing migration', () => {
   it('stores only hashes for public pairing secrets and device identity', () => {

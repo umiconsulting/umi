@@ -8,6 +8,7 @@ on:
     paths:
       - 'apps/umi-api/**'
       - 'packages/contract/**'
+      - 'db/migrations/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
