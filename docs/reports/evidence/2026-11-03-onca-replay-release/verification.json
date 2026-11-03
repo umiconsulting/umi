@@ -19,12 +19,15 @@
     "fleet-after-pairing.json": "ee1d9f5a4afb198e22081983c0b827212c113777321defba18317680653ccd7f",
     "review-regressions-red.log": "24dea43931aa36c8c05c4ba62b5200692daee41ab9edb6fc5a3f60d287ab4ed6",
     "review-alias-green.log": "56f1fa9eff6533e194cb4563ad33448ac6cefae6a926690fbe2e37a44498946f",
-    "official-cart-alias-red.log": "5f0d00f7264e7041360a6462bc200f0117b617f3a011ea9c6dd17095bd1e71e1"
+    "official-cart-alias-red.log": "5f0d00f7264e7041360a6462bc200f0117b617f3a011ea9c6dd17095bd1e71e1",
+    "prettier-final.log": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
   },
   "newRegressionCount": 15,
   "reviewCorrections": [
     "provisional_lifecycle_identity",
     "coherent_current_sale_restore",
     "official_checkout_with_provisional_lifecycle"
-  ]
+  ],
+  "prettierVersion": "3.9.4",
+  "prettierExit": 0
 }

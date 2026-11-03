@@ -265,7 +265,6 @@ La prueba usa refs remotas; el checkout de soporte conserva refs locales adicion
 La nueva ejecución de CI queda pendiente tras publicar la corrección.
 Evidencia: [metadatos del escaneo](./evidence/2026-11-02-onca-paid-tables/gitleaks-ci-metadata.json).
 
-
 ## ONCA, 3 de noviembre: flota ADB recuperada y corrección del panel preparada
 
 Barra y Cocina quedaron vinculadas de nuevo con Juan-PC.
@@ -282,14 +281,12 @@ Las ventas conciliadas de MXN 50 y MXN 270 se conservan; esta corrección no sol
 
 Detalle: [liberación de la cuenta tras el replay](./2026-11-03-onca-replay-paid-account-fix.md).
 
-
 ## ONCA, 3 de noviembre: revisión de la liberación del panel
 
 La revisión reprodujo dos casos adicionales: ID provisional en el ciclo y restauración con una confirmación retenida.
 Las identidades provisional y oficial quedan vinculadas. La restauración completa ambos estados antes de liberar la cuenta pagada.
 Las tres regresiones adicionales fallaron antes de la corrección; las 137 pruebas relacionadas pasan después.
 El análisis, el formato y git diff --check pasan. La entrega en tablets sigue pendiente de aprobar el PR y generar otra build.
-
 
 ## ONCA, 3 de noviembre: identidad confirmada del carrito
 
