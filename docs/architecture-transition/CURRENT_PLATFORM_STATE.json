@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-30",
-  "branch": "build-v3",
+  "updatedAt": "2026-11-02",
+  "branch": "staging",
   "certificationSourceCommit": "a1e794d8fe0e9883f5677147ab81c4342f1a3980",
   "certificationDate": "2026-07-27",
   "BUILD_V3_CERTIFIED": true,
@@ -46,9 +46,9 @@
   "authorities": {
     "api": "apps/umi-api",
     "contracts": "packages/contract",
-    "database": "Supabase PostgreSQL",
+    "database": "PostgreSQL",
     "identity": "umi.user",
-    "migrations": "docs/migration/build-v3 before cutover; supabase/migrations after approved cutover",
+    "migrations": "db/ and db/migrations/",
     "sessions": "runtime.session",
     "businessCommands": "merchant.business_command",
     "optimisticConcurrency": "merchant.aggregate_version",

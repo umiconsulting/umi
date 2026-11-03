@@ -96,27 +96,25 @@ statements, all guarded, in one file.
 
 ```bash
 # 1. A pristine target, to prove the DDL still applies from scratch.
-createdb umi_mig_test && docs/migration/build-v3/00_run.sh umi_mig_test
+createdb umi_mig_test && db/00_run.sh umi_mig_test
 
 # 2. Rows, so the migration meets the case that an empty database hides.
 psql -d umi_mig_test -f <a seed or a production-shaped sample>
 
-# 3. The migration, TWICE. Both must succeed.
-#    No --single-transaction: every statement is guarded, so the file does not
-#    need one, and `create index concurrently` cannot run inside a transaction.
-psql -v ON_ERROR_STOP=1 -d umi_mig_test -f docs/migration/build-v3/migrations/NNN_*.sql
-psql -v ON_ERROR_STOP=1 -d umi_mig_test -f docs/migration/build-v3/migrations/NNN_*.sql
+# 3. Run the delta migration runner twice.
+#    The first pass applies unapplied files and records them in runtime.migration_ledger.
+#    The second pass verifies that all applied files are skipped with matching SHA-256 checksums.
+bash db/migrate.sh umi_mig_test
+bash db/migrate.sh umi_mig_test
 
 # 4. The invariants, and the security gate.
-psql -v ON_ERROR_STOP=1 -d umi_mig_test -f docs/migration/build-v3/99_verify.sql
-psql -v ON_ERROR_STOP=1 -d umi_mig_test -f docs/migration/build-v3/security_gate.sql
+psql -v ON_ERROR_STOP=1 -d umi_mig_test -f db/99_verify.sql
+psql -v ON_ERROR_STOP=1 -d umi_mig_test -f db/security_gate.sql
 ```
 
 **What CI does for you, and what it does not.**
 
-The `gate` job applies every file here TWICE, against a database that carries
-rows, then runs `99_verify.sql` and `security_gate.sql`. `migration-shape.spec.ts`
-checks the shape with no database, on every pull request.
+The `gate` job runs `db/00_run.sh` to build the base schema, runs `db/migrate.sh` to apply unapplied forward migrations and record their SHA-256 checksums in `runtime.migration_ledger`, seeds test rows, re-applies `90_rls.sql`, verifies that a second `db/migrate.sh` pass skips all applied migrations (`0 applied`), and then runs `99_verify.sql` and `security_gate.sql`. `migration-shape.spec.ts` checks the shape with no database, on every pull request.
 
 ⚠️ Rehearse against a copy of PRODUCTION anyway. The CI database holds a few
 seeded rows, not your data, and a migration meets its real cases only there.

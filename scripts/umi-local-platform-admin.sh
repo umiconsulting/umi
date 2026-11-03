@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Grant the build-v3 platform role to a local account.
+# Grant the platform role to a local account.
 #
 # WHY THIS EXISTS
 # A platform role is the only way to reach every cafe from the Dashboard.
@@ -28,7 +28,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT/apps/umi-api/.env"
-SEED="$ROOT/docs/migration/build-v3/backfill/seed_rbac.sql"
+SEED="$ROOT/db/backfill/seed_rbac.sql"
 
 email="hola@umiconsulting.co"
 password=""

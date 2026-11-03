@@ -2,10 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const sql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/36_pos_inventory.sql'),
-  'utf8',
-);
+const sql = readFileSync(resolve(process.cwd(), '../../db/36_pos_inventory.sql'), 'utf8');
 const checkout = readFileSync(
   resolve(process.cwd(), 'src/modules/pos-checkout/pos-checkout.repository.ts'),
   'utf8',
@@ -18,10 +15,7 @@ const inventory = readFileSync(
   resolve(process.cwd(), 'src/modules/pos-inventory/pos-inventory.repository.ts'),
   'utf8',
 );
-const rls = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/90_rls.sql'),
-  'utf8',
-);
+const rls = readFileSync(resolve(process.cwd(), '../../db/90_rls.sql'), 'utf8');
 
 describe('Gate 3E inventory authority', () => {
   it('stores immutable facts and rebuilds the balance from the ledger', () => {

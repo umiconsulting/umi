@@ -1,6 +1,5 @@
 -- Preserve the consumed checkout approval when the sale commits its stock.
 -- The ledger keeps its existing approval guard and the callable interface stays unchanged.
-begin;
 create or replace function merchant.commit_sale_inventory(
   p_reservation_id uuid,
   p_sale_id uuid,
@@ -59,4 +58,3 @@ begin
 end $$;
 revoke all on function merchant.commit_sale_inventory(uuid,uuid,uuid,uuid,uuid,integer,date,text) from public,readonly;
 grant execute on function merchant.commit_sale_inventory(uuid,uuid,uuid,uuid,uuid,integer,date,text) to api,worker;
-commit;

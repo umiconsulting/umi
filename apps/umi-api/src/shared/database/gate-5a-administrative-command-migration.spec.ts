@@ -3,21 +3,15 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const sql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/43_dashboard_administrative_commands.sql'),
+  resolve(process.cwd(), '../../db/43_dashboard_administrative_commands.sql'),
   'utf8',
 );
 const wiringSql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/44_dashboard_operational_wiring.sql'),
+  resolve(process.cwd(), '../../db/44_dashboard_operational_wiring.sql'),
   'utf8',
 );
-const runnerSql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/00_run.sh'),
-  'utf8',
-);
-const rlsSql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/90_rls.sql'),
-  'utf8',
-);
+const runnerSql = readFileSync(resolve(process.cwd(), '../../db/00_run.sh'), 'utf8');
+const rlsSql = readFileSync(resolve(process.cwd(), '../../db/90_rls.sql'), 'utf8');
 
 describe('Gate 5A administrative command migration', () => {
   it('keeps Dashboard sessions separate from device sessions', () => {

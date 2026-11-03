@@ -12,7 +12,7 @@
 -- missing, and each one turns a measurement into a false verdict:
 --
 --   1 · THE POS ENTITLEMENT. UmiPOS is sold, not bundled into a public plan
---       (`docs/migration/build-v3/migrations/002_onca_onboarding.sql` writes the
+--       (`db/migrations/002_onca_onboarding.sql` writes the
 --       same override for ONCA, and its comment is the authority on this). Every
 --       `@RequireProduct('pos')` route then answers 403 `product_not_active` for
 --       EVERY role. A `refused` verdict would pass there for the wrong reason, and

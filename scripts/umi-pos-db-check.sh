@@ -27,7 +27,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DDL="$ROOT/docs/migration/build-v3"
+DDL="$ROOT/db"
 DB="${UMI_POS_DB_NAME:-umi_pos_check_$$}"
 
 if ! command -v psql >/dev/null 2>&1; then

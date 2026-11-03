@@ -1,5 +1,3 @@
-BEGIN;
-
 CREATE TABLE IF NOT EXISTS merchant.loyalty_reward_policy (
   merchant_id uuid PRIMARY KEY REFERENCES merchant.merchant(id) ON DELETE CASCADE,
   mode text NOT NULL DEFAULT 'accumulate' CHECK (mode IN ('accumulate','single_cycle')),
@@ -228,4 +226,3 @@ LANGUAGE sql STABLE SET search_path=pg_catalog,merchant AS $$
 $$;
 REVOKE ALL ON FUNCTION merchant.loyalty_reward_card_state(uuid,uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION merchant.loyalty_reward_card_state(uuid,uuid) TO api,worker;
-COMMIT;

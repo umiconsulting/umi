@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
-# build-v3 COEXIST backfill — prod (core/loyalty/ops/grow/comms/observability)
-# translated into the new umi/merchant/runtime schemas, on a clone of the prod
+# Legacy COEXIST backfill — prod (core/loyalty/ops/grow/comms/observability)
+# translated into the umi/merchant/runtime schemas, on a clone of the prod
 # snapshot. Proves the rename is lossless (see reconcile_v3.sql).
 #
 #   usage: ./00_run_backfill.sh [target_db] [template_db]
@@ -22,7 +22,7 @@
 #          inside one database.
 #          Two guards, both deliberate: the name must match the positional target
 #          (a typo cannot silently hit the wrong database), and the run refuses if
-#          the target already carries build-v3 objects unless
+#          the target already carries schema objects unless
 #          UMI_BACKFILL_ALLOW_REAPPLY=1 is set on purpose.
 #
 # ORDER MATTERS. Two ordering rules the hard way:
@@ -39,8 +39,8 @@ set -euo pipefail
 DB="${1:-umi_backfill_v3}"
 TEMPLATE="${2:-umi_prod_snapshot}"
 BOOTSTRAP_EMAIL="${BOOTSTRAP_EMAIL:-bootstrap@localhost.invalid}"
-DDL="$(cd "$(dirname "$0")/.." && pwd)"     # docs/migration/build-v3
-BF="$(cd "$(dirname "$0")" && pwd)"         # .../backfill
+DDL="$(cd "$(dirname "$0")/.." && pwd)"     # db/
+BF="$(cd "$(dirname "$0")" && pwd)"         # db/backfill/
 
 if [ -n "${UMI_BACKFILL_IN_PLACE:-}" ]; then
   # ---- IN PLACE: the database already exists and is the target itself. -------

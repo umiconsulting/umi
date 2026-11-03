@@ -32,7 +32,7 @@ APP_DIR="$REPO_DIR/apps/$APP_NAME"
 TAG_VAR="$(printf '%s' "$APP_NAME" | tr '[:lower:]-' '[:upper:]_')_TAG"
 
 # Compose file + project directory. Prod keeps both inside $APP_DIR, which is
-# why they default to it. A second environment on the same box (the build-v3 QA
+# why they default to it. A second environment on the same box (the staging QA
 # stack) keeps its compose file in the repo at deploy/<env>/compose.yml while
 # its `.env`, certs and secrets stay in a state directory outside git — so the
 # project directory has to be nameable separately from the compose file.
@@ -90,6 +90,13 @@ if [ ! -f "$COMPOSE_FILE" ]; then
   exit 1
 fi
 
+MIGRATIONS_DIR="$REPO_DIR/db/migrations"
+if [ ! -f "$REPO_DIR/db/migrate.sh" ] &&
+  [ "$(git -C "$REPO_DIR" config --get core.sparseCheckout || true)" = "true" ]; then
+  echo "    db is outside the sparse cone — adding it"
+  git -C "$REPO_DIR" sparse-checkout add db
+fi
+
 # 2) Pin the exact tag in .env -> deterministic restarts + one-line rollback.
 #    The `.env` lives in the PROJECT directory (prod: $APP_DIR; a second
 #    environment: its own state dir), never in the checkout.
@@ -99,6 +106,29 @@ if grep -q "^${TAG_VAR}=" .env; then
   sed -i "s|^${TAG_VAR}=.*|${TAG_VAR}=${TAG}|" .env
 else
   printf '%s=%s\n' "$TAG_VAR" "$TAG" >> .env
+fi
+
+# 2b) Apply unapplied PostgreSQL forward migrations via db/migrate.sh (tracked in runtime.migration_ledger).
+#     Uses DATABASE_URL_ADMIN from .env when set, or the local compose Postgres
+#     service (postgres-staging / postgres) with the database named in DATABASE_URL_APP.
+if [ -d "$MIGRATIONS_DIR" ]; then
+  DB_ADMIN_URL="$(grep -E '^DATABASE_URL_ADMIN=' .env 2>/dev/null | head -n 1 | cut -d= -f2- || true)"
+  PG_SERVICE="$(compose config --services 2>/dev/null | grep -E '^postgres(-staging)?$' | head -n 1 || true)"
+  if [ -n "$DB_ADMIN_URL" ]; then
+    echo "==> Applying unapplied PostgreSQL forward migrations via DATABASE_URL_ADMIN"
+    PGSSLROOTCERT_VAL="$(grep -E '^PGSSLROOTCERT=' .env 2>/dev/null | head -n 1 | cut -d= -f2- || true)"
+    PGSSLROOTCERT="${PGSSLROOTCERT_VAL}" bash "$REPO_DIR/db/migrate.sh" "$DB_ADMIN_URL"
+  elif [ -n "$PG_SERVICE" ]; then
+    DB_APP_URL="$(grep -E '^DATABASE_URL_APP=' .env 2>/dev/null | head -n 1 | cut -d= -f2- || true)"
+    DB_NAME="$(printf '%s' "$DB_APP_URL" | sed -E 's#^[^?]+/([^/?]+)(\?.*)?$#\1#')"
+    DB_NAME="${DB_NAME:-postgres}"
+    echo "==> Applying unapplied PostgreSQL forward migrations on $PG_SERVICE ($DB_NAME)"
+    compose up -d "$PG_SERVICE"
+    PG_CONTAINER="$(compose ps -q "$PG_SERVICE")"
+    UMI_PG_CONTAINER="$PG_CONTAINER" bash "$REPO_DIR/db/migrate.sh" "$DB_NAME"
+  else
+    echo "==> Skipping forward migrations (set DATABASE_URL_ADMIN in $PROJECT_DIR/.env for external PostgreSQL DDL)"
+  fi
 fi
 
 # 3) Pull the prebuilt image(s) and roll the services. No build on the VPS.

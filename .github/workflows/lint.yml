@@ -20,11 +20,11 @@ name: lint
 # never reports again — the Pending-forever deadlock described below. Adding a step
 # changes neither the job name nor the contexts, so nothing has to be re-approved.
 #
-# Pushes to `build-v3` are checked too: it has no deploy workflow, so a merge into
-# it would otherwise run nothing. `main` is covered by its PR gate plus the deploy.
+# Pushes to `staging` are checked too so every integration merge runs the full
+# lint, formatting, and secret scan gate. `main` is covered by its PR gate plus the deploy.
 #
 # ⚠️ NO `paths:` FILTER — DO NOT ADD ONE. This check is REQUIRED by branch
-# protection on `build-v3`, and GitHub leaves a required-but-skipped check Pending
+# protection on `staging`, and GitHub leaves a required-but-skipped check Pending
 # forever rather than treating it as passed. A path filter would therefore not make
 # a docs-only PR faster; it would make it UNMERGEABLE, with no failing check to fix
 # and (because protection is enforced for admins) no way to click through it. The
@@ -33,7 +33,7 @@ name: lint
 on:
   pull_request:
   push:
-    branches: [build-v3]
+    branches: [staging]
 
 permissions:
   contents: read
@@ -99,12 +99,10 @@ jobs:
       # key beside its certificate and the WWDR chain — a complete working kit for
       # signing Apple Wallet passes as Umi.
       #
-      # THIS IS THE ONLY COPY OF THE SCAN. `main` carried a standalone
-      # `secret-scan.yml` because `main` has no `lint` workflow. That file arrived
-      # here in the main→build-v3 merge and was deleted in the same pull request:
-      # it made gitleaks run twice per PR, and its own header said to fold rather
-      # than duplicate. Deleting the step below therefore removes the control
-      # outright — restore the standalone workflow in the same commit if you ever do.
+      # THIS IS THE ONLY COPY OF THE SCAN. A standalone `secret-scan.yml` was
+      # folded into this workflow so gitleaks runs once per PR. Deleting the step
+      # below therefore removes the control outright — restore the standalone
+      # workflow in the same commit if you ever do.
       #
       # The binary is installed directly instead of using gitleaks/gitleaks-action:
       # that action requires a paid GITLEAKS_LICENSE for repositories owned by an

@@ -64,7 +64,7 @@ Merge to `main`. That's it. Watch progress under the repo's **Actions** tab; the
 run fails (and does not flip traffic blindly) if tests fail, the SSH/pull fails,
 or `/health` doesn't come back.
 
-## Release identity and required env (build-v3)
+## Release identity and required env
 
 The image carries its own identity — `deploy-backend.yml` bakes these at build
 time, and `/health/live` reports them:

@@ -2,11 +2,8 @@
 # the reusable deploy-backend workflow — see .github/workflows/deploy-backend.yml.
 #
 # This is the non-production twin of umi-api-deploy.yml (which ships main to prod).
-# It used to deploy `build-v3` — a branch that no longer exists, because the cutover
-# of 2026-10-06 merged everything into main and the merged branches were deleted.
-# Pointing this at `staging` is what turns the QA stack into the pre-production
-# environment it was meant to be: the same code as main, one step behind it, with its
-# own database, its own domain and its own secrets.
+# It runs the pre-production environment: the same code as main, one step ahead of it,
+# with its own database, its own domain and its own secrets.
 #
 # It ships the same image prod does, built from this branch, into a separate
 # compose project on the same host — see deploy/staging/compose.yml.
@@ -18,6 +15,7 @@ on:
     paths:
       - 'apps/umi-api/**'
       - 'packages/contract/**'
+      - 'db/migrations/**'
       - 'deploy/staging/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -49,9 +47,7 @@ jobs:
       image: ghcr.io/umiconsulting/umi-api
       health_url: https://api-staging.umiconsulting.co/health
       # The staging checkout on the box. deploy.sh git-resets it to the branch before
-      # rolling containers, so what runs always matches what CI built. The directory
-      # was renamed with the branch — it was /home/juan/umi-buildv3, a name that
-      # outlived the branch it referred to.
+      # rolling containers, so what runs always matches what CI built.
       repo_dir: /home/juan/umi-staging
       branch: staging
       # The QA stack's compose file now lives in the repo; its .env, certs and

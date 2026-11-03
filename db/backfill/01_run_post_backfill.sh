@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# build-v3 — carry a BACKFILLED database to the head of the DDL chain.
+# Carry a BACKFILLED database to the head of the DDL chain.
 #
 #   usage: ./01_run_post_backfill.sh <db>
 #

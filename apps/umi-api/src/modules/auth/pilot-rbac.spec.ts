@@ -263,10 +263,7 @@ describe('Gate 3D.1 pilot RBAC matrix', () => {
   });
 
   it('keeps the generated SQL synchronized with the canonical matrix', () => {
-    const sql = readFileSync(
-      resolve(root, 'docs/migration/build-v3/35_pos_pilot_rbac.sql'),
-      'utf8',
-    );
+    const sql = readFileSync(resolve(root, 'db/35_pos_pilot_rbac.sql'), 'utf8');
     expect(sql).toContain('GENERATED FROM config/umipos-pilot-role-grants.json');
     expect(sql).not.toContain('cross join umi.permission');
     expect(sql).toContain("'cash.movement.paid_out.approve'");

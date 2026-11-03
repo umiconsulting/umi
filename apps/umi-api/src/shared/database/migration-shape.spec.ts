@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
  * THE SHAPE OF A RE-RUNNABLE MIGRATION, checked without a database.
  *
  * After the cutover the numbered DDL files freeze and a schema change arrives as
- * a file in `docs/migration/build-v3/migrations/`. That file runs against the
+ * a file in `db/migrations/`. That file runs against the
  * database holding the customers, by hand, inside a maintenance window. A
  * half-applied migration leaves a person reading a failed transcript and
  * guessing what landed.
@@ -25,8 +25,8 @@ import { describe, expect, it } from 'vitest';
  * table "merchant" already exists`. Nothing tested a second apply.
  */
 
-const BUILD_V3 = join(__dirname, '../../../../../docs/migration/build-v3');
-const MIGRATIONS_DIR = join(BUILD_V3, 'migrations');
+const DB_DIR = join(__dirname, '../../../../../db');
+const MIGRATIONS_DIR = join(DB_DIR, 'migrations');
 
 /**
  * The SQL with its comments removed.
@@ -84,7 +84,7 @@ function pairs(sql: string, re: RegExp): string[] {
 }
 
 describe('90_rls.sql · re-runnable by construction', () => {
-  const sql = readFileSync(join(BUILD_V3, '90_rls.sql'), 'utf8');
+  const sql = readFileSync(join(DB_DIR, '90_rls.sql'), 'utf8');
 
   it('guards every `create policy` with a drop OF THE SAME POLICY ON THE SAME TABLE', () => {
     // Counting is not enough. 22 drops that all name the wrong table would keep
@@ -192,7 +192,7 @@ describe('forward migrations · the shape every file must take', () => {
         ];
         expect(
           bypasses,
-          'use merchant.with_append_only_writable — see docs/migration/build-v3/migrations/README.md',
+          'use merchant.with_append_only_writable — see db/migrations/README.md',
         ).toEqual([]);
       });
     });

@@ -3,7 +3,7 @@
 # Verify the 79_cycle_anchor CARRY, which no gate can.
 #
 # The carry only runs when the legacy schemas exist (`core`/`loyalty`), and the CI
-# gate builds a PRISTINE build-v3 database by design — so `gate` exercises the DDL
+# gate builds a PRISTINE database by design — so `gate` exercises the DDL
 # and never the arithmetic that matters on the night. This script is that
 # verification: three cards whose cached numbers the naive modulo does NOT
 # reproduce, and an assertion that after 79 they do.

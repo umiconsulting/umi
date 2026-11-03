@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const root = join(__dirname, '../../../../..');
-const sql = readFileSync(join(root, 'docs/migration/build-v3/46_platform_bootstrap.sql'), 'utf8');
-const runner = readFileSync(join(root, 'docs/migration/build-v3/00_run.sh'), 'utf8');
+const sql = readFileSync(join(root, 'db/46_platform_bootstrap.sql'), 'utf8');
+const runner = readFileSync(join(root, 'db/00_run.sh'), 'utf8');
 
 describe('Gate 6B platform bootstrap migration', () => {
   it('stores idempotent bootstrap results outside merchant authority', () => {

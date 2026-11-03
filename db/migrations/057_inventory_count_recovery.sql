@@ -1,6 +1,5 @@
 -- Count recovery keeps the original operator and command provenance.
 -- Merchant and location policies still restrict every operation.
-begin;
 create or replace function merchant.inventory_count_cancel_authorized(
   p_count_id uuid,p_merchant_id uuid,p_location_id uuid
 ) returns boolean language sql stable security invoker set search_path=pg_catalog as $$
@@ -98,4 +97,3 @@ grant execute on function merchant.guard_inventory_count_update() to api,worker;
 drop trigger if exists inventory_count_update_guard on merchant.inventory_count;
 create trigger inventory_count_update_guard before update on merchant.inventory_count
   for each row execute function merchant.guard_inventory_count_update();
-commit;

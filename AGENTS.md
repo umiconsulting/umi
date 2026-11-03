@@ -8,7 +8,6 @@ This file defines product boundaries, ownership, architecture rules, and the res
 - `WORKSPACE.md` — workspace map and cognitive layers
 - `docs/architecture/agent-operating-system.md` — neutral agent OS
 - `docs/architecture/maps/retrieval-map.md` — bounded progressive disclosure
-- `docs/migration/build-v3/GATED_CUTOVER_PLAN.md` — active cutover program
 
 ## Product boundaries
 
@@ -19,16 +18,27 @@ This file defines product boundaries, ownership, architecture rules, and the res
 | `apps/umi-cash`         | Cash compatibility client and Cash-specific Prisma. It forwards the frozen wallet-pass URL to `umi-api` |
 | `apps/umi-dashboard`    | Owner dashboard app shell and live-data UI                                                              |
 | `apps/umi-landing-page` | Public landing and lead capture                                                                         |
-| root `docs/`            | Architecture, migration, governance, and cross-product planning                                         |
+| `db/`                   | Canonical PostgreSQL schema definitions and forward migrations (`db/migrations/`)                       |
+| root `docs/`            | Architecture, governance, and cross-product planning                                                    |
 
 ## Database ownership
 
 - `umi` owns the sealed SaaS, identity, and entitlement model.
 - `merchant` owns café business facts and row-level security policies.
 - `runtime` owns sealed operational machinery.
-- `docs/migration/build-v3` owns pre-cutover database definitions.
-- `supabase/migrations` accepts approved post-cutover migrations only.
-- Build-v2 and legacy schemas are historical inputs. Do not add new logic to them.
+- `db/` owns the base PostgreSQL schema definitions (`db/00_run.sh`).
+- `db/migrations/` owns all PostgreSQL forward migrations.
+- `db/migrate.sh` applies only unapplied forward migrations and tracks state and SHA-256 checksums in `runtime.migration_ledger`.
+- Legacy schemas in `docs/migration/` are historical records only. Do not add new logic to them.
+
+## Branch and pull request workflow
+
+- Create each feature or fix branch from `origin/staging`.
+- Open each feature pull request into `staging` (`gh pr create --base staging`).
+- Do not stack an unmerged feature branch on another unmerged feature branch.
+- Pass all CI gates (`lint`, `contract`, `tokens`, `build-and-test`, `gate`) before merge.
+- Validate the merged change on the `staging` environment before promotion to `main`.
+- Promote `staging` to `main` with a pull request (`staging` into `main`) and use a merge commit (`--merge`) so `staging` and `main` share commit history.
 
 ## Architecture rules
 
@@ -178,16 +188,14 @@ See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
 
 ## Current stance
 
-- `apps/umi-api` owns authoritative business writes for build-v3.
-- Build-v3 uses `umi`, `merchant`, and `runtime` as its canonical schemas.
+- `apps/umi-api` owns authoritative business writes.
+- PostgreSQL uses `umi`, `merchant`, and `runtime` as its canonical schemas.
 - KDS reads the API-owned kitchen projection. KDS does not own commercial order truth.
-- UmiPOS consumes contract version 2.13.0 from `packages/contract`.
+- UmiPOS consumes the typed contract from `packages/contract`.
 - The workspace uses one Git repository at `git@github.com:umiconsulting/umi.git`.
 - App directories are not separate Git repositories.
 - Root pnpm workspaces and Turborepo own the active JavaScript workspace workflow.
 - Umi Cash stays outside pnpm and uses its separate npm lockfile.
-- The active program driver is the build-v3 gated cutover plan.
-- P7 production cutover remains active. Gate 13 waits for real hardware and environment validation.
 
 ## Commands
 
