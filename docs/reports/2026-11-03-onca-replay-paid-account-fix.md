@@ -26,14 +26,18 @@ El ajuste conserva su comportamiento.
 Flutter 3.47.5; Dart 3.13.4. Ejecución como juan en Juan-PC.
 Las pruebas iniciales de venta y cola pasaron: 94 casos.
 Las regresiones reprodujeron el panel retenido y la carrera con un guardado en curso antes de sus correcciones.
-La verificación final pasó: 137 pruebas relacionadas, análisis sin incidencias, formato sin cambios y git diff --check.
+La verificación final pasó: 139 pruebas relacionadas, análisis sin incidencias, formato sin cambios y git diff --check.
 
-Las trece regresiones cubren aceptación, duplicado, recibo ausente, otra cuenta, una selección nueva durante la lectura,
+Las quince regresiones cubren aceptación, duplicado, recibo ausente, otra cuenta, una selección nueva durante la lectura,
 restauración posterior, alias provisional, checkout abierto, salida del checkout y guardado en curso.
 La revisión añadió el caso donde el ciclo conserva el ID provisional después de mapear el carrito.
 También reprodujo una restauración que liberaba el carrito antes de actualizar la venta.
-La confirmación ahora conserva ambos IDs y refreshCurrent aplica el estado antes de liberar el panel.
-Las tres regresiones adicionales fallaron antes de esas correcciones.
+La confirmación conserva el ID seleccionado y los alias de creación aceptados del mismo comercio y local.
+Esto reconoce el ID provisional del ciclo incluso cuando el checkout ya usa el ID oficial.
+Los mappings de otras operaciones no amplían esa identidad.
+refreshCurrent aplica el estado completo antes de liberar el panel.
+Las tres regresiones de la primera revisión y la variante con checkout oficial fallaron antes de sus correcciones.
+Un control adicional conserva la venta cuando el mapping procede de otra operación.
 Usan los controladores reales y el diario cifrado; los repositorios externos son adaptadores de prueba.
 No ejecutan cobros de producción.
 

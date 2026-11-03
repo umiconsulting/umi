@@ -289,3 +289,10 @@ La revisión reprodujo dos casos adicionales: ID provisional en el ciclo y resta
 Las identidades provisional y oficial quedan vinculadas. La restauración completa ambos estados antes de liberar la cuenta pagada.
 Las tres regresiones adicionales fallaron antes de la corrección; las 137 pruebas relacionadas pasan después.
 El análisis, el formato y git diff --check pasan. La entrega en tablets sigue pendiente de aprobar el PR y generar otra build.
+
+
+## ONCA, 3 de noviembre: identidad confirmada del carrito
+
+La identidad del checkout también reconoce los alias de creación aceptados cuando el cobro ya usa el ID oficial.
+Un mapping de otra operación no permite liberar una venta distinta. Las 139 pruebas relacionadas pasan.
+El análisis, el formato y git diff --check pasan. La corrección sigue pendiente de entrega por APK tras aprobar el PR.

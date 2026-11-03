@@ -107,9 +107,7 @@ final class SaleLifecycleController extends ChangeNotifier {
     if (_disposed ||
         confirmed == null ||
         _cart.state.cart?.id != confirmed.cartId ||
-        (saleId != null &&
-            saleId != confirmed.cartId &&
-            saleId != confirmed.sourceCartId) ||
+        (saleId != null && !confirmed.cartIds.contains(saleId)) ||
         _opening ||
         _mutationActive ||
         _state.phase == SalePhase.checkingOut ||

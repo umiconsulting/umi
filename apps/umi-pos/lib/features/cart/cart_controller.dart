@@ -195,8 +195,8 @@ final class CartController extends ChangeNotifier {
     unawaited(_reconcileReplayedCheckout());
   }
 
-  ({String cartId, String sourceCartId})? _replayedCheckout;
-  ({String cartId, String sourceCartId})? get replayedCheckout =>
+  ({String cartId, Set<String> cartIds})? _replayedCheckout;
+  ({String cartId, Set<String> cartIds})? get replayedCheckout =>
       _replayedCheckout;
 
   Future<void> _reconcileReplayedCheckout() async {
@@ -246,9 +246,29 @@ final class CartController extends ChangeNotifier {
                 snapshot.mappings[cartId] != selected.id)) {
           continue;
         }
-        final confirmed = (cartId: selected.id, sourceCartId: cartId);
-        if (_replayedCheckout == confirmed) return;
-        _replayedCheckout = confirmed;
+        final cartIds = <String>{selected.id, cartId};
+        for (final creation in snapshot.entries) {
+          final created = creation.command;
+          if ((created.commandType == 'pos.cart.open' ||
+                  created.commandType == 'pos.command.group') &&
+              created.merchantId == selected.merchantId &&
+              created.locationId == selected.locationId &&
+              (creation.status == JournalStatus.accepted ||
+                  creation.status == JournalStatus.duplicate)) {
+            final alias = created.provisionalId;
+            if (alias != null && snapshot.mappings[alias] == selected.id) {
+              cartIds.add(alias);
+            }
+          }
+        }
+        if (_replayedCheckout?.cartId == selected.id &&
+            setEquals(_replayedCheckout?.cartIds, cartIds)) {
+          return;
+        }
+        _replayedCheckout = (
+          cartId: selected.id,
+          cartIds: Set<String>.unmodifiable(cartIds),
+        );
         notifyListeners();
         return;
       }

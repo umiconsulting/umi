@@ -548,6 +548,63 @@ Widget _scaledHistoryApp(
 );
 
 void main() {
+  for (final mappingType in ['pos.cart.open', 'pos.table.command']) {
+    test(
+      'replayed checkout with an official cart uses only account aliases: $mappingType',
+      () async {
+        final value = await _replayedCashFixture();
+        addTearDown(value.lifecycle.dispose);
+        addTearDown(value.cart.dispose);
+        const officialCartId = '00000000-0000-4000-8000-000000000070';
+        final mapped = await value.journal.append(
+          commandId: '00000000-0000-4000-8000-000000000090',
+          deviceId: '00000000-0000-4000-8000-000000000010',
+          credentialVersion: 1,
+          merchantId: merchantId,
+          locationId: locationId,
+          operatorSessionId: operatorId,
+          idempotencyKey: '00000000-0000-4000-8000-000000000091',
+          provisionalId: saleId,
+          commandType: mappingType,
+          payload: {
+            'cartId': saleId,
+            'locationId': locationId,
+            'operatorSessionId': operatorId,
+          },
+        );
+        await value.journal.apply(
+          ReplayResult(
+            commandId: mapped.commandId,
+            deviceSequence: mapped.deviceSequence,
+            status: 'accepted',
+            officialId: officialCartId,
+            officialCommit: null,
+            serverConflictReference: null,
+            failure: null,
+          ),
+        );
+        value.cart.restore(_cashReplayCart(officialCartId));
+        expect(value.lifecycle.state.sale?.id, saleId);
+        final command = await _appendReplayedCash(
+          value.journal,
+          cartId: officialCartId,
+        );
+
+        await value.journal.apply(_officialCashResult(command));
+        await _waitForReplay(() => value.cart.state.cart == null);
+
+        if (mappingType == 'pos.cart.open') {
+          expect(value.cart.state.cart, isNull);
+          expect(value.lifecycle.state.sale, isNull);
+          expect(await value.lifecycle.newSale(), isTrue);
+        } else {
+          expect(value.cart.state.cart?.id, officialCartId);
+          expect(value.lifecycle.state.sale?.id, saleId);
+        }
+      },
+    );
+  }
+
   test(
     'replayed checkout releases a sale that still has its provisional identity',
     () async {
