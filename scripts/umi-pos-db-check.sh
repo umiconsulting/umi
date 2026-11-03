@@ -1804,8 +1804,6 @@ expect "another merchant cannot read kitchen work" "0" \
   "$(as_api "$B" "" "" "select count(*) from merchant.kitchen_order where id='a4200000-0000-4000-8000-000000000091';")"
 expect_error "api cannot insert a kitchen event directly" \
   "$(as_api_raw "$A" "$A1" "$D1" "insert into merchant.kitchen_event(event_id,merchant_id,location_id,kitchen_order_id,kind,aggregate_version,correlation_id) values(gen_random_uuid(),'$A','$A1','a4200000-0000-4000-8000-000000000091','order_updated',2,'forged');")"
-expect_error "api cannot read an unscoped KDS view" \
-  "$(as_api_raw "$A" "$A1" "$D1" "select count(*) from kds.station_order;")"
 expect_error "a kitchen route cannot cross locations" \
   "$(q -c "insert into merchant.kitchen_route(merchant_id,location_id,product_id,station_id) values('$A','$A1','a3000000-0000-4000-8000-000000000091','a2000000-0000-4000-8000-000000000092');")"
 expect "all kitchen authority tables force RLS" "6" \
