@@ -120,3 +120,79 @@ Controller and widget tests prove the local behavior described above. Native ope
 
 The pre-existing modified plan and untracked test-data report retain their original state and remain outside this commit.
 The requested report resides under an ignored directory and is explicitly included with `git add -f`.
+
+## Review correction, round 1
+
+Base: `e948e175`, after the separate branding commit.
+Finding: P2 in `task-3c-kds-station-identity-review.md`.
+The review reproduced a delayed version `2` response after a newer snapshot removed the selected card and advanced its sibling to version `3`.
+The selected-card guard then had no current card to inspect.
+The shared version update reduced the sibling version and replaced its newer timestamp.
+
+The correction adds one comparison in `_withServerVersion`.
+If the sibling has a newer version than the response, the owner returns the existing projection.
+This preserves its version, timestamp, work, and item states.
+The selected-card removal and the existing selected-card guard retain their code.
+The comparison applies wherever this existing owner updates a sibling version.
+
+Two parameterized regressions adapt the review's external reproduction:
+
+- `late complete retains newer sibling snapshot and next version`
+- `late cancel_ack retains newer sibling snapshot and next version`
+
+Each test sends a station command at version `1` and holds its accepted response at version `2`.
+Each test then loads a newer snapshot with only the sibling at version `3` and a newer timestamp.
+After the held response arrives, the test compares the complete sibling projection with that snapshot.
+The next sibling command must use expected version `3` and its own item ID.
+
+### Round 1 red evidence
+
+The two tests ran before the one-line correction, from `apps/umi-pos`:
+
+```sh
+/private/tmp/onca-flutter-sdk-3.47.5/bin/flutter test --no-pub test/features/kitchen/kitchen_board_test.dart --name 'late (complete|cancel_ack) retains newer sibling snapshot and next version' --reporter expanded
+```
+
+Result: exit `1`; both tests failed after the delayed response.
+Both first confirmed that the newer snapshot was visible.
+The failures were:
+
+```text
+late complete retains newer sibling snapshot and next version [E]
+  Expected: <3>
+    Actual: <2>
+late cancel_ack retains newer sibling snapshot and next version [E]
+  Expected: <3>
+    Actual: <2>
+00:00 +0 -2: Some tests failed.
+```
+
+### Round 1 green evidence
+
+The same focused command ran after the correction.
+Result: exit `0`:
+
+```text
+00:00 +0: the board works the tickets late complete retains newer sibling snapshot and next version
+00:00 +1: the board works the tickets late cancel_ack retains newer sibling snapshot and next version
+00:00 +2: (tearDownAll)
+00:00 +2: All tests passed!
+```
+
+The complete kitchen scope and the original external review reproduction then ran together:
+
+```sh
+/private/tmp/onca-flutter-sdk-3.47.5/bin/flutter test --no-pub test/kitchen_status_test.dart test/features/kitchen /private/tmp/umi-task3c-stale-review_test.dart --reporter expanded
+```
+
+Result: exit `0`; `+153: All tests passed!`.
+This includes the previous 150 tests, both new regressions, and the original external review reproduction.
+
+The changed-file analyzer command from the first implementation ran again.
+Result: exit `0`; `No issues found!`.
+The same Dart format command returned exit `0` with zero changes.
+`git diff --check` returned exit `0`.
+
+The tools and native validation limits stated above still apply.
+This correction changes only the existing version owner, the focused regressions, and this report.
+The branding assets, prototype, root plan, and test-data report retain their prior state.
