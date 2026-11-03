@@ -64,6 +64,22 @@ abstract interface class TableSeatProjectionRepository {
     String tableId,
     int partySize,
   );
+
+  Future<TableStateMap> projectOpenAccount(
+    String merchantId,
+    String locationId,
+    String tableId,
+    String accountId,
+    String? accountFolio, {
+    required String? serverTime,
+  });
+
+  Future<TableStateMap> projectReleasedAccount(
+    String merchantId,
+    String locationId,
+    String accountId, {
+    required String? serverTime,
+  });
 }
 
 final class ApiTableStateRepository implements TableStateRepository {

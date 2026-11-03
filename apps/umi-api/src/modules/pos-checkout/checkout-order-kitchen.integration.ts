@@ -4,6 +4,9 @@ import { resolve } from 'node:path';
 import { Pool, type PoolClient } from 'pg';
 import { describe, expect, it } from 'vitest';
 import { cancelSentOrderLine } from '../../shared/orders/cancel-sent-order-line';
+import { TableMapRepository } from '../table-map/table-map.repository';
+import { PosCartRepository } from '../pos-cart/pos-cart.repository';
+import { PosSaleRepository } from '../pos-sale/pos-sale.repository';
 import { PosCheckoutRepository } from './pos-checkout.repository';
 
 const dsn = process.env.CANCEL_VERIFY_DATABASE_URL;
@@ -12,9 +15,13 @@ const dsn = process.env.CANCEL_VERIFY_DATABASE_URL;
  * Stock tracking is disabled only in this disposable fixture. Loyalty closeout
  * uses an explicit no-op adapter and remains outside this test. */
 describe.skipIf(!dsn)('checkout order and kitchen on a disposable populated copy', () => {
-  it.each([false, true])(
-    'settles the same order after correction; replace all sent lines: %s',
-    async (replaceAll) => {
+  it.each([
+    { replaceAll: false, staleVisit: false },
+    { replaceAll: true, staleVisit: false },
+    { replaceAll: false, staleVisit: true },
+  ])(
+    'settles the same order; replace all: $replaceAll; older cart visit: $staleVisit',
+    async ({ replaceAll, staleVisit }) => {
       const pool = new Pool({ connectionString: dsn });
       const client = await pool.connect();
       try {
@@ -32,6 +39,76 @@ describe.skipIf(!dsn)('checkout order and kitchen on a disposable populated copy
         FROM merchant.pos_cart c JOIN runtime.operator_session os ON os.id=c.operator_session_id
         WHERE c.id=current_setting('test.cart')::uuid`);
         const row = scoped.rows[0];
+        const fixtureTableIds = [randomUUID(), randomUUID(), randomUUID()];
+        const plan = {
+          schemaVersion: 1,
+          areas: [
+            {
+              id: randomUUID(),
+              name: 'Checkout test',
+              width: 1200,
+              height: 800,
+              elements: fixtureTableIds.map((id, index) => ({
+                id,
+                kind: 'table',
+                shape: 'square',
+                label: `Test ${index + 1}`,
+                capacity: 4,
+                x: 120 + index * 200,
+                y: 120,
+                width: 80,
+                height: 80,
+                rotation: 0,
+              })),
+            },
+          ],
+        };
+        await client.query(
+          `INSERT INTO merchant.floor_plan
+             (merchant_id,location_id,version,draft,published_version,published,published_at)
+           VALUES ($1::uuid,$2::uuid,1,$3::jsonb,1,$3::jsonb,now())
+           ON CONFLICT (merchant_id,location_id) DO UPDATE SET
+             version=merchant.floor_plan.version+1,draft=$3::jsonb,
+             published_version=merchant.floor_plan.version+1,published=$3::jsonb,published_at=now()`,
+          [row.merchant_id, row.location_id, JSON.stringify(plan)],
+        );
+        const room = new TableMapRepository({} as never);
+        const tables = await room.servingTables(client, row.merchant_id, row.location_id);
+        const snapshot = await room.readInTransaction(client, row.merchant_id, row.location_id);
+        const table = [...tables.values()].find(
+          (candidate) =>
+            candidate.capacity >= 2 &&
+            !snapshot.states.some((state) => state.tableId === candidate.tableId && state.seatedAt),
+        );
+        expect(table, 'The disposable fixture needs a free table for two people.').toBeDefined();
+        const party = replaceAll
+          ? await room.merge(client, row.merchant_id, row.location_id, {
+              tableIds: fixtureTableIds.slice(0, 2),
+              partySize: 2,
+            })
+          : await room.seat(client, row.merchant_id, row.location_id, {
+              tableId: table!.tableId,
+              partySize: 2,
+            });
+        const seated = party.find((entry) => entry.tableId === table!.tableId)!;
+        await client.query(
+          `UPDATE merchant.pos_cart SET table_id=$2::uuid,table_name=$3,
+             table_visit_id=(SELECT visit_id FROM merchant.table_state
+               WHERE merchant_id=$4::uuid AND location_id=$5::uuid AND table_id=$2::uuid)
+           WHERE id=$1::uuid`,
+          [row.id, table!.tableId, table!.label, row.merchant_id, row.location_id],
+        );
+        const visit = await client.query(
+          `SELECT visit_id FROM merchant.table_state
+           WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND table_id=$3::uuid`,
+          [row.merchant_id, row.location_id, table!.tableId],
+        );
+        if (staleVisit) {
+          await client.query(
+            'UPDATE merchant.pos_cart SET table_visit_id=$2::uuid WHERE id=$1::uuid',
+            [row.id, randomUUID()],
+          );
+        }
         await client.query(`UPDATE merchant.customer_order SET external_ref=$2 WHERE id=$1`, [
           row.fired_order_id,
           `pos-cart:${row.id}`,
@@ -157,6 +234,10 @@ describe.skipIf(!dsn)('checkout order and kitchen on a disposable populated copy
           null,
         );
         expect(reservation.status).toBe('reserved');
+        const beforeCommit = await room.readInTransaction(client, row.merchant_id, row.location_id);
+        expect(
+          beforeCommit.states.find((entry) => entry.tableId === table!.tableId)?.paidAt,
+        ).toBeNull();
         const result = await repository.commit(
           scopedClient,
           checkoutCart as never,
@@ -181,18 +262,32 @@ describe.skipIf(!dsn)('checkout order and kitchen on a disposable populated copy
           null,
         );
         expect(result.sale.orderId).toBe(row.fired_order_id);
-        const releasedTable = await client.query(
-          `SELECT state,seated_at,visit_id
+        const paidTable = await client.query(
+          `SELECT state,seated_at,party_size,group_id,visit_id,paid_at
              FROM merchant.table_state
             WHERE merchant_id=$1::uuid AND location_id=$2::uuid
               AND table_id=(SELECT table_id FROM merchant.pos_cart WHERE id=$3::uuid)`,
           [row.merchant_id, row.location_id, row.id],
         );
-        expect(releasedTable.rows[0]).toMatchObject({
-          state: 'dirty',
-          seated_at: null,
-          visit_id: null,
+        expect(paidTable.rows[0]).toMatchObject({
+          state: 'seated',
+          seated_at: new Date(seated.seatedAt!),
+          party_size: 2,
+          group_id: seated.groupId,
+          visit_id: visit.rows[0].visit_id,
         });
+        if (staleVisit) expect(paidTable.rows[0].paid_at).toBeNull();
+        else expect(paidTable.rows[0].paid_at).toBeInstanceOf(Date);
+        const paidRoom = await room.readInTransaction(client, row.merchant_id, row.location_id);
+        for (const member of party) {
+          expect(paidRoom.states.find((entry) => entry.tableId === member.tableId)).toMatchObject({
+            state: 'seated',
+            partySize: 2,
+            groupId: seated.groupId,
+            paidAt: paidTable.rows[0].paid_at?.toISOString() ?? null,
+            openAccountId: null,
+          });
+        }
         const items = await client.query(
           'SELECT id,voided_at,variant_name,course_number FROM merchant.order_item WHERE order_id=$1',
           [row.fired_order_id],
@@ -228,6 +323,114 @@ describe.skipIf(!dsn)('checkout order and kitchen on a disposable populated copy
         );
         expect(reserved.rows[0].status).toBe('committed');
         expect(noOpCalls).toHaveLength(1);
+        if (staleVisit) return;
+
+        // Un consumo nuevo añade saldo a la misma visita; su cancelación conserva a las personas.
+        const carts = new PosCartRepository({} as never);
+        const sales = new PosSaleRepository({} as never, carts);
+        const next = await carts.openTable(
+          client,
+          row.merchant_id,
+          row.location_id,
+          row.operator_session_id,
+          table!.tableId,
+        );
+        expect(next).not.toBeNull();
+        const withBalance = await room.readInTransaction(client, row.merchant_id, row.location_id);
+        for (const member of party) {
+          expect(
+            withBalance.states.find((entry) => entry.tableId === member.tableId),
+          ).toMatchObject({
+            paidAt: paidTable.rows[0].paid_at.toISOString(),
+            openAccountId: next!.id,
+          });
+        }
+        await sales.cancelCarriedOver(
+          client,
+          row.merchant_id,
+          row.user_id,
+          false,
+          {
+            locationId: row.location_id,
+            operatorSessionId: row.operator_session_id,
+            idempotencyKey: randomUUID(),
+            accounts: [{ cartId: next!.id, expectedVersion: next!.version }],
+            reasonCode: 'operator_mistake',
+            reason: 'Disposable second-consumption test',
+          },
+          { allowCurrentBusinessDay: true },
+        );
+        const afterCancellation = await room.readInTransaction(
+          client,
+          row.merchant_id,
+          row.location_id,
+        );
+        expect(
+          afterCancellation.states.find((entry) => entry.tableId === table!.tableId),
+        ).toMatchObject({
+          state: 'seated',
+          seatedAt: seated.seatedAt,
+          partySize: 2,
+          paidAt: paidTable.rows[0].paid_at.toISOString(),
+          openAccountId: null,
+        });
+
+        const takeaway = await carts.openTable(
+          client,
+          row.merchant_id,
+          row.location_id,
+          row.operator_session_id,
+          table!.tableId,
+        );
+        await expect(
+          carts.setFulfillment(
+            client,
+            row.merchant_id,
+            takeaway!.id,
+            takeaway!.version,
+            row.operator_session_id,
+            'takeout',
+          ),
+        ).resolves.toBe(true);
+        const afterTakeaway = await room.readInTransaction(
+          client,
+          row.merchant_id,
+          row.location_id,
+        );
+        expect(
+          afterTakeaway.states.find((entry) => entry.tableId === table!.tableId),
+        ).toMatchObject({
+          state: 'seated',
+          partySize: 2,
+          paidAt: paidTable.rows[0].paid_at.toISOString(),
+        });
+
+        const moved = await room.move(client, row.merchant_id, row.location_id, {
+          fromTableId: table!.tableId,
+          toTableId: fixtureTableIds[2],
+        });
+        expect(moved.find((entry) => entry.tableId === fixtureTableIds[2])).toMatchObject({
+          state: 'seated',
+          seatedAt: seated.seatedAt,
+          partySize: 2,
+          paidAt: paidTable.rows[0].paid_at.toISOString(),
+        });
+        expect(moved.find((entry) => entry.tableId === table!.tableId)).toMatchObject({
+          state: 'dirty',
+          paidAt: null,
+        });
+        const cleared = await room.clear(client, row.merchant_id, row.location_id, {
+          tableId: fixtureTableIds[2],
+        });
+        expect(cleared).toMatchObject([{ state: 'dirty', paidAt: null, seatedAt: null }]);
+        await room.openTable(client, row.merchant_id, row.location_id, {
+          tableId: fixtureTableIds[2],
+        });
+        const newParty = await room.seat(client, row.merchant_id, row.location_id, {
+          tableId: fixtureTableIds[2],
+          partySize: 1,
+        });
+        expect(newParty).toMatchObject([{ state: 'seated', paidAt: null, partySize: 1 }]);
       } finally {
         await client.query('ROLLBACK');
         client.release();

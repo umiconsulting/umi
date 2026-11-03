@@ -287,11 +287,17 @@ class _OrderTablePickerState extends State<OrderTablePicker> {
     }
   }
 
+  String _visualStateFor(String tableId) =>
+      widget.room?.isPaidAndOccupied(tableId) == true
+      ? tableVisualPaid
+      : widget.room?.stateOf(tableId).state ?? tableStateOpen;
+
   String _stateLabel(String state, bool es) => switch (state) {
     tableStateSeated => es ? 'Ocupada' : 'Occupied',
     tableStateOrdered => es ? 'Pedido enviado' : 'Order sent',
     tableStateServed => es ? 'Servida' : 'Served',
     tableStateAwaitingPayment => es ? 'Pidió la cuenta' : 'Bill requested',
+    tableVisualPaid => es ? 'Pagada y ocupada' : 'Paid and occupied',
     tableStateDirty => es ? 'Por limpiar' : 'Needs cleaning',
     _ => es ? 'Disponible' : 'Available',
   };
@@ -471,7 +477,7 @@ class _OrderTablePickerState extends State<OrderTablePicker> {
                             key: ValueKey('table-choice-${element.id}'),
                             title: Text(element.label),
                             subtitle: Text(
-                              '${_stateLabel(room?.stateOf(element.id).state ?? tableStateOpen, es)} · ${element.capacity} ${es ? 'lugares' : 'seats'}',
+                              '${_stateLabel(_visualStateFor(element.id), es)} · ${element.capacity} ${es ? 'lugares' : 'seats'}',
                             ),
                             onTap: _confirming
                                 ? null
@@ -491,6 +497,8 @@ class _OrderTablePickerState extends State<OrderTablePicker> {
                             state:
                                 room?.stateOf(table.table.id).state ??
                                 tableStateOpen,
+                            paid:
+                                room?.isPaidAndOccupied(table.table.id) == true,
                             selected: selected?.id == table.table.id,
                             partySize: room?.stateOf(table.table.id).partySize,
                             accountFolio: room
@@ -611,7 +619,7 @@ class _OrderTablePickerState extends State<OrderTablePicker> {
         children: [
           Text(table.label, style: PosTheme.of(context).textTheme.titleLarge),
           Text(
-            '${_stateLabel(entry?.state ?? tableStateOpen, es)} · ${table.capacity} ${es ? 'lugares' : 'seats'}',
+            '${_stateLabel(_visualStateFor(table.id), es)} · ${table.capacity} ${es ? 'lugares' : 'seats'}',
           ),
           if (elapsed != null)
             Text('${es ? 'Tiempo' : 'Time'}: ${formatTableTurn(elapsed)}'),
@@ -633,7 +641,11 @@ class _OrderTablePickerState extends State<OrderTablePicker> {
               ),
           ] else if (present) ...[
             Text(
-              es
+              room?.isPaidAndOccupied(table.id) == true
+                  ? (es
+                        ? 'La cuenta está pagada. Libera la mesa cuando los clientes se vayan.'
+                        : 'The account is paid. Clear the table when the guests leave.')
+                  : es
                   ? 'Sin cuenta abierta. Confirma si los clientes siguen aquí o ya se fueron.'
                   : 'No open account. Confirm whether the guests are still here or have left.',
             ),

@@ -457,6 +457,45 @@ describe('table state · the room, the turn timer, merge/split and the publish g
     const occupied = await read();
     expect(occupied.states).toHaveLength(1);
     expect(occupied.states[0]).toMatchObject({ tableId: T2, state: 'seated', partySize: 4 });
+    // Los dashboards anteriores rechazan propiedades nuevas en este contrato estricto.
+    expect(occupied.states[0]).not.toHaveProperty('paidAt');
+  });
+
+  it('preserves a paid visit through service and move, then resets it on departure', async () => {
+    const seated = await seat(T2, 2);
+    await pg.query(
+      `UPDATE merchant.table_state SET paid_at=now()
+       WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND table_id=$3::uuid`,
+      [MERCHANT, LOCATION, T2],
+    );
+    const posRoom = await scoped(() =>
+      tables.readForPos(user, MERCHANT, {
+        locationId: LOCATION,
+        operatorSessionId: OPERATOR_SESSION,
+      }),
+    );
+    const paidAt = posRoom.states.find((entry) => entry.tableId === T2)?.paidAt;
+    expect(paidAt).toEqual(expect.any(String));
+    const served = await markServed(T2);
+    expect(served.changed[0]).toMatchObject({ state: 'served', paidAt, openAccountId: null });
+    const moved = await move(T2, T3);
+    expect(moved.changed.find((entry) => entry.tableId === T3)).toMatchObject({
+      state: 'served',
+      paidAt,
+      seatedAt: seated.changed[0].seatedAt,
+      partySize: 2,
+    });
+    expect(moved.changed.find((entry) => entry.tableId === T2)).toMatchObject({
+      state: 'dirty',
+      paidAt: null,
+    });
+    expect((await clear(T3)).changed[0]).toMatchObject({ state: 'dirty', paidAt: null });
+    await openTable(T3);
+    expect((await seat(T3, 1)).changed[0]).toMatchObject({
+      state: 'seated',
+      paidAt: null,
+      partySize: 1,
+    });
   });
 
   it('refuses a seat on an occupied table, and does not disturb the party that is there', async () => {
