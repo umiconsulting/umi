@@ -1321,8 +1321,9 @@ final class CheckoutController extends ChangeNotifier {
           taxSnapshotAt: snapshotAt,
           connectivity: _connectivity?.state ?? PosConnectivity.unknown,
           paymentMethod: _paymentMethod,
-          localCommitWhileOnline:
-              localFirstFastPathEnabled && _worthTryingOnline,
+          // Pending cart commands select this ordered journal path while the
+          // API is reachable. They do not revoke the native fast-path opt-in.
+          localCommitWhileOnline: localFirstFastPathEnabled,
         ),
         now: DateTime.now().toUtc(),
       );
