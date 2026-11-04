@@ -1669,7 +1669,7 @@ class _PosNavigationState extends State<PosNavigation> {
       );
     }
     return Container(
-      width: rail ? (expanded ? railWidth : 64) : null,
+      width: rail ? (expanded ? railWidth : 72) : null,
       decoration: BoxDecoration(
         color: p.rail,
         border: rail

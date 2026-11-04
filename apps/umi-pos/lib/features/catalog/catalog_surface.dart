@@ -32,6 +32,7 @@ import '../cash/cash_controller.dart';
 import '../cash/cash_surface.dart';
 import '../checkout/checkout_controller.dart';
 import '../checkout/checkout_surface.dart';
+import '../checkout/partial_checkout_surface.dart' show checkoutNavigationOf;
 import '../customer_value/customer_value_controller.dart';
 import '../customer_value/customer_value_surface.dart';
 import '../entry/device_channel_socket_client.dart';
@@ -983,6 +984,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     OperatorPermissions permissions, {
     required bool canWriteCart,
   }) async {
+    final navigation = checkoutNavigationOf(context);
     await Navigator.of(context).push(
       PosPageRoute<void>(
         builder: (sheetContext) => AnimatedBuilder(
@@ -994,6 +996,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 toolbarHeight: 56,
                 title: _merchantHeading(sheetContext, showWordmark: true),
               ),
+              bottomNavigationBar: navigation == null
+                  ? null
+                  : PosNavigation(
+                      destinations: navigation.destinations,
+                      selectedIndex: navigation.selectedIndex,
+                    ),
               body: SafeArea(
                 child: _CartPanel(
                   serviceControls: _accountService?.call(),
@@ -2002,7 +2010,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     return PosPage(
       appBar: !orderVisible
           ? PosHeader(
-              toolbarHeight: 48,
+              toolbarHeight: 56,
               automaticallyImplyLeading: false,
               title: _merchantHeading(
                 context,
@@ -2350,7 +2358,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       pending: widget.cart.pendingSyncCount,
     );
     final header = PosHeader(
-      toolbarHeight: compactHeader ? 56 : 72,
+      toolbarHeight: 56,
       // The order context (PoloTab's "Para llevar" pill) takes the title slot —
       // the barista sets dine-in vs takeout here before building the order.
       titleSpacing: UmiSpacing.md,
@@ -3085,6 +3093,18 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       ],
     );
     final spanish = Localizations.localeOf(context).languageCode == 'es';
+    final landscape =
+        wide &&
+        MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height;
+    final newOrder = canWriteCart && _canStartNewAccount
+        ? _BarAction(
+            icon: PosGlyphs.addShoppingCartOutlined,
+            focusNode: _newSaleFocus,
+            compact: textScale >= 1.5,
+            label: spanish ? 'Nuevo pedido' : 'New order',
+            onPressed: () => _newSale(context),
+          )
+        : null;
     final catalogHeading = Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -3095,41 +3115,32 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               child: Text(
                 spanish ? 'La carta' : 'The menu',
                 style: PosTheme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontSize: wide ? 30 : 24,
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ),
-          if (canWriteCart && _canStartNewAccount)
-            _BarAction(
-              icon: PosGlyphs.addShoppingCartOutlined,
-              focusNode: _newSaleFocus,
-              compact: textScale >= 1.5,
-              label: spanish ? 'Nuevo pedido' : 'New order',
-              onPressed: () => _newSale(context),
-            ),
+          if (!landscape && newOrder != null) newOrder,
         ],
       ),
     );
-    final productTools = Wrap(
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 8,
-      children: [
-        Text(
-          spanish ? 'Productos' : 'Products',
-          style: PosTheme.of(context).textTheme.bodySmall,
-        ),
-        if (_frequentTop.isNotEmpty)
-          PosTextButton(
-            onPressed: () => setState(() => _showFrequent = !_showFrequent),
-            child: Text(
-              spanish ? 'Frecuentes' : 'Frequent',
-              style: PosTheme.of(context).textTheme.bodySmall,
+    final productTools = ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 44),
+      child: Row(
+        children: [
+          if (landscape && newOrder != null) newOrder,
+          const Spacer(),
+          if (_frequentTop.isNotEmpty)
+            PosTextButton(
+              onPressed: () => setState(() => _showFrequent = !_showFrequent),
+              child: Text(
+                spanish ? 'Frecuentes' : 'Frequent',
+                style: PosTheme.of(context).textTheme.bodySmall,
+              ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
     final scrollingProducts = scrollingHeader == null
         ? null
@@ -3150,13 +3161,30 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     final productPane = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!keyboard) catalogHeading,
-        search,
-        const SizedBox(height: 12),
+        if (landscape && !keyboard)
+          Row(
+            children: [
+              Expanded(child: catalogHeading),
+              Expanded(flex: 2, child: search),
+            ],
+          )
+        else ...[
+          if (!keyboard) catalogHeading,
+          search,
+        ],
+        const SizedBox(height: 8),
         if (!keyboard) categories,
         if (frequent != null) ...[const SizedBox(height: 12), frequent],
         productTools,
         Expanded(child: _content(context, state)),
+        if (landscape)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '${state.products.where((product) => CatalogMoney.fromJson(product.price).minorUnits > 0).length} ${spanish ? 'productos disponibles' : 'available products'}',
+              style: PosTheme.of(context).textTheme.labelSmall,
+            ),
+          ),
       ],
     );
 
@@ -3537,10 +3565,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       CatalogPhase.ready => LayoutBuilder(
         builder: (context, size) {
           final textScale = MediaQuery.textScalerOf(context).scale(16) / 16;
-          final columns = (size.maxWidth / (180 * textScale)).floor().clamp(
-            1,
-            MediaQuery.sizeOf(context).width < 1100 ? 2 : 4,
-          );
+          final columns =
+              (size.maxWidth /
+                      ((textScale < 1.5 && size.maxWidth >= 280 ? 140 : 180) *
+                          textScale))
+                  .floor()
+                  .clamp(1, MediaQuery.sizeOf(context).width < 1100 ? 2 : 4);
           // Keep the barista's fast path to sellable café items (audit F8):
           // a zero-price product (space rental, placeholders) cannot be
           // charged, so it does not belong in the sale grid.
@@ -3849,6 +3879,8 @@ final class _CategoryTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = PosTheme.of(context);
     final palette = theme.colorScheme;
+    final size = MediaQuery.sizeOf(context);
+    final compact = size.width < 700 || size.height > size.width;
     return SingleChildScrollView(
       key: const ValueKey('catalog-category-index'),
       scrollDirection: Axis.horizontal,
@@ -3856,19 +3888,19 @@ final class _CategoryTabs extends StatelessWidget {
         children: [
           for (final item in tabs)
             Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: EdgeInsets.only(right: compact ? 4 : 8),
               child: PosTapRegion(
                 semanticLabel: item.label,
                 selected: item.selected,
                 onTap: item.onTap,
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  constraints: const BoxConstraints(
-                    minHeight: 56,
+                  constraints: BoxConstraints(
+                    minHeight: compact ? 48 : 56,
                     minWidth: 88,
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: compact ? 8 : 12,
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
@@ -3908,7 +3940,7 @@ final class _CategoryTabs extends StatelessWidget {
                         ),
                       ),
                       if (item.count != null) ...[
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 8),
                         Text(
                           '${item.count}',
                           style: theme.textTheme.labelSmall?.copyWith(
@@ -4575,7 +4607,7 @@ final class _DetailState extends State<_Detail> {
                   detail.name,
                   style: PosTheme.of(
                     context,
-                  ).textTheme.headlineSmall?.copyWith(fontSize: 24),
+                  ).textTheme.headlineSmall?.copyWith(fontSize: 18),
                 ),
                 Text(
                   formatMinorUnits(money.minorUnits, money.currency),
@@ -4669,54 +4701,68 @@ final class _DetailState extends State<_Detail> {
           ],
         ),
       const SizedBox(height: UmiSpacing.md),
-      // LABELLED, BECAUSE THE COURSE STEPPER SITS TWO ROWS BELOW.
-      //
-      // Two bare `− 1 +` rows in one pane read as the same control written twice,
-      // and the owner asked why there were two on 2026-10-12. They are different
-      // facts about the line — how many of this item, and which course it belongs
-      // to — so both rows say which one they are.
-      Row(
-        children: [
-          Expanded(
-            child: Text(
-              l.cartQuantityLabel,
-              style: PosTheme.of(context).textTheme.titleSmall,
-            ),
-          ),
-          const SizedBox(width: UmiSpacing.sm),
-          PosIconButton(
-            tooltip: l.decreaseQuantity,
-            onPressed: quantity > 1 ? () => setState(() => quantity--) : null,
-            icon: const PosIcon(PosGlyphs.remove),
-          ),
-          SizedBox(
-            width: 32,
-            child: Text(
-              '$quantity',
-              textAlign: TextAlign.center,
-              style: PosTheme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                fontFeatures: const [FontFeature.tabularFigures()],
+      LayoutBuilder(
+        builder: (context, box) {
+          final quantityControl = Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l.cartQuantityLabel,
+                  style: PosTheme.of(context).textTheme.titleSmall,
+                ),
               ),
-            ),
-          ),
-          PosIconButton(
-            tooltip: l.increaseQuantity,
-            onPressed: quantity < 999 ? () => setState(() => quantity++) : null,
-            icon: const PosIcon(PosGlyphs.add),
-          ),
-        ],
-      ),
-      const SizedBox(height: UmiSpacing.md),
-      // Which round the dish belongs to (§8H step 4). It sits with quantity and
-      // note because it is the same kind of fact about the line, and it is the
-      // only place the operator can set it before the kitchen ever sees the
-      // ticket.
-      CourseControl(
-        course: course,
-        enabled: widget.canWrite,
-        hint: l.cartCourseHint,
-        onChanged: (value) => setState(() => course = value),
+              const SizedBox(width: UmiSpacing.sm),
+              PosIconButton(
+                tooltip: l.decreaseQuantity,
+                onPressed: quantity > 1
+                    ? () => setState(() => quantity--)
+                    : null,
+                icon: const PosIcon(PosGlyphs.remove),
+              ),
+              SizedBox(
+                width: 32,
+                child: Text(
+                  '$quantity',
+                  textAlign: TextAlign.center,
+                  style: PosTheme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              PosIconButton(
+                tooltip: l.increaseQuantity,
+                onPressed: quantity < 999
+                    ? () => setState(() => quantity++)
+                    : null,
+                icon: const PosIcon(PosGlyphs.add),
+              ),
+            ],
+          );
+          final courseControl = CourseControl(
+            course: course,
+            enabled: widget.canWrite,
+            hint: l.cartCourseHint,
+            onChanged: (value) => setState(() => course = value),
+          );
+          if (box.maxWidth >= 640 * MediaQuery.textScalerOf(context).scale(1)) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: quantityControl),
+                const SizedBox(width: 24),
+                Expanded(child: courseControl),
+              ],
+            );
+          }
+          return Column(
+            children: [
+              quantityControl,
+              const SizedBox(height: 16),
+              courseControl,
+            ],
+          );
+        },
       ),
       const SizedBox(height: UmiSpacing.md),
       PosField(
@@ -4877,7 +4923,9 @@ final class _OptionCard extends StatelessWidget {
         selected: selected,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 88),
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.sizeOf(context).width < 700 ? 64 : 72,
+          ),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: selected ? scheme.primaryContainer : scheme.surface,
@@ -5644,19 +5692,7 @@ final class _CartPanelState extends State<_CartPanel> {
                   children: [
                     PosListRow(
                       contentPadding: EdgeInsets.zero,
-                      leading: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: PosTheme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHigh,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Text('${item.quantity}'),
-                      ),
+                      leading: Text('${item.quantity}'),
                       title: Text(
                         item.productName,
                         style: PosTheme.of(context).textTheme.titleSmall,
@@ -5676,14 +5712,7 @@ final class _CartPanelState extends State<_CartPanel> {
                           if (item.note != null) item.note!,
                         ].join(' · '),
                       ),
-                      trailing: SizedBox(
-                        width: 100,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Text(_money(price.lineTotal)),
-                        ),
-                      ),
+                      trailing: Text(_money(price.lineTotal)),
                     ),
                     if (item.fired)
                       Align(
@@ -5890,7 +5919,7 @@ final class _CartPanelState extends State<_CartPanel> {
       _Total(
         label: l.totalLabel,
         value: _money(totals.grandTotal),
-        emphasized: true,
+        emphasized: remainingMoney == null,
       ),
       if (paidMoney != null && remainingMoney != null) ...[
         _Total(label: spanish ? 'Pagado' : 'Paid', value: _money(paidMoney)),
@@ -5969,14 +5998,7 @@ final class _CartPanelState extends State<_CartPanel> {
                   ? null
                   : () => _openCheckout(context),
               icon: const PosIcon(PosGlyphs.paymentsOutlined),
-              label: Row(
-                children: [
-                  Expanded(child: Text(l.checkoutAction)),
-                  const SizedBox(width: 8),
-                  if (remainingMoney != null || !readsBalance)
-                    Text(_money(remainingMoney ?? totals.grandTotal)),
-                ],
-              ),
+              label: Text(l.checkoutAction),
             ),
         ],
       ),

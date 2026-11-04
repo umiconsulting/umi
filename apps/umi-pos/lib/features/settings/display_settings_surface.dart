@@ -305,14 +305,14 @@ final class _PosSettingsWorkspaceState extends State<PosSettingsWorkspace> {
       ),
     };
     Widget sectionButton((String, String) tab, {required bool wide}) => Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: EdgeInsets.zero,
       child: PosTapRegion(
         selected: selected == tab.$1,
         semanticLabel: tab.$2,
         onTap: () => setState(() => _selected = tab.$1),
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 56),
+          constraints: const BoxConstraints(minHeight: 48),
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
@@ -348,14 +348,28 @@ final class _PosSettingsWorkspaceState extends State<PosSettingsWorkspace> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SingleChildScrollView(
+              Padding(
                 key: const ValueKey('settings-sections'),
-                scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    for (final tab in tabs) sectionButton(tab, wide: false),
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, bank) {
+                    final scale = MediaQuery.textScalerOf(context).scale(1);
+                    final columns = bank.maxWidth < 600 || scale >= 1.5
+                        ? 2
+                        : tabs.length;
+                    final width = (bank.maxWidth - 8 * (columns - 1)) / columns;
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final tab in tabs)
+                          SizedBox(
+                            width: width,
+                            child: sectionButton(tab, wide: columns > 2),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 24),
