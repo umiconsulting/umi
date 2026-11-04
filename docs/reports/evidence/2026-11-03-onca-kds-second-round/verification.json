@@ -1,0 +1,16 @@
+{
+  "base": "d626bdc44bf56a3c5a5176b52e6e481108729b21",
+  "red": "KITCHEN_INVALID_TRANSITION, currentStatus ready",
+  "stationIntegrationPassed": 13,
+  "kdsIntegrationPassed": 23,
+  "kdsIntegrationSkipped": 2,
+  "unitPassed": 135,
+  "legacyGate4a": "fixture missing in dedicated verification database; not passed",
+  "types": true,
+  "lint": true,
+  "apiBuild": true,
+  "review": "no production defects; two coverage improvements applied",
+  "deployed": false,
+  "fleetBuild": 336,
+  "fleetDoctorExit": 0
+}

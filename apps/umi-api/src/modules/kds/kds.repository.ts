@@ -1896,15 +1896,20 @@ export class KdsRepository {
           }
         }
       } else if (input.commandType === 'complete') {
-        const eligible = await client.query<{ count: string }>(
-          `SELECT count(*)::text AS count FROM merchant.kitchen_order_item
+        // La comanda incluye las rondas anteriores. Valida todos los productos
+        // seleccionados, pero cierra sólo los que aún no tienen confirmación.
+        const eligible = await client.query<{ count: string; pending_count: string }>(
+          `SELECT count(*)::text AS count,
+                  count(*) FILTER (WHERE station_completed_at IS NULL)::text AS pending_count
+           FROM merchant.kitchen_order_item
            WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid
              AND station_id=ANY($3::uuid[]) AND (cardinality($4::uuid[])=0 OR id=ANY($4::uuid[]))
-             AND status='ready' AND station_completed_at IS NULL`,
+             AND status='ready'`,
           [input.order.merchant_id, input.order.id, stationScope, input.itemIds],
         );
         const count = Number(eligible.rows[0]?.count ?? 0);
-        if (count === 0 || (input.itemIds.length > 0 && count !== input.itemIds.length)) {
+        const pendingCount = Number(eligible.rows[0]?.pending_count ?? 0);
+        if (pendingCount === 0 || (input.itemIds.length > 0 && count !== input.itemIds.length)) {
           effectCount = 0;
         } else {
           const effect = await client.query(
