@@ -201,37 +201,62 @@ class _DenominationCounterState extends State<DenominationCounter> {
       return LayoutBuilder(
         builder: (context, box) {
           final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
-          final columns = box.maxWidth >= 312 && scale < 1.5
-              ? (box.maxWidth >= 700 ? 3 : 2)
+          final splitGroups =
+              box.maxWidth >= 400 * scale && scale < 1.5 && groups.length > 1;
+          final groupWidth = splitGroups
+              ? (box.maxWidth - 24) / groups.length
+              : box.maxWidth;
+          final columns = !splitGroups && groupWidth >= 312 && scale < 1.5
+              ? 2
               : 1;
-          final width = (box.maxWidth - 8 * (columns - 1)) / columns;
+          final width = (groupWidth - 8 * (columns - 1)) / columns;
+          Widget group((String, List<int>) item) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(item.$1, style: theme.textTheme.titleSmall),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final denomination in item.$2)
+                    SizedBox(
+                      width: width,
+                      child: _denominationRow(
+                        context,
+                        l,
+                        theme,
+                        denomination,
+                        width,
+                        stacked: true,
+                        splitGroup: splitGroups,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          );
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              for (final group in groups)
-                if (group.$2.isNotEmpty) ...[
-                  Text(group.$1, style: theme.textTheme.titleSmall),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final denomination in group.$2)
-                        SizedBox(
-                          width: width,
-                          child: _denominationRow(
-                            context,
-                            l,
-                            theme,
-                            denomination,
-                            width,
-                            stacked: true,
-                          ),
-                        ),
+              if (splitGroups)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var index = 0; index < groups.length; index++) ...[
+                      if (index > 0) const SizedBox(width: 24),
+                      Expanded(child: group(groups[index])),
                     ],
-                  ),
-                  const SizedBox(height: 16),
-                ],
+                  ],
+                )
+              else
+                for (final item in groups)
+                  if (item.$2.isNotEmpty) ...[
+                    group(item),
+                    const SizedBox(height: 16),
+                  ],
               if (widget.showTotal)
                 Text(
                   '${es ? 'Total contado' : 'Counted total'} · ${_money(_total)}',
@@ -337,6 +362,7 @@ class _DenominationCounterState extends State<DenominationCounter> {
     int denomination,
     double labelWidth, {
     required bool stacked,
+    bool splitGroup = false,
   }) {
     final quantity = _counts[denomination] ?? 0;
     final label = Column(
@@ -402,17 +428,40 @@ class _DenominationCounterState extends State<DenominationCounter> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_money(denomination), style: theme.textTheme.bodyMedium),
+                if (splitGroup)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _money(denomination),
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            '= ${_money(denomination * quantity)}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Text(_money(denomination), style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 8),
                 Row(children: controls),
-                const SizedBox(height: 8),
-                Text(
-                  '= ${_money(denomination * quantity)}',
-                  textAlign: TextAlign.right,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                if (!splitGroup) const SizedBox(height: 8),
+                if (!splitGroup)
+                  Text(
+                    '= ${_money(denomination * quantity)}',
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
               ],
             )
           : stacked

@@ -12,6 +12,7 @@ import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
 import 'package:umi_pos/features/checkout/checkout_surface.dart';
 import 'package:umi_pos/features/checkout/partial_checkout_surface.dart';
+import 'package:umi_pos/features/checkout/payment_method_tile.dart';
 
 const _merchant = '00000000-0000-4000-8000-000000000001';
 const _location = '00000000-0000-4000-8000-000000000002';
@@ -238,11 +239,13 @@ Future<(CartController, CheckoutController)> _pump(
   _Repo repository, {
   bool canConfirmManualTerminal = false,
   String? merchantLabel,
+  Size viewport = const Size(1280, 1800),
+  bool shell = false,
   Future<bool?> Function(int amountMinor, bool selected)?
   onShowBankTransferDetails,
 }) async {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(1280, 1800);
+  tester.view.physicalSize = viewport;
   addTearDown(tester.view.reset);
   const telemetry = SafeTelemetry(
     enabled: false,
@@ -278,6 +281,20 @@ Future<(CartController, CheckoutController)> _pump(
         cart: cart,
         operatorSessionId: _operator,
         merchantLabel: merchantLabel,
+        navigation: shell
+            ? PosNavigation(
+                destinations: const [
+                  PosDestination(
+                    icon: PosIcon(PosGlyphs.receiptLong),
+                    label: 'Sale',
+                  ),
+                  PosDestination(
+                    icon: PosIcon(PosGlyphs.paymentsOutlined),
+                    label: 'Cash',
+                  ),
+                ],
+              )
+            : null,
         canConfirmManualTerminal: canConfirmManualTerminal,
         cashShiftId: _shift,
         onShowBankTransferDetails:
@@ -290,6 +307,50 @@ Future<(CartController, CheckoutController)> _pump(
 }
 
 void main() {
+  for (final width in [800.0, 820.0]) {
+    testWidgets(
+      'portrait partial checkout retains vertical methods and account at $width',
+      (tester) async {
+        final repository = _Repo()..enableManualTerminal = true;
+        final (cart, checkout) = await _pump(
+          tester,
+          repository,
+          viewport: Size(width, 1280),
+          shell: true,
+          canConfirmManualTerminal: true,
+          merchantLabel: 'Cafe · Local',
+        );
+        final first = tester.getRect(find.byType(PaymentMethodTile).first);
+        final second = tester.getRect(find.byType(PaymentMethodTile).at(1));
+        final principal = tester.getRect(
+          find.byKey(const ValueKey('partial-principal')),
+        );
+        final account = tester.getRect(
+          find.byKey(const ValueKey('partial-account-summary')),
+        );
+        expect(first.right, lessThanOrEqualTo(principal.left));
+        expect(second.top, greaterThanOrEqualTo(first.bottom));
+        expect(account.left, greaterThanOrEqualTo(principal.right));
+        expect(tester.takeException(), isNull);
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('partial-account-summary')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('partial-account-disclosure')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        checkout.dispose();
+        cart.dispose();
+      },
+    );
+  }
+
   testWidgets('phone partial checkout retains UMI beside the real merchant', (
     tester,
   ) async {

@@ -3030,68 +3030,80 @@ Future<void> _count(BuildContext context, CashController controller) async {
           final valid = totalOnly
               ? (totalMinorUnits ?? 0) > 0
               : tally.totalMinorUnits > 0;
-          final controls = Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        es ? 'Total contado' : 'Counted total',
-                        style: PosTheme.of(context).textTheme.bodySmall,
-                      ),
+          Widget controls(bool rail) {
+            final amount = Text(
+              formatMinorUnits(
+                totalOnly ? totalMinorUnits ?? 0 : tally.totalMinorUnits,
+                currency,
+              ),
+              key: const ValueKey('count-workspace-total'),
+              style: rail
+                  ? PosTheme.of(context).textTheme.displaySmall
+                  : PosTheme.of(context).textTheme.titleLarge,
+            );
+            final totalLabel = Text(
+              es ? 'Total contado' : 'Counted total',
+              style: PosTheme.of(context).textTheme.bodySmall,
+            );
+            final submit = PosButton(
+              compact: true,
+              style: PosButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+              onPressed: valid ? () => Navigator.pop(countContext, true) : null,
+              child: Text(
+                blind ? l.submitBlindCountAction : l.submitCountAction,
+              ),
+            );
+            final cancel = PosTextButton(
+              compact: true,
+              onPressed: () => Navigator.pop(countContext, false),
+              child: Text(l.closeAction),
+            );
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (rail) ...[
+                    totalLabel,
+                    const SizedBox(height: 8),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: amount,
                     ),
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          formatMinorUnits(
-                            totalOnly
-                                ? totalMinorUnits ?? 0
-                                : tally.totalMinorUnits,
-                            currency,
+                  ] else
+                    Row(
+                      children: [
+                        Expanded(child: totalLabel),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: amount,
                           ),
-                          key: const ValueKey('count-workspace-total'),
-                          style: PosTheme.of(context).textTheme.titleLarge,
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    PosTextButton(
-                      compact: true,
-                      onPressed: () => Navigator.pop(countContext, false),
-                      child: Text(l.closeAction),
+                  const SizedBox(height: 8),
+                  if (rail) ...[
+                    submit,
+                    cancel,
+                  ] else
+                    Row(
+                      children: [
+                        cancel,
+                        const SizedBox(width: 8),
+                        Expanded(child: submit),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: PosButton(
-                        compact: true,
-                        style: PosButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                        ),
-                        onPressed: valid
-                            ? () => Navigator.pop(countContext, true)
-                            : null,
-                        child: Text(
-                          blind
-                              ? l.submitBlindCountAction
-                              : l.submitCountAction,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
+                ],
+              ),
+            );
+          }
+
           final content = SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -3195,7 +3207,12 @@ Future<void> _count(BuildContext context, CashController controller) async {
                     child: LayoutBuilder(
                       builder: (context, box) {
                         final wide =
-                            box.maxWidth >= 900 &&
+                            box.maxWidth >=
+                                680 *
+                                    (MediaQuery.textScalerOf(
+                                          context,
+                                        ).scale(16) /
+                                        16) &&
                             MediaQuery.textScalerOf(context).scale(16) < 24;
                         final submit = DecoratedBox(
                           decoration: BoxDecoration(
@@ -3208,7 +3225,7 @@ Future<void> _count(BuildContext context, CashController controller) async {
                               ),
                             ),
                           ),
-                          child: controls,
+                          child: controls(wide),
                         );
                         return wide
                             ? Row(
@@ -3216,7 +3233,7 @@ Future<void> _count(BuildContext context, CashController controller) async {
                                 children: [
                                   Expanded(child: content),
                                   SizedBox(
-                                    width: 304,
+                                    width: 256,
                                     child: Align(
                                       alignment: Alignment.bottomCenter,
                                       child: submit,

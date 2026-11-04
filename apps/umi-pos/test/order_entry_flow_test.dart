@@ -838,6 +838,13 @@ void main() {
           findsOneWidget,
         );
         expect(find.byType(PosAlertDialog), findsNothing);
+        final choice = find.byKey(const ValueKey('catalog-service-choice'));
+        expect(tester.getRect(choice).height, lessThan(240));
+        expect(find.text('Latte').hitTestable(), findsOneWidget);
+        await tester.tap(find.text('Latte'));
+        await tester.pumpAndSettle();
+        expect(f.repo.additions, 0);
+        expect(choice, findsOneWidget);
         expect(f.cart.state.cart!.toJson(), original);
         expect(f.repo.creations, 0);
         if (type == 'takeout') {
