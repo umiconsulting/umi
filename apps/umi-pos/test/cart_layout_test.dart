@@ -1400,6 +1400,7 @@ void main() {
       80,
       scrollable: sheetScroll,
     );
+    await tester.pumpAndSettle();
     expect(find.text('Latte 0').hitTestable(), findsOneWidget);
     // And the actions are pinned below the panel's scroll, inside the space the
     // keyboard leaves — the point of the scroll is that they are not pushed off
@@ -1407,6 +1408,7 @@ void main() {
     // without hunting for them.
     final fire = find.byTooltip('Enviar a cocina');
     await tester.scrollUntilVisible(fire, 100, scrollable: sheetScroll);
+    await tester.pumpAndSettle();
     expect(fire, findsOneWidget);
     expect(
       tester.getRect(fire).bottom,

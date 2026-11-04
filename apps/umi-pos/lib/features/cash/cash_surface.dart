@@ -3152,13 +3152,19 @@ Future<void> _count(BuildContext context, CashController controller) async {
               actionsInline: true,
               title: Row(
                 children: [
-                  Text(
-                    'umi',
-                    style: PosTheme.of(
-                      context,
-                    ).textTheme.headlineSmall?.copyWith(fontSize: 22),
-                  ),
-                  const SizedBox(width: 16),
+                  if (navigation == null ||
+                      MediaQuery.sizeOf(context).width < 700 ||
+                      MediaQuery.sizeOf(context).height -
+                              MediaQuery.viewInsetsOf(context).bottom <
+                          600) ...[
+                    Text(
+                      'umi',
+                      style: PosTheme.of(
+                        context,
+                      ).textTheme.headlineSmall?.copyWith(fontSize: 22),
+                    ),
+                    const SizedBox(width: 16),
+                  ],
                   Expanded(
                     child: Text(
                       l.cashCenterTitle,

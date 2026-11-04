@@ -603,6 +603,7 @@ void main() {
         await tester.ensureVisible(find.text('Contar el cajón'));
         await tester.tap(find.text('Contar el cajón'));
         await tester.pumpAndSettle();
+        expect(find.text('umi'), findsOneWidget);
         final bills = tester.getRect(find.text('Billetes'));
         final coins = tester.getRect(find.text('Monedas'));
         final total = tester.getRect(
@@ -611,6 +612,23 @@ void main() {
         expect(bills.top, coins.top);
         expect(bills.right, lessThanOrEqualTo(coins.left));
         expect(coins.right, lessThanOrEqualTo(total.left));
+        expect(
+          find.descendant(
+            of: find.byType(PosHeader).last,
+            matching: find.text('umi'),
+          ),
+          findsNothing,
+        );
+        tester.view.physicalSize = const Size(402, 874);
+        await tester.pumpAndSettle();
+        expect(find.text('umi'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(PosHeader).last,
+            matching: find.text('umi'),
+          ),
+          findsOneWidget,
+        );
         expect(repository.countedWith, isNull);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());

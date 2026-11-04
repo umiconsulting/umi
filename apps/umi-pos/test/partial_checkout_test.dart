@@ -14,6 +14,8 @@ import 'package:umi_pos/features/checkout/checkout_surface.dart';
 import 'package:umi_pos/features/checkout/partial_checkout_surface.dart';
 import 'package:umi_pos/features/checkout/payment_method_tile.dart';
 
+import 'receipt_document_test.dart' show fonts;
+
 const _merchant = '00000000-0000-4000-8000-000000000001';
 const _location = '00000000-0000-4000-8000-000000000002';
 const _operator = '00000000-0000-4000-8000-000000000003';
@@ -241,6 +243,7 @@ Future<(CartController, CheckoutController)> _pump(
   String? merchantLabel,
   Size viewport = const Size(1280, 1800),
   bool shell = false,
+  bool viaRoute = false,
   Future<bool?> Function(int amountMinor, bool selected)?
   onShowBankTransferDetails,
 }) async {
@@ -268,6 +271,30 @@ Future<(CartController, CheckoutController)> _pump(
     operatorSessionId: _operator,
     currency: 'MXN',
   );
+  final surface = PartialCheckoutSurface(
+    checkout: checkout,
+    cart: cart,
+    operatorSessionId: _operator,
+    merchantLabel: merchantLabel,
+    navigation: shell
+        ? PosNavigation(
+            destinations: const [
+              PosDestination(
+                icon: PosIcon(PosGlyphs.receiptLong),
+                label: 'Sale',
+              ),
+              PosDestination(
+                icon: PosIcon(PosGlyphs.paymentsOutlined),
+                label: 'Cash',
+              ),
+            ],
+          )
+        : null,
+    canConfirmManualTerminal: canConfirmManualTerminal,
+    cashShiftId: _shift,
+    onShowBankTransferDetails:
+        onShowBankTransferDetails ?? (_, _) async => false,
+  );
   await tester.pumpWidget(
     PosApp(
       locale: const Locale('en'),
@@ -276,37 +303,105 @@ Future<(CartController, CheckoutController)> _pump(
         AppLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
       ],
-      home: PartialCheckoutSurface(
-        checkout: checkout,
-        cart: cart,
-        operatorSessionId: _operator,
-        merchantLabel: merchantLabel,
-        navigation: shell
-            ? PosNavigation(
-                destinations: const [
-                  PosDestination(
-                    icon: PosIcon(PosGlyphs.receiptLong),
-                    label: 'Sale',
-                  ),
-                  PosDestination(
-                    icon: PosIcon(PosGlyphs.paymentsOutlined),
-                    label: 'Cash',
-                  ),
-                ],
-              )
-            : null,
-        canConfirmManualTerminal: canConfirmManualTerminal,
-        cashShiftId: _shift,
-        onShowBankTransferDetails:
-            onShowBankTransferDetails ?? (_, _) async => false,
-      ),
+      home: viaRoute
+          ? Builder(
+              builder: (context) => PosButton(
+                onPressed: () => Navigator.of(
+                  context,
+                ).push(PosPageRoute<void>(builder: (_) => surface)),
+                child: const Text('Open partial'),
+              ),
+            )
+          : surface,
     ),
   );
   await tester.pumpAndSettle();
+  if (viaRoute) {
+    await tester.tap(find.text('Open partial'));
+    await tester.pumpAndSettle();
+  }
   return (cart, checkout);
 }
 
 void main() {
+  testWidgets(
+    'phone partial route puts methods before the form and keeps cash visible',
+    (tester) async {
+      await fonts();
+      final repository = _Repo()
+        ..enableManualTerminal = true
+        ..enableBankTransfer = true;
+      final (cart, checkout) = await _pump(
+        tester,
+        repository,
+        viewport: const Size(402, 874),
+        shell: true,
+        viaRoute: true,
+        canConfirmManualTerminal: true,
+        merchantLabel: 'Café · Local',
+      );
+      final principal = find.byKey(const ValueKey('partial-principal'));
+      final cash = find.byKey(const ValueKey('partial-cash-received'));
+      final methods = find.byType(PaymentMethodTile);
+      for (final method in methods.evaluate()) {
+        final rect = tester.getRect(find.byWidget(method.widget));
+        expect(rect.bottom, lessThan(tester.getRect(principal).top));
+        expect(rect.height, greaterThanOrEqualTo(48));
+        expect(find.byWidget(method.widget).hitTestable(), findsOneWidget);
+      }
+      expect(
+        tester
+            .getSize(find.widgetWithText(PosTextButton, 'Back to account'))
+            .height,
+        44,
+      );
+      expect(
+        tester.getSize(find.widgetWithText(PosTextButton, 'Refresh')).height,
+        44,
+      );
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('partial-account-disclosure')))
+            .height,
+        44,
+      );
+      expect(cash.hitTestable(), findsOneWidget);
+      expect(
+        tester.getRect(cash).bottom,
+        lessThanOrEqualTo(
+          tester
+              .getRect(find.byKey(const ValueKey('partial-payment-editor')))
+              .bottom,
+        ),
+      );
+      expect(find.text('Amount due'), findsOneWidget);
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('partial-cash-change')))
+            .height,
+        36,
+      );
+      expect(
+        find.byKey(const ValueKey('partial-exact-charge')).hitTestable(),
+        findsOneWidget,
+      );
+      final charge = find.byKey(const ValueKey('partial-charge'));
+      expect(charge.hitTestable(), findsOneWidget);
+      expect(tester.getSize(charge).height, 48);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(cash);
+      await tester.pumpAndSettle();
+      expect(cash.hitTestable(), findsOneWidget);
+      expect(charge.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      checkout.dispose();
+      cart.dispose();
+    },
+  );
+
   for (final width in [800.0, 820.0]) {
     testWidgets(
       'portrait partial checkout retains vertical methods and account at $width',

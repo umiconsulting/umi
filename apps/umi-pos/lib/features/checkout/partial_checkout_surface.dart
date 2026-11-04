@@ -841,6 +841,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
             final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
             final wide = constraints.maxWidth >= 680 * scale;
             final narrowPanes = constraints.maxWidth < 1000;
+            _compactPhone = !wide && constraints.maxWidth < 700 && scale < 1.5;
             _methodBankVertical =
                 wide &&
                 constraints.maxWidth >= 680 * scale &&
@@ -853,11 +854,20 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
             final editor = Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    _compactPhone ? 4 : 12,
+                    16,
+                    0,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
                         child: PosTextButton(
+                          compact: _compactPhone,
+                          style: _compactPhone
+                              ? _compactTextButtonStyle()
+                              : null,
                           onPressed: busy
                               ? null
                               : () => Navigator.of(context).pop(),
@@ -867,6 +877,8 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                         ),
                       ),
                       PosTextButton(
+                        compact: _compactPhone,
+                        style: _compactPhone ? _compactTextButtonStyle() : null,
                         onPressed: busy ? null : _refresh,
                         child: Text(label('Actualizar', 'Refresh')),
                       ),
@@ -880,27 +892,36 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          label('Cobro dividido', 'Split payment'),
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontSize: 18,
+                        if (_compactPhone)
+                          _compactAccountHeader()
+                        else ...[
+                          Text(
+                            label('Cobro dividido', 'Split payment'),
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontSize: 18,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          [cart.accountFolio, tableLabel]
-                              .whereType<String>()
-                              .where((value) => value.isNotEmpty)
-                              .join(' · '),
-                          key: const ValueKey('partial-account-context'),
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 4),
+                          Text(
+                            [cart.accountFolio, tableLabel]
+                                .whereType<String>()
+                                .where((value) => value.isNotEmpty)
+                                .join(' · '),
+                            key: const ValueKey('partial-account-context'),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         if (!wide && ledger != null)
                           PosDisclosure(
                             key: const ValueKey('partial-account-disclosure'),
+                            compact: _compactPhone,
+                            tilePadding: _compactPhone ? EdgeInsets.zero : null,
                             title: Text(
                               label('Detalle de la cuenta', 'Account details'),
+                              style: _compactPhone
+                                  ? theme.textTheme.bodyMedium
+                                  : null,
                             ),
                             children: [_accountSummary()],
                           ),
@@ -911,7 +932,12 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                 ),
                 if (ledger != null)
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      _compactPhone ? 8 : 16,
+                      16,
+                      _compactPhone ? 8 : 16,
+                    ),
                     child: _checkoutBar(),
                   ),
               ],
@@ -959,6 +985,64 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
     );
   }
 
+  bool _compactPhone = false;
+
+  PosButtonStyle _compactTextButtonStyle() => PosTextButton.styleFrom(
+    textStyle: PosTheme.of(context).textTheme.bodyMedium,
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  );
+
+  Widget _compactAccountHeader() {
+    final theme = PosTheme.of(context);
+    final titleStyle = theme.textTheme.bodyMedium?.copyWith(
+      fontSize: 18,
+      fontWeight: FontWeight.w600,
+    );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label('Cobro dividido', 'Split payment'),
+                style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+              ),
+              Text(
+                [cart.accountFolio, tableLabel]
+                    .whereType<String>()
+                    .where((value) => value.isNotEmpty)
+                    .join(' · '),
+                key: const ValueKey('partial-account-context'),
+                style: titleStyle,
+              ),
+            ],
+          ),
+        ),
+        if (ledger != null) ...[
+          const SizedBox(width: 12),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  label('Por cobrar', 'Amount due'),
+                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+                ),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(money(remaining), style: titleStyle),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   bool _methodBankVertical = false;
   double _methodWidth = 180;
 
@@ -971,13 +1055,14 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
         if (ledger == null && busy) const Center(child: PosSpinner()),
         if (error != null) ...[_notice(error!), const SizedBox(height: 16)],
         if (ledger != null) ...[
-          _summaryRow(
-            label('Por cobrar', 'Amount due'),
-            money(remaining),
-            emphasized: true,
-          ),
+          if (!_compactPhone)
+            _summaryRow(
+              label('Por cobrar', 'Amount due'),
+              money(remaining),
+              emphasized: true,
+            ),
           if (blocked) ...[
-            const SizedBox(height: UmiSpacing.md),
+            SizedBox(height: _compactPhone ? 8 : UmiSpacing.md),
             _notice(
               hasUnknown
                   ? label(
@@ -1022,10 +1107,18 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
               ),
           ],
           if (!canFinalize && !blocked) ...[
-            const SizedBox(height: UmiSpacing.lg),
+            if (_compactPhone) ...[
+              _paymentMethods(),
+              const SizedBox(height: 8),
+            ] else
+              const SizedBox(height: UmiSpacing.lg),
             Text(
               label('Cobrar a esta persona', 'Charge this guest'),
-              style: theme.textTheme.titleLarge,
+              style: _compactPhone
+                  ? theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    )
+                  : theme.textTheme.titleLarge,
             ),
             const SizedBox(height: UmiSpacing.sm),
             Wrap(
@@ -1033,6 +1126,8 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
               children: [
                 for (final parts in [1, 2, 3, 4])
                   PosTextButton(
+                    compact: _compactPhone,
+                    style: _compactPhone ? _compactTextButtonStyle() : null,
                     key: ValueKey('partial-equal-$parts'),
                     onPressed: busy
                         ? null
@@ -1057,12 +1152,14 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
             ),
             PosField(
               key: const ValueKey('partial-principal'),
+              style: _compactPhone ? theme.textTheme.bodyMedium : null,
               controller: principal,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
               inputFormatters: cashAmountFormatters,
               decoration: PosFieldDecoration(
+                isDense: _compactPhone,
                 labelText: label(
                   'Consumo de esta persona',
                   'This guest’s portion',
@@ -1078,11 +1175,16 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                     : null,
               ),
             ),
-            const SizedBox(height: UmiSpacing.md),
+            SizedBox(height: _compactPhone ? 8 : UmiSpacing.md),
             if (widget.checkout.policy?.tip['enabled'] == true)
               PosDisclosure(
                 key: const ValueKey('partial-tip-disclosure'),
-                title: Text(label('Agregar propina', 'Add tip')),
+                compact: _compactPhone,
+                tilePadding: _compactPhone ? EdgeInsets.zero : null,
+                title: Text(
+                  label('Agregar propina', 'Add tip'),
+                  style: _compactPhone ? theme.textTheme.bodyMedium : null,
+                ),
                 initiallyExpanded: (tipMinor ?? 0) > 0,
                 children: [
                   Text(
@@ -1154,8 +1256,8 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                   ),
                 ],
               ),
-            const SizedBox(height: UmiSpacing.md),
-            if (!_methodBankVertical) _paymentMethods(),
+            SizedBox(height: _compactPhone ? 8 : UmiSpacing.md),
+            if (!_methodBankVertical && !_compactPhone) _paymentMethods(),
             if (method == 'bank_transfer')
               PosTextButton(
                 key: const ValueKey('partial-bank-view-details'),
@@ -1171,7 +1273,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                   'Open a cash shift or enable a payment method to split this account.',
                 ),
               ),
-            const SizedBox(height: UmiSpacing.md),
+            SizedBox(height: _compactPhone ? 8 : UmiSpacing.md),
             if (method == 'cash') _cashInput(),
           ],
         ],
@@ -1184,7 +1286,9 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
     children: [
       Text(
         label('Método de pago', 'Payment method'),
-        style: PosTheme.of(context).textTheme.titleMedium,
+        style: _compactPhone
+            ? PosTheme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12)
+            : PosTheme.of(context).textTheme.titleMedium,
       ),
       if (lockedMethod != null)
         Text(
@@ -1193,7 +1297,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
             'This account keeps the same method. This location does not allow mixed methods.',
           ),
         ),
-      const SizedBox(height: UmiSpacing.sm),
+      SizedBox(height: _compactPhone ? 4 : UmiSpacing.sm),
       LayoutBuilder(
         builder: (context, box) {
           final compact = MediaQuery.sizeOf(context).width < 700;
@@ -1331,9 +1435,11 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
       PosField(
         key: const ValueKey('partial-cash-received'),
         controller: cashReceived,
+        style: _compactPhone ? PosTheme.of(context).textTheme.bodyMedium : null,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         inputFormatters: cashAmountFormatters,
         decoration: PosFieldDecoration(
+          isDense: _compactPhone,
           labelText: label('Efectivo recibido', 'Cash received'),
         ),
         onChanged: (_) => cashReceivedEdited = true,
@@ -1436,27 +1542,53 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
 
     final received = receivedMinor;
     final difference = received == null ? null : received - charge;
-    final change = Column(
-      key: const ValueKey('partial-cash-change'),
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          difference != null && difference < 0
-              ? label('Falta', 'Amount due')
-              : label('Cambio', 'Change'),
-          style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
-            color: PosTheme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        Text(
-          difference == null ? '—' : money(difference.abs()),
-          style: PosTheme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-        ),
-      ],
-    );
+    final change = _compactPhone
+        ? SizedBox(
+            key: const ValueKey('partial-cash-change'),
+            height: 36,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    difference != null && difference < 0
+                        ? label('Falta', 'Amount due')
+                        : label('Cambio', 'Change'),
+                    style: PosTheme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(fontSize: 12),
+                  ),
+                ),
+                Text(
+                  difference == null ? '—' : money(difference.abs()),
+                  style: PosTheme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          )
+        : Column(
+            key: const ValueKey('partial-cash-change'),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                difference != null && difference < 0
+                    ? label('Falta', 'Amount due')
+                    : label('Cambio', 'Change'),
+                style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+                  color: PosTheme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Text(
+                difference == null ? '—' : money(difference.abs()),
+                style: PosTheme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ],
+          );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1465,10 +1597,15 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
           '${label('propina', 'tip')} ${money(tipMinor ?? 0)} = '
           '${label('cargo', 'charge')} ${money(charge)}',
           key: const ValueKey('partial-exact-charge'),
-          style: PosTheme.of(context).textTheme.bodySmall,
+          style: _compactPhone
+              ? PosTheme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12)
+              : PosTheme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 8),
-        if (method == 'cash') ...[change, const SizedBox(height: 12)],
+        if (method == 'cash') ...[
+          change,
+          SizedBox(height: _compactPhone ? 4 : 12),
+        ],
         action,
       ],
     );
