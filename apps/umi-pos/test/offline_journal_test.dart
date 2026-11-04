@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/features/offline/connectivity_controller.dart';
@@ -5,7 +8,166 @@ import 'package:umi_pos/features/offline/offline_journal.dart';
 import 'package:umi_pos/features/offline/recovery_actions.dart';
 import 'package:umi_pos/features/offline/replay_engine.dart';
 
+import 'support/settled_journal_fixture.dart';
+
 void main() {
+  test('settled history leaves capacity for the next command', () async {
+    final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+    await seedSettledJournalHistory(
+      journal,
+      deviceId: _id(2),
+      merchantId: _id(3),
+      locationId: _id(4),
+      operatorSessionId: _id(5),
+    );
+    final history = await journal.load();
+    expect(history.entries, hasLength(250));
+    expect(history.pendingCount, 0);
+    final next = await journal.append(
+      commandId: _id(9001),
+      deviceId: _id(2),
+      credentialVersion: 1,
+      merchantId: _id(3),
+      locationId: _id(4),
+      operatorSessionId: _id(5),
+      idempotencyKey: _id(9001),
+      payload: const {'next': true},
+    );
+    final current = await journal.load();
+    expect(next.deviceSequence, 251);
+    expect(current.nextSequence, 252);
+    expect(current.pendingCount, 1);
+    expect(current.entries, hasLength(251));
+    expect(
+      current.entries.take(250).map((entry) => entry.toJson()),
+      history.entries.map((entry) => entry.toJson()),
+    );
+  });
+
+  test('active commands still stop at the 250 command limit', () async {
+    final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+    for (var sequence = 1; sequence <= 250; sequence++) {
+      await journal.append(
+        commandId: _id(10000 + sequence),
+        deviceId: _id(2),
+        credentialVersion: 1,
+        merchantId: _id(3),
+        locationId: _id(4),
+        operatorSessionId: _id(5),
+        idempotencyKey: _id(10000 + sequence),
+        payload: {'pending': sequence},
+      );
+    }
+    await journal.markUnknown(_id(10001));
+    await journal.apply(
+      ReplayResult(
+        commandId: _id(10002),
+        deviceSequence: 2,
+        status: 'conflict',
+        officialId: null,
+        officialCommit: null,
+        serverConflictReference: _id(12000),
+        failure: const {'classification': 'server_validation_failed'},
+      ),
+    );
+    await expectLater(
+      journal.append(
+        commandId: _id(13000),
+        deviceId: _id(2),
+        credentialVersion: 1,
+        merchantId: _id(3),
+        locationId: _id(4),
+        operatorSessionId: _id(5),
+        idempotencyKey: _id(13000),
+        payload: const {},
+      ),
+      throwsA(
+        isA<OfflineJournalException>().having(
+          (error) => error.category,
+          'category',
+          'queue_capacity_exceeded',
+        ),
+      ),
+    );
+    final snapshot = await journal.load();
+    expect(snapshot.pendingCount, 250);
+    expect(snapshot.entries, hasLength(250));
+    expect(snapshot.nextSequence, 251);
+  });
+
+  test(
+    'new commands compact expired settled history without losing cash proof',
+    () async {
+      final store = _MemoryCipherStore();
+      final journal = EncryptedOfflineJournal(store, web: false);
+      for (var index = 1; index <= 6; index++) {
+        await journal.append(
+          commandId: _id(14000 + index),
+          deviceId: _id(2),
+          credentialVersion: 1,
+          merchantId: _id(3),
+          locationId: _id(4),
+          operatorSessionId: _id(5),
+          idempotencyKey: _id(14000 + index),
+          commandType: index <= 2 ? 'pos.checkout.cash' : 'operational.ack',
+          provisionalId: index == 1 ? _id(15000) : null,
+          payload: const {},
+          maxPendingCashCount: 3,
+          maxPendingCashMinorUnits: 30000,
+          cashAmountMinorUnits: 5000,
+        );
+        if (index <= 2) {
+          await journal.apply(
+            ReplayResult(
+              commandId: _id(14000 + index),
+              deviceSequence: index,
+              status: 'accepted',
+              officialId: _id(15000 + index),
+              officialCommit: null,
+              serverConflictReference: null,
+              failure: null,
+            ),
+          );
+        }
+      }
+      await journal.markUnknown(_id(14004));
+      await journal.apply(
+        ReplayResult(
+          commandId: _id(14005),
+          deviceSequence: 5,
+          status: 'conflict',
+          officialId: null,
+          officialCommit: null,
+          serverConflictReference: _id(16000),
+          failure: const {'classification': 'server_validation_failed'},
+        ),
+      );
+      await _expireRetentionDeadlines(store, replayingCommandId: _id(14006));
+      await journal.append(
+        commandId: _id(17000),
+        deviceId: _id(2),
+        credentialVersion: 1,
+        merchantId: _id(3),
+        locationId: _id(4),
+        operatorSessionId: _id(5),
+        idempotencyKey: _id(17000),
+        payload: const {},
+      );
+      final snapshot = await journal.load();
+      expect(snapshot.entries.map((entry) => entry.command.commandId), [
+        _id(14002),
+        _id(14003),
+        _id(14004),
+        _id(14005),
+        _id(14006),
+        _id(17000),
+      ]);
+      expect(snapshot.mappings[_id(15000)], _id(15001));
+      expect(journal.pendingCount.value, 5);
+      expect(snapshot.nextSequence, 8);
+    },
+  );
+
   test(
     'encrypts payload, allocates ordered sequences, and detects tampering',
     () async {
@@ -678,6 +840,43 @@ void main() {
       expect((await journal.load()).mappings[_id(7)], _id(8));
     },
   );
+}
+
+Future<void> _expireRetentionDeadlines(
+  _MemoryCipherStore store, {
+  String? replayingCommandId,
+}) async {
+  final cipher = AesGcm.with256bits();
+  final key = SecretKey(base64Decode(store.key!));
+  final wrapper = jsonDecode(store.ciphertext!) as Map<String, Object?>;
+  final clear = await cipher.decrypt(
+    SecretBox(
+      base64Decode(wrapper['ciphertext']! as String),
+      nonce: base64Decode(wrapper['nonce']! as String),
+      mac: Mac(base64Decode(wrapper['mac']! as String)),
+    ),
+    secretKey: key,
+  );
+  final data = jsonDecode(utf8.decode(clear)) as Map<String, Object?>;
+  for (final rawEntry in data['entries']! as List<Object?>) {
+    final entry = rawEntry! as Map<String, Object?>;
+    final command = entry['command']! as Map<String, Object?>;
+    if (command['commandId'] == replayingCommandId) {
+      entry['status'] = 'replaying';
+    }
+    entry['retentionDeadline'] = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(days: 1))
+        .toIso8601String();
+  }
+  final box = await cipher.encrypt(
+    utf8.encode(jsonEncode(data)),
+    secretKey: key,
+  );
+  wrapper['ciphertext'] = base64Encode(box.cipherText);
+  wrapper['nonce'] = base64Encode(box.nonce);
+  wrapper['mac'] = base64Encode(box.mac.bytes);
+  await store.writeCiphertext(jsonEncode(wrapper));
 }
 
 String _id(int value) =>
