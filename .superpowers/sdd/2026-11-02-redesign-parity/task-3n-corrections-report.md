@@ -113,3 +113,20 @@ git diff --check
 ```
 
 Las 25 filas tienen implementación en el código final. Root conserva la comparación visual final en Android y la aceptación del APK. Este informe separa esa aceptación de las pruebas de widgets y controladores. Los propietarios de API, contrato 2.51, persistencia, leases, pagos, operación sin conexión y hardware permanecen. No se modificaron API, esquema, datos, emuladores ni procesos externos.
+
+## Seguimiento menor M1 de la revisión D
+
+Producto final: `4bc6589a`. La segunda inserción del selector de servicio en paisaje exige ahora `!keyboard`. Las ramas con y sin teclado son excluyentes y conservan una sola inserción. Es el único cambio de producción posterior a D.
+
+La cobertura añadida abre el selector y enfoca la búsqueda en 1340 × 800 con un inset inferior de 200 px. Verifica al menos 440 px de área de trabajo, un selector compacto, el producto visible y ninguna adición ni mutación de la cuenta al pulsarlo durante la decisión.
+
+Esta prueba del flujo real también pasaba antes del ajuste: el `PosPage` exterior consume el inset inferior antes de que el catálogo lea `viewInsets`. Por ello no constituye evidencia RED/GREEN del condicional interno señalado por la revisión. La exclusión se comprueba en el cambio de código; la prueba cubre el comportamiento de la ruta real. No se modificó la gestión del teclado del shell.
+
+| Comprobación final sobre `4bc6589a` | Resultado | Evidencia |
+| --- | --- | --- |
+| Entrada de pedido | 23 aprobadas | `/private/tmp/umi-design2-m1-order-entry.log` |
+| Suite completa Flutter, una ejecución sobre el código final | 1,288 aprobadas, 5 omisiones existentes, 0 fallos | `/private/tmp/umi-design2-corrections-full-m1-final.log` |
+| Analizador completo | 0 errores, 0 advertencias, 3 infos anteriores | `/private/tmp/umi-design2-m1-analyze-full.log` |
+| Espacios y conflictos del diff | Correcto | `git diff --check` |
+
+La aceptación visual nativa final sigue a cargo de root.
