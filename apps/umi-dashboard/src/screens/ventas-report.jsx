@@ -107,6 +107,7 @@ function SeriesChart({ series, bucket, currency }) {
             key={p.label}
             style={{
               flex: '1 0 24px',
+              height: '100%',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',

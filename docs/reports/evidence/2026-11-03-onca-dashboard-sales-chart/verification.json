@@ -1,0 +1,12 @@
+{
+  "productionChange": "height 100% on SeriesChart column",
+  "redMaxBarPixels": 2,
+  "browserCases": 2,
+  "viewports": [1440, 768],
+  "unitPassed": 427,
+  "lintErrors": 0,
+  "existingLintWarnings": 68,
+  "build": "passed with test configuration",
+  "review": "no findings",
+  "deployed": false
+}
