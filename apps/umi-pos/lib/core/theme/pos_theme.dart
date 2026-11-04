@@ -47,8 +47,9 @@ final class PosPalette {
   Color get primary => dark
       ? (midnight ? const Color(0xFFA8BBDE) : const Color(0xFF7999DF))
       : const Color(0xFF223979);
-  Color get onPrimary =>
-      dark ? const Color(0xFF131F44) : const Color(0xFFFFFEFA);
+  Color get onPrimary => dark
+      ? (midnight ? const Color(0xFF131F44) : const Color(0xFF0B172C))
+      : const Color(0xFFFFFEFA);
   Color get primaryContainer => dark
       ? (midnight ? const Color(0xFF111A2E) : const Color(0xFF1A2440))
       : const Color(0xFFE8EDF8);

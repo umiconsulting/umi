@@ -100,7 +100,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   /// side by side. Narrower surfaces keep the modal sheet.
   static const double _panelBreakpoint = 720;
 
-  bool get _panelShown => MediaQuery.sizeOf(context).width >= _panelBreakpoint;
+  bool get _panelShown =>
+      MediaQuery.sizeOf(context).width >= _panelBreakpoint ||
+      MediaQuery.textScalerOf(context).scale(16) < 24;
   bool get _portraitPanel {
     final size = MediaQuery.sizeOf(context);
     return _panelShown && size.height > size.width;
@@ -279,146 +281,147 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     _elementsById = {for (final table in tables) table.id: table};
     final visuals = room == null ? null : _visuals(room, tables);
     final dock =
-        MediaQuery.sizeOf(context).width >= 1100 &&
+        MediaQuery.sizeOf(context).width >= 900 &&
+        MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height &&
         MediaQuery.textScalerOf(context).scale(16) < 24;
+    final controls = <Widget>[
+      _topBar(tables, visuals, l10n, es),
+      if (widget.onShowAccounts != null)
+        Align(
+          alignment: Alignment.centerRight,
+          child: PosTextButton.icon(
+            onPressed: widget.onShowAccounts,
+            icon: const PosIcon(PosGlyphs.receiptLong),
+            label: Text(es ? 'Cuentas abiertas' : 'Open accounts'),
+          ),
+        ),
+      if (controller.loading) const PosProgress(),
+      if (controller.failed)
+        PosNoticeBanner(
+          content: Text(
+            es
+                ? 'No se pudo actualizar el plano. La información puede estar desactualizada.'
+                : 'Could not refresh the floor plan. The information may be out of date.',
+          ),
+          actions: [
+            PosTextButton(
+              onPressed: _load,
+              child: Text(es ? 'Reintentar' : 'Retry'),
+            ),
+          ],
+        ),
+      if (room != null && room.stale)
+        PosNoticeBanner(
+          content: Text(
+            es
+                ? 'No se pudo actualizar el estado de las mesas. Lo que ves puede estar desactualizado.'
+                : 'Could not refresh table state. What you see may be out of date.',
+          ),
+          actions: [
+            PosTextButton(
+              onPressed: _load,
+              child: Text(es ? 'Reintentar' : 'Retry'),
+            ),
+          ],
+        ),
+      if (room?.errorCode != null) _failureBanner(room!, l10n),
+      if (_notice != null)
+        PosNoticeBanner(
+          content: Text(_notice!),
+          actions: [
+            PosTextButton(
+              onPressed: () => setState(() => _notice = null),
+              child: Text(l10n.closeAction),
+            ),
+          ],
+        ),
+      if (_result != null)
+        Semantics(
+          liveRegion: true,
+          child: PosNoticeBanner(
+            content: Text(_result!),
+            actions: [
+              PosTextButton(
+                onPressed: () => setState(() => _result = null),
+                child: Text(l10n.closeAction),
+              ),
+            ],
+          ),
+        ),
+      if (_mergeMode || _moveFrom != null) _gestureBar(room, l10n, es),
+      if (!widget.directAccounts && controller.refreshedAt != null)
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: Text(
+            '${es ? 'Plano actualizado' : 'Map refreshed'}: ${PosLocalLabels.of(context).formatTimeOfDay(PosTime.fromDateTime(controller.refreshedAt!))}',
+          ),
+        ),
+      if (areas.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            UmiSpacing.md,
+            0,
+            UmiSpacing.md,
+            UmiSpacing.sm,
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) => Row(
+              children: [
+                Expanded(
+                  child: widget.directAccounts && areas.length == 1
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            areas.single.name,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        )
+                      : FloorPlanAreaSelector(
+                          areas: areas,
+                          selectedAreaId: area?.id,
+                          onSelect: (value) => setState(() => _areaId = value),
+                        ),
+                ),
+                // The hint is a nicety, so it yields to the chips: the
+                // operator needs every area on a narrow surface.
+                //
+                // It ALSO YIELDS TO AN ARMED MODE. It says what a tap on a table does — open
+                // its detail — and with a move or a merge armed a tap does something else.
+                // Two instructions on one screen, one of them false, is how a table gets
+                // moved by accident; the gesture bar above already says what the next tap
+                // will do. Measured on the iMin D3-504 on 2026-10-11: with `Moviendo Mesa 3…`
+                // in the bar, this hint still read `Toca una mesa para ver el detalle`.
+                if (constraints.maxWidth >= 560 &&
+                    _moveFrom == null &&
+                    !_mergeMode) ...[
+                  const SizedBox(width: UmiSpacing.md),
+                  Flexible(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 280),
+                      child: Text(
+                        es
+                            ? 'Toca una mesa para ver el detalle'
+                            : 'Tap a table to see its detail',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+    ];
     return PosPage(
       body: SafeArea(
         child: Column(
           children: [
-            _topBar(tables, visuals, l10n, es),
-            if (widget.onShowAccounts != null)
-              Align(
-                alignment: Alignment.centerRight,
-                child: PosTextButton.icon(
-                  onPressed: widget.onShowAccounts,
-                  icon: const PosIcon(PosGlyphs.receiptLong),
-                  label: Text(es ? 'Cuentas abiertas' : 'Open accounts'),
-                ),
-              ),
-            if (controller.loading) const PosProgress(),
-            if (controller.failed)
-              PosNoticeBanner(
-                content: Text(
-                  es
-                      ? 'No se pudo actualizar el plano. La información puede estar desactualizada.'
-                      : 'Could not refresh the floor plan. The information may be out of date.',
-                ),
-                actions: [
-                  PosTextButton(
-                    onPressed: _load,
-                    child: Text(es ? 'Reintentar' : 'Retry'),
-                  ),
-                ],
-              ),
-            if (room != null && room.stale)
-              PosNoticeBanner(
-                content: Text(
-                  es
-                      ? 'No se pudo actualizar el estado de las mesas. Lo que ves puede estar desactualizado.'
-                      : 'Could not refresh table state. What you see may be out of date.',
-                ),
-                actions: [
-                  PosTextButton(
-                    onPressed: _load,
-                    child: Text(es ? 'Reintentar' : 'Retry'),
-                  ),
-                ],
-              ),
-            if (room?.errorCode != null) _failureBanner(room!, l10n),
-            if (_notice != null)
-              PosNoticeBanner(
-                content: Text(_notice!),
-                actions: [
-                  PosTextButton(
-                    onPressed: () => setState(() => _notice = null),
-                    child: Text(l10n.closeAction),
-                  ),
-                ],
-              ),
-            if (_result != null)
-              Semantics(
-                liveRegion: true,
-                child: PosNoticeBanner(
-                  content: Text(_result!),
-                  actions: [
-                    PosTextButton(
-                      onPressed: () => setState(() => _result = null),
-                      child: Text(l10n.closeAction),
-                    ),
-                  ],
-                ),
-              ),
-            if (_mergeMode || _moveFrom != null) _gestureBar(room, l10n, es),
-            if (!widget.directAccounts && controller.refreshedAt != null)
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  '${es ? 'Plano actualizado' : 'Map refreshed'}: ${PosLocalLabels.of(context).formatTimeOfDay(PosTime.fromDateTime(controller.refreshedAt!))}',
-                ),
-              ),
-            if (areas.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  UmiSpacing.md,
-                  0,
-                  UmiSpacing.md,
-                  UmiSpacing.sm,
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) => Row(
-                    children: [
-                      Expanded(
-                        child: widget.directAccounts && areas.length == 1
-                            ? Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                ),
-                                child: Text(
-                                  areas.single.name,
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                              )
-                            : FloorPlanAreaSelector(
-                                areas: areas,
-                                selectedAreaId: area?.id,
-                                onSelect: (value) =>
-                                    setState(() => _areaId = value),
-                              ),
-                      ),
-                      // The hint is a nicety, so it yields to the chips: the
-                      // operator needs every area on a narrow surface.
-                      //
-                      // It ALSO YIELDS TO AN ARMED MODE. It says what a tap on a table does — open
-                      // its detail — and with a move or a merge armed a tap does something else.
-                      // Two instructions on one screen, one of them false, is how a table gets
-                      // moved by accident; the gesture bar above already says what the next tap
-                      // will do. Measured on the iMin D3-504 on 2026-10-11: with `Moviendo Mesa 3…`
-                      // in the bar, this hint still read `Toca una mesa para ver el detalle`.
-                      if (constraints.maxWidth >= 560 &&
-                          _moveFrom == null &&
-                          !_mergeMode) ...[
-                        const SizedBox(width: UmiSpacing.md),
-                        Flexible(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 280),
-                            child: Text(
-                              es
-                                  ? 'Toca una mesa para ver el detalle'
-                                  : 'Tap a table to see its detail',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.right,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
+            if (!dock) ...controls,
             Expanded(
               child: _portraitPanel
                   ? ListView(
@@ -436,7 +439,25 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                       children: [
                         Expanded(
                           flex: 3,
-                          child: _roomView(area, visuals, l10n, es),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizedBox(
+                                width: 232,
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: controls,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 24),
+                              Expanded(
+                                child: _roomView(area, visuals, l10n, es),
+                              ),
+                            ],
+                          ),
                         ),
                         Expanded(
                           flex: 2,
@@ -509,7 +530,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       );
     }
     return PosHeader(
-      toolbarHeight: widget.directAccounts ? 56 : 72,
+      toolbarHeight: 56,
       actionsInline:
           widget.directAccounts && MediaQuery.sizeOf(context).width >= 560,
       automaticallyImplyLeading: !widget.embedded,
@@ -829,9 +850,20 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       final facts = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            l10n.tableStatePanelTitle(selected.label),
-            style: theme.textTheme.titleLarge,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.tableStatePanelTitle(selected.label),
+                  style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
+                ),
+              ),
+              PosIconButton(
+                tooltip: es ? 'Quitar selección' : 'Clear selection',
+                onPressed: () => setState(() => _selectedId = null),
+                icon: const PosIcon(PosGlyphs.close, size: 18),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Text(
@@ -936,12 +968,16 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     return Container(
       key: const ValueKey('table-detail-panel'),
       width: stacked || docked ? double.infinity : 320,
-      margin: EdgeInsets.fromLTRB(stacked || docked ? 16 : 0, 0, 16, 16),
+      margin: docked
+          ? EdgeInsets.zero
+          : EdgeInsets.fromLTRB(stacked ? 16 : 0, 0, 16, 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: docked ? BorderRadius.zero : BorderRadius.circular(8),
+        border: docked
+            ? Border(top: BorderSide(color: theme.colorScheme.outlineVariant))
+            : Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: SingleChildScrollView(child: content),
     );

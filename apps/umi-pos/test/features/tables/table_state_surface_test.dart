@@ -802,24 +802,37 @@ void main() {
       await tester.tap(find.text('T1'));
       await tester.pumpAndSettle();
       expect(opened, isEmpty);
-      expect(find.byKey(const ValueKey('table-detail-panel')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('selected-table-summary')),
-        findsOneWidget,
-      );
-      expect(find.text('Open account'), findsOneWidget);
-      expect(find.text('Seat'), findsOneWidget);
-      await tester.tap(find.text('Close'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Details'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Open account'));
-      await tester.pumpAndSettle();
-      expect(opened, [t1]);
-      expect(
-        find.byKey(const ValueKey('selected-table-summary')),
-        findsOneWidget,
-      );
+      if (textScale == 1) {
+        expect(
+          find.byKey(const ValueKey('table-detail-panel')),
+          findsOneWidget,
+        );
+        expect(find.byType(PosAlertDialog), findsNothing);
+        expect(find.byType(FloorPlanMap), findsOneWidget);
+        await tester.ensureVisible(find.text('Open account'));
+        await tester.tap(find.text('Open account'));
+        await tester.pumpAndSettle();
+        expect(opened, [t1]);
+      } else {
+        expect(find.byKey(const ValueKey('table-detail-panel')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('selected-table-summary')),
+          findsOneWidget,
+        );
+        expect(find.text('Open account'), findsOneWidget);
+        expect(find.text('Seat'), findsOneWidget);
+        await tester.tap(find.text('Close'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Details'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Open account'));
+        await tester.pumpAndSettle();
+        expect(opened, [t1]);
+        expect(
+          find.byKey(const ValueKey('selected-table-summary')),
+          findsOneWidget,
+        );
+      }
       expect(harness.room.seated, isNull);
       expect(tester.takeException(), isNull);
       await harness.dispose(tester);
@@ -1262,24 +1275,15 @@ void main() {
     tester.view.physicalSize = const Size(375, 812);
     await tester.pumpAndSettle();
     expect(find.byType(FloorPlanMap), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('selected-table-summary')),
-      findsOneWidget,
-    );
-    expect(find.text('Seated · 2 guests'), findsOneWidget);
-    await tester.tap(find.text('Details'));
-    await tester.pumpAndSettle();
-    expect(find.text('2 min at table'), findsOneWidget);
+    expect(find.byKey(const ValueKey('table-detail-panel')), findsOneWidget);
+    expect(find.byType(PosAlertDialog), findsNothing);
+    expect(find.text('Seated'), findsWidgets);
     expect(find.text('Move'), findsOneWidget);
-    await tester.tap(find.text('Close'));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('selected-table-summary')),
-      findsOneWidget,
-    );
+    await tester.ensureVisible(find.byTooltip('Clear selection'));
     await tester.tap(find.byTooltip('Clear selection'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('selected-table-summary')), findsNothing);
+    expect(find.text('Move'), findsNothing);
+    expect(find.byType(FloorPlanMap), findsOneWidget);
     expect(harness.room.moved, isNull);
     expect(harness.room.seated, isNull);
     expect(tester.takeException(), isNull);

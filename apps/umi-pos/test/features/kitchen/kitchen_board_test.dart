@@ -2291,7 +2291,10 @@ void main() {
         ),
       );
       await _settle(tester);
-      expect(find.text('1'), findsOneWidget);
+      expect(
+        find.text('1'),
+        findsNWidgets(2),
+      ); // One lane count and one ticket quantity.
       expect(find.text(l.kitchenAllDayCount(7)), findsOneWidget);
       expect(find.text('×7'), findsNothing);
       expect(find.byTooltip(l.kitchenAllDayTooltip(7, 2)), findsOneWidget);

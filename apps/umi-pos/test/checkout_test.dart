@@ -674,13 +674,15 @@ Future<_TenderSheet> _openTenderSheet(
   _CheckoutRepository repository, {
   required CheckoutPolicy policy,
   _CartRepository? cartRepository,
+  Size viewport = const Size(1280, 3200),
+  bool shell = false,
   Future<String?> Function()? onOpenCashShift,
   Future<String?> Function()? onEnsureCashShift,
 }) async {
   tester.view.devicePixelRatio = 1;
   // Tall enough that the whole tender surface lays out at once, so every
   // asserted part is on screen without scrolling.
-  tester.view.physicalSize = const Size(1280, 3200);
+  tester.view.physicalSize = viewport;
   addTearDown(tester.view.reset);
   repository.policyValue = policy;
   final cart = CartController(
@@ -719,18 +721,35 @@ Future<_TenderSheet> _openTenderSheet(
       ],
       home: Builder(
         builder: (context) => PosPage(
-          body: PosButton(
-            onPressed: () => showCheckoutSheet(
-              context,
-              checkout: checkout,
-              cashShiftId: null,
-              cart: cart,
-              entry: root.entry,
-              sales: root.sales,
-              onOpenCashShift: onOpenCashShift,
-              onEnsureCashShift: onEnsureCashShift,
+          bottomNavigationBar: shell
+              ? PosNavigation(
+                  onDestinationSelected: (_) {},
+                  destinations: const [
+                    PosDestination(
+                      icon: PosIcon(PosGlyphs.receiptLong),
+                      label: 'Sale',
+                    ),
+                    PosDestination(
+                      icon: PosIcon(PosGlyphs.paymentsOutlined),
+                      label: 'Cash desk',
+                    ),
+                  ],
+                )
+              : null,
+          body: Builder(
+            builder: (context) => PosButton(
+              onPressed: () => showCheckoutSheet(
+                context,
+                checkout: checkout,
+                cashShiftId: null,
+                cart: cart,
+                entry: root.entry,
+                sales: root.sales,
+                onOpenCashShift: onOpenCashShift,
+                onEnsureCashShift: onEnsureCashShift,
+              ),
+              child: const Text('open'),
             ),
-            child: const Text('open'),
           ),
         ),
       ),
@@ -2387,6 +2406,37 @@ void main() {
     expect(find.text('MXN 372.40'), findsOneWidget);
     await sheet.dispose();
   });
+
+  testWidgets(
+    'phone checkout keeps method row, full cash keypad and charge reachable with the locked shell',
+    (tester) async {
+      final sheet = await _openTenderSheet(
+        tester,
+        _CheckoutRepository(),
+        policy: CheckoutPolicy.fromJson(_policy),
+        viewport: const Size(402, 874),
+        shell: true,
+      );
+      final charge = find.byKey(const ValueKey('checkout-charge'));
+      expect(charge.hitTestable(), findsOneWidget);
+      final keypad = find.byKey(const ValueKey('checkout-keypad'));
+      expect(keypad, findsOneWidget);
+      expect(tester.getRect(keypad).height, 188);
+      expect(
+        tester.getRect(keypad).bottom,
+        lessThan(tester.getRect(charge).top),
+      );
+      expect(find.text('0').hitTestable(), findsOneWidget);
+      expect(find.text('9').hitTestable(), findsOneWidget);
+      final navigation = tester
+          .widgetList<PosNavigation>(find.byType(PosNavigation))
+          .last;
+      expect(navigation.destinations, hasLength(2));
+      expect(navigation.onDestinationSelected, isNull);
+      expect(tester.takeException(), isNull);
+      await sheet.dispose();
+    },
+  );
 
   testWidgets('checkout sheet renders authoritative totals and payment methods', (
     tester,

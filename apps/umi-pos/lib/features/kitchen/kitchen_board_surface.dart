@@ -275,7 +275,7 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
             Text(
               stationName,
               style: PosTheme.of(context).textTheme.headlineSmall?.copyWith(
-                fontSize: 24,
+                fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -704,9 +704,19 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
             children: [
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  '$label · ${items.length + (withUnassigned ? unassigned.length : 0)}',
-                  style: PosTheme.of(context).textTheme.titleMedium,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: PosTheme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    Text(
+                      '${items.length + (withUnassigned ? unassigned.length : 0)}',
+                      style: PosTheme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                 ),
               ),
               for (final order in items) ...[
@@ -1180,19 +1190,20 @@ final class _TicketCard extends StatelessWidget {
       child: PosSurface(
         color: scheme.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           side: BorderSide(
             color: urgent || high || kitchenOrderOverdue(order, now)
                 ? accent
-                : scheme.primary,
-            width: 1.5,
+                : scheme.outlineVariant,
           ),
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (kitchenStationStatus(order) == 'preparing')
+              Container(height: 3, color: accent),
             Padding(
               padding: const EdgeInsets.all(UmiSpacing.md),
               child: Column(

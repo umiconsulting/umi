@@ -56,8 +56,9 @@ class _AccountPreviewState extends State<AccountPreview> {
       if (cart != null && readBalance != null) {
         try {
           final balance = await readBalance(cart);
-          if (mounted && request == _request)
+          if (mounted && request == _request) {
             setState(() => _balance = balance);
+          }
         } catch (_) {
           /* Unknown balance remains explicitly unknown. */
         }

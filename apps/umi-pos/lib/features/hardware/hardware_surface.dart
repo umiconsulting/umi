@@ -173,31 +173,33 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
   Widget build(BuildContext context) {
     final snapshot = _snapshot;
     return PosPage(
-      appBar: PosHeader(
-        title: StationHeading(
-          title: widget.embedded
-              ? (widget.section == 'print'
-                    ? text('Printing', 'Impresión')
-                    : text(
-                        'Devices at this register',
-                        'Dispositivos de esta caja',
-                      ))
-              : text('Hardware center', 'Centro de hardware'),
-        ),
-        actions: [
-          PosIconButton(
-            tooltip: text('Refresh hardware', 'Actualizar hardware'),
-            onPressed: _busy ? null : _load,
-            icon: const PosIcon(PosGlyphs.refresh),
-          ),
-          if (!widget.embedded)
-            PosIconButton(
-              tooltip: text('Close', 'Cerrar'),
-              onPressed: () => Navigator.pop(context),
-              icon: const PosIcon(PosGlyphs.close),
+      appBar: widget.embedded
+          ? null
+          : PosHeader(
+              title: StationHeading(
+                title: widget.embedded
+                    ? (widget.section == 'print'
+                          ? text('Printing', 'Impresión')
+                          : text(
+                              'Devices at this register',
+                              'Dispositivos de esta caja',
+                            ))
+                    : text('Hardware center', 'Centro de hardware'),
+              ),
+              actions: [
+                PosIconButton(
+                  tooltip: text('Refresh hardware', 'Actualizar hardware'),
+                  onPressed: _busy ? null : _load,
+                  icon: const PosIcon(PosGlyphs.refresh),
+                ),
+                if (!widget.embedded)
+                  PosIconButton(
+                    tooltip: text('Close', 'Cerrar'),
+                    onPressed: () => Navigator.pop(context),
+                    icon: const PosIcon(PosGlyphs.close),
+                  ),
+              ],
             ),
-        ],
-      ),
       body: SafeArea(
         child: _busy && snapshot == null
             ? const Center(child: PosSpinner())
@@ -228,6 +230,15 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (widget.embedded)
+          Align(
+            alignment: Alignment.centerRight,
+            child: PosTextButton.icon(
+              onPressed: _busy ? null : _load,
+              icon: const PosIcon(PosGlyphs.refresh, size: 18),
+              label: Text(text('Refresh hardware', 'Actualizar hardware')),
+            ),
+          ),
         if (widget.section != 'print') ...[
           Semantics(
             header: true,
@@ -407,44 +418,48 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
     },
   );
 
-  Widget _deviceCard(HardwareDevice device) => PosCard(
+  Widget _deviceCard(HardwareDevice device) => Container(
+    decoration: BoxDecoration(
+      color: PosTheme.of(context).colorScheme.surface,
+      border: Border.all(
+        color: PosTheme.of(context).colorScheme.outlineVariant,
+      ),
+      borderRadius: BorderRadius.circular(8),
+    ),
     child: Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${_deviceType(device.type)} · ${device.publicReference}',
-                  style: PosTheme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              Semantics(
-                label: device.enabled
-                    ? _unverifiedTerminalDrawer(device)
-                          ? text(
-                              'Terminal port available; physical drawer unverified',
-                              'Puerto de la terminal disponible; cajón físico sin verificar',
-                            )
-                          : text('Device enabled', 'Dispositivo activo')
-                    : text('Device disabled', 'Dispositivo inactivo'),
-                child: PosIcon(
-                  !device.enabled
-                      ? PosGlyphs.block
-                      : _unverifiedTerminalDrawer(device)
-                      ? PosGlyphs.helpOutline
-                      : PosGlyphs.checkCircle,
-                  color: device.enabled && !_unverifiedTerminalDrawer(device)
-                      ? PosColors.green
-                      : PosColors.grey,
-                ),
-              ),
-            ],
+          Text(
+            '${device.manufacturer} ${device.model}',
+            style: PosTheme.of(context).textTheme.titleSmall,
           ),
-          Text('${device.manufacturer} ${device.model}'),
-          Text('${text('Connection', 'Conexión')}: ${_connection(device)}'),
+          const SizedBox(height: 8),
+          PosTag(
+            label: Text(
+              !device.enabled
+                  ? text('Disabled', 'Inactivo')
+                  : _unverifiedTerminalDrawer(device)
+                  ? text('Drawer unverified', 'Cajón sin verificar')
+                  : _connection(device),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '${text('Device', 'Dispositivo')}: ${_deviceType(device.type)} · ${device.publicReference}',
+            style: PosTheme.of(context).textTheme.bodySmall,
+          ),
+          Text(
+            '${text('Use', 'Uso')}: ${device.primary == true ? text('Primary', 'Principal') : _deviceType(device.type)}',
+            style: PosTheme.of(context).textTheme.bodySmall,
+          ),
+          Text(
+            '${text('Connection', 'Conexión')}: ${_connection(device)}',
+            style: PosTheme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          const PosDivider(),
           Wrap(
             spacing: 8,
             children: [

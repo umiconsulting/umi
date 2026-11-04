@@ -33,6 +33,7 @@ Future<void> showPartialCheckout(
   required String operatorSessionId,
   String? operatorName,
   String? merchantLabel,
+  Widget? headerAction,
   required bool canConfirmManualTerminal,
   required String? cashShiftId,
   Future<void> Function()? prepare,
@@ -50,6 +51,7 @@ Future<void> showPartialCheckout(
         operatorName: operatorName,
         merchantLabel: merchantLabel,
         navigation: navigation,
+        headerAction: headerAction,
         canConfirmManualTerminal: canConfirmManualTerminal,
         cashShiftId: cashShiftId,
         prepare: prepare,
@@ -69,6 +71,7 @@ final class PartialCheckoutSurface extends StatefulWidget {
     this.operatorName,
     this.merchantLabel,
     this.navigation,
+    this.headerAction,
     required this.canConfirmManualTerminal,
     required this.cashShiftId,
     this.prepare,
@@ -82,6 +85,7 @@ final class PartialCheckoutSurface extends StatefulWidget {
   final String? operatorName;
   final String? merchantLabel;
   final PosNavigation? navigation;
+  final Widget? headerAction;
   final bool canConfirmManualTerminal;
   final String? cashShiftId;
   final Future<void> Function()? prepare;
@@ -805,6 +809,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                 ],
               ),
               actions: [
+                ?widget.headerAction,
                 if (widget.operatorName != null)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -815,8 +820,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                   ),
               ],
             ),
-      bottomNavigationBar:
-          widget.navigation == null || MediaQuery.sizeOf(context).width < 700
+      bottomNavigationBar: widget.navigation == null
           ? null
           : PosNavigation(
               destinations: widget.navigation!.destinations,
@@ -943,6 +947,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
   }
 
   bool _methodBankVertical = false;
+  double _methodWidth = 180;
 
   Widget _paymentControls() {
     final theme = PosTheme.of(context);
@@ -1176,27 +1181,52 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
           ),
         ),
       const SizedBox(height: UmiSpacing.sm),
-      Wrap(
-        direction: vertical ? Axis.vertical : Axis.horizontal,
-        spacing: UmiSpacing.sm,
-        runSpacing: UmiSpacing.sm,
-        children: [
-          if (widget.cashShiftId != null &&
-              (lockedMethod == null || lockedMethod == 'cash'))
-            _methodButton('cash', label('Efectivo', 'Cash')),
-          if (manualAllowed &&
-              (lockedMethod == null || lockedMethod == 'manual_terminal'))
-            _methodButton(
-              'manual_terminal',
-              label('Terminal externa', 'External terminal'),
-            ),
-          if (bankAllowed &&
-              (lockedMethod == null || lockedMethod == 'bank_transfer'))
-            _methodButton(
-              'bank_transfer',
-              label('Transferencia', 'Bank transfer'),
-            ),
-        ],
+      LayoutBuilder(
+        builder: (context, box) {
+          final compact = MediaQuery.sizeOf(context).width < 700;
+          final count =
+              (widget.cashShiftId != null &&
+                      (lockedMethod == null || lockedMethod == 'cash')
+                  ? 1
+                  : 0) +
+              (manualAllowed &&
+                      (lockedMethod == null ||
+                          lockedMethod == 'manual_terminal')
+                  ? 1
+                  : 0) +
+              (bankAllowed &&
+                      (lockedMethod == null || lockedMethod == 'bank_transfer')
+                  ? 1
+                  : 0);
+          final columns = MediaQuery.textScalerOf(context).scale(16) >= 24
+              ? min(2, max(1, count))
+              : max(1, count);
+          _methodWidth = compact
+              ? (box.maxWidth - 4 * (columns - 1)) / columns
+              : (vertical ? 168 : 180);
+          return Wrap(
+            direction: vertical ? Axis.vertical : Axis.horizontal,
+            spacing: compact ? 4 : 8,
+            runSpacing: compact ? 4 : 8,
+            children: [
+              if (widget.cashShiftId != null &&
+                  (lockedMethod == null || lockedMethod == 'cash'))
+                _methodButton('cash', label('Efectivo', 'Cash')),
+              if (manualAllowed &&
+                  (lockedMethod == null || lockedMethod == 'manual_terminal'))
+                _methodButton(
+                  'manual_terminal',
+                  label('Terminal externa', 'External terminal'),
+                ),
+              if (bankAllowed &&
+                  (lockedMethod == null || lockedMethod == 'bank_transfer'))
+                _methodButton(
+                  'bank_transfer',
+                  label('Transferencia', 'Bank transfer'),
+                ),
+            ],
+          );
+        },
       ),
     ],
   );
@@ -1327,17 +1357,24 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
         ['.', '0', 'backspace'],
       ])
         Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(bottom: 4),
           child: Row(
             children: [
               for (var i = 0; i < row.length; i++) ...[
-                if (i > 0) const SizedBox(width: 8),
+                if (i > 0) const SizedBox(width: 4),
                 Expanded(
                   child: SizedBox(
                     height:
-                        52 *
+                        44 *
                         MediaQuery.textScalerOf(context).scale(1).clamp(1, 1.5),
                     child: PosButton.tonal(
+                      compact: true,
+                      style: PosButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                      ),
                       key: ValueKey('partial-cash-key-${row[i]}'),
                       onPressed: busy ? null : () => _keypadInput(row[i]),
                       child: row[i] == 'backspace'
@@ -1361,6 +1398,8 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
 
   Widget _checkoutBar() {
     final action = PosButton(
+      compact: true,
+      style: PosButton.styleFrom(minimumSize: const Size.fromHeight(48)),
       key: ValueKey(canFinalize ? 'partial-finalize' : 'partial-charge'),
       onPressed: canFinalize && !busy && !finalizationUnknown
           ? _finalize
@@ -1417,7 +1456,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
   }
 
   Widget _methodButton(String value, String title) => SizedBox(
-    width: _methodBankVertical ? 168 : 180,
+    width: _methodWidth,
     child: PaymentMethodTile(
       key: ValueKey('partial-method-$value'),
       icon: switch (value) {

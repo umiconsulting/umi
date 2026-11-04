@@ -32,6 +32,56 @@ Future<void> _pump(
 );
 
 void main() {
+  testWidgets(
+    'grouped phone count retains two keys per row and the half peso coin',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 874);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      DenominationTally? tally;
+      await tester.pumpWidget(
+        PosApp(
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          home: PosPage(
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: DenominationCounter(
+                currency: 'MXN',
+                denominations: const [50000, 20000, 1000, 50],
+                grouped: true,
+                showTotal: false,
+                onChanged: (value) => tally = value,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(find.text('MXN 500.00')).dy,
+        tester.getTopLeft(find.text('MXN 200.00')).dy,
+      );
+      expect(find.text('Billetes'), findsOneWidget);
+      expect(find.text('Monedas'), findsOneWidget);
+      expect(find.text('= MXN 0.00'), findsNWidgets(4));
+      await tester.enterText(find.byType(PosField).first, '1');
+      await tester.enterText(find.byType(PosField).last, '3');
+      await tester.pump();
+      expect(tally!.totalMinorUnits, 50150);
+      expect(tally!.lines.last['denomination'], {
+        'minorUnits': 50,
+        'currency': 'MXN',
+      });
+      expect(find.text('= MXN 1.50'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('typing a quantity feeds the tally and the line total', (
     tester,
   ) async {

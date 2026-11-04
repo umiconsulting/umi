@@ -77,3 +77,11 @@ The complete suite covers payment policy, mixed tender, tip, manual/integrated t
 Widget tests establish behavior and layout safety. They do not establish native visual acceptance.
 The root agent must judge actual native captures against the selected source at the task's target sizes.
 The prior iOS signing/runtime limitation remains separate. This task does not weaken credential storage or signing requirements.
+
+## Correcciones de fidelidad, 2026-11-04
+
+El audit posterior tiene24filas. El código ahora cubre sus composiciones. El informe detallado es `.superpowers/sdd/2026-11-02-redesign-parity/task-3n-corrections-report.md`.
+
+P2 separado: `0a90e721`. CheckpointA: `51eaab72`. B incluye superficies restantes, importes largos al200%, shell de pago y retorno al catálogo. Las pruebas enfocadas aprobaron295casos. Caja aprobó46casos después de conservar el propietario del anuncio accesible.
+
+La suite completa final y la aceptación visual nativa quedan en verificación. Root conserva APK, emuladores, datos y capturas.
