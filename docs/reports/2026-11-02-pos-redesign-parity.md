@@ -1,91 +1,43 @@
 # Native POS: selected Rediseño 2
 
-Status: **native source implementation complete; native screenshot acceptance pending**.
-The root agent owns the Android build, isolated API, fixtures, emulators and runtime comparison.
+Status: source corrections complete at `417129ce`. Root owns final Android screenshot acceptance.
+
+The native POS now covers the 24 audit rows and the approved inline service follow-up. The work corrects composition and density across the existing operational surfaces. The final matrix is `.superpowers/sdd/2026-11-02-redesign-parity/task-3n-corrections-report.md`.
 
 ## Selected source
 
-The selected prototype is `/Users/moon/Documents/umipos-redesign`, design 2, release b1adc1e9.
-Its current `src/redesign-compositions.css` and `src/full-directions.css` replace prior Task 3B visual requirements.
-The final sale captures supply the product hierarchy. Existing operational captures supply the other screen references.
+The selected prototype is `/Users/moon/Documents/umipos-redesign`, design 2, release `b1adc1e9`. Its current composition sources remain authoritative. Flutter uses its existing controls and Lucide registry. The product retains lowercase umi, IBM Plex Sans and the selected palette.
+
 UNSLOP applies the approved direction. Its author is Damir Sokolovsky (@heydamir), under CC BY 4.0.
 
-Flutter remains native. The implementation uses the existing native controls and Lucide glyph registry.
-It adds no WebView, React runtime, backend route, schema, entitlement or permission.
-Contract 2.51.0 and the current controllers remain authoritative.
+## Result
 
-## Presentation changes
+- The shared shell retains a 72 px collapsed rail and a 56 px header. Standard dark retains navy navigation.
+- Sale uses the selected category, product, account and modifier hierarchy. Product names remain 18 px/600. Frequency uses actual terminal history.
+- Service selection stays inside the catalogue. It preserves the current account before confirmation. Products remain visible during the decision.
+- Account and payment routes retain the actual permitted navigation with payment callbacks blocked. Completion returns to the catalogue.
+- Full and partial payment retain the selected portrait work areas at 800/820 px. The account region remains 304 px.
+- Count uses the cash workspace, real register identity, all denominations and fixed total controls. Portrait tablets retain two denomination groups and a 256 px submit region.
+- Tables preserve published geometry. Initial state reads remain neutral. Failed refreshes retain valid prior state. Same-account previews refresh without leases and reject older replies.
+- Incoming, KDS, cash, Settings and hardware retain their command owners and recovery controls. Real receipts keep merchant branding and document height.
 
-- Shared shell: IBM Plex Sans, persistent lowercase umi, an expandable navy rail, navy phone navigation and clear selected/focus states.
-- PIN: a centered console with real terminal, location and retained operator identity. Enrollment, PIN, refusal, lock and session callbacks remain intact.
-- Sale: horizontal category keys, readable counts, a primary Nuevo pedido action and photo-free product keys with 18px/600 names.
-- Product emphasis: up to three keys span two rows when saved device-local adds provide a real signal. The label is Frecuente.
-- Modifiers: two-column inspector groups with stacked option keys. Variants, min/max rules, quantity, courses, notes, prices and apply/cancel retain their handlers.
-- Account: separate line cards, consumption details, dispatch and collection zones. Total, paid and remaining values keep their authoritative owners.
-- Tables: the complete published floor remains. A wide detail dock sits below the map. Portrait and phone detail access remain available.
-- Incoming: a compact queue and a broad summary desk. Source line count and source total are explicit. The existing bind callback remains.
-- KDS: received, preparation and ready lanes use actual station work. Hide/show ready has a live count and changes presentation only.
-- Checkout and partial payment: a method bank, payment work area and account record. Narrow tablets retain the account beside the work area.
-- Cash: a status/equation band, operation areas and a separate ledger. Denomination keys keep every configured denomination, including MXN 0.50.
-- Settings/hardware: horizontal section keys and responsive device panels. Registration, transports, tests, primary selection, activation, copies and print preferences remain.
-- Completion: real receipt content beside the payment result, with the existing receipt/customer/print and next-order actions. Source receipt branding remains intact.
-
-The frequency signal counts adds on this terminal. It makes no global sales claim.
-The initial signal stays fixed during adds and search. Product order and repeated-add behavior remain unchanged.
-No saved signal produces regular keys. The native grid also handles a catalog with no chargeable keys.
-The retained photo preference controls product detail images. The product grid has no images.
-
-## Retained behavior and limits
-
-Domain controllers, contracts, roles, leases, persistence, hardware, idempotency and offline ownership remain unchanged.
-All English/Spanish strings and light/dark/midnight themes remain supported.
-Keyboard, enlarged text, sent-line guards, rounds, partial payments, exceptions and account transfers remain covered.
-Current staging paid-but-occupied tables retain new consumption, explicit clear, move, merge, split and clean actions.
-KDS retains station/day filters, receive/start/ready/item actions, course controls, retry and cancellation acknowledgement.
-Cocina/Barra roles retain their existing destination restrictions.
-
-Incoming orders remain summary-only with manual ring-up. Binding links the source reference to the current POS cart.
-It does not import source lines, options, notes or catalog IDs. Source total stays separate from the POS cart amount.
-No dashboard-only route is called. Complete source-order import needs a separate contract decision.
-Entry contracts supply no staff picker or protected shift metrics. The PIN console adds neither invented metrics nor protected sales data.
+Contract 2.51, permissions, payment guards, partial balances, persistence, leases, offline operation and hardware remain authoritative. Incoming remains summary-only with manual ring-up. The source total stays separate from the POS cart total.
 
 ## Verification
 
-SDK: official Flutter 3.47.5, tag `6a19cca564`, engine `af7e796e16`, Dart 3.13.4.
-Checkpoint A: `d960db64`; 109 focused tests passed. Its scoped analyzer found no issues.
-Checkpoint B: **1,266 full-suite tests passed, five skipped, zero failures**, in 23 seconds.
-A final copy-only follow-up passed 19 focused tests for incoming, display preferences and grid geometry.
+SDK: official Flutter 3.47.5 at `/Users/moon/.local/opt/flutter-3.47.5/bin/flutter`.
 
-Commands and logs:
+| Check | Result | Log |
+| --- | --- | --- |
+| Final full suite | 1,287 passed, 5 existing skips, 0 failures | `/private/tmp/umi-design2-corrections-full-d-final.log` |
+| Final full analyzer | 0 errors, 0 warnings, 3 existing infos | `/private/tmp/umi-design2-d-analyze-full.log` |
+| Final focused checks | 158 passed | `/private/tmp/umi-design2-d-focused.log` |
+| Diff whitespace | Clean | `git diff --check` |
 
-- `flutter test --no-pub`: `/private/tmp/umi-design2-native-full-final2.log`.
-- `flutter test --no-pub test/incoming_orders_surface_test.dart test/display_preferences_test.dart test/product_key_layout_test.dart`: `/private/tmp/umi-design2-final-label-checks.log`.
-- Checkpoint A analyzer, eight changed owners: `/private/tmp/umi-design2-analyze-a-final.log`.
-- Checkpoint B analyzer, 19 changed owners: `/private/tmp/umi-design2-analyzer-scoped-final.log`; no issues.
-- `flutter analyze --no-pub --no-fatal-infos`: `/private/tmp/umi-design2-analyzer-full.log`; zero errors/warnings and three existing infos.
-- `git diff --check`: clean.
+The infos remain in `inventory_repository.dart:76`, `cash_keyboard_test.dart:63` and `pos_entry_brand_test.dart:3`. The skips remain the five Linux AppImage cases.
 
-The three existing analyzer infos are `inventory_repository.dart:76`, `cash_keyboard_test.dart:63` and `pos_entry_brand_test.dart:3`.
-The five skips are Linux-only AppImage updater cases: unset APPIMAGE, replacement, current release, failed download and absent asset.
-No test skip was added.
+## Checkpoints and limits
 
-New regressions cover grid spans, regular/empty keys, stable local emphasis, real station lanes, ready visibility/counts and the floor dock.
-The floor test also verifies published dimensions, element coordinates and touch access to both fixture tables.
-Red evidence exists for category placement, modifier stacking, frequency changes, ready visibility, preparation placement, floor docking and empty grid geometry.
-The complete suite covers payment policy, mixed tender, tip, manual/integrated terminal, unknown outcomes, transfers, receipts and retry guards.
+P2: `0a90e721`. A: `51eaab72`. B: `aee849ae`. C: `05794250`. D: `417129ce`.
 
-Widget tests establish behavior and layout safety. They do not establish native visual acceptance.
-The root agent must judge actual native captures against the selected source at the task's target sizes.
-The prior iOS signing/runtime limitation remains separate. This task does not weaken credential storage or signing requirements.
-
-## Correcciones de fidelidad, 2026-11-04
-
-El audit posterior tiene24filas. El código ahora cubre sus composiciones. El informe detallado es `.superpowers/sdd/2026-11-02-redesign-parity/task-3n-corrections-report.md`.
-
-P2 separado: `0a90e721`. CheckpointA: `51eaab72`. B incluye superficies restantes, importes largos al200%, shell de pago y retorno al catálogo. Las pruebas enfocadas aprobaron295casos. Caja aprobó46casos después de conservar el propietario del anuncio accesible.
-
-La suite completa final y la aceptación visual nativa quedan en verificación. Root conserva APK, emuladores, datos y capturas.
-
-El checkpoint B es `aee849ae`: 1,271 pruebas aprobadas y 5 omisiones existentes. El analizador no informa errores ni advertencias. Conserva tres infos anteriores.
-
-C añade el selector de servicio en línea, la navegación real de las rutas de cuenta y pago, y las correcciones de recuperación y estado inicial. Sus 262 pruebas enfocadas aprueban. Su analizador conserva las mismas tres infos. La suite completa C sigue en curso.
+Root owns APK builds, emulators, fixtures, authenticated Android capture and final visual comparison. Widget tests establish their stated native client behavior and geometry. Physical device and provider outcomes remain separate runtime evidence. No backend, schema, fixture or production change is included.

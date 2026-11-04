@@ -1,6 +1,6 @@
 # Rediseño 2: correcciones nativas
 
-Base: `67bacd42`. Fuente: Rediseño 2, release `b1adc1e9`.
+Base: `67bacd42`. Fuente final del producto: `417129ce`. Fuente: Rediseño 2, release `b1adc1e9`.
 
 UNSLOP se aplica a la dirección aprobada. Autor de la habilidad: Damir Sokolovsky (@heydamir), CC BY 4.0.
 
@@ -41,7 +41,6 @@ GREEN: `/private/tmp/umi-design2-preview-green.log`. 27 pruebas aprobadas.
 | 22 | Cash movement grid and status band | Implementado. Movimientos phone en dos columnas, último control completo cuando corresponde, borde y relleno12. Banda estado/ecuación1:2 usa una sola identidad. Captura final: root. |
 | 23 | Hardware panels | Implementado. Sin cabecera anidada. Panel20/8, identidad, estado textual real, conexión/uso y acciones existentes. Captura final: root. |
 | 24 | Receipt region and actions | Implementado. Recibo corto con altura documental y centro vertical en ancho. Phone comparte desplazamiento. Acción principal48 y comprobante real. Captura final: root. |
-
 | 25 | Inline service choice | Implementado. Servicio del nuevo pedido dentro del catálogo. Comer aquí usa el propietario de selección de mesa. Para llevar usa el propietario de apertura actual. Volver, Escape, navegación y cierre conservan la cuenta. Los otros llamadores conservan su presentación. |
 
 ## Límites
@@ -81,6 +80,36 @@ C conserva la dirección aprobada. Corrige los estados que detectaron la revisi�
 
 C enfocado: 262 pruebas aprobadas. Log: `/private/tmp/umi-design2-c-focused.log`.
 C analizador completo: cero errores y advertencias; 3 infos existentes. Log: `/private/tmp/umi-design2-c-analyze-full.log`.
-Suite completa C: pendiente al cerrar el checkpoint.
+La suite completa final incluye C y D: 1,287 pruebas aprobadas, 5 omisiones existentes y cero fallos.
 
 Las omisiones existentes corresponden a cinco casos Linux AppImage. Las tres infos existentes permanecen en `inventory_repository.dart`, `cash_keyboard_test.dart` y `pos_entry_brand_test.dart`. Los mensajes de negativa de caja son diagnósticos esperados anteriores. C conserva sus aserciones y los propietarios accesibles.
+
+## Checkpoint D y cierre
+
+Producto final: `417129ce`. Checkpoint C: `05794250`. D conserva el alcance de las mismas 25 filas.
+
+- Cobro completo y parcial usan banco vertical, área de trabajo y cuenta de 304 px a 800/820 px. Los puntos de corte usan el ancho disponible después de la navegación. Los controles adicionales permanecen. Los importes conservan todos sus dígitos con texto ampliado.
+- El conteo mantiene los grupos de billetes y monedas juntos y el área de envío de 256 px en tableta vertical. El teléfono conserva el total fijo compacto. Los valores, entradas y subtotales permanecen disponibles.
+- El selector de servicio ocupa su altura de contenido. Los productos permanecen visibles y sus acciones quedan bloqueadas durante la decisión. Las pruebas verifican ambos servicios sin mutaciones antes de la elección.
+
+RED de la composición de cobro vertical: `/private/tmp/umi-design2-portrait-composition-red.log`. El registro inicial del caso de conteo tuvo una etiqueta de política incorrecta en su fixture; se corrigió antes de validar la geometría.
+La regresión adicional de texto al 200 % detectó un importe de pago parcial que excedía el espacio. Su lectura usa ahora un ancho flexible y conserva todos los dígitos. Diagnóstico: `/private/tmp/umi-design2-partial-scale-diagnostic.log`.
+
+Verificación final:
+
+| Comprobación | Resultado | Evidencia |
+| --- | --- | --- |
+| D enfocado: cobro, parcial, caja, denominaciones y entrada de pedido | 158 aprobadas | `/private/tmp/umi-design2-d-focused.log` |
+| Suite completa Flutter | 1,287 aprobadas, 5 omitidas, 0 fallos | `/private/tmp/umi-design2-corrections-full-d-final.log` |
+| Analizador completo | 0 errores, 0 advertencias, 3 infos anteriores | `/private/tmp/umi-design2-d-analyze-full.log` |
+| Espacios y conflictos del diff | Correcto | `git diff --check` |
+
+Comandos finales:
+
+```sh
+/Users/moon/.local/opt/flutter-3.47.5/bin/flutter test --no-pub
+/Users/moon/.local/opt/flutter-3.47.5/bin/flutter analyze --no-pub --no-fatal-infos
+git diff --check
+```
+
+Las 25 filas tienen implementación en el código final. Root conserva la comparación visual final en Android y la aceptación del APK. Este informe separa esa aceptación de las pruebas de widgets y controladores. Los propietarios de API, contrato 2.51, persistencia, leases, pagos, operación sin conexión y hardware permanecen. No se modificaron API, esquema, datos, emuladores ni procesos externos.
