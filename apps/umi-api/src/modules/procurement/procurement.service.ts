@@ -6,6 +6,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Uuid } from '@umi/contract';
 import type {
   CancelPurchaseOrderRequest,
   CreatePurchaseOrderRequest,
@@ -34,6 +35,7 @@ import { commandFingerprint } from '../integrity/canonical-json';
 import { IntegrityService } from '../integrity/integrity.service';
 import type { AuditAppend } from '../integrity/integrity.types';
 import { parseCfdiInvoice } from './cfdi-parser';
+import { decodeInvoiceArtifact } from './invoice-artifact';
 import { ProcurementRepository } from './procurement.repository';
 import { procurementConstraintCode, procurementLedgerCode } from './procurement-errors';
 
@@ -60,6 +62,23 @@ export class ProcurementService {
     private readonly integrity: IntegrityService,
     private readonly metrics: MetricsService,
   ) {}
+
+  async purchaseEntryContext(access: MerchantAccess, query: { locationId: string }) {
+    resolveLocationAuthority(access, query.locationId);
+    return this.repo.purchaseEntryContext(access.merchantId, query.locationId);
+  }
+
+  async supplierInvoiceArtifact(access: MerchantAccess, invoiceId: string) {
+    if (!Uuid.safeParse(invoiceId).success)
+      throw new BadRequestException({ code: 'VALIDATION_FAILED' });
+    const artifact = await this.repo.supplierInvoiceArtifact(access.merchantId, invoiceId);
+    if (!artifact) throw new NotFoundException({ code: 'SUPPLIER_INVOICE_ARTIFACT_NOT_FOUND' });
+    return {
+      contentType: artifact.contentType,
+      dataBase64: artifact.bytes.toString('base64'),
+      correlationId: this.correlationId(),
+    };
+  }
 
   // ── Suppliers ────────────────────────────────────────────────────────────
 
@@ -736,42 +755,6 @@ interface ProcurementCommandContext {
 /** base64url JSON keyset cursor, the same shape the customer list uses. */
 function encodeCursor(cursor: Record<string, string>): string {
   return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
-}
-
-/** The column's own bound: 12 MB of bytes, which is the binary of 20 MB of base64. */
-const MAX_INVOICE_ARTIFACT_BYTES = 12_582_912;
-
-const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-/**
- * WHAT A PHOTO UPLOAD IS ALLOWED TO BE (plan D11 and §10.2).
- *
- * The image is stored and nothing else happens: no lines, no match, no ledger. The
- * content type comes from the BYTES and not from the caller, because
- * `supplier_invoice.artifact_content_type` is a claim about a file the platform will
- * later render, and a caller-supplied type is a caller-supplied HTML sniffing hazard.
- * A `data:` URL is accepted because that is what a browser's FileReader produces.
- */
-function decodeInvoiceArtifact(raw: string): { bytes: Buffer; contentType: string } {
-  const base64 = raw.replace(/^data:[^;,]*;base64,/, '').replace(/\s+/g, '');
-  const bytes = Buffer.from(base64, 'base64');
-  if (bytes.byteLength === 0)
-    throw new BadRequestException({ code: 'SUPPLIER_INVOICE_ARTIFACT_UNSUPPORTED' });
-  if (bytes.byteLength > MAX_INVOICE_ARTIFACT_BYTES)
-    throw new BadRequestException({ code: 'SUPPLIER_INVOICE_ARTIFACT_TOO_LARGE' });
-
-  if (bytes.byteLength >= 8 && bytes.subarray(0, 8).equals(PNG_MAGIC))
-    return { bytes, contentType: 'image/png' };
-  if (bytes.byteLength >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff)
-    return { bytes, contentType: 'image/jpeg' };
-  if (
-    bytes.byteLength >= 12 &&
-    bytes.toString('ascii', 0, 4) === 'RIFF' &&
-    bytes.toString('ascii', 8, 12) === 'WEBP'
-  )
-    return { bytes, contentType: 'image/webp' };
-
-  throw new BadRequestException({ code: 'SUPPLIER_INVOICE_ARTIFACT_UNSUPPORTED' });
 }
 
 /**
