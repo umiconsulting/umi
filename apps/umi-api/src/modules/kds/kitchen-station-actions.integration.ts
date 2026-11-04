@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { Pool, type PoolClient } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { KdsRepository, type OrderScopeRow } from './kds.repository';
+import { appendKitchenItems } from './kitchen-projector';
 
 // Cada caso usa datos aislados y ROLLBACK; no modifica las cuentas del café local.
 describe('kitchen station actions with real PostgreSQL', () => {
@@ -52,7 +53,7 @@ describe('kitchen station actions with real PostgreSQL', () => {
   });
   afterAll(async () => pool.end());
 
-  async function seed(status = 'exception', course = 1) {
+  async function seed(status = 'exception', course = 1, itemCount = 3) {
     const source = randomUUID(),
       id = randomUUID();
     await client.query(
@@ -66,7 +67,7 @@ describe('kitchen station actions with real PostgreSQL', () => {
       [id, merchant, location, source, status],
     );
     const items: string[] = [];
-    for (let index = 0; index < 3; index++) {
+    for (let index = 0; index < itemCount; index++) {
       const sourceItem = randomUUID(),
         item = randomUUID();
       items.push(item);
@@ -142,6 +143,152 @@ describe('kitchen station actions with real PostgreSQL', () => {
       priority: null,
     });
   }
+
+  function boardItemIds(row: { items: unknown }): string[] {
+    return (row.items as Array<{ id: string }>).map((item) => item.id);
+  }
+
+  async function secondRound(ready = true, otherWork = false) {
+    const { order, items, source } = await seed(
+      otherWork ? 'exception' : 'queued',
+      1,
+      otherWork ? 3 : 1,
+    );
+    expect((await command(order, 'mark_item_ready', [items[0]])).status).toBe('succeeded');
+    expect((await command(order, 'complete', [items[0]], 2)).status).toBe('succeeded');
+    expect(await repo.boardSnapshot(merchant, location, [stations[0]])).toHaveLength(0);
+    const previous = (
+      await client.query(`SELECT * FROM merchant.kitchen_order_item WHERE id=$1`, [items[0]])
+    ).rows[0];
+    const product = randomUUID();
+    await client.query(
+      `INSERT INTO merchant.product(id,merchant_id,name,price,requires_preparation)
+      VALUES ($1,$2,'Second coffee',50,true)`,
+      [product, merchant],
+    );
+    await client.query(
+      `INSERT INTO merchant.kitchen_route(merchant_id,location_id,product_id,station_id)
+      VALUES ($1,$2,$3,$4)`,
+      [merchant, location, product, stations[0]],
+    );
+    await client.query(
+      `INSERT INTO merchant.order_item(id,order_id,product_id,name,quantity,unit_price,display_order)
+      VALUES ($1,$2,$3,'Second coffee',1,50,1)`,
+      [randomUUID(), source, product],
+    );
+    expect(await appendKitchenItems(client, merchant, source)).toBe(order.id);
+    const [queued] = await repo.boardSnapshot(merchant, location, [stations[0]]);
+    expect(Number(queued.version)).toBe(4);
+    const newItem = boardItemIds(queued).find((id) => id !== items[0])!;
+    if (ready)
+      expect((await command(order, 'mark_item_ready', [newItem], 4)).status).toBe('succeeded');
+    const [board] = await repo.boardSnapshot(merchant, location, [stations[0]]);
+    expect(boardItemIds(board)).toEqual([items[0], newItem]);
+    return { order, items, previous, newItem, board, product, source };
+  }
+
+  it('finishes a second round from the board without recall or a second completion', async () => {
+    const { order, items, previous, newItem, board } = await secondRound();
+    const selected = boardItemIds(board);
+    const key = randomUUID();
+    const completed = await command(order, 'complete', selected, 5, key);
+    expect(completed).toMatchObject({
+      status: 'succeeded',
+      result: { status: 'completed', version: 6 },
+    });
+    expect(await repo.boardSnapshot(merchant, location, [stations[0]])).toHaveLength(0);
+    expect(await command(order, 'complete', selected, 5, key)).toEqual(completed);
+    expect(await repo.boardSnapshot(merchant, location, [stations[0]])).toHaveLength(0);
+    expect(
+      (await client.query(`SELECT * FROM merchant.kitchen_order_item WHERE id=$1`, [items[0]]))
+        .rows[0],
+    ).toEqual(previous);
+    expect(
+      (
+        await client.query(
+          `SELECT status,station_completed_at FROM merchant.kitchen_order_item WHERE id=$1`,
+          [newItem],
+        )
+      ).rows[0],
+    ).toMatchObject({ status: 'ready', station_completed_at: expect.any(Date) });
+    expect(
+      (
+        await client.query(
+          `SELECT count(*)::int AS count FROM merchant.kitchen_command WHERE kitchen_order_id=$1 AND command_type='recall'`,
+          [order.id],
+        )
+      ).rows[0].count,
+    ).toBe(0);
+  });
+
+  it('refuses a second round while a selected new item is not ready', async () => {
+    const { order, board } = await secondRound(false);
+    expect((await command(order, 'complete', boardItemIds(board), 4)).status).toBe('conflict');
+    expect(await repo.boardSnapshot(merchant, location, [stations[0]])).toHaveLength(1);
+  });
+
+  it('refuses a selection of ready and pending products without finishing either', async () => {
+    const { order, product, source, newItem } = await secondRound();
+    await client.query(
+      `INSERT INTO merchant.order_item(id,order_id,product_id,name,quantity,unit_price,display_order)
+      VALUES ($1,$2,$3,'Pending coffee',1,50,2)`,
+      [randomUUID(), source, product],
+    );
+    expect(await appendKitchenItems(client, merchant, source)).toBe(order.id);
+    const [board] = await repo.boardSnapshot(merchant, location, [stations[0]]);
+    expect((await command(order, 'complete', boardItemIds(board), 6)).status).toBe('conflict');
+    const [remaining] = await repo.boardSnapshot(merchant, location, [stations[0]]);
+    expect(boardItemIds(remaining)).toHaveLength(3);
+    expect(
+      (
+        await client.query(
+          `SELECT station_completed_at FROM merchant.kitchen_order_item WHERE id=$1`,
+          [newItem],
+        )
+      ).rows[0].station_completed_at,
+    ).toBeNull();
+    expect(
+      (remaining.items as Array<{ status: string }>).filter((item) => item.status === 'queued'),
+    ).toHaveLength(1);
+  });
+
+  it('refuses an old round alone without hiding the new ready work', async () => {
+    const { order, items } = await secondRound();
+    expect((await command(order, 'complete', items, 5)).status).toBe('conflict');
+    expect(await repo.boardSnapshot(merchant, location, [stations[0]])).toHaveLength(1);
+  });
+
+  it('finishes the new round without changing pending work at another station', async () => {
+    const { order, items, board } = await secondRound(true, true);
+    const before = (
+      await client.query(
+        `SELECT * FROM merchant.kitchen_order_item WHERE id=ANY($1::uuid[]) ORDER BY id`,
+        [items.slice(1)],
+      )
+    ).rows;
+    expect((await command(order, 'complete', boardItemIds(board), 5)).status).toBe('succeeded');
+    expect(await repo.boardSnapshot(merchant, location, [stations[0]])).toHaveLength(0);
+    expect(await repo.boardSnapshot(merchant, location, [stations[1]])).toHaveLength(1);
+    expect(
+      (
+        await client.query(
+          `SELECT * FROM merchant.kitchen_order_item WHERE id=ANY($1::uuid[]) ORDER BY id`,
+          [items.slice(1)],
+        )
+      ).rows,
+    ).toEqual(before);
+  });
+
+  it('refuses a second round selection that includes another station', async () => {
+    const { order, items, board } = await secondRound(true, true);
+    expect(
+      (await command(order, 'mark_item_ready', [items[1]], 5, randomUUID(), stations[1])).status,
+    ).toBe('succeeded');
+    expect((await command(order, 'complete', [...boardItemIds(board), items[1]], 6)).status).toBe(
+      'conflict',
+    );
+    expect(await repo.boardSnapshot(merchant, location, stations)).toHaveLength(2);
+  });
 
   it('can prepare, ready and finish its item despite an unrouted item in a commercially closed order', async () => {
     const { order, items, source } = await seed();

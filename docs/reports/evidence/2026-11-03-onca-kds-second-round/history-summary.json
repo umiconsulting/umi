@@ -1,0 +1,243 @@
+{
+  "incident": "ONCA KDS second round completion",
+  "window": {
+    "from": "2026-11-02T07:00:00Z",
+    "until": "2026-11-03T07:00:00Z",
+    "localDate": "2026-11-02",
+    "timezone": "America/Mazatlan"
+  },
+  "readOnly": [
+    {
+      "role": "worker_login",
+      "read_only": "on"
+    }
+  ],
+  "releaseAtInspection": {
+    "imageAndStartedAt": "ghcr.io/umiconsulting/umi-api:sha-f4c868676d11941fabd318a00849e0fff9c7113d 2026-11-03T05:28:35.876732389Z"
+  },
+  "runtimeCompleteImplementation": {
+    "file": "/app/dist/modules/kds/kds.repository.js",
+    "sha256": "dc97f7c0dbba85359681451a0fa2f9197395f47e167fc633c6c96151cb1f4a19",
+    "completeImplementation": "else if (input.commandType === 'complete') {\n                const eligible = await client.query(`SELECT count(*)::text AS count FROM merchant.kitchen_order_item\n           WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid\n             AND station_id=ANY($3::uuid[]) AND (cardinality($4::uuid[])=0 OR id=ANY($4::uuid[]))\n             AND status='ready' AND station_completed_at IS NULL`, [input.order.merchant_id, input.order.id, stationScope, input.itemIds]);\n                const count = Number(eligible.rows[0]?.count ?? 0);\n                if (count === 0 || (input.itemIds.length > 0 && count !== input.itemIds.length)) {\n                    effectCount = 0;\n                }\n                else {\n                    const effect = await client.query(`UPDATE merchant.kitchen_order_item SET station_completed_at=clock_timestamp(),\n               version=version+1,updated_at=clock_timestamp()\n             WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid\n               AND station_id=ANY($3::uuid[]) AND (cardinality($4::uuid[])=0 OR id=ANY($4::uuid[]))\n               AND status='ready' AND station_completed_at IS NULL`, [input.order.merchant_id, input.order.id, stationScope, input.itemIds]);\n                    effectCount = effect.rowCount ?? 0;\n                }\n            }\n            else if (input.commandType === 'mark_order_ready') {\n                const effect = await client.query(`UPDATE merchant.kitchen_order_item SET status='ready',version=version+1,\n                  ready_at=clock_timestamp(),updated_at=clock_timestamp()\n            WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid\n              AND station_id=ANY($3::uuid[])\n              AND status IN ('queued','preparing') AND course_number <= $4\n            RETURNING id::text`, [input"
+  },
+  "example": {
+    "kitchenOrderId": "edeba8eb-cb3b-4a39-a9ed-fa40f4e05181",
+    "publicReference": "Cuenta 053 · Pared",
+    "station": "Barra",
+    "stationId": "81fff2aa-705d-48bb-b75d-7406ca36acb4",
+    "events": [
+      {
+        "sequence": "1038",
+        "kind": "order_created",
+        "aggregate_version": "1",
+        "status": "queued",
+        "occurred_at": "2026-11-02 22:50:50.883165+00",
+        "correlation_id": "kitchen:create:449d5f88-30ae-48ed-b5f3-42716620845f"
+      },
+      {
+        "sequence": "1039",
+        "kind": "order_updated",
+        "aggregate_version": "2",
+        "status": "queued",
+        "occurred_at": "2026-11-02 22:50:51.032044+00",
+        "correlation_id": "account-context:6810dfdd-6a0d-4f0a-a2ed-3a6c13a476a2:2"
+      },
+      {
+        "sequence": "1041",
+        "kind": "item_updated",
+        "aggregate_version": "3",
+        "status": "ready",
+        "occurred_at": "2026-11-02 22:58:24.362124+00",
+        "correlation_id": "88483cdb-ed71-47ab-ba2a-fb208950679b"
+      },
+      {
+        "sequence": "1042",
+        "kind": "order_updated",
+        "aggregate_version": "4",
+        "status": "completed",
+        "occurred_at": "2026-11-02 22:58:26.339226+00",
+        "correlation_id": "9b937bbd-e444-4d97-a63d-e5366bca16e5"
+      },
+      {
+        "sequence": "1117",
+        "kind": "order_updated",
+        "aggregate_version": "5",
+        "status": "queued",
+        "occurred_at": "2026-11-03 01:45:36.534186+00",
+        "correlation_id": "kitchen:append:449d5f88-30ae-48ed-b5f3-42716620845f"
+      },
+      {
+        "sequence": "1118",
+        "kind": "item_updated",
+        "aggregate_version": "6",
+        "status": "ready",
+        "occurred_at": "2026-11-03 01:46:04.655472+00",
+        "correlation_id": "2380b05c-d627-4e86-bcea-5e5c8a1b0f11"
+      },
+      {
+        "sequence": "1119",
+        "kind": "order_recalled",
+        "aggregate_version": "7",
+        "status": "in_preparation",
+        "occurred_at": "2026-11-03 01:47:16.012818+00",
+        "correlation_id": "a6e62e08-f2cd-4197-9f6b-efed292aa55f"
+      },
+      {
+        "sequence": "1120",
+        "kind": "item_updated",
+        "aggregate_version": "8",
+        "status": "partially_ready",
+        "occurred_at": "2026-11-03 01:55:21.646073+00",
+        "correlation_id": "c47be868-b9a6-4912-8a58-b6d455a7961e"
+      },
+      {
+        "sequence": "1121",
+        "kind": "item_updated",
+        "aggregate_version": "9",
+        "status": "ready",
+        "occurred_at": "2026-11-03 01:55:24.760519+00",
+        "correlation_id": "3845e486-9b80-40df-9727-f9d99973ff91"
+      },
+      {
+        "sequence": "1122",
+        "kind": "order_updated",
+        "aggregate_version": "10",
+        "status": "completed",
+        "occurred_at": "2026-11-03 01:55:27.744527+00",
+        "correlation_id": "44064e24-bc68-4066-a1a8-091f1d08be5c"
+      }
+    ],
+    "commands": [
+      {
+        "id": "700f7832-b233-4f1c-8e8b-6fe259d27253",
+        "command_type": "mark_item_ready",
+        "expected_version": "2",
+        "status": "succeeded",
+        "result": {
+          "status": "ready",
+          "version": 3,
+          "sequence": 1041,
+          "updatedAt": "2026-11-02T22:58:24.057Z",
+          "kitchenOrderId": "edeba8eb-cb3b-4a39-a9ed-fa40f4e05181"
+        },
+        "created_at": "2026-11-02 22:58:24.057069+00",
+        "correlation_id": "88483cdb-ed71-47ab-ba2a-fb208950679b"
+      },
+      {
+        "id": "21b955ce-5536-443c-b6f4-4decd101de28",
+        "command_type": "complete",
+        "expected_version": "3",
+        "status": "succeeded",
+        "result": {
+          "status": "completed",
+          "version": 4,
+          "sequence": 1042,
+          "updatedAt": "2026-11-02T22:58:26.093Z",
+          "kitchenOrderId": "edeba8eb-cb3b-4a39-a9ed-fa40f4e05181"
+        },
+        "created_at": "2026-11-02 22:58:26.093733+00",
+        "correlation_id": "9b937bbd-e444-4d97-a63d-e5366bca16e5"
+      },
+      {
+        "id": "c72f3657-cd34-4ba7-88ef-ceadbdfe05ce",
+        "command_type": "mark_item_ready",
+        "expected_version": "5",
+        "status": "succeeded",
+        "result": {
+          "status": "ready",
+          "version": 6,
+          "sequence": 1118,
+          "updatedAt": "2026-11-03T01:46:04.374Z",
+          "kitchenOrderId": "edeba8eb-cb3b-4a39-a9ed-fa40f4e05181"
+        },
+        "created_at": "2026-11-03 01:46:04.374452+00",
+        "correlation_id": "2380b05c-d627-4e86-bcea-5e5c8a1b0f11"
+      },
+      {
+        "id": "5017ac10-dbc9-4842-ae3b-946712f16549",
+        "command_type": "complete",
+        "expected_version": "6",
+        "status": "conflict",
+        "result": {
+          "code": "KITCHEN_INVALID_TRANSITION",
+          "currentStatus": "ready"
+        },
+        "created_at": "2026-11-03 01:46:07.379696+00",
+        "correlation_id": "90e521cf-10ef-469d-b180-f8ff9bd23041"
+      },
+      {
+        "id": "c8ff9cdf-f022-4425-9019-de0f44801969",
+        "command_type": "recall",
+        "expected_version": "6",
+        "status": "succeeded",
+        "result": {
+          "status": "in_preparation",
+          "version": 7,
+          "sequence": 1119,
+          "updatedAt": "2026-11-03T01:47:15.755Z",
+          "kitchenOrderId": "edeba8eb-cb3b-4a39-a9ed-fa40f4e05181"
+        },
+        "created_at": "2026-11-03 01:47:15.755632+00",
+        "correlation_id": "a6e62e08-f2cd-4197-9f6b-efed292aa55f"
+      },
+      {
+        "id": "3bfea9aa-41e8-4d27-8bab-e6b1753c914a",
+        "command_type": "complete",
+        "expected_version": "7",
+        "status": "conflict",
+        "result": {
+          "code": "KITCHEN_INVALID_TRANSITION",
+          "currentStatus": "in_preparation"
+        },
+        "created_at": "2026-11-03 01:47:18.657793+00",
+        "correlation_id": "6b5ca710-1bf3-40b6-9e44-ae9a9b56db1b"
+      },
+      {
+        "id": "bb5534e1-f6c7-42b0-8d2f-b6f2dcdca8d5",
+        "command_type": "mark_item_ready",
+        "expected_version": "7",
+        "status": "succeeded",
+        "result": {
+          "status": "partially_ready",
+          "version": 8,
+          "sequence": 1120,
+          "updatedAt": "2026-11-03T01:55:21.327Z",
+          "kitchenOrderId": "edeba8eb-cb3b-4a39-a9ed-fa40f4e05181"
+        },
+        "created_at": "2026-11-03 01:55:21.327535+00",
+        "correlation_id": "c47be868-b9a6-4912-8a58-b6d455a7961e"
+      },
+      {
+        "id": "dd252d6f-1b68-478e-af31-a9e5d9c1fef8",
+        "command_type": "mark_item_ready",
+        "expected_version": "8",
+        "status": "succeeded",
+        "result": {
+          "status": "ready",
+          "version": 9,
+          "sequence": 1121,
+          "updatedAt": "2026-11-03T01:55:24.423Z",
+          "kitchenOrderId": "edeba8eb-cb3b-4a39-a9ed-fa40f4e05181"
+        },
+        "created_at": "2026-11-03 01:55:24.423276+00",
+        "correlation_id": "3845e486-9b80-40df-9727-f9d99973ff91"
+      },
+      {
+        "id": "561de680-a7fa-4fdc-94f3-75006719b484",
+        "command_type": "complete",
+        "expected_version": "9",
+        "status": "succeeded",
+        "result": {
+          "status": "completed",
+          "version": 10,
+          "sequence": 1122,
+          "updatedAt": "2026-11-03T01:55:27.480Z",
+          "kitchenOrderId": "edeba8eb-cb3b-4a39-a9ed-fa40f4e05181"
+        },
+        "created_at": "2026-11-03 01:55:27.480664+00",
+        "correlation_id": "44064e24-bc68-4066-a1a8-091f1d08be5c"
+      }
+    ]
+  },
+  "scopeLimit": "The owner cannot identify the account from the report. Account 053 is an independently observed matching sequence."
+}
