@@ -1467,7 +1467,9 @@ class _PosNavigationState extends State<PosNavigation> {
     final controls = List.generate(destinations.length, (index) {
       final d = destinations[index] as PosDestination;
       final chosen = selectedIndex == index;
-      final foreground = chosen ? p.primary : p.onSurfaceVariant;
+      final foreground = rail
+          ? (chosen ? PosColors.white : p.onRail.withValues(alpha: .84))
+          : (chosen ? p.primary : p.onSurfaceVariant);
       final label = Text(
         d.label,
         textAlign: rail ? TextAlign.start : TextAlign.center,
@@ -1500,7 +1502,9 @@ class _PosNavigationState extends State<PosNavigation> {
             vertical: 8,
           ),
           decoration: BoxDecoration(
-            color: chosen ? p.primaryContainer : null,
+            color: chosen
+                ? (rail ? p.onRail.withValues(alpha: .16) : p.primaryContainer)
+                : null,
             borderRadius: BorderRadius.circular(8),
           ),
           child: rail && !expanded
@@ -1685,7 +1689,7 @@ class _PosNavigationState extends State<PosNavigation> {
                           child: Text(
                             'umi',
                             style: theme.textTheme.headlineSmall?.copyWith(
-                              color: p.onSurface,
+                              color: p.onRail,
                               fontSize: 29,
                             ),
                           ),
@@ -1697,7 +1701,7 @@ class _PosNavigationState extends State<PosNavigation> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
                     child: PosSurface(
-                      color: p.surfaceContainerHigh,
+                      color: p.onRail.withValues(alpha: .08),
                       borderRadius: BorderRadius.circular(6),
                       child: expanded
                           ? SizedBox(
@@ -1713,6 +1717,7 @@ class _PosNavigationState extends State<PosNavigation> {
                                 ),
                                 style: PosTextButton.styleFrom(
                                   alignment: Alignment.centerLeft,
+                                  foregroundColor: p.onRail,
                                   textStyle: theme.textTheme.labelMedium,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
@@ -1730,6 +1735,9 @@ class _PosNavigationState extends State<PosNavigation> {
                                         ? 'Collapse menu'
                                         : 'Expand menu'),
                               onPressed: () => _setRailExpanded(!_railExpanded),
+                              style: PosIconButton.styleFrom(
+                                foregroundColor: p.onRail,
+                              ),
                               icon: PosIcon(
                                 PosGlyph(
                                   expanded

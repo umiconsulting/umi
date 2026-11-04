@@ -627,7 +627,7 @@ final class _PinFrame extends StatelessWidget {
       state.device?.displayName,
     ].whereType<String>().join(' · ');
     final identity = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
         Semantics(
@@ -695,25 +695,23 @@ final class _PinFrame extends StatelessWidget {
                     child: Center(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxWidth: wide ? (largeText ? 1000 : 700) : 400,
+                          maxWidth: largeText ? 480 : 400,
                         ),
-                        child: wide
-                            ? Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(child: identity),
-                                  const SizedBox(width: 80),
-                                  Expanded(child: child),
-                                ],
-                              )
-                            : Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  identity,
-                                  const SizedBox(height: 24),
-                                  child,
-                                ],
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            identity,
+                            const SizedBox(height: 24),
+                            Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 320,
+                                ),
+                                child: child,
                               ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

@@ -83,15 +83,15 @@ final class PosPalette {
   Color get onSignal => const Color(0xFF131F44);
   // The rail: the dashboard's sidebar in the dark themes, the brand navy in the light
   // one — which is where it already was.
-  Color get rail => surface;
-  Color get onRail => onSurface;
+  Color get rail => dark ? surface : const Color(0xFF223979);
+  Color get onRail => const Color(0xFFF2F5FC);
 }
 
 final class PosTextStyles {
   PosTextStyles({
     required Color ink,
     String fontFamily = 'IBM Plex Sans',
-    String headingFamily = 'Bricolage Grotesque',
+    String headingFamily = 'IBM Plex Sans',
   }) {
     TextStyle style(
       double size,
@@ -108,10 +108,10 @@ final class PosTextStyles {
       fontFeatures: const [FontFeature.tabularFigures()],
     );
     TextStyle heading(double size, double height, FontWeight weight) =>
-        style(size, height, weight, -.35).copyWith(fontFamily: headingFamily);
-    displayLarge = heading(44, 1.08, FontWeight.w700);
-    displaySmall = heading(36, 1.12, FontWeight.w700);
-    headlineMedium = heading(30, 1.16, FontWeight.w700);
+        style(size, height, weight).copyWith(fontFamily: headingFamily);
+    displayLarge = heading(44, 1.08, FontWeight.w600);
+    displaySmall = heading(36, 1.12, FontWeight.w600);
+    headlineMedium = heading(30, 1.16, FontWeight.w600);
     headlineSmall = heading(24, 1.2, FontWeight.w600);
     titleLarge = heading(20, 1.25, FontWeight.w600);
     titleMedium = style(16, 1.3, FontWeight.w600);
