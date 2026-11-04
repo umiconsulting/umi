@@ -24,25 +24,25 @@ No API, contract or database owner changed in this presentation branch.
 
 ### Native results
 
-| Check | Observed result | Scope |
-| --- | --- | --- |
-| Phone account | Both sent rows, operator note, total93, paid31 and due62 remain visible. Save and split share one row. | Exact final APK. |
-| Sent-line actions | Labelled line menu retains Repeat and Cancel. | Native menu opened; source tests exercise the same owners and permissions. |
-| Phone partial payment | Account/due band and method keys precede the form. Portion31 and cash31 reached the ledger once. | Exact final APK. |
-| Operator note and quantity | The note reached the server. Direct quantity reduction restored one Croissant before fire. | Exact final APK. |
-| Interrupted connection | The isolated API stopped. One quantity increase remained local, then reached the server after recovery. | Exact final APK. No duplicate line appeared. |
-| Cold process restart | Enrollment persisted. After PIN entry, the normal account list recovered the same account with paid31 and due62. | Exact final APK. No enrollment reset or lost payment. |
-| Cash completion | Remaining62, received100 and change38 finalized overall account7, daily folio002. Ticket0005 retained both products and the note. | Exact final APK. |
-| Drawer failure | The app retained the successful charge and showed its drawer warning. | Exact final APK. No physical drawer pulse is claimed. |
-| Portrait denomination count | Bills and coins stayed parallel, with a fixed right total. The rail retained one umi mark. | Exact final APK at800 logical pixels. |
-| Blind count, reconciliation and close | Counted1,351.50 equalled expected1,351.50. Variance0. Outcome balanced. One shift-close row exists. | Exact final APK. Server count resolved at ledger sequence11. |
-| Physical map | Published geometry and occupied/paid-occupied states remained visible in portrait and landscape. | Exact final APK. |
-| Full portrait checkout | Method bank, work area and304px account region stayed parallel. | Inspected on4bc6589a. Its owner is unchanged in final E. No charge on account004. |
-| Mixed takeaway | Overall account6 used Latte Mediano with oat milk87 and Croissant48. Cash45 plus explicit manual-terminal confirmation90 finalized ticket0004. | On4bc6589a. Final E preserves these business owners. No provider authorization is claimed. |
-| Two-station completion | Cocina completed while Barra retained queued Latte. Barra then completed. | On4bc6589a. Server order completed at version8; both items completed at version4. KDS code is unchanged in E. |
-| Station role | The preparation role exposed KDS and its allowed Settings, without cash/payment destinations. | On4bc6589a and final E. Station selection remains a display filter. |
-| Receipt output | Native Imprimir recibo delivered757bytes for ticket0003 to the synthetic TCP sink. | On4bc6589a. Physical printing remains unverified. |
-| Hardware settings | Both synthetic TCP devices remained assigned after package updates. | On4bc6589a. Hardware owner is unchanged in E. Physical USB/drawer hardware is absent. |
+| Check                                 | Observed result                                                                                                                                | Scope                                                                                                         |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Phone account                         | Both sent rows, operator note, total93, paid31 and due62 remain visible. Save and split share one row.                                         | Exact final APK.                                                                                              |
+| Sent-line actions                     | Labelled line menu retains Repeat and Cancel.                                                                                                  | Native menu opened; source tests exercise the same owners and permissions.                                    |
+| Phone partial payment                 | Account/due band and method keys precede the form. Portion31 and cash31 reached the ledger once.                                               | Exact final APK.                                                                                              |
+| Operator note and quantity            | The note reached the server. Direct quantity reduction restored one Croissant before fire.                                                     | Exact final APK.                                                                                              |
+| Interrupted connection                | The isolated API stopped. One quantity increase remained local, then reached the server after recovery.                                        | Exact final APK. No duplicate line appeared.                                                                  |
+| Cold process restart                  | Enrollment persisted. After PIN entry, the normal account list recovered the same account with paid31 and due62.                               | Exact final APK. No enrollment reset or lost payment.                                                         |
+| Cash completion                       | Remaining62, received100 and change38 finalized overall account7, daily folio002. Ticket0005 retained both products and the note.              | Exact final APK.                                                                                              |
+| Drawer failure                        | The app retained the successful charge and showed its drawer warning.                                                                          | Exact final APK. No physical drawer pulse is claimed.                                                         |
+| Portrait denomination count           | Bills and coins stayed parallel, with a fixed right total. The rail retained one umi mark.                                                     | Exact final APK at800 logical pixels.                                                                         |
+| Blind count, reconciliation and close | Counted1,351.50 equalled expected1,351.50. Variance0. Outcome balanced. One shift-close row exists.                                            | Exact final APK. Server count resolved at ledger sequence11.                                                  |
+| Physical map                          | Published geometry and occupied/paid-occupied states remained visible in portrait and landscape.                                               | Exact final APK.                                                                                              |
+| Full portrait checkout                | Method bank, work area and304px account region stayed parallel.                                                                                | Inspected on4bc6589a. Its owner is unchanged in final E. No charge on account004.                             |
+| Mixed takeaway                        | Overall account6 used Latte Mediano with oat milk87 and Croissant48. Cash45 plus explicit manual-terminal confirmation90 finalized ticket0004. | On4bc6589a. Final E preserves these business owners. No provider authorization is claimed.                    |
+| Two-station completion                | Cocina completed while Barra retained queued Latte. Barra then completed.                                                                      | On4bc6589a. Server order completed at version8; both items completed at version4. KDS code is unchanged in E. |
+| Station role                          | The preparation role exposed KDS and its allowed Settings, without cash/payment destinations.                                                  | On4bc6589a and final E. Station selection remains a display filter.                                           |
+| Receipt output                        | Native Imprimir recibo delivered757bytes for ticket0003 to the synthetic TCP sink.                                                             | On4bc6589a. Physical printing remains unverified.                                                             |
+| Hardware settings                     | Both synthetic TCP devices remained assigned after package updates.                                                                            | On4bc6589a. Hardware owner is unchanged in E. Physical USB/drawer hardware is absent.                         |
 
 The final cash ledger has 11 entries. Its signed sum is 135,150 minor units.
 Paid-out and safe-drop amounts have positive stored values and subtract from expected cash.
@@ -56,8 +56,8 @@ No payload credentials, operator PINs or enrollment tokens appear in the evidenc
 These are real Android captures with synthetic business data. They are not Stageshow frames.
 Final E captures require two consecutive identical screenshot frames. The before frame is the prior M1 build.
 
-| Account before | Account after |
-| --- | --- |
+| Account before                                                                   | Account after                                                            |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | ![Account before](assets/2026-11-04-pos-design2-native/account-before-phone.png) | ![Account after](assets/2026-11-04-pos-design2-native/account-phone.png) |
 
 - [Phone sale](assets/2026-11-04-pos-design2-native/sale-phone.png)
@@ -87,7 +87,6 @@ C moves the service choice before the same baseline account-switch block. D/M1 c
 This is an open baseline functional failure. Keep the financial guard; correct refusal guidance and local reconciliation separately.
 No payment guard, conflict or backend state was bypassed during this test.
 
-
 Status: in progress. Native baseline `67bacd42`; first correction installed at `51eaab72`.
 The visual comparison has 24 surface rows. Visual acceptance remains open.
 The correction pass must receive a new build and runtime checks before acceptance.
@@ -107,30 +106,30 @@ The correction pass must receive a new build and runtime checks before acceptanc
 
 ## Observed behavior at checkpoint B
 
-| Flow | Observed result | Evidence and limit |
-| --- | --- | --- |
-| Open cash shift | One MXN 1,000 bill produced a MXN 1,000 opening float. | Native input and stored opening denomination; shift remains open. |
-| Takeaway options | Latte required a variant and a required milk option. Mediano and oat milk produced MXN 87. | Add stayed disabled before required selections. |
-| Takeaway account | Latte 87 plus Croissant 48 produced account 002 total 135. | Stored lines retain the variant, milk modifier, note and service course. |
-| Preparation dispatch | Both lines became sent. Editable line actions changed to their sent-line actions. | Actual kitchen projection has Barra and Cocina items. |
-| KDS receive/start/ready | Barra Latte and Cocina Croissant reached ready through native controls. | Actual station item states and modifier/note text were inspected. |
-| KDS ready filter | Hide ready (1) removed the ready lane. Show ready (1) restored it. | `b-kds-ready-hidden-tablet-landscape.png`. The count remains one while hidden. |
-| Station sibling | Completed Barra work leaves the Cocina projection available. | Read-only reconciliation confirms Latte station completion and retained Croissant. A fresh complete sequence after corrections remains required. |
-| Partial cash | Half of 135 registered a confirmed cash tender of 67.50. | Backend partial ledger and account remaining 67.50 agree. |
-| Manual external terminal | Operator confirmation registered the remaining 67.50. Closing the account produced ticket 0001 for 135. | Local synthetic confirmation only. No payment provider or physical terminal authorization. |
-| Dine-in cash | M1 account 003 charged 48, received 100 and returned change 52. | Native result and real receipt, ticket 0002. |
-| Paid table | M1 remained Pagada y ocupada after payment. | `b-floor-paid-occupied-phone.png`. |
-| New consumption | Nuevo consumo on paid M1 opened account 004 in the same seated visit. | New Americano line was sent. Account remains open for further checks. |
-| Move and clean | Moving M1 to M3 preserved account 004 and two people. M1 became Por limpiar; Mesa lista restored Libre. | Native map and account preview read actual state. |
-| Printer configuration | Registered and assigned a synthetic TCP printer through Settings. Printer preferences remain reachable. | Local socket sink on 127.0.0.1:9101, exposed only to this emulator through ADB reverse. |
-| Printer connection test | The connection test returned success. | The socket accepted connections with zero payload bytes. This proves connection handling only. Receipt byte output remains pending. |
-| USB absence | Discovery returned the supported no-printer message. | No physical USB printer is connected. |
-| Terminal drawer absence | Discovery returned the supported unavailable-port message. | The emulator exposes no supported physical drawer port. |
-| Cash movements | Entry 20, exit 10 and safe drop 5 each reached the cash ledger once. | The first entry met a stale-version refusal after payments. Retry preserved both fields and used the refreshed version. |
-| Blind count controls | One 1,000 bill plus one 0.50 coin produced total 1,000.50. | The count was cancelled. No count or close was submitted. |
-| Public intake replay | The same successful request returned the same order ID on replay. | One table-order link and one source order exist. The cached response retains `created: true`; that flag alone does not prove uniqueness. |
-| Incoming binding | Atender bound source order to account 005. Manual ring-up produced 93. | Source lines and notes were not imported. See the functional failure below. |
-| Update persistence | Installing correction A with `adb install -r` restored both enrollments and operator sessions. | Both reached authorized screens. The phone catalog completed its initial load; no enrollment reset occurred. |
+| Flow                     | Observed result                                                                                         | Evidence and limit                                                                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Open cash shift          | One MXN 1,000 bill produced a MXN 1,000 opening float.                                                  | Native input and stored opening denomination; shift remains open.                                                                                |
+| Takeaway options         | Latte required a variant and a required milk option. Mediano and oat milk produced MXN 87.              | Add stayed disabled before required selections.                                                                                                  |
+| Takeaway account         | Latte 87 plus Croissant 48 produced account 002 total 135.                                              | Stored lines retain the variant, milk modifier, note and service course.                                                                         |
+| Preparation dispatch     | Both lines became sent. Editable line actions changed to their sent-line actions.                       | Actual kitchen projection has Barra and Cocina items.                                                                                            |
+| KDS receive/start/ready  | Barra Latte and Cocina Croissant reached ready through native controls.                                 | Actual station item states and modifier/note text were inspected.                                                                                |
+| KDS ready filter         | Hide ready (1) removed the ready lane. Show ready (1) restored it.                                      | `b-kds-ready-hidden-tablet-landscape.png`. The count remains one while hidden.                                                                   |
+| Station sibling          | Completed Barra work leaves the Cocina projection available.                                            | Read-only reconciliation confirms Latte station completion and retained Croissant. A fresh complete sequence after corrections remains required. |
+| Partial cash             | Half of 135 registered a confirmed cash tender of 67.50.                                                | Backend partial ledger and account remaining 67.50 agree.                                                                                        |
+| Manual external terminal | Operator confirmation registered the remaining 67.50. Closing the account produced ticket 0001 for 135. | Local synthetic confirmation only. No payment provider or physical terminal authorization.                                                       |
+| Dine-in cash             | M1 account 003 charged 48, received 100 and returned change 52.                                         | Native result and real receipt, ticket 0002.                                                                                                     |
+| Paid table               | M1 remained Pagada y ocupada after payment.                                                             | `b-floor-paid-occupied-phone.png`.                                                                                                               |
+| New consumption          | Nuevo consumo on paid M1 opened account 004 in the same seated visit.                                   | New Americano line was sent. Account remains open for further checks.                                                                            |
+| Move and clean           | Moving M1 to M3 preserved account 004 and two people. M1 became Por limpiar; Mesa lista restored Libre. | Native map and account preview read actual state.                                                                                                |
+| Printer configuration    | Registered and assigned a synthetic TCP printer through Settings. Printer preferences remain reachable. | Local socket sink on 127.0.0.1:9101, exposed only to this emulator through ADB reverse.                                                          |
+| Printer connection test  | The connection test returned success.                                                                   | The socket accepted connections with zero payload bytes. This proves connection handling only. Receipt byte output remains pending.              |
+| USB absence              | Discovery returned the supported no-printer message.                                                    | No physical USB printer is connected.                                                                                                            |
+| Terminal drawer absence  | Discovery returned the supported unavailable-port message.                                              | The emulator exposes no supported physical drawer port.                                                                                          |
+| Cash movements           | Entry 20, exit 10 and safe drop 5 each reached the cash ledger once.                                    | The first entry met a stale-version refusal after payments. Retry preserved both fields and used the refreshed version.                          |
+| Blind count controls     | One 1,000 bill plus one 0.50 coin produced total 1,000.50.                                              | The count was cancelled. No count or close was submitted.                                                                                        |
+| Public intake replay     | The same successful request returned the same order ID on replay.                                       | One table-order link and one source order exist. The cached response retains `created: true`; that flag alone does not prove uniqueness.         |
+| Incoming binding         | Atender bound source order to account 005. Manual ring-up produced 93.                                  | Source lines and notes were not imported. See the functional failure below.                                                                      |
+| Update persistence       | Installing correction A with `adb install -r` restored both enrollments and operator sessions.          | Both reached authorized screens. The phone catalog completed its initial load; no enrollment reset occurred.                                     |
 
 The tablet kitchen role shows preparation and its allowed settings. It exposes no cash or payment destination.
 Saved station selection remains a terminal display filter. It does not establish new per-staff station authorization.
