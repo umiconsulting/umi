@@ -329,3 +329,20 @@ El propietario confirmó que entendió la restricción del rol.
 
 No se alteraron pagos, cuentas ni comandas reales durante el soporte.
 Informe: [Segunda ronda de KDS](2026-11-03-onca-kds-second-round.md).
+
+## 2026-11-03 — Dashboard: barras de ventas por día y hora reducidas a una línea
+
+Las capturas del propietario y una prueba de navegador reprodujeron las barras planas.
+Los datos controlados tenían importes distintos, pero la barra máxima medía dos píxeles.
+La columna flex no tenía una altura definida y la barra dependía de su altura porcentual.
+
+Se agregó `height: '100%'` a la columna de SeriesChart.
+Chromium mostró proporciones correctas por hora y día en anchos de 1440 y 768 píxeles.
+Dos regresiones de navegador, 427 pruebas unitarias, lint sin errores y compilación aprobaron.
+La revisión independiente no encontró defectos. El lint conserva sus 68 advertencias anteriores.
+Se agregó un workflow para ejecutar la regresión de navegador en CI.
+
+Las consultas y los importes no cambiaron. Los datos de prueba no validan la contabilidad real.
+El ajuste del dashboard queda en un PR separado y espera aprobación antes de publicarse.
+No se requiere otra actualización de las tablets.
+Informe: [Gráfica de ventas](2026-11-03-onca-dashboard-sales-chart.md).
