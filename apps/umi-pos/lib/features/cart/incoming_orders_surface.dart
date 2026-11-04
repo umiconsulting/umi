@@ -100,7 +100,6 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final state = widget.incoming.state;
-    final wide = MediaQuery.sizeOf(context).width >= 900;
     final queueHeader = PosHeader(
       automaticallyImplyLeading: false,
       title: StationHeading(
@@ -135,11 +134,27 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
       ],
     );
     return PosPage(
-      appBar: wide ? null : queueHeader,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: _body(l, state, queueHeader: wide ? queueHeader : null),
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final queueVisible =
+                  box.maxWidth >= 720 &&
+                  state.phase == IncomingOrdersPhase.ready &&
+                  state.orders.isNotEmpty;
+              if (queueVisible) {
+                return _body(l, state, queueHeader: queueHeader);
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  queueHeader,
+                  Expanded(child: _body(l, state)),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

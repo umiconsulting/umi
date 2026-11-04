@@ -133,6 +133,7 @@ final class RoomRepository implements TableStateRepository {
       );
 
   TableStateMap map;
+  Completer<TableStateMap>? pendingRead;
   Object? commandFailure;
   SeatTableRequest? seated;
   MovePartyRequest? moved;
@@ -147,7 +148,7 @@ final class RoomRepository implements TableStateRepository {
   Future<TableStateMap> read(
     String merchantId,
     PosTableStateQuery query,
-  ) async => map;
+  ) async => pendingRead == null ? map : pendingRead!.future;
 
   @override
   Future<TableStateChangeResult> seat(
@@ -429,6 +430,78 @@ Future<SurfaceHarness> pumpSurface(
 }
 
 void main() {
+  for (final firstFails in [false, true]) {
+    testWidgets(
+      'first room read remains unknown and retains the last valid state, initial failure=$firstFails',
+      (tester) async {
+        final gate = Completer<TableStateMap>();
+        final repository = RoomRepository(
+          states: [entryJson(t1, tableStateSeated, partySize: 2)],
+        )..pendingRead = gate;
+        var opens = 0;
+        final harness = await pumpSurface(
+          tester,
+          repository: repository,
+          onOpenAccount: (_, {partySize}) async {
+            opens++;
+            return true;
+          },
+        );
+        final map = find.byType(FloorPlanMap);
+        expect(map, findsOneWidget);
+        expect(
+          tester.widget<FloorPlanMap>(map).tableStates![t1]!.displayState,
+          isNot(tableStateOpen),
+        );
+        await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
+        await tester.pumpAndSettle();
+        expect(find.text('Open account'), findsNothing);
+        expect(find.text('Seat'), findsNothing);
+        expect(opens, 0);
+        if (firstFails) {
+          gate.completeError(StateError('Initial room unavailable'));
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<FloorPlanMap>(map).tableStates![t1]!.displayState,
+            tableVisualUnknown,
+          );
+          expect(find.text('Open account'), findsNothing);
+          final success = Completer<TableStateMap>();
+          repository.pendingRead = success;
+          await tester.tap(find.byTooltip('Refresh'));
+          await tester.pump();
+          success.complete(repository.map);
+        } else {
+          gate.complete(repository.map);
+        }
+        repository.pendingRead = null;
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<FloorPlanMap>(map).tableStates![t1]!.state,
+          tableStateSeated,
+        );
+        final failedRefresh = Completer<TableStateMap>();
+        repository.pendingRead = failedRefresh;
+        await tester.tap(find.byTooltip('Refresh'));
+        await tester.pump();
+        expect(
+          tester.widget<FloorPlanMap>(map).tableStates![t1]!.state,
+          tableStateSeated,
+        );
+        failedRefresh.completeError(StateError('No room reply'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<FloorPlanMap>(map).tableStates![t1]!.state,
+          tableStateSeated,
+        );
+        expect(harness.tableState.stale, isTrue);
+        expect(opens, 0);
+        expect(tester.takeException(), isNull);
+        await harness.dispose(tester);
+      },
+    );
+  }
+
   testWidgets(
     'same selected account refreshes through the room without accepting stale replies',
     (tester) async {

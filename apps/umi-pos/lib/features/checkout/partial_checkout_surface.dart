@@ -784,6 +784,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
       appBar: widget.merchantLabel == null
           ? null
           : PosHeader(
+              actionsInline: true,
               automaticallyImplyLeading: false,
               toolbarHeight: 56,
               title: Row(
@@ -813,9 +814,17 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                 if (widget.operatorName != null)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      widget.operatorName!,
-                      style: theme.textTheme.bodySmall,
+                    child: SizedBox(
+                      width: MediaQuery.sizeOf(context).width < 700 ? 80 : 160,
+                      child: PosTooltip(
+                        message: widget.operatorName!,
+                        child: Text(
+                          widget.operatorName!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
                     ),
                   ),
               ],

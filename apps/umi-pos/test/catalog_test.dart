@@ -10,6 +10,7 @@ import 'package:umi_pos/core/storage/local_working_copy.dart';
 import 'package:umi_pos/core/theme/display_preferences.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/core/theme/umi_theme.dart';
+import 'package:umi_pos/features/cart/course_control.dart';
 import 'package:umi_pos/features/catalog/catalog_controller.dart';
 import 'package:umi_pos/features/catalog/catalog_repository.dart';
 import 'package:umi_pos/features/catalog/catalog_surface.dart';
@@ -1064,6 +1065,23 @@ void main() {
             find.widgetWithText(PosButton, 'Agregar a la comanda'),
             findsOneWidget,
           );
+          if (size.width < 700) {
+            final l = AppLocalizations.of(
+              tester.element(find.byType(CatalogSurface)),
+            );
+            expect(
+              tester.getTopLeft(find.text(l.cartQuantityLabel)).dy,
+              tester.getTopLeft(find.text(l.cartCourseLabel)).dy,
+            );
+            expect(
+              tester.getTopLeft(find.byTooltip(l.increaseQuantity)).dy,
+              closeTo(
+                tester.getTopLeft(find.byKey(CourseControl.increaseKey)).dy,
+                2,
+              ),
+            );
+            expect(find.text(l.cartCourseHint), findsOneWidget);
+          }
           expect(tester.takeException(), isNull);
         }
         await tester.pumpWidget(const SizedBox());

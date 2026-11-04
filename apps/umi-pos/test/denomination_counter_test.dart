@@ -69,6 +69,15 @@ void main() {
       expect(find.text('Billetes'), findsOneWidget);
       expect(find.text('Monedas'), findsOneWidget);
       expect(find.text('= MXN 0.00'), findsNWidgets(4));
+      expect(tester.widget<Text>(find.text('MXN 500.00')).style!.fontSize, 14);
+      expect(
+        tester.getTopLeft(find.text('MXN 500.00')).dy,
+        lessThan(tester.getTopLeft(find.byType(PosField).first).dy),
+      );
+      expect(
+        tester.getTopLeft(find.byType(PosField).first).dy,
+        lessThan(tester.getTopLeft(find.text('= MXN 0.00').first).dy),
+      );
       await tester.enterText(find.byType(PosField).first, '1');
       await tester.enterText(find.byType(PosField).last, '3');
       await tester.pump();

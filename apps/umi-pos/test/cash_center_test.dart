@@ -485,6 +485,62 @@ Future<void> _seedOpenShift(_FakeCashRepository repository) => repository.open(
 );
 
 void main() {
+  testWidgets(
+    'phone separates full-width safe drop and drawer access from the movement pair',
+    (tester) async {
+      tester.view.physicalSize = const Size(402, 874);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repository = _FakeCashRepository();
+      await _seedOpenShift(repository);
+      repository.snapshot = CashCenterSnapshot.fromJson({
+        ...repository.snapshot.toJson(),
+        'allowedActions': ['movement', 'no_sale', 'suspend', 'count'],
+      });
+      final controller = CashController(repository: repository);
+      controller.setContext(
+        merchantId: 'merchant',
+        locationId: 'location',
+        operatorSessionId: 'operator',
+      );
+      await controller.load();
+      await tester.pumpWidget(
+        PosApp(
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: CashCenter(
+            controller: controller,
+            permissions: OperatorPermissions(const [
+              'cash.shift.read',
+              'cash.movement.paid_in',
+              'cash.movement.paid_out',
+              'cash.movement.safe_drop',
+              'cash.drawer.no_sale',
+              'cash.count.submit',
+            ]),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final l = AppLocalizations.of(tester.element(find.byType(CashCenter)));
+      Finder keyFor(String label) => find
+          .ancestor(of: find.text(label), matching: find.byType(PosTapRegion))
+          .first;
+      final entry = tester.getRect(keyFor(l.paidInAction));
+      final exit = tester.getRect(keyFor(l.paidOutAction));
+      final safe = tester.getRect(keyFor(l.safeDropAction));
+      expect(entry.top, exit.top);
+      expect(safe.width, greaterThan(entry.width * 1.9));
+      expect(safe.top, greaterThanOrEqualTo(entry.bottom));
+      expect(repository.movedWith, isNull);
+      expect(repository.noSaleRequest, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      controller.dispose();
+    },
+  );
+
   for (final cancel in [false, true]) {
     testWidgets(
       'total-only count keeps the principal policy and closes safely cancel=$cancel',
@@ -496,6 +552,10 @@ void main() {
         await _seedOpenShift(repository);
         repository.snapshot = CashCenterSnapshot.fromJson({
           ...repository.snapshot.toJson(),
+          'currentShift': {
+            ...repository.snapshot.currentShift!,
+            'registerId': repository.snapshot.registers.first['id'],
+          },
           'policy': {
             ...repository.snapshot.policy,
             'countMethod': 'total_only',
@@ -530,6 +590,8 @@ void main() {
         await tester.ensureVisible(find.text('Contar el cajón'));
         await tester.tap(find.text('Contar el cajón'));
         await tester.pumpAndSettle();
+        expect(find.text('umi'), findsOneWidget);
+        expect(find.textContaining('Caja principal'), findsOneWidget);
         expect(find.byType(DenominationCounter), findsNothing);
         final field = find.descendant(
           of: find.byKey(const ValueKey('cash-count-workspace')),

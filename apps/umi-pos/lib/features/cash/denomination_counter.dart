@@ -345,7 +345,9 @@ class _DenominationCounterState extends State<DenominationCounter> {
       children: [
         Text(
           _money(denomination),
-          style: theme.textTheme.bodyLarge,
+          style: widget.grouped
+              ? theme.textTheme.bodyMedium
+              : theme.textTheme.bodyLarge,
           maxLines: stacked ? null : 2,
           overflow: stacked ? null : TextOverflow.ellipsis,
         ),
@@ -395,7 +397,25 @@ class _DenominationCounterState extends State<DenominationCounter> {
         border: Border.all(color: theme.colorScheme.outlineVariant),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: stacked
+      child: widget.grouped
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_money(denomination), style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 8),
+                Row(children: controls),
+                const SizedBox(height: 8),
+                Text(
+                  '= ${_money(denomination * quantity)}',
+                  textAlign: TextAlign.right,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            )
+          : stacked
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,

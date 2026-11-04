@@ -201,21 +201,37 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
               ],
             ),
       body: SafeArea(
-        child: _busy && snapshot == null
-            ? const Center(child: PosSpinner())
-            : _error != null
-            ? Center(
-                child: Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    text(
-                      'Hardware data is unavailable.',
-                      'Los datos de hardware no están disponibles.',
-                    ),
-                  ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (widget.embedded)
+              Align(
+                alignment: Alignment.centerRight,
+                child: PosTextButton.icon(
+                  onPressed: _busy ? null : _load,
+                  icon: const PosIcon(PosGlyphs.refresh, size: 18),
+                  label: Text(text('Refresh hardware', 'Actualizar hardware')),
                 ),
-              )
-            : _content(snapshot),
+              ),
+            Expanded(
+              child: _busy && snapshot == null
+                  ? const Center(child: PosSpinner())
+                  : _error != null
+                  ? Center(
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          text(
+                            'Hardware data is unavailable.',
+                            'Los datos de hardware no están disponibles.',
+                          ),
+                        ),
+                      ),
+                    )
+                  : _content(snapshot),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -230,15 +246,6 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (widget.embedded)
-          Align(
-            alignment: Alignment.centerRight,
-            child: PosTextButton.icon(
-              onPressed: _busy ? null : _load,
-              icon: const PosIcon(PosGlyphs.refresh, size: 18),
-              label: Text(text('Refresh hardware', 'Actualizar hardware')),
-            ),
-          ),
         if (widget.section != 'print') ...[
           Semantics(
             header: true,
