@@ -1,6 +1,6 @@
 # Native POS: selected Rediseño 2
 
-Status: final product `2fd267ed` passed the full suite. Root approved E phone visuals and the source review. Root owns remaining runtime acceptance.
+Status: final product `2fd267ed` passed source checks and bounded Android inspection. Operational acceptance remains blocked by two baseline findings.
 
 The native POS now covers the 24 audit rows and the approved inline service follow-up. The work corrects composition and density across the existing operational surfaces. The final matrix is `.superpowers/sdd/2026-11-02-redesign-parity/task-3n-corrections-report.md`.
 
@@ -47,3 +47,7 @@ Minor D review follow-up: `4bc6589a` makes the landscape service-selector insert
 E: `2fd267ed` corrects native phone account density and partial payment composition. Two sent lines remain visible with the pinned balance and collection actions. The phone partial route places methods before the form. Count shows one wordmark when the rail is present. The corrections report records the route tests, moved actions and limits. Root approved the phone account and partial payment frames, verified menu actions and recorded an exact cash portion of 31. The source review approved E. The full suite and full analyzer then ran once on the exact final product.
 
 Root owns APK builds, emulators, fixtures, authenticated Android capture and final visual comparison. Widget tests establish their stated native client behavior and geometry. Physical device and provider outcomes remain separate runtime evidence. No backend, schema, fixture or production change is included.
+
+## Final Android evidence
+
+The [native runtime report](2026-11-03-pos-design2-native-runtime.md) retains final phone and tablet captures. It records note/quantity recovery, partial payments, cold restart, cash reconciliation and close. Two baseline failures and the remaining hardware/provider checks prevent a complete operational acceptance claim. This branch is ready for draft review and team tests only.
