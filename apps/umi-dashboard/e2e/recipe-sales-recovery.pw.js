@@ -22,20 +22,32 @@ const test = base.extend({
 test('retries the exact confirmed replacement with its retained command identity', async ({
   recipePage: page,
   baseURL,
-}) => {
-  await replacementRecovery(page, baseURL);
+}, testInfo) => {
+  await replacementRecovery(
+    page,
+    baseURL,
+    testInfo.outputPath('umi-inventory-phase2-task2-retry-503.png'),
+  );
 });
 
 test('reloads a stale recipe and saves with the new version', async ({
   recipePage: page,
   baseURL,
-}) => {
-  await staleRecovery(page, baseURL);
+}, testInfo) => {
+  await staleRecovery(
+    page,
+    baseURL,
+    testInfo.outputPath('umi-inventory-phase2-task2-stale-reload.png'),
+  );
 });
 
 test('shows the Spanish domain error and keeps the draft editable', async ({
   recipePage: page,
   baseURL,
-}) => {
-  await translatedError(page, baseURL);
+}, testInfo) => {
+  await translatedError(
+    page,
+    baseURL,
+    testInfo.outputPath('umi-inventory-phase2-task2-translated-error.png'),
+  );
 });
