@@ -76,6 +76,7 @@ class FloorPlanSurface extends StatefulWidget {
 
 class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     with WidgetsBindingObserver {
+  int _accountRefreshGeneration = 0;
   Timer? _timer;
   Timer? _ticker;
   String? _areaId;
@@ -204,6 +205,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       }
       return;
     }
+    _accountRefreshGeneration++;
     final scope = '$merchant:$location:$operator';
     if (_context != scope) {
       _context = scope;
@@ -862,6 +864,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       final preview = entry?.openAccountId != null && widget.readAccount != null
           ? AccountPreview(
               key: ValueKey('table-account-${entry!.openAccountId}'),
+              refreshGeneration: _accountRefreshGeneration,
               load: () => widget.readAccount!(selected),
               balance: widget.readBalance,
             )

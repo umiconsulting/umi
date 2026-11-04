@@ -6,14 +6,21 @@ import 'account_details_surface.dart';
 
 /// A read-only preview. Reads never resume an account or claim its lease.
 class AccountPreview extends StatefulWidget {
-  const AccountPreview({required this.load, this.balance, super.key});
+  const AccountPreview({
+    required this.load,
+    this.balance,
+    this.refreshGeneration = 0,
+    super.key,
+  });
   final Future<Cart?> Function() load;
+  final int refreshGeneration;
   final Future<Map<String, Object?>?> Function(Cart)? balance;
   @override
   State<AccountPreview> createState() => _AccountPreviewState();
 }
 
 class _AccountPreviewState extends State<AccountPreview> {
+  int _request = 0;
   Cart? _cart;
   Map<String, Object?>? _balance;
   bool _loading = true;
@@ -24,29 +31,39 @@ class _AccountPreviewState extends State<AccountPreview> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(covariant AccountPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshGeneration != widget.refreshGeneration) _load();
+  }
+
   Future<void> _load() async {
+    final request = ++_request;
+    final read = widget.load;
+    final readBalance = widget.balance;
     setState(() {
       _loading = true;
       _failed = false;
       _balance = null;
     });
     try {
-      final cart = await widget.load();
-      if (!mounted) return;
+      final cart = await read();
+      if (!mounted || request != _request) return;
       setState(() {
         _cart = cart;
         _loading = false;
       });
-      if (cart != null && widget.balance != null) {
+      if (cart != null && readBalance != null) {
         try {
-          final balance = await widget.balance!(cart);
-          if (mounted) setState(() => _balance = balance);
+          final balance = await readBalance(cart);
+          if (mounted && request == _request)
+            setState(() => _balance = balance);
         } catch (_) {
           /* Unknown balance remains explicitly unknown. */
         }
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && request == _request) {
         setState(() {
           _cart = null;
           _loading = false;
