@@ -187,3 +187,25 @@ No backend or contract correction has been made for this finding.
 Physical print output, an actual drawer pulse and provider authorization require their real devices.
 The earlier enrollment reset remains unexplained. The subsequent correction-A package update preserved enrollment and operator state.
 A separate device reboot remains pending.
+
+## Draft PR and CI gate
+
+[PR #252](https://github.com/umiconsulting/umi/pull/252) targets staging and remains a draft.
+The native app source and tests remain identical to `2fd267ed` after the evidence/format commits.
+
+GitHub identified a separate baseline API gate failure. Run `41805521020` passed 2,144 unit tests, skipped 29 and failed one ownership assertion.
+`inventory-initial-cost-migration.spec.ts` forbids legacy migration paths in the workflow.
+`umi-api-ci.yml` already applies the paid-table-visit migration from that legacy directory.
+The workflow, assertion and SQL file are unchanged from origin/staging in this branch.
+The assertion remains intact. Canonical migration placement requires a separate owner correction before merge.
+
+The new dashboard browser gate exposed three Mac-specific screenshot paths on its Linux runner.
+The three cases failed with ENOENT while the other 23 browser cases passed.
+Source `241254f6` now uses Playwright output paths and a portable default for manual callers.
+All recovery assertions and steps remain unchanged.
+The three affected cases passed. The exact 26-case browser gate passed in 52.5 seconds.
+A manual two-argument caller also passed and retained its PNG. ESLint and Prettier passed.
+Tools: Node 22.23.3, pnpm 10.29.3, Playwright 1.62.1 and Chromium 151.0.7922.34.
+Linux CI must still confirm the updated branch. No API, SQL or native app code changed in this fix.
+Lint, contract, tokens and the rule gate passed after formatting. Vercel dashboard preview passed.
+The complete GitHub check result remains separate from the successful native Android suite.
