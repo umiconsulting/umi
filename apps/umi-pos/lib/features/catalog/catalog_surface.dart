@@ -481,6 +481,11 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         ? SaleCustomerSummary.fromJson(customer).displayName
         : l.attachCustomerAction;
     return PosTextButton.icon(
+      compact: true,
+      style: PosTextButton.styleFrom(
+        textStyle: PosTheme.of(context).textTheme.bodyMedium,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      ),
       onPressed: () => showCustomerPicker(context, widget.sales),
       icon: PosIcon(
         hasCustomer ? PosGlyphs.personOutline : PosGlyphs.personAddAlt1Outlined,
@@ -2365,38 +2370,41 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 if (value != null) selectServiceType(value);
               },
             )
-          : PosSegmented<String>(
-              showSelectedIcon: false,
-              style: PosSegmented.styleFrom(
-                selectedBackgroundColor: PosTheme.of(
-                  context,
-                ).colorScheme.primaryContainer,
-                selectedForegroundColor: PosTheme.of(
-                  context,
-                ).colorScheme.primary,
-                side: BorderSide(
-                  color: PosTheme.of(context).colorScheme.outlineVariant,
-                ),
-              ),
-              segments: [
-                PosSegment(
-                  value: 'dine_in',
-                  icon: const PosIcon(PosGlyphs.restaurantOutlined, size: 18),
-                  label: Text(spanish ? 'Comer aquí' : 'Dine in'),
-                ),
-                PosSegment(
-                  value: 'takeout',
-                  icon: const PosIcon(
-                    PosGlyphs.takeoutDiningOutlined,
-                    size: 18,
+          : Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                for (final type in ['dine_in', 'takeout'])
+                  PosButton.icon(
+                    compact: true,
+                    selected: _orderType == type,
+                    style: PosButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
+                      textStyle: PosTheme.of(context).textTheme.bodyMedium,
+                      backgroundColor: _orderType == type
+                          ? PosTheme.of(context).colorScheme.primaryContainer
+                          : PosTheme.of(context).colorScheme.surface,
+                      foregroundColor: _orderType == type
+                          ? PosTheme.of(context).colorScheme.primary
+                          : PosTheme.of(context).colorScheme.onSurface,
+                    ),
+                    onPressed: () => selectServiceType(type),
+                    icon: PosIcon(
+                      type == 'dine_in'
+                          ? PosGlyphs.restaurantOutlined
+                          : PosGlyphs.takeoutDiningOutlined,
+                      size: 18,
+                    ),
+                    label: Text(
+                      type == 'dine_in'
+                          ? (spanish ? 'Comer aquí' : 'Dine in')
+                          : (spanish ? 'Para llevar' : 'Takeout'),
+                    ),
                   ),
-                  label: Text(spanish ? 'Para llevar' : 'Takeout'),
-                ),
               ],
-              selected: {_orderType},
-              onSelectionChanged: (selection) {
-                selectServiceType(selection.first);
-              },
             ),
     );
     // THE BUYER SITS WITH THE ORDER TYPE.
@@ -5692,10 +5700,16 @@ final class _CartPanelState extends State<_CartPanel> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (cart != null)
-            Text(accountReference(cart), style: theme.textTheme.bodySmall),
+            Text(
+              accountReference(cart),
+              style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+            ),
           Text(
             cart == null ? l.cartTitle : identity,
-            style: theme.textTheme.titleLarge,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -5708,14 +5722,14 @@ final class _CartPanelState extends State<_CartPanel> {
           if (cart != null &&
               (cart.operatorName != null ||
                   (minutes != null && minutes >= 0))) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               [
                 if (minutes != null && minutes >= 0)
                   es ? 'Abierta hace $minutes min' : 'Opened $minutes min ago',
                 if (cart.operatorName != null) cart.operatorName!,
               ].join(' · '),
-              style: theme.textTheme.bodySmall,
+              style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
             ),
           ],
         ],
@@ -5862,7 +5876,7 @@ final class _CartPanelState extends State<_CartPanel> {
     final accountContext = <Widget>[
       if (serviceControls != null) ...[
         serviceControls!,
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
       ],
       Wrap(
         spacing: 8,
@@ -5871,6 +5885,11 @@ final class _CartPanelState extends State<_CartPanel> {
           ?customerControl,
           if (onAssignTable != null || cart.tableName != null)
             PosTextButton.icon(
+              compact: true,
+              style: PosTextButton.styleFrom(
+                textStyle: PosTheme.of(context).textTheme.bodyMedium,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              ),
               onPressed: controller.isWriting ? null : onAssignTable,
               icon: const PosIcon(PosGlyphs.tableRestaurantOutlined, size: 18),
               label: Text(
@@ -5901,66 +5920,120 @@ final class _CartPanelState extends State<_CartPanel> {
           itemBuilder: (context, index) {
             final item = items[index];
             final price = PriceSnapshot.fromJson(item.price);
+            final details = [
+              if (item.courseNumber != 1)
+                l.cartCourseCurrent(item.courseNumber),
+              if (item.variant != null) item.variant!['name'] as String,
+              ...item.modifiers.map((m) => m['name'] as String),
+              if (item.note != null) item.note!,
+            ].join(' · ');
             return Semantics(
               label: '${item.productName}, ${item.quantity}',
               child: Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: PosTheme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(8),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: PosTheme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    LayoutBuilder(
-                      builder: (context, lineBox) => PosListRow(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Text('${item.quantity}'),
-                        title: Text(
-                          item.productName,
-                          style: PosTheme.of(context).textTheme.titleSmall,
-                        ),
-                        subtitle: Text(
-                          [
-                            // A course other than the first is said on
-                            // the line itself, because it is a fact
-                            // about the dish and the operator has to be
-                            // able to check it without opening the
-                            // sheet again. Course 1 stays quiet.
-                            if (item.courseNumber != 1)
-                              l.cartCourseCurrent(item.courseNumber),
-                            if (item.variant != null)
-                              item.variant!['name'] as String,
-                            ...item.modifiers.map((m) => m['name'] as String),
-                            if (item.note != null) item.note!,
-                          ].join(' · '),
-                        ),
-                        trailing: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: lineBox.maxWidth * .42,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: LayoutBuilder(
+                            builder: (context, lineBox) => PosListRow(
+                              contentPadding: EdgeInsets.zero,
+                              dense: true,
+                              minTileHeight: 44,
+                              leading: Text(
+                                '${item.quantity}',
+                                style: PosTheme.of(
+                                  context,
+                                ).textTheme.bodySmall?.copyWith(fontSize: 12),
+                              ),
+                              title: Text(
+                                item.productName,
+                                style: PosTheme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: details.isEmpty
+                                  ? null
+                                  : Text(
+                                      details,
+                                      style: PosTheme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(fontSize: 12),
+                                    ),
+                              trailing: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: lineBox.maxWidth * .42,
+                                ),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    _money(price.lineTotal),
+                                    style: PosTheme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerRight,
-                            child: Text(_money(price.lineTotal)),
-                          ),
                         ),
-                      ),
+                        if (item.fired)
+                          PosMenuButton<String>(
+                            key: ValueKey('sent-line-actions-${item.id}'),
+                            tooltip: spanish
+                                ? 'Acciones de ${item.productName}'
+                                : 'Actions for ${item.productName}',
+                            icon: const PosIcon(PosGlyphs.moreVert),
+                            itemBuilder: (_) => [
+                              PosMenuItem(
+                                value: 'repeat',
+                                enabled:
+                                    permissions.allows('cart.write') &&
+                                    !controller.isWriting,
+                                child: Text(l.repeatCartLineAction),
+                              ),
+                              PosMenuItem(
+                                value: 'cancel',
+                                enabled:
+                                    permissions.allows('cart.write') &&
+                                    !controller.isWriting &&
+                                    permissions.allows('order.fire') &&
+                                    controller.supportsSentLineCancellation,
+                                child: Text(spanish ? 'Cancelar' : 'Cancel'),
+                              ),
+                            ],
+                            onSelected: (value) {
+                              if (value == 'repeat') {
+                                controller.repeat(item);
+                              } else {
+                                _cancelSentLine(context, item);
+                              }
+                            },
+                          ),
+                      ],
                     ),
                     if (item.fired)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          kitchenCartLineLabel(
-                            item,
-                            lineStatuses,
-                            spanish: spanish,
-                          ),
-                          style: PosTheme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: PosTheme.of(context).colorScheme.primary,
-                              ),
+                      Text(
+                        kitchenCartLineLabel(
+                          item,
+                          lineStatuses,
+                          spanish: spanish,
                         ),
+                        style: PosTheme.of(context).textTheme.bodySmall
+                            ?.copyWith(
+                              fontSize: 12,
+                              color: PosTheme.of(context).colorScheme.primary,
+                            ),
                       ),
                     if (!item.fired)
                       Row(
@@ -6027,33 +6100,6 @@ final class _CartPanelState extends State<_CartPanel> {
                                 controller.remove(item);
                               }
                             },
-                          ),
-                        ],
-                      )
-                    else
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          PosTextButton.icon(
-                            key: ValueKey('repeat-cart-line-${item.id}'),
-                            onPressed:
-                                permissions.allows('cart.write') &&
-                                    !controller.isWriting
-                                ? () => controller.repeat(item)
-                                : null,
-                            icon: const PosIcon(PosGlyphs.repeat, size: 16),
-                            label: Text(l.repeatCartLineAction),
-                          ),
-                          PosTextButton.icon(
-                            onPressed:
-                                permissions.allows('cart.write') &&
-                                    !controller.isWriting &&
-                                    permissions.allows('order.fire') &&
-                                    controller.supportsSentLineCancellation
-                                ? () => _cancelSentLine(context, item)
-                                : null,
-                            icon: const PosIcon(PosGlyphs.close, size: 16),
-                            label: Text(spanish ? 'Cancelar' : 'Cancel'),
                           ),
                         ],
                       ),
@@ -6136,6 +6182,8 @@ final class _CartPanelState extends State<_CartPanel> {
     final footer = <Widget>[
       const PosDivider(),
       PosDisclosure(
+        compact: true,
+        tilePadding: EdgeInsets.zero,
         title: Text(
           spanish ? 'Detalle de consumo' : 'Account details',
           style: PosTheme.of(context).textTheme.bodySmall,
@@ -6178,65 +6226,75 @@ final class _CartPanelState extends State<_CartPanel> {
         ),
       const SizedBox(height: UmiSpacing.sm),
     ];
-    final actions = <Widget>[
+    final secondaryLabels = <String>[
+      if (onSave != null) spanish ? 'Guardar y salir' : 'Save and leave',
+      if (canSplit) l.splitCheckAction,
+    ];
+    final secondaryActions = <Widget>[
       if (onSave != null)
         PosOutlineButton.icon(
+          compact: true,
+          style: PosOutlineButton.styleFrom(
+            textStyle: PosTheme.of(context).textTheme.bodyMedium,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          ),
           onPressed: controller.isWriting ? null : onSave,
           icon: const PosIcon(PosGlyphs.pauseCircleOutline),
           label: Text(spanish ? 'Guardar y salir' : 'Save and leave'),
         ),
-      _CartActions(
-        labels: [
-          if (permissions.allows('order.fire') && unfiredCount > 0)
-            spanish ? 'Enviar a cocina' : 'Send to kitchen',
-          if (canSplit) l.splitCheckAction,
-          if (permissions.allows('checkout.commit')) l.checkoutAction,
-        ],
-        buttons: [
-          if (canSplit)
-            PosOutlineButton.icon(
-              key: const ValueKey('account-split-check'),
-              onPressed:
-                  items.isEmpty ||
-                      controller.isWriting ||
-                      !checkout.canCollectPartialPayments ||
-                      !partialTenderReady
-                  ? null
-                  : () => _openCheckout(context, split: true),
-              icon: const PosIcon(PosGlyphs.callSplit),
-              label: Text(l.splitCheckAction),
-            ),
-          if (permissions.allows('checkout.commit'))
-            PosButton.icon(
-              compact: true,
-              style: PosButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-                backgroundColor: PosTheme.of(context).colorScheme.action,
-                foregroundColor: PosTheme.of(context).colorScheme.onAction,
-                disabledBackgroundColor: PosTheme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest,
-                disabledForegroundColor: PosTheme.of(
-                  context,
-                ).colorScheme.onSurfaceVariant,
-                side:
-                    PosTheme.of(context).colorScheme.midnight &&
-                        items.isNotEmpty &&
-                        permissions.allows('checkout.commit')
-                    ? BorderSide(color: PosTheme.of(context).colorScheme.signal)
-                    : null,
-              ),
-              onPressed:
-                  items.isEmpty ||
-                      !permissions.allows('checkout.commit') ||
-                      controller.isWriting
-                  ? null
-                  : () => _openCheckout(context),
-              icon: const PosIcon(PosGlyphs.paymentsOutlined),
-              label: Text(l.checkoutAction),
-            ),
-        ],
-      ),
+      if (canSplit)
+        PosOutlineButton.icon(
+          compact: true,
+          style: PosOutlineButton.styleFrom(
+            textStyle: PosTheme.of(context).textTheme.bodyMedium,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          ),
+          key: const ValueKey('account-split-check'),
+          onPressed:
+              items.isEmpty ||
+                  controller.isWriting ||
+                  !checkout.canCollectPartialPayments ||
+                  !partialTenderReady
+              ? null
+              : () => _openCheckout(context, split: true),
+          icon: const PosIcon(PosGlyphs.callSplit),
+          label: Text(l.splitCheckAction),
+        ),
+    ];
+    final actions = <Widget>[
+      if (secondaryActions.isNotEmpty) ...[
+        _CartActions(labels: secondaryLabels, buttons: secondaryActions),
+        const SizedBox(height: 8),
+      ],
+      if (permissions.allows('checkout.commit'))
+        PosButton.icon(
+          compact: true,
+          style: PosButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            backgroundColor: PosTheme.of(context).colorScheme.action,
+            foregroundColor: PosTheme.of(context).colorScheme.onAction,
+            disabledBackgroundColor: PosTheme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
+            disabledForegroundColor: PosTheme.of(
+              context,
+            ).colorScheme.onSurfaceVariant,
+            side:
+                PosTheme.of(context).colorScheme.midnight &&
+                    items.isNotEmpty &&
+                    permissions.allows('checkout.commit')
+                ? BorderSide(color: PosTheme.of(context).colorScheme.signal)
+                : null,
+          ),
+          onPressed:
+              items.isEmpty ||
+                  !permissions.allows('checkout.commit') ||
+                  controller.isWriting
+              ? null
+              : () => _openCheckout(context),
+          icon: const PosIcon(PosGlyphs.paymentsOutlined),
+          label: Text(l.checkoutAction),
+        ),
     ];
     return Container(
       key: const ValueKey('account-workspace'),
@@ -6269,7 +6327,7 @@ final class _CartPanelState extends State<_CartPanel> {
                   child: ListView(
                     children: [
                       _heading(context, l, showClose: false),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       ...accountContext,
                       ...lines,
                       ...footer,
@@ -6285,7 +6343,7 @@ final class _CartPanelState extends State<_CartPanel> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _heading(context, l),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               ...accountContext,
               Expanded(
                 child: ListView(
@@ -6310,15 +6368,42 @@ final class _CartActions extends StatelessWidget {
   final List<Widget> buttons;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      for (var i = 0; i < buttons.length; i++) ...[
-        if (i > 0) const SizedBox(height: 8),
-        buttons[i],
-      ],
-    ],
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      final style = PosTheme.of(context).textTheme.bodyMedium!;
+      final scale = MediaQuery.textScalerOf(context);
+      final width = (box.maxWidth - 8 * (buttons.length - 1)) / buttons.length;
+      final fits = labels.every((label) {
+        final text = TextPainter(
+          text: TextSpan(text: label, style: style),
+          textDirection: Directionality.of(context),
+          textScaler: scale,
+        )..layout();
+        final fits = text.width + 44 <= width && text.height <= 36;
+        text.dispose();
+        return fits;
+      });
+      if (fits) {
+        return Row(
+          children: [
+            for (var i = 0; i < buttons.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(child: buttons[i]),
+            ],
+          ],
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < buttons.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            buttons[i],
+          ],
+        ],
+      );
+    },
   );
 }
 
@@ -6338,7 +6423,9 @@ final class _Total extends StatelessWidget {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(child: Text(label)),
+        Expanded(
+          child: Text(label, style: PosTheme.of(context).textTheme.bodyMedium),
+        ),
         const SizedBox(width: UmiSpacing.sm),
         // MONEY NEVER WRAPS. A total that reads `MXN` / `245.0` / `0` down three lines is a number
         // nobody can take in at the counter, and `Extra large` on the till produced exactly that
@@ -6361,7 +6448,7 @@ final class _Total extends StatelessWidget {
                       height: 1.25,
                       fontWeight: FontWeight.w600,
                     )
-                  : null,
+                  : PosTheme.of(context).textTheme.bodyMedium,
             ),
           ),
         ),

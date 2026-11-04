@@ -27,6 +27,7 @@ import 'package:umi_pos/features/sale/sale_repository.dart';
 import 'package:umi_pos/features/tables/floor_plan_controller.dart';
 import 'package:umi_pos/features/tables/order_table_picker.dart';
 
+import 'receipt_document_test.dart' show fonts;
 import 'support/fakes.dart';
 
 final class _EmptyCatalogRepo implements CatalogRepository {
@@ -238,7 +239,8 @@ final class _CartRepo
     implements
         CartRepository,
         OpenAccountCartRepository,
-        AccountDetailsCartRepository {
+        AccountDetailsCartRepository,
+        SentCartLineRepository {
   _CartRepo(this.cart);
   Cart cart;
   int fulfillmentWrites = 0;
@@ -251,6 +253,22 @@ final class _CartRepo
   Cart? listedAccount;
   int resumes = 0;
   int currentReads = 0;
+  int suspends = 0;
+  RemoveSentCartLineRequest? lastCancellation;
+
+  @override
+  Future<Cart> cancelSentLine(
+    String merchantId,
+    String lineId,
+    RemoveSentCartLineRequest request,
+  ) async {
+    lastCancellation = request;
+    return cart = Cart.fromJson({
+      ...cart.toJson(),
+      'items': cart.items.where((line) => line['id'] != lineId).toList(),
+      'version': cart.version + 1,
+    });
+  }
 
   @override
   Future<List<Cart>> openAccounts(String merchantId, CartQuery query) async =>
@@ -327,11 +345,15 @@ final class _CartRepo
     required String idempotencyKey,
     String? accountName,
     bool updateName = false,
-  }) async => this.cart = Cart.fromJson({
-    ...cart.toJson(),
-    'lifecycleState': 'suspended',
-    'version': cart.version + 1,
-  });
+  }) async {
+    suspends++;
+    return this.cart = Cart.fromJson({
+      ...cart.toJson(),
+      'lifecycleState': 'suspended',
+      'version': cart.version + 1,
+    });
+  }
+
   @override
   Future<Cart> openTableAccount(
     String merchantId, {
@@ -505,6 +527,7 @@ final class _Checkout extends _CheckoutBase
     implements PartialPaymentRepository {
   int policyLoads = 0;
   int partialReads = 0;
+  Map<String, Object?>? ledgerSnapshot;
   Completer<void>? partialReadGate;
 
   @override
@@ -561,6 +584,9 @@ final class _Checkout extends _CheckoutBase
   ) async {
     if (partialReadGate != null) await partialReadGate!.future;
     partialReads++;
+    if (ledgerSnapshot != null) {
+      return CheckoutPartialPaymentResult(ok: true, data: ledgerSnapshot!);
+    }
     throw const AppException(
       category: AppErrorCategory.unknown,
       code: 'RESOURCE_NOT_FOUND',
@@ -822,7 +848,185 @@ Future<void> _mount(
   }
 }
 
+Cart _sentPartialAccount() {
+  final base = _cartWithLines(2);
+  return Cart.fromJson({
+    ...base.toJson(),
+    'accountFolio': 'Cuenta 005',
+    'tableId': 'table',
+    'tableName': 'M2',
+    'createdAt': DateTime.now()
+        .subtract(const Duration(minutes: 8))
+        .toIso8601String(),
+    'operatorName': 'Administradora UmiPOS',
+    'firedOrderId': 'sent-order',
+    'lifecycleState': 'suspended',
+    'items': [
+      for (var index = 0; index < base.items.length; index++)
+        {
+          ...base.items[index],
+          'productName': index == 0 ? 'Americano' : 'Croissant',
+          'fired': true,
+          'price': {
+            ...base.items[index]['price']! as Map<String, Object?>,
+            for (final field in ['unitPrice', 'lineSubtotal', 'lineTotal'])
+              field: {
+                'minorUnits': index == 0 ? 4500 : 4800,
+                'currency': 'MXN',
+              },
+            'tax': {'minorUnits': 0, 'currency': 'MXN'},
+          },
+        },
+    ],
+    'totals': {
+      ...base.totals,
+      'subtotal': {'minorUnits': 9300, 'currency': 'MXN'},
+      'tax': {'minorUnits': 0, 'currency': 'MXN'},
+      'grandTotal': {'minorUnits': 9300, 'currency': 'MXN'},
+    },
+  });
+}
+
+Future<void> _resumeDensityAccount(WidgetTester tester) async {
+  await tester.tap(find.text('Mesas').last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.byTooltip('Lista'));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byKey(ValueKey('open-account-${_sentPartialAccount().id}')),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.byType(PosOrderButton));
+  await tester.pumpAndSettle();
+}
+
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'phone sent account preserves two lines and partial collection at scale $scale',
+      (tester) async {
+        await fonts();
+        final f = await _fixture(initialNoCart: true);
+        addTearDown(f.dispose);
+        f.repo.listedAccount = f.repo.cart = _sentPartialAccount();
+        (f.checkoutRepo as _Checkout).ledgerSnapshot = {
+          'cartId': f.repo.listedAccount!.id,
+          'cartVersion': 2,
+          'amountDue': {'minorUnits': 9300, 'currency': 'MXN'},
+          'appliedAmount': {'minorUnits': 3100, 'currency': 'MXN'},
+          'remainingBalance': {'minorUnits': 6200, 'currency': 'MXN'},
+          'tipAmount': {'minorUnits': 0, 'currency': 'MXN'},
+          'tenderDrafts': <Object?>[],
+          'blockedByUnknown': false,
+          'canFinalize': false,
+          'confirmationReferences': <String, String>{},
+        };
+        tester.platformDispatcher.textScaleFactorTestValue = 1;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await _mount(tester, f.surface, size: const Size(402, 874));
+        await _resumeDensityAccount(tester);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        await tester.pumpAndSettle();
+        final save = find.widgetWithText(PosOutlineButton, 'Guardar y salir');
+        final split = find.byKey(const ValueKey('account-split-check'));
+        final charge = find.widgetWithText(PosButton, 'Cobrar');
+        expect(charge.hitTestable(), findsOneWidget);
+        expect(tester.getSize(charge).height, greaterThanOrEqualTo(48));
+        if (scale == 1) {
+          final viewport = tester.getRect(
+            find.byKey(const ValueKey('account-lines')),
+          );
+          for (final line in f.cart.state.cart!.items) {
+            final rect = tester.getRect(
+              find
+                  .ancestor(
+                    of: find.text(line['productName']! as String),
+                    matching: find.byWidgetPredicate(
+                      (widget) =>
+                          widget is Semantics &&
+                          widget.properties.label ==
+                              '${line['productName']}, ${line['quantity']}',
+                    ),
+                  )
+                  .first,
+            );
+            expect(rect.top, greaterThanOrEqualTo(viewport.top));
+            expect(rect.bottom, lessThanOrEqualTo(viewport.bottom));
+          }
+          expect(find.text('MXN 93.00').hitTestable(), findsOneWidget);
+          expect(find.text('MXN 31.00').hitTestable(), findsOneWidget);
+          expect(find.text('MXN 62.00').hitTestable(), findsOneWidget);
+          expect(tester.getRect(save).top, tester.getRect(split).top);
+          expect(tester.getSize(save).width, tester.getSize(split).width);
+          expect(tester.getSize(save).height, 44);
+          expect(tester.getSize(split).height, 44);
+        } else {
+          await tester.scrollUntilVisible(
+            find.text('Croissant'),
+            120,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const ValueKey('account-workspace')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('Croissant').hitTestable(), findsOneWidget);
+          expect(
+            tester.getRect(split).top,
+            greaterThan(tester.getRect(save).bottom),
+          );
+        }
+        await tester.tap(split);
+        await tester.pumpAndSettle();
+        expect(find.byType(PartialCheckoutSurface), findsOneWidget);
+        await tester.tap(find.text('Volver a la cuenta'));
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(f.repo.suspends, 1);
+        expect(f.cart.state.cart, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('sent line menu repeats and cancels through the account owners', (
+    tester,
+  ) async {
+    final f = await _fixture(initialNoCart: true);
+    addTearDown(f.dispose);
+    f.repo.listedAccount = f.repo.cart = _sentPartialAccount();
+    await _mount(tester, f.surface, size: const Size(402, 874));
+    await _resumeDensityAccount(tester);
+    final menu = find.byTooltip('Acciones de Americano');
+    await tester.tap(menu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Repetir producto'));
+    await tester.pumpAndSettle();
+    expect(f.repo.additions, 1);
+    expect(
+      f.repo.lastAdd?.productId,
+      _sentPartialAccount().items.first['productId'],
+    );
+    final version = f.cart.state.cart!.version;
+    await tester.tap(menu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cancelar producto enviado'), findsOneWidget);
+    await tester.tap(find.text('El cliente cambió el pedido'));
+    await tester.pumpAndSettle();
+    expect(f.repo.lastCancellation?.reasonCode, 'customer_changed');
+    expect(f.repo.lastCancellation?.expectedVersion, version);
+    expect(
+      f.cart.state.cart!.items.where((line) => line['fired'] == true),
+      hasLength(1),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   for (final type in ['takeout', 'dine_in']) {
     testWidgets(
       'inline new order preserves the current account until $type is confirmed',
