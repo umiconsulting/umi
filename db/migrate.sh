@@ -112,7 +112,7 @@ for f in "$MIGRATIONS_DIR"/*.sql; do
   echo "== applying $base =="
   psql_flags=()
   case "$base" in
-    038_*) psql_flags=(--single-transaction) ;;
+    038_*|062_*) psql_flags=(--single-transaction) ;;
   esac
   run_psql -q "${psql_flags[@]}" < "$f"
   run_psql -q -c "insert into runtime.migration_ledger (filename, checksum) values ('$base', '$checksum') on conflict (filename) do update set checksum = excluded.checksum, applied_at = now();"
