@@ -15,33 +15,33 @@ GREEN: `/private/tmp/umi-design2-preview-green.log`. 27 pruebas aprobadas.
 
 ## Estado de las correcciones
 
-| Fila | Superficie | Estado |
-| --- | --- | --- |
-| 1 | Full/partial phone method bank | Implementado. Métodos reales en claves de texto de 48 px. Ancho compartido y filas adicionales según espacio y texto. Captura final: root. |
-| 2 | Phone account/amount checkout hierarchy | Implementado. Identidad y saldo comparten la cabecera. Detalle y división preceden métodos y formulario. Ajustes condicionales conservan sus controles. Captura final: root. |
-| 3 | Checkout keypad and control density | Implementado. Teclado phone de 188 px: claves44 y espacios4. Presentación compacta explícita. Prueba402×874 conserva teclado completo y acción. Captura final: root. |
-| 4 | Count workspace | Implementado. El propietario del conteo usa una pantalla de caja con identidad real. Conserva política, cancelación, reconteo y envío. Captura final: root. |
-| 5 | Grouped denomination keys and fixed total | Implementado. Grupos MXN de billetes y monedas, dos claves por fila, subtotal cero explícito. Total separado del desplazamiento. Otras monedas conservan todas las denominaciones. Captura final: root. |
-| 6 | Settings section bank | Implementado. Banco2×2 en teléfono y claves iguales en tableta. Conserva selección y permisos. Captura final: root. |
-| 7 | Wide sale toolbar | Implementado. Tres bandas en paisaje: título/búsqueda, categorías, nuevo pedido/herramientas. Captura final: root. |
-| 8 | Operational type hierarchy | Implementado. Títulos operativos18/600; cuerpo14, secundario13, etiquetas12. Nombres de productos18/600. Captura final: root. |
-| 9 | Tablet map controls and lower dock | Implementado. Paisaje desde900: controles232 junto al plano completo y región inferior con regla. Conserva geometría publicada. Captura final: root. |
-| 10 | Inline phone table detail | Implementado. El teléfono con escala normal añade detalle debajo del mapa. Texto ampliado conserva la alternativa accesible y sus acciones. Captura final: root. |
-| 11 | Completion change emphasis | Implementado. El efectivo destaca cambio real. Otros métodos destacan importe cobrado. Total y recibido quedan subordinados. Captura final: root. |
-| 12 | Shell rail/header geometry | Implementado. Rail72 colapsado y cabecera56. Expansión184 y preferencias existentes permanecen. Captura final: root. |
-| 13 | Standard dark palette and navy navigation | Implementado. Dark usa101725/151E2E/7999DF. Navy223979 permanece en navegación. Midnight conserva su modo propio. Captura final: root. |
-| 14 | PIN console geometry | Implementado. Consola centrada, título20/500, marco phone16, regla y claves56. ConservaPIN4–8. Captura final: root. |
-| 15 | Portrait categories and tools | Implementado. Categorías phone/retrato48, espacios4 y relleno8. Banda de herramientas44 sin título Productos. Captura final: root. |
-| 16 | Narrow product grid and wide footer | Implementado. Dos columnas desde280 de catálogo a escala normal. Pie ancho usa cantidad cargada y monedas reales. Captura final: root. |
-| 17 | Modifier keys and lower form | Implementado. Opciones64/72. Cantidad y tiempo comparten fila en teléfono normal. Las etiquetas y los controles quedan alineados. La ayuda y la nota conservan ancho completo. Captura final: root. |
-| 18 | Account rows and due hierarchy | Implementado. Cantidad plana, importe limitado proporcionalmente, total/pagado secundarios y saldo dominante. Cobrar evita duplicar importe. Captura final: root. |
-| 19 | Account/checkout shell and catalog return | Implementado. Navegación visible en cuenta, cobro completo, parcial y resultado. Destinos bloqueados durante pago. El resultado final vuelve al catálogo. Captura final: root. |
-| 20 | Incoming queue and review desk | Implementado. Cabecera dentro de cola304, total en cada resumen, cliente dominante y región inferior de total/acción. Conserva aviso manual honesto. Captura final: root. |
-| 21 | KDS headings/tickets | Implementado. Nombre y conteo en columnas. Tarjeta8, borde neutro y acento superior solo para trabajo en preparación. Captura final: root. |
-| 22 | Cash movement grid and status band | Implementado. Movimientos phone en dos columnas, último control completo cuando corresponde, borde y relleno12. Banda estado/ecuación1:2 usa una sola identidad. Captura final: root. |
-| 23 | Hardware panels | Implementado. Sin cabecera anidada. Panel20/8, identidad, estado textual real, conexión/uso y acciones existentes. Captura final: root. |
-| 24 | Receipt region and actions | Implementado. Recibo corto con altura documental y centro vertical en ancho. Phone comparte desplazamiento. Acción principal48 y comprobante real. Captura final: root. |
-| 25 | Inline service choice | Implementado. Servicio del nuevo pedido dentro del catálogo. Comer aquí usa el propietario de selección de mesa. Para llevar usa el propietario de apertura actual. Volver, Escape, navegación y cierre conservan la cuenta. Los otros llamadores conservan su presentación. |
+| Fila | Superficie                                | Estado                                                                                                                                                                                                                                                                       |
+| ---- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Full/partial phone method bank            | Implementado. Métodos reales en claves de texto de 48 px. Ancho compartido y filas adicionales según espacio y texto. Captura final: root.                                                                                                                                   |
+| 2    | Phone account/amount checkout hierarchy   | Implementado. Identidad y saldo comparten la cabecera. Detalle y división preceden métodos y formulario. Ajustes condicionales conservan sus controles. Captura final: root.                                                                                                 |
+| 3    | Checkout keypad and control density       | Implementado. Teclado phone de 188 px: claves44 y espacios4. Presentación compacta explícita. Prueba402×874 conserva teclado completo y acción. Captura final: root.                                                                                                         |
+| 4    | Count workspace                           | Implementado. El propietario del conteo usa una pantalla de caja con identidad real. Conserva política, cancelación, reconteo y envío. Captura final: root.                                                                                                                  |
+| 5    | Grouped denomination keys and fixed total | Implementado. Grupos MXN de billetes y monedas, dos claves por fila, subtotal cero explícito. Total separado del desplazamiento. Otras monedas conservan todas las denominaciones. Captura final: root.                                                                      |
+| 6    | Settings section bank                     | Implementado. Banco2×2 en teléfono y claves iguales en tableta. Conserva selección y permisos. Captura final: root.                                                                                                                                                          |
+| 7    | Wide sale toolbar                         | Implementado. Tres bandas en paisaje: título/búsqueda, categorías, nuevo pedido/herramientas. Captura final: root.                                                                                                                                                           |
+| 8    | Operational type hierarchy                | Implementado. Títulos operativos18/600; cuerpo14, secundario13, etiquetas12. Nombres de productos18/600. Captura final: root.                                                                                                                                                |
+| 9    | Tablet map controls and lower dock        | Implementado. Paisaje desde900: controles232 junto al plano completo y región inferior con regla. Conserva geometría publicada. Captura final: root.                                                                                                                         |
+| 10   | Inline phone table detail                 | Implementado. El teléfono con escala normal añade detalle debajo del mapa. Texto ampliado conserva la alternativa accesible y sus acciones. Captura final: root.                                                                                                             |
+| 11   | Completion change emphasis                | Implementado. El efectivo destaca cambio real. Otros métodos destacan importe cobrado. Total y recibido quedan subordinados. Captura final: root.                                                                                                                            |
+| 12   | Shell rail/header geometry                | Implementado. Rail72 colapsado y cabecera56. Expansión184 y preferencias existentes permanecen. Captura final: root.                                                                                                                                                         |
+| 13   | Standard dark palette and navy navigation | Implementado. Dark usa101725/151E2E/7999DF. Navy223979 permanece en navegación. Midnight conserva su modo propio. Captura final: root.                                                                                                                                       |
+| 14   | PIN console geometry                      | Implementado. Consola centrada, título20/500, marco phone16, regla y claves56. ConservaPIN4–8. Captura final: root.                                                                                                                                                          |
+| 15   | Portrait categories and tools             | Implementado. Categorías phone/retrato48, espacios4 y relleno8. Banda de herramientas44 sin título Productos. Captura final: root.                                                                                                                                           |
+| 16   | Narrow product grid and wide footer       | Implementado. Dos columnas desde280 de catálogo a escala normal. Pie ancho usa cantidad cargada y monedas reales. Captura final: root.                                                                                                                                       |
+| 17   | Modifier keys and lower form              | Implementado. Opciones64/72. Cantidad y tiempo comparten fila en teléfono normal. Las etiquetas y los controles quedan alineados. La ayuda y la nota conservan ancho completo. Captura final: root.                                                                          |
+| 18   | Account rows and due hierarchy            | Implementado. Cantidad plana, importe limitado proporcionalmente, total/pagado secundarios y saldo dominante. Cobrar evita duplicar importe. Captura final: root.                                                                                                            |
+| 19   | Account/checkout shell and catalog return | Implementado. Navegación visible en cuenta, cobro completo, parcial y resultado. Destinos bloqueados durante pago. El resultado final vuelve al catálogo. Captura final: root.                                                                                               |
+| 20   | Incoming queue and review desk            | Implementado. Cabecera dentro de cola304, total en cada resumen, cliente dominante y región inferior de total/acción. Conserva aviso manual honesto. Captura final: root.                                                                                                    |
+| 21   | KDS headings/tickets                      | Implementado. Nombre y conteo en columnas. Tarjeta8, borde neutro y acento superior solo para trabajo en preparación. Captura final: root.                                                                                                                                   |
+| 22   | Cash movement grid and status band        | Implementado. Movimientos phone en dos columnas, último control completo cuando corresponde, borde y relleno12. Banda estado/ecuación1:2 usa una sola identidad. Captura final: root.                                                                                        |
+| 23   | Hardware panels                           | Implementado. Sin cabecera anidada. Panel20/8, identidad, estado textual real, conexión/uso y acciones existentes. Captura final: root.                                                                                                                                      |
+| 24   | Receipt region and actions                | Implementado. Recibo corto con altura documental y centro vertical en ancho. Phone comparte desplazamiento. Acción principal48 y comprobante real. Captura final: root.                                                                                                      |
+| 25   | Inline service choice                     | Implementado. Servicio del nuevo pedido dentro del catálogo. Comer aquí usa el propietario de selección de mesa. Para llevar usa el propietario de apertura actual. Volver, Escape, navegación y cierre conservan la cuenta. Los otros llamadores conservan su presentación. |
 
 ## Límites
 
@@ -97,12 +97,12 @@ La regresión adicional de texto al 200 % detectó un importe de pago parcial qu
 
 Verificación final:
 
-| Comprobación | Resultado | Evidencia |
-| --- | --- | --- |
-| D enfocado: cobro, parcial, caja, denominaciones y entrada de pedido | 158 aprobadas | `/private/tmp/umi-design2-d-focused.log` |
-| Suite completa Flutter | 1,287 aprobadas, 5 omitidas, 0 fallos | `/private/tmp/umi-design2-corrections-full-d-final.log` |
-| Analizador completo | 0 errores, 0 advertencias, 3 infos anteriores | `/private/tmp/umi-design2-d-analyze-full.log` |
-| Espacios y conflictos del diff | Correcto | `git diff --check` |
+| Comprobación                                                         | Resultado                                     | Evidencia                                               |
+| -------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------- |
+| D enfocado: cobro, parcial, caja, denominaciones y entrada de pedido | 158 aprobadas                                 | `/private/tmp/umi-design2-d-focused.log`                |
+| Suite completa Flutter                                               | 1,287 aprobadas, 5 omitidas, 0 fallos         | `/private/tmp/umi-design2-corrections-full-d-final.log` |
+| Analizador completo                                                  | 0 errores, 0 advertencias, 3 infos anteriores | `/private/tmp/umi-design2-d-analyze-full.log`           |
+| Espacios y conflictos del diff                                       | Correcto                                      | `git diff --check`                                      |
 
 Comandos finales:
 
@@ -122,12 +122,12 @@ La cobertura añadida abre el selector y enfoca la búsqueda en 1340 × 800 con 
 
 Esta prueba del flujo real también pasaba antes del ajuste: el `PosPage` exterior consume el inset inferior antes de que el catálogo lea `viewInsets`. Por ello no constituye evidencia RED/GREEN del condicional interno señalado por la revisión. La exclusión se comprueba en el cambio de código; la prueba cubre el comportamiento de la ruta real. No se modificó la gestión del teclado del shell.
 
-| Comprobación final sobre `4bc6589a` | Resultado | Evidencia |
-| --- | --- | --- |
-| Entrada de pedido | 23 aprobadas | `/private/tmp/umi-design2-m1-order-entry.log` |
+| Comprobación final sobre `4bc6589a`                         | Resultado                                         | Evidencia                                                |
+| ----------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------- |
+| Entrada de pedido                                           | 23 aprobadas                                      | `/private/tmp/umi-design2-m1-order-entry.log`            |
 | Suite completa Flutter, una ejecución sobre el código final | 1,288 aprobadas, 5 omisiones existentes, 0 fallos | `/private/tmp/umi-design2-corrections-full-m1-final.log` |
-| Analizador completo | 0 errores, 0 advertencias, 3 infos anteriores | `/private/tmp/umi-design2-m1-analyze-full.log` |
-| Espacios y conflictos del diff | Correcto | `git diff --check` |
+| Analizador completo                                         | 0 errores, 0 advertencias, 3 infos anteriores     | `/private/tmp/umi-design2-m1-analyze-full.log`           |
+| Espacios y conflictos del diff                              | Correcto                                          | `git diff --check`                                       |
 
 La aceptación visual nativa final sigue a cargo de root.
 
@@ -156,11 +156,11 @@ Evidencia de reproducción:
 
 Verificación de `2fd267ed`:
 
-| Comprobación | Resultado | Evidencia |
-| --- | --- | --- |
-| Cuenta, entrada de pedido, cobro parcial, caja y cuentas abiertas | 148 aprobadas, 0 fallos | `/private/tmp/umi-design2-e-focused.log` |
-| Analizador de los 7 archivos modificados | Sin incidencias | `/private/tmp/umi-design2-e-analyze-scoped.log` |
-| Espacios y conflictos del diff | Correcto | `git diff --check` |
+| Comprobación                                                      | Resultado               | Evidencia                                       |
+| ----------------------------------------------------------------- | ----------------------- | ----------------------------------------------- |
+| Cuenta, entrada de pedido, cobro parcial, caja y cuentas abiertas | 148 aprobadas, 0 fallos | `/private/tmp/umi-design2-e-focused.log`        |
+| Analizador de los 7 archivos modificados                          | Sin incidencias         | `/private/tmp/umi-design2-e-analyze-scoped.log` |
+| Espacios y conflictos del diff                                    | Correcto                | `git diff --check`                              |
 
 Comandos:
 
@@ -178,12 +178,12 @@ Root aprobó la cuenta y el cobro parcial en teléfono tras dos cuadros estables
 
 Después de esa aceptación, se ejecutaron la suite completa y el analizador completo una vez sobre el producto exacto `2fd267ed`.
 
-| Comprobación final | Resultado | Evidencia |
-| --- | --- | --- |
-| Suite completa Flutter | 1,292 aprobadas, 5 omisiones existentes, 0 fallos | `/private/tmp/umi-design2-corrections-full-e-final.log` |
-| Analizador completo | 0 errores, 0 advertencias, 3 infos anteriores | `/private/tmp/umi-design2-e-analyze-full.log` |
-| Producto sin cambios posteriores | Coincide con `2fd267ed` | `git diff --exit-code 2fd267ed -- apps/umi-pos` |
-| Espacios y conflictos del diff | Correcto | `git diff --check` |
+| Comprobación final               | Resultado                                         | Evidencia                                               |
+| -------------------------------- | ------------------------------------------------- | ------------------------------------------------------- |
+| Suite completa Flutter           | 1,292 aprobadas, 5 omisiones existentes, 0 fallos | `/private/tmp/umi-design2-corrections-full-e-final.log` |
+| Analizador completo              | 0 errores, 0 advertencias, 3 infos anteriores     | `/private/tmp/umi-design2-e-analyze-full.log`           |
+| Producto sin cambios posteriores | Coincide con `2fd267ed`                           | `git diff --exit-code 2fd267ed -- apps/umi-pos`         |
+| Espacios y conflictos del diff   | Correcto                                          | `git diff --check`                                      |
 
 ```sh
 /Users/moon/.local/opt/flutter-3.47.5/bin/flutter test --no-pub

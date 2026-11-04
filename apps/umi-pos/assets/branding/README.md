@@ -42,16 +42,16 @@ Exact bytes depend on these tool versions. The versioned SVG fixes the font outl
 
 ## Dimensions and safe areas
 
-| Asset | Dimensions | Placement |
-| --- | --- | --- |
-| iOS and macOS icons | Existing `Contents.json`: point size × scale | Ink width is 66% of the square. Opaque RGB PNG. |
-| Android legacy icons | 48, 72, 96, 144, 192px | Ink width is 66%. Opaque RGB PNG. |
-| Android adaptive foreground | 108 × 108dp | Ink width is 58.32dp. Its full bounding rectangle fits inside the central 66dp circle. |
-| Android adaptive background | Full resource | Opaque approved light surface. |
-| Android launch vector | 288 × 288dp | Ink width is 168dp. Its full bounding rectangle fits inside the central 192dp circle. |
-| iOS launch images | 288, 576, 864px | Transparent square at 1×/2×/3×. Visible ink width is 168pt. |
-| Windows ICO | 16, 24, 32, 48, 64, 128, 256px | Same 66% composition, with all seven entries. |
-| Web development icons | 192, 512px; favicon 32px | Same composition; the full ink rectangle also fits inside the maskable 80% circle. |
+| Asset                       | Dimensions                                   | Placement                                                                              |
+| --------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------- |
+| iOS and macOS icons         | Existing `Contents.json`: point size × scale | Ink width is 66% of the square. Opaque RGB PNG.                                        |
+| Android legacy icons        | 48, 72, 96, 144, 192px                       | Ink width is 66%. Opaque RGB PNG.                                                      |
+| Android adaptive foreground | 108 × 108dp                                  | Ink width is 58.32dp. Its full bounding rectangle fits inside the central 66dp circle. |
+| Android adaptive background | Full resource                                | Opaque approved light surface.                                                         |
+| Android launch vector       | 288 × 288dp                                  | Ink width is 168dp. Its full bounding rectangle fits inside the central 192dp circle.  |
+| iOS launch images           | 288, 576, 864px                              | Transparent square at 1×/2×/3×. Visible ink width is 168pt.                            |
+| Windows ICO                 | 16, 24, 32, 48, 64, 128, 256px               | Same 66% composition, with all seven entries.                                          |
+| Web development icons       | 192, 512px; favicon 32px                     | Same composition; the full ink rectangle also fits inside the maskable 80% circle.     |
 
 The source contains no border, icon mask, or shadow.
 The adaptive ink rectangle has a diagonal of about 64.18dp, below the 66dp safe diameter.

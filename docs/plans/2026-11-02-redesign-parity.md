@@ -181,5 +181,7 @@ Hardware, provider, variance/handoff and final native table grouping checks rema
 
 - [x] Request a separate review of each task and a final branch review. Address behavior loss before opening the PR.
 - [x] Verify the same commit that will be sent for review. Record test commands, branch base, screenshots and remaining external checks.
-- [ ] Push the feature branch and open a draft PR against `staging`. Link the existing Azure work item if one exists.
+- [x] Push the feature branch and open a draft PR against `staging`: [PR #252](https://github.com/umiconsulting/umi/pull/252). No linked Azure work item was identified in this task.
 - [ ] Give the user the Pages URL, draft PR, verified scope, and the exact staging/hardware access still required.
+
+Draft PR: https://github.com/umiconsulting/umi/pull/252. Required GitHub checks run on the PR. No merge or production promotion occurred.

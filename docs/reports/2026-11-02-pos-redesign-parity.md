@@ -27,14 +27,14 @@ Contract 2.51, permissions, payment guards, partial balances, persistence, lease
 
 SDK: official Flutter 3.47.5 at `/Users/moon/.local/opt/flutter-3.47.5/bin/flutter`.
 
-| Check | Result | Log |
-| --- | --- | --- |
-| E covering tests | 148 passed, 0 failures | `/private/tmp/umi-design2-e-focused.log` |
-| E scoped analyzer, 7 modified files | No issues | `/private/tmp/umi-design2-e-analyze-scoped.log` |
+| Check                               | Result                                     | Log                                                     |
+| ----------------------------------- | ------------------------------------------ | ------------------------------------------------------- |
+| E covering tests                    | 148 passed, 0 failures                     | `/private/tmp/umi-design2-e-focused.log`                |
+| E scoped analyzer, 7 modified files | No issues                                  | `/private/tmp/umi-design2-e-analyze-scoped.log`         |
 | Final full suite, source `2fd267ed` | 1,292 passed, 5 existing skips, 0 failures | `/private/tmp/umi-design2-corrections-full-e-final.log` |
-| Final full analyzer | 0 errors, 0 warnings, 3 existing infos | `/private/tmp/umi-design2-e-analyze-full.log` |
-| D focused checks | 158 passed | `/private/tmp/umi-design2-d-focused.log` |
-| Diff whitespace | Clean | `git diff --check` |
+| Final full analyzer                 | 0 errors, 0 warnings, 3 existing infos     | `/private/tmp/umi-design2-e-analyze-full.log`           |
+| D focused checks                    | 158 passed                                 | `/private/tmp/umi-design2-d-focused.log`                |
+| Diff whitespace                     | Clean                                      | `git diff --check`                                      |
 
 The infos remain in `inventory_repository.dart:76`, `cash_keyboard_test.dart:63` and `pos_entry_brand_test.dart:3`. The skips remain the five Linux AppImage cases.
 
