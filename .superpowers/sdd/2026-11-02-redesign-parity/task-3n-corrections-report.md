@@ -130,3 +130,44 @@ Esta prueba del flujo real también pasaba antes del ajuste: el `PosPage` exteri
 | Espacios y conflictos del diff | Correcto | `git diff --check` |
 
 La aceptación visual nativa final sigue a cargo de root.
+
+## Checkpoint E: aceptación nativa de cuenta y cobro parcial
+
+Producto: `2fd267ed`. La referencia sigue en Rediseño 2, `b1adc1e9`. E corrige las filas 18, 1 y 2 según las capturas Android de root.
+
+- E1: la cuenta usa líneas continuas con reglas. Conserva cantidad, descripción, opciones, nota, precio y estado real. Las líneas enviadas usan un menú con el nombre del producto. Repetir y Cancelar conservan sus condiciones y propietarios. La cancelación conserva el diálogo, los motivos y la autorización existentes.
+- La identidad usa título 18/600 y metadatos 12. Servicio, cliente y mesa conservan controles de al menos 44 px. Total y pagado usan cuerpo 14. El saldo conserva su jerarquía dominante. El detalle de consumo usa una fila de 44 px y conserva subtotal, impuesto y descuentos.
+- Guardar y salir y Dividir cuenta comparten una fila de anchos iguales cuando sus etiquetas caben. La medición usa la fuente y la escala reales. El texto ampliado conserva la alternativa vertical. Cobrar mantiene su fila de 48 px. El envío permanece separado cuando existen líneas sin enviar.
+- E2: el teléfono presenta la identidad y el saldo real en una banda. Volver, Actualizar y el detalle usan controles de 44 px. Los métodos de 48 px preceden al formulario. La cabecera sustituye el saldo duplicado del formulario. La ecuación de consumo, propina y cargo permanece en el pie. El cambio usa 36 px y el botón principal usa 48 px.
+- El formulario parcial conserva desplazamiento, porciones, importe propio, propinas, efectivo, importes rápidos, teclado, métodos externos, avisos y recuperación de pagos inciertos. La composición de tres áreas de D permanece en tableta.
+- E3: el conteo omite únicamente su logotipo interior cuando la navegación lateral ya lo presenta. El teléfono conserva su propio logotipo. La condición usa los mismos límites de ancho y altura que el shell. El conteo conserva sus grupos, total y controles.
+
+La prueba de cuenta recorre Mesas, Lista, reanudación y la cuenta del teléfono. Usa dos líneas enviadas de 45 y 48, total 93, pagado 31 y saldo 62. A 402 × 874 verifica ambas líneas completas dentro del área visible. Comprueba los importes y las acciones fijas. A 200 % verifica desplazamiento y acciones accesibles. Los casos ejecutan Guardar y salir, Dividir cuenta, Repetir y Cancelar mediante sus propietarios reales.
+
+La prueba de cobro parcial abre una ruta con la cabecera y la navegación nativas. Verifica el orden de métodos y formulario, el efectivo visible y las alturas de controles. También verifica la alternativa al 200 %. Las pruebas de conteo comprueban un logotipo en tableta y el logotipo interior al cambiar a teléfono.
+
+Las pruebas nuevas usan IBM Plex Sans. Las primeras ejecuciones con la fuente de prueba Ahem exigían más ancho que la fuente real. La prueba anterior del área corta ahora espera un frame después de `scrollUntilVisible`. Conserva todas sus aserciones de visibilidad, altura y acciones. Los propietarios de desplazamiento permanecen.
+
+Evidencia de reproducción:
+
+- Cuenta: `/private/tmp/umi-design2-e-account-red-final.log`. La segunda línea excedía el límite visible: 510 frente a 432 px.
+- Cobro parcial: `/private/tmp/umi-design2-e-partial-red-final.log`. Los métodos terminaban en 680 px, después del formulario situado en 440 px.
+- Conteo: `/private/tmp/umi-design2-e-count-brand-red.log`. La tableta presentaba dos textos `umi`.
+
+Verificación de `2fd267ed`:
+
+| Comprobación | Resultado | Evidencia |
+| --- | --- | --- |
+| Cuenta, entrada de pedido, cobro parcial, caja y cuentas abiertas | 148 aprobadas, 0 fallos | `/private/tmp/umi-design2-e-focused.log` |
+| Analizador de los 7 archivos modificados | Sin incidencias | `/private/tmp/umi-design2-e-analyze-scoped.log` |
+| Espacios y conflictos del diff | Correcto | `git diff --check` |
+
+Comandos:
+
+```sh
+/Users/moon/.local/opt/flutter-3.47.5/bin/flutter test --no-pub test/cart_layout_test.dart test/order_entry_flow_test.dart test/partial_checkout_test.dart test/cash_center_test.dart test/open_accounts_test.dart
+/Users/moon/.local/opt/flutter-3.47.5/bin/flutter analyze --no-pub --no-fatal-infos lib/features/catalog/catalog_surface.dart lib/features/checkout/partial_checkout_surface.dart lib/features/cash/cash_surface.dart test/cart_layout_test.dart test/order_entry_flow_test.dart test/partial_checkout_test.dart test/cash_center_test.dart
+git diff --check
+```
+
+Herramienta: Flutter oficial 3.47.5, SDK autorizado por root. Las pruebas verifican conducta y geometría del cliente nativo. Root conserva el APK y la aceptación visual en Android. La suite completa de E espera esa aceptación por instrucción de root. El último resultado completo sigue en M1, `4bc6589a`.
