@@ -271,7 +271,7 @@ class PosHeader extends StatelessWidget implements PreferredSizeWidget {
     this.backgroundColor,
     this.centerTitle = false,
     this.actionsInline = false,
-    this.toolbarHeight = 72,
+    this.toolbarHeight = 56,
     super.key,
   });
   final Widget? title, leading;

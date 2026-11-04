@@ -33,10 +33,10 @@ final class PosPalette {
   final bool midnight;
 
   Color get background => dark
-      ? (midnight ? const Color(0xFF000000) : const Color(0xFF070C18))
+      ? (midnight ? const Color(0xFF000000) : const Color(0xFF101725))
       : const Color(0xFFF7F7F4);
   Color get surface => dark
-      ? (midnight ? const Color(0xFF000000) : const Color(0xFF0F1728))
+      ? (midnight ? const Color(0xFF000000) : const Color(0xFF151E2E))
       : const Color(0xFFFFFEFA);
   Color get onSurface => dark
       ? (midnight ? const Color(0xFFF2F2F2) : const Color(0xFFEDF1F8))
@@ -44,7 +44,9 @@ final class PosPalette {
   Color get onSurfaceVariant => dark
       ? (midnight ? const Color(0xFFB0B0B0) : const Color(0xFF99A2B5))
       : const Color(0xFF59677F);
-  Color get primary => dark ? const Color(0xFFA8BBDE) : const Color(0xFF223979);
+  Color get primary => dark
+      ? (midnight ? const Color(0xFFA8BBDE) : const Color(0xFF7999DF))
+      : const Color(0xFF223979);
   Color get onPrimary =>
       dark ? const Color(0xFF131F44) : const Color(0xFFFFFEFA);
   Color get primaryContainer => dark
@@ -83,7 +85,7 @@ final class PosPalette {
   Color get onSignal => const Color(0xFF131F44);
   // The rail: the dashboard's sidebar in the dark themes, the brand navy in the light
   // one — which is where it already was.
-  Color get rail => dark ? surface : const Color(0xFF223979);
+  Color get rail => midnight ? surface : const Color(0xFF223979);
   Color get onRail => const Color(0xFFF2F5FC);
 }
 
@@ -117,7 +119,7 @@ final class PosTextStyles {
     titleMedium = style(16, 1.3, FontWeight.w600);
     titleSmall = style(14, 1.3, FontWeight.w600);
     bodyLarge = style(16, 1.45, FontWeight.w400);
-    bodyMedium = style(15, 1.4, FontWeight.w400);
+    bodyMedium = style(14, 1.4, FontWeight.w400);
     bodySmall = style(13, 1.4, FontWeight.w400);
     labelLarge = style(14, 1.25, FontWeight.w600);
     labelMedium = style(13, 1.3, FontWeight.w400);

@@ -80,6 +80,7 @@ class StationHeading extends StatelessWidget {
           Text(
             title,
             style: theme.textTheme.headlineSmall?.copyWith(
+              fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
           ),

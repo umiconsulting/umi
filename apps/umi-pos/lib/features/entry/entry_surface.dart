@@ -284,7 +284,7 @@ final class _PinLoginState extends State<_PinLogin> {
               // 60 px is still a long way above the till's 48 px floor, and it is the room that
               // keeps the action on the screen at 200 % text. The keys are the biggest thing on
               // this screen after the type itself, so they are the honest place to take it from.
-              keyHeight: largeText ? 60 : 48,
+              keyHeight: largeText ? 60 : 56,
               rowGap: largeText ? UmiSpacing.xs : UmiSpacing.sm,
             ),
             SizedBox(height: block),
@@ -635,8 +635,8 @@ final class _PinFrame extends StatelessWidget {
           child: Text(
             es ? 'Iniciar sesión' : 'Sign in',
             style: theme.textTheme.headlineMedium?.copyWith(
-              fontSize: 30,
-              fontWeight: FontWeight.w600,
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
@@ -662,9 +662,9 @@ final class _PinFrame extends StatelessWidget {
               children: [
                 Padding(
                   padding: EdgeInsets.fromLTRB(
-                    wide ? 48 : 24,
+                    wide ? 48 : 16,
                     largeText ? 8 : 24,
-                    wide ? 48 : 24,
+                    wide ? 48 : 16,
                     largeText ? 8 : 20,
                   ),
                   child: Row(
@@ -686,31 +686,42 @@ final class _PinFrame extends StatelessWidget {
                     ],
                   ),
                 ),
+                const PosDivider(height: 1),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: wide ? 48 : 24,
-                      vertical: wide && box.maxHeight > 800 ? 48 : 8,
-                    ),
-                    child: Center(
+                  child: LayoutBuilder(
+                    builder: (context, console) => SingleChildScrollView(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: wide ? 48 : 16,
+                        vertical: wide && box.maxHeight > 800 ? 48 : 8,
+                      ),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxWidth: largeText ? 480 : 400,
+                          minHeight:
+                              (console.maxHeight -
+                                      (wide && box.maxHeight > 800 ? 96 : 16))
+                                  .clamp(0, double.infinity),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            identity,
-                            const SizedBox(height: 24),
-                            Center(
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 320,
-                                ),
-                                child: child,
-                              ),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: largeText ? 480 : 400,
                             ),
-                          ],
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                identity,
+                                const SizedBox(height: 24),
+                                Center(
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 320,
+                                    ),
+                                    child: child,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -719,9 +730,9 @@ final class _PinFrame extends StatelessWidget {
                 if (!largeText && box.maxHeight > 700)
                   Padding(
                     padding: EdgeInsets.fromLTRB(
-                      wide ? 48 : 24,
+                      wide ? 48 : 16,
                       12,
-                      wide ? 48 : 24,
+                      wide ? 48 : 16,
                       20,
                     ),
                     child: Column(
