@@ -838,10 +838,12 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 700;
+            final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+            final wide = constraints.maxWidth >= 680 * scale;
+            final narrowPanes = constraints.maxWidth < 1000;
             _methodBankVertical =
                 wide &&
-                constraints.maxWidth >= 1000 &&
+                constraints.maxWidth >= 680 * scale &&
                 MediaQuery.textScalerOf(context).scale(16) < 24 &&
                 ledger != null &&
                 !canFinalize &&
@@ -880,7 +882,9 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                       children: [
                         Text(
                           label('Cobro dividido', 'Split payment'),
-                          style: theme.textTheme.headlineSmall,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontSize: 18,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -914,21 +918,21 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
             );
             if (!wide) return editor;
             return Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(narrowPanes ? 8 : 16),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (_methodBankVertical) ...[
                     SizedBox(
-                      width: 168,
+                      width: narrowPanes ? 112 : 168,
                       child: SingleChildScrollView(
                         child: _paymentMethods(vertical: true),
                       ),
                     ),
-                    const SizedBox(width: 24),
+                    SizedBox(width: narrowPanes ? 16 : 24),
                   ],
                   Expanded(child: editor),
-                  const SizedBox(width: 24),
+                  SizedBox(width: narrowPanes ? 16 : 24),
                   SizedBox(
                     width: 304,
                     child: Container(
@@ -1212,7 +1216,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
               : max(1, count);
           _methodWidth = compact
               ? (box.maxWidth - 4 * (columns - 1)) / columns
-              : (vertical ? 168 : 180);
+              : (vertical ? box.maxWidth : 180);
           return Wrap(
             direction: vertical ? Axis.vertical : Axis.horizontal,
             spacing: compact ? 4 : 8,
@@ -1298,7 +1302,13 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
         children: [
           Expanded(child: Text(title, style: style)),
           const SizedBox(width: 12),
-          Text(value, style: style),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.topRight,
+              child: Text(value, style: style),
+            ),
+          ),
         ],
       ),
     );

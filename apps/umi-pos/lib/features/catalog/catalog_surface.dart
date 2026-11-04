@@ -3289,19 +3289,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               onCancel: () => _finishServiceChoice(null),
             ),
           );
-    final scrollingProducts = serviceChoice != null && scrollingHeader != null
-        ? ListView(
-            children: [
-              scrollingHeader,
-              catalogHeading,
-              search,
-              const SizedBox(height: 8),
-              categories,
-              const SizedBox(height: 8),
-              serviceChoice,
-            ],
-          )
-        : scrollingHeader == null
+    final scrollingProducts = scrollingHeader == null
         ? null
         : _content(
             context,
@@ -3309,7 +3297,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             scrollHeaders: [
               scrollingHeader,
               if (!keyboard) catalogHeading,
-              const SizedBox(height: 8),
+              if (serviceChoice != null) ...[
+                serviceChoice,
+                const SizedBox(height: 8),
+              ],
               search,
               if (!keyboard) ...[const SizedBox(height: 8), categories],
               if (frequent != null) ...[const SizedBox(height: 8), frequent],
@@ -3329,13 +3320,18 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           )
         else ...[
           if (!keyboard) catalogHeading,
+          if (serviceChoice != null) ...[
+            serviceChoice,
+            const SizedBox(height: 8),
+          ],
           search,
         ],
+        if (landscape && serviceChoice != null) serviceChoice,
         const SizedBox(height: 8),
         if (!keyboard) categories,
         if (frequent != null) ...[const SizedBox(height: 12), frequent],
         productTools,
-        Expanded(child: serviceChoice ?? _content(context, state)),
+        Expanded(child: _content(context, state)),
         if (landscape)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -3385,6 +3381,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           state,
           scrollHeaders: [
             if (!keyboard) catalogHeading,
+            ?serviceChoice,
             search,
             if (!keyboard) ...[
               const SizedBox(height: UmiSpacing.sm),
@@ -3768,16 +3765,18 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                                 sum + (item['quantity'] as num).toInt(),
                           ) ??
                       0,
-                  onTap: () => products[index].availability == 'enabled'
-                      ? _showDetail(
-                          products[index].id,
-                          summary: products[index],
-                          canWrite: OperatorPermissions(
-                            widget.entry.state.operator?.permissions ??
-                                const [],
-                          ).allows('cart.write'),
-                        )
-                      : _refuseUnavailable(products[index].name),
+                  onTap: _serviceChoice != null
+                      ? null
+                      : () => products[index].availability == 'enabled'
+                            ? _showDetail(
+                                products[index].id,
+                                summary: products[index],
+                                canWrite: OperatorPermissions(
+                                  widget.entry.state.operator?.permissions ??
+                                      const [],
+                                ).allows('cart.write'),
+                              )
+                            : _refuseUnavailable(products[index].name),
                 );
           final count = products.length + (state.loadingMore ? 1 : 0);
           if (scrollHeaders.isNotEmpty) {
@@ -3838,6 +3837,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     bool? canWrite,
     int? scanGeneration,
   }) async {
+    if (_serviceChoice != null) return;
     if (_menuTapSuppressed) return;
     try {
       if (item == null && !await _prepareMobileOrder()) return;
@@ -4201,7 +4201,7 @@ final class _ProductCard extends StatelessWidget {
     this.frequent = false,
   });
   final CatalogProductSummary product;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final int quantity;
   final bool frequent;
 

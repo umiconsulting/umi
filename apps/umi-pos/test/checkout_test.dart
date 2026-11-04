@@ -17,6 +17,7 @@ import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
 import 'package:umi_pos/features/checkout/checkout_surface.dart';
 import 'package:umi_pos/features/checkout/partial_checkout_surface.dart';
+import 'package:umi_pos/features/checkout/payment_method_tile.dart';
 import 'package:umi_pos/features/customer_value/customer_value_controller.dart';
 import 'package:umi_pos/features/customer_value/customer_value_repository.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
@@ -2406,6 +2407,36 @@ void main() {
     expect(find.text('MXN 372.40'), findsOneWidget);
     await sheet.dispose();
   });
+
+  for (final width in [800.0, 820.0]) {
+    testWidgets(
+      'portrait checkout keeps method bank, work and account beside one another at $width',
+      (tester) async {
+        final sheet = await _openTenderSheet(
+          tester,
+          _CheckoutRepository(),
+          policy: CheckoutPolicy.fromJson(_policy),
+          viewport: Size(width, 1280),
+          shell: true,
+        );
+        final first = tester.getRect(find.byType(PaymentMethodTile).first);
+        final second = tester.getRect(find.byType(PaymentMethodTile).at(1));
+        final work = tester.getRect(
+          find.byKey(const ValueKey('checkout-keypad')),
+        );
+        final account = find.byKey(const ValueKey('checkout-account'));
+        expect(first.right, lessThanOrEqualTo(work.left));
+        expect(second.top, greaterThanOrEqualTo(first.bottom));
+        expect(tester.getRect(account).left, greaterThanOrEqualTo(work.right));
+        final pane = find
+            .ancestor(of: account, matching: find.byType(SizedBox))
+            .first;
+        expect(tester.getRect(pane).width, 304);
+        expect(tester.takeException(), isNull);
+        await sheet.dispose();
+      },
+    );
+  }
 
   testWidgets(
     'phone checkout keeps method row, full cash keypad and charge reachable with the locked shell',

@@ -541,6 +541,84 @@ void main() {
     },
   );
 
+  for (final width in [800.0, 820.0]) {
+    testWidgets(
+      'portrait count retains bill and coin columns beside its submit region at $width',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 1280);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final repository = _FakeCashRepository();
+        await _seedOpenShift(repository);
+        repository.snapshot = CashCenterSnapshot.fromJson({
+          ...repository.snapshot.toJson(),
+          'policy': {
+            ...repository.snapshot.policy,
+            'blindCountRequired': false,
+          },
+          'currentShift': {
+            ...repository.snapshot.currentShift!,
+            'registerId': repository.snapshot.registers.first['id'],
+          },
+        });
+        final controller = CashController(repository: repository);
+        controller.setContext(
+          merchantId: 'merchant',
+          locationId: 'location',
+          operatorSessionId: 'operator',
+        );
+        await controller.load();
+        await tester.pumpWidget(
+          PosApp(
+            locale: const Locale('es'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            home: PosPage(
+              bottomNavigationBar: PosNavigation(
+                destinations: const [
+                  PosDestination(
+                    icon: PosIcon(PosGlyphs.receiptLong),
+                    label: 'Venta',
+                  ),
+                  PosDestination(
+                    icon: PosIcon(PosGlyphs.paymentsOutlined),
+                    label: 'Caja',
+                  ),
+                ],
+              ),
+              body: CashCenter(
+                embedded: true,
+                controller: controller,
+                permissions: OperatorPermissions(const [
+                  'cash.shift.read',
+                  'cash.count.submit',
+                ]),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cierre'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Contar el cajón'));
+        await tester.tap(find.text('Contar el cajón'));
+        await tester.pumpAndSettle();
+        final bills = tester.getRect(find.text('Billetes'));
+        final coins = tester.getRect(find.text('Monedas'));
+        final total = tester.getRect(
+          find.byKey(const ValueKey('count-workspace-total')),
+        );
+        expect(bills.top, coins.top);
+        expect(bills.right, lessThanOrEqualTo(coins.left));
+        expect(coins.right, lessThanOrEqualTo(total.left));
+        expect(repository.countedWith, isNull);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        controller.dispose();
+      },
+    );
+  }
+
   for (final cancel in [false, true]) {
     testWidgets(
       'total-only count keeps the principal policy and closes safely cancel=$cancel',
