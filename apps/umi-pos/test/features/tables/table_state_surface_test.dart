@@ -380,6 +380,8 @@ Future<SurfaceHarness> pumpSurface(
   onOpenAccount,
   Future<bool> Function()? onOpenTemporaryAccount,
   bool directAccounts = false,
+  Future<Cart?> Function(FloorPlanElement)? readAccount,
+  Future<Map<String, Object?>?> Function(Cart)? readBalance,
 }) async {
   final entry = await readyEntryController(permissions: permissions);
   final room = repository ?? RoomRepository();
@@ -411,6 +413,8 @@ Future<SurfaceHarness> pumpSurface(
           onOpenAccount: onOpenAccount,
           onOpenTemporaryAccount: onOpenTemporaryAccount,
           directAccounts: directAccounts,
+          readAccount: readAccount,
+          readBalance: readBalance,
         ),
       ),
     ),
@@ -425,6 +429,113 @@ Future<SurfaceHarness> pumpSurface(
 }
 
 void main() {
+  testWidgets(
+    'same selected account refreshes through the room without accepting stale replies',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      Cart account(int version) => Cart.fromJson({
+        'id': 'same-account',
+        'merchantId': merchantId,
+        'locationId': locationId,
+        'operatorSessionId': operatorSessionId,
+        'status': 'draft',
+        'version': version,
+        'fulfillmentType': 'dine_in',
+        'tableId': t1,
+        'accountFolio': 'Account 024',
+        'items': [
+          {'productName': 'Product $version', 'quantity': 1},
+        ],
+        'totals': {
+          'subtotal': {'minorUnits': version * 4500, 'currency': 'MXN'},
+          'tax': {'minorUnits': 0, 'currency': 'MXN'},
+          'discounts': {
+            'total': {'minorUnits': 0, 'currency': 'MXN'},
+            'entries': [],
+          },
+          'grandTotal': {'minorUnits': version * 4500, 'currency': 'MXN'},
+          'businessDate': '2026-09-16',
+        },
+        'checkoutEnabled': true,
+        'checkoutMessageCode': 'ready',
+        'updatedAt': serverClock,
+      });
+      Map<String, Object?> ledger(int paid, int due) => {
+        'appliedAmount': {'minorUnits': paid, 'currency': 'MXN'},
+        'remainingBalance': {'minorUnits': due, 'currency': 'MXN'},
+      };
+      var reads = 0;
+      final balanceVersions = <int>[];
+      final oldCart = Completer<Cart?>();
+      final oldBalance = Completer<Map<String, Object?>?>();
+      final harness = await pumpSurface(
+        tester,
+        repository: RoomRepository(
+          states: [
+            entryJson(
+              t1,
+              tableStateSeated,
+              partySize: 2,
+              seatedAt: '2026-09-16T17:58:00.000Z',
+              openAccountId: 'same-account',
+            ),
+          ],
+        ),
+        readAccount: (_) {
+          reads++;
+          return reads == 2 ? oldCart.future : Future.value(account(reads));
+        },
+        readBalance: (cart) {
+          balanceVersions.add(cart.version);
+          return cart.version == 3
+              ? oldBalance.future
+              : Future.value(ledger(cart.version * 1000, cart.version * 3500));
+        },
+      );
+      await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
+      await tester.pumpAndSettle();
+      expect(find.text('1 × Product 1'), findsOneWidget);
+      expect(find.text('Paid · MXN 10.00'), findsOneWidget);
+      await tester.tap(find.byTooltip('Refresh'));
+      await tester.pump();
+      expect(reads, 2);
+      expect(find.text('Loading account…'), findsOneWidget);
+      expect(find.text('Paid · MXN 10.00'), findsNothing);
+      await tester.tap(find.byTooltip('Refresh'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 × Product 3'), findsOneWidget);
+      expect(find.text('Total · MXN 135.00'), findsOneWidget);
+      expect(find.text('Review balance at checkout'), findsOneWidget);
+      oldCart.complete(account(2));
+      await tester.pumpAndSettle();
+      expect(find.text('1 × Product 2'), findsNothing);
+      expect(balanceVersions, [1, 3]);
+      await tester.tap(find.byTooltip('Refresh'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 × Product 4'), findsOneWidget);
+      expect(find.text('Paid · MXN 40.00'), findsOneWidget);
+      expect(find.text('Remaining · MXN 140.00'), findsOneWidget);
+      oldBalance.complete(ledger(1, 1));
+      await tester.pumpAndSettle();
+      expect(find.text('Paid · MXN 0.01'), findsNothing);
+      await tester.pump(const Duration(seconds: 1));
+      expect(reads, 4, reason: 'The table timer must not cause account reads');
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pumpAndSettle();
+      expect(reads, 5);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(reads, 6);
+      expect(harness.room.seated, isNull);
+      expect(harness.room.moved, isNull);
+      expect(tester.takeException(), isNull);
+      await harness.dispose(tester);
+    },
+  );
+
   testWidgets('wide table detail docks below the complete published floor', (
     tester,
   ) async {
