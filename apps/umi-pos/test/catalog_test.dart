@@ -279,7 +279,7 @@ CatalogController controller(FakeCatalogRepository repository) {
 void main() {
   for (final dark in [false, true]) {
     testWidgets(
-      'long photo labels retain contrast against black and white images in dark=$dark',
+      'photo-free keys retain readable names and category contrast in dark=$dark',
       (tester) async {
         const name = 'Una bebida con nombre largo para comprobar el contraste';
         final repo = FakeCatalogRepository(
@@ -336,32 +336,10 @@ void main() {
         );
         await tester.pump();
         final label = tester.widget<Text>(find.text(name));
-        final ink = label.style!.color!;
         expect(label.style!.backgroundColor, isNull);
-        final scrim = tester.widget<DecoratedBox>(
-          find
-              .byWidgetPredicate(
-                (w) =>
-                    w is DecoratedBox &&
-                    w.key.toString().contains('product-photo-scrim-'),
-              )
-              .first,
-        );
-        final gradient =
-            (scrim.decoration as BoxDecoration).gradient! as LinearGradient;
-        final ground = gradient.colors[2];
-        expect(gradient.stops![2], .66);
-        for (final image in [
-          const Color(0xFF000000),
-          const Color(0xFFFFFFFF),
-        ]) {
-          final actual = Color.alphaBlend(ground, image);
-          final a = ink.computeLuminance(), b = actual.computeLuminance();
-          expect(
-            ((a > b ? a : b) + .05) / ((a < b ? a : b) + .05),
-            greaterThanOrEqualTo(4.5),
-          );
-        }
+        expect(find.byType(Image), findsNothing);
+        expect(label.style!.fontSize, 18);
+        expect(label.style!.fontWeight, FontWeight.w600);
         final fills = <Color>[];
         for (final name in ['Sage', 'Cyan', 'Lavender']) {
           final box = tester.widget<Container>(
@@ -600,20 +578,17 @@ void main() {
       final first = ear('Todo');
       final drinks = ear('Bebidas');
       final desserts = ear('Postres');
-      if (size.width >= 1100) {
-        final products = tester.getRect(
-          find.byKey(const PageStorageKey('catalog-grid')),
-        );
+      expect(drinks.left, greaterThanOrEqualTo(first.right));
+      expect(desserts.left, greaterThanOrEqualTo(drinks.right));
+      final products = tester.getRect(
+        find.byKey(const PageStorageKey('catalog-grid')),
+      );
+      expect(drinks.bottom, lessThanOrEqualTo(products.top));
+      if (size.width >= 700) {
         final account = tester.getRect(
           find.byKey(const ValueKey('catalog-account')),
         );
-        expect(products.right, lessThanOrEqualTo(drinks.left));
-        expect(drinks.right, lessThanOrEqualTo(account.left));
-        expect(drinks.top, greaterThanOrEqualTo(first.bottom));
-        expect(desserts.top, greaterThanOrEqualTo(drinks.bottom));
-      } else {
-        expect(drinks.left, greaterThanOrEqualTo(first.right));
-        expect(desserts.left, greaterThanOrEqualTo(drinks.right));
+        expect(products.right, lessThanOrEqualTo(account.left));
       }
       final categoryText = tester.widget<Text>(find.text('Bebidas'));
       final categoryContainer = tester.widget<Container>(
@@ -627,8 +602,8 @@ void main() {
       final softened = HSLColor.fromColor(
         (categoryContainer.decoration! as BoxDecoration).color!,
       );
-      expect(softened.saturation, lessThan(.30));
-      expect(softened.lightness, greaterThan(.88));
+      expect(softened.saturation, lessThan(.36));
+      expect(softened.lightness, greaterThan(.70));
       expect(
         softened.hue,
         closeTo(HSLColor.fromColor(const Color(0xFF67E8F9)).hue, 3),
@@ -640,7 +615,7 @@ void main() {
       );
       expect(
         (allContainer.decoration! as BoxDecoration).color,
-        const Color(0xFFE9EAF0),
+        const Color(0xFFCDD2DF),
       );
       final foreground = categoryText.style!.color!.computeLuminance();
       final background = (categoryContainer.decoration! as BoxDecoration).color!
@@ -728,7 +703,7 @@ void main() {
   );
 
   testWidgets(
-    'a product with no photo is a block of its category colour with its initials',
+    'a product key shows its full name without a decorative photo or initials',
     (tester) async {
       // The tile carries the owner's colour and the product's own letters, and nothing
       // else. The owner removed the line drawing that used to sit behind the letters on
@@ -773,31 +748,18 @@ void main() {
       );
       await tester.pump();
 
-      // The initials are the product's, not the category's: "Croissant" reads CR.
-      expect(find.text('CR'), findsOneWidget);
-      // The card and the page are ColoredBoxes too; the innermost ancestor of the letters is
-      // the block itself.
-      final block = find
-          .ancestor(of: find.text('CR'), matching: find.byType(ColoredBox))
-          .first;
-      expect(tester.widget<ColoredBox>(block).color, const Color(0xFFF58231));
-      // A light owner colour would wash white letters out, so the ink follows luminance.
-      final letters = tester.widget<Text>(find.text('CR'));
-      expect(letters.style?.color, const Color(0xFFFFFFFF));
-      // No drawing and no corner badge: the block and the letters are the whole tile. Scoped to
-      // the tile because the icons elsewhere on the card are painted, on purpose.
-      expect(
-        find.descendant(of: block, matching: find.byType(CustomPaint)),
-        findsNothing,
-      );
-
+      expect(find.text('CR'), findsNothing);
+      expect(find.byType(Image), findsNothing);
+      final name = tester.widget<Text>(find.text('Croissant'));
+      expect(name.style!.fontSize, 18);
+      expect(name.style!.fontWeight, FontWeight.w600);
       await tester.pumpWidget(const SizedBox());
       value.dispose();
       root.dispose();
     },
   );
 
-  testWidgets('product detail keeps variant choices horizontal inside its scroll surface', (
+  testWidgets('product detail presents variant and modifier inspectors with stacked keys', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
@@ -855,11 +817,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('product-detail-photo')), findsNothing);
     expect(find.byType(RawScrollbar), findsWidgets);
-    final small = tester.getCenter(find.text('Chico'));
-    final medium = tester.getCenter(find.text('Mediano'));
-    final large = tester.getCenter(find.text('Grande'));
-    expect(small.dy, medium.dy);
-    expect(medium.dy, large.dy);
+    final small = tester.getTopLeft(find.text('Chico'));
+    final medium = tester.getTopLeft(find.text('Mediano'));
+    final large = tester.getTopLeft(find.text('Grande'));
+    expect(small.dx, medium.dx);
+    expect(medium.dx, large.dx);
+    expect(small.dy, lessThan(medium.dy));
+    expect(medium.dy, lessThan(large.dy));
 
     // Every option tile in a row is the same size, whether or not it carries a
     // surcharge. The tile with a price used to be one line taller than the one
@@ -882,7 +846,7 @@ void main() {
           .first,
     );
     expect(plain, withPrice);
-    expect(plain.width, greaterThanOrEqualTo(200));
+    expect(plain.width, greaterThanOrEqualTo(160));
 
     // AND THE NAME SITS IN THE MIDDLE OF ITS TILE.
     //

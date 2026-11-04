@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
@@ -607,6 +609,46 @@ void _completeText(WidgetTester tester, String label) {
 }
 
 void main() {
+  testWidgets('local frequency emphasis stays fixed during adds and search', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    SharedPreferences.setMockInitialValues({
+      'umi.pos.frequent.merchant.location': jsonEncode([
+        for (var index = 0; index < 2; index++)
+          {
+            'id': 'product-$index',
+            'name': 'Producto $index',
+            'price': {'minorUnits': 4500, 'currency': 'MXN'},
+            'count': index == 0 ? 2 : 1,
+          },
+      ]),
+    });
+    final fixture = await _fixture(lines: 0);
+    await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+    await tester.pumpAndSettle();
+    final first = find.byKey(const ValueKey('product-key-product-0'));
+    final second = find.byKey(const ValueKey('product-key-product-1'));
+    expect(tester.getSize(first).height, 232);
+    expect(tester.getSize(second).height, 112);
+    expect(find.text('Frecuente'), findsOneWidget);
+    await tester.tap(second);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(first).height, 232);
+    expect(tester.getSize(second).height, 112);
+    await tester.enterText(find.byType(EditableText), 'Producto');
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(first).height, 232);
+    expect(tester.getSize(second).height, 112);
+    expect(find.text('Frecuente'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    fixture.dispose();
+  });
+
   testWidgets(
     'return from partial payment clears stale balance until deferred ledger resolves',
     (tester) async {
