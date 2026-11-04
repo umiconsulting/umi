@@ -1467,9 +1467,9 @@ class _PosNavigationState extends State<PosNavigation> {
     final controls = List.generate(destinations.length, (index) {
       final d = destinations[index] as PosDestination;
       final chosen = selectedIndex == index;
-      final foreground = rail
-          ? (chosen ? PosColors.white : p.onRail.withValues(alpha: .84))
-          : (chosen ? p.primary : p.onSurfaceVariant);
+      final foreground = chosen
+          ? PosColors.white
+          : p.onRail.withValues(alpha: .84);
       final label = Text(
         d.label,
         textAlign: rail ? TextAlign.start : TextAlign.center,
@@ -1486,8 +1486,8 @@ class _PosNavigationState extends State<PosNavigation> {
         focusNode: _node(identities[index]),
         selected: chosen,
         semanticLabel: d.label,
-        focusColor: rail ? p.signal : p.primary,
-        hoverColor: rail ? p.onRail.withValues(alpha: .08) : null,
+        focusColor: p.signal,
+        hoverColor: p.onRail.withValues(alpha: .08),
         borderRadius: BorderRadius.circular(8),
         onTap: onDestinationSelected == null
             ? null
@@ -1502,9 +1502,7 @@ class _PosNavigationState extends State<PosNavigation> {
             vertical: 8,
           ),
           decoration: BoxDecoration(
-            color: chosen
-                ? (rail ? p.onRail.withValues(alpha: .16) : p.primaryContainer)
-                : null,
+            color: chosen ? p.onRail.withValues(alpha: .16) : null,
             borderRadius: BorderRadius.circular(8),
           ),
           child: rail && !expanded
@@ -1575,9 +1573,12 @@ class _PosNavigationState extends State<PosNavigation> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            selectedIndex >= 3
-                ? (destinations[selectedIndex] as PosDestination).icon
-                : const PosIcon(PosGlyphs.moreVert, size: 22),
+            IconTheme(
+              data: IconThemeData(color: p.onRail),
+              child: selectedIndex >= 3
+                  ? (destinations[selectedIndex] as PosDestination).icon
+                  : const PosIcon(PosGlyphs.moreVert, size: 22),
+            ),
             const SizedBox(height: 5),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -1589,11 +1590,13 @@ class _PosNavigationState extends State<PosNavigation> {
                         : (spanish ? 'Más' : 'More'),
                     maxLines: 1,
                     softWrap: false,
-                    style: theme.textTheme.labelSmall,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: p.onRail,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 4),
-                const PosIcon(PosGlyphs.expandMore, size: 14),
+                PosIcon(PosGlyphs.expandMore, size: 14, color: p.onRail),
               ],
             ),
           ],
@@ -1668,7 +1671,7 @@ class _PosNavigationState extends State<PosNavigation> {
     return Container(
       width: rail ? (expanded ? railWidth : 64) : null,
       decoration: BoxDecoration(
-        color: rail ? p.rail : p.surface,
+        color: p.rail,
         border: rail
             ? Border(right: BorderSide(color: p.outlineVariant))
             : Border(top: BorderSide(color: p.outlineVariant)),

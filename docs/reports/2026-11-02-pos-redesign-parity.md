@@ -1,80 +1,79 @@
-# Native POS presentation review
+# Native POS: selected Rediseño 2
 
-Status: **selected Rediseño 2 applied to checkpoint A; operational surfaces in progress**. Native screenshot comparison remains required.
+Status: **native source implementation complete; native screenshot acceptance pending**.
+The root agent owns the Android build, isolated API, fixtures, emulators and runtime comparison.
 
-## Selected Rediseño 2: checkpoint A
+## Selected source
 
-The selected source is `/Users/moon/Documents/umipos-redesign`, design 2, release b1adc1e9.
-Current source CSS and final sale captures replace all prior Task 3B visual requirements.
+The selected prototype is `/Users/moon/Documents/umipos-redesign`, design 2, release b1adc1e9.
+Its current `src/redesign-compositions.css` and `src/full-directions.css` replace prior Task 3B visual requirements.
+The final sale captures supply the product hierarchy. Existing operational captures supply the other screen references.
+UNSLOP applies the approved direction. Its author is Damir Sokolovsky (@heydamir), under CC BY 4.0.
 
-Checkpoint A uses IBM Plex Sans, an expandable navy rail, a centered PIN console, horizontal category keys, and photo-free product keys.
-Names use 18 px and weight 600. Nuevo pedido has a filled primary action.
-The modifier workspace uses side-by-side groups and stacked option keys. Account lines use separate surface cards.
-Dispatch, consumption details, authoritative balances and collection retain their original callbacks and guards.
-All existing themes, locales, routes, permissions and product options remain available.
+Flutter remains native. The implementation uses the existing native controls and Lucide glyph registry.
+It adds no WebView, React runtime, backend route, schema, entitlement or permission.
+Contract 2.51.0 and the current controllers remain authoritative.
 
-Frecuente means device-local adds. Up to three products with at least two saved adds span two rows.
-The initial signal stays fixed during adds and search. Catalog order remains unchanged.
-No real signal produces regular keys. No demo sales rank is copied into product code.
+## Presentation changes
 
-Official Flutter 3.47.5, tag 6a19cca564, Dart 3.13.4 ran **109 focused tests**, with zero failures.
-Tests cover product geometry, frequency stability, catalog, modifiers, account layouts, entry/PIN, keyboard and role access.
-The desktop horizontal-category assertion failed before the source change.
-The modifier stack assertion failed before the source change.
-The frequency regression failed with live re-ranking and passed with the fixed initial signal.
-These tests verify behavior and layout safety. They do not establish native visual acceptance.
+- Shared shell: IBM Plex Sans, persistent lowercase umi, an expandable navy rail, navy phone navigation and clear selected/focus states.
+- PIN: a centered console with real terminal, location and retained operator identity. Enrollment, PIN, refusal, lock and session callbacks remain intact.
+- Sale: horizontal category keys, readable counts, a primary Nuevo pedido action and photo-free product keys with 18px/600 names.
+- Product emphasis: up to three keys span two rows when saved device-local adds provide a real signal. The label is Frecuente.
+- Modifiers: two-column inspector groups with stacked option keys. Variants, min/max rules, quantity, courses, notes, prices and apply/cancel retain their handlers.
+- Account: separate line cards, consumption details, dispatch and collection zones. Total, paid and remaining values keep their authoritative owners.
+- Tables: the complete published floor remains. A wide detail dock sits below the map. Portrait and phone detail access remain available.
+- Incoming: a compact queue and a broad summary desk. Source line count and source total are explicit. The existing bind callback remains.
+- KDS: received, preparation and ready lanes use actual station work. Hide/show ready has a live count and changes presentation only.
+- Checkout and partial payment: a method bank, payment work area and account record. Narrow tablets retain the account beside the work area.
+- Cash: a status/equation band, operation areas and a separate ledger. Denomination keys keep every configured denomination, including MXN 0.50.
+- Settings/hardware: horizontal section keys and responsive device panels. Registration, transports, tests, primary selection, activation, copies and print preferences remain.
+- Completion: real receipt content beside the payment result, with the existing receipt/customer/print and next-order actions. Source receipt branding remains intact.
 
-The remaining operational surfaces and complete-suite validation follow checkpoint A.
-The prior evidence below describes earlier checkpoints and their separate limitations.
+The frequency signal counts adds on this terminal. It makes no global sales claim.
+The initial signal stays fixed during adds and search. Product order and repeated-add behavior remain unchanged.
+No saved signal produces regular keys. The native grid also handles a catalog with no chargeable keys.
+The retained photo preference controls product detail images. The product grid has no images.
 
-## Presentation checkpoint
+## Retained behavior and limits
 
-The current native implementation covers the shared navigation and merchant header, catalog/categories/photos, product modifiers, entry/PIN, tables and accounts, incoming summaries, KDS, cash, settings, full checkout, and partial checkout. This coverage describes implemented surfaces, not accepted design.
+Domain controllers, contracts, roles, leases, persistence, hardware, idempotency and offline ownership remain unchanged.
+All English/Spanish strings and light/dark/midnight themes remain supported.
+Keyboard, enlarged text, sent-line guards, rounds, partial payments, exceptions and account transfers remain covered.
+Current staging paid-but-occupied tables retain new consumption, explicit clear, move, merge, split and clean actions.
+KDS retains station/day filters, receive/start/ready/item actions, course controls, retry and cancellation acknowledgement.
+Cocina/Barra roles retain their existing destination restrictions.
 
-The changes use restrained category colors, existing merchant/product data, Lucide navigation glyphs, tablet account panes, phone disclosures, and fixed payment actions. Full and partial checkout display actual account items, options, notes, sent state, totals, and the payment ledger. Tip controls remain governed by the existing policy. Collection, retry, finalization, and unknown-payment guards retain their original handlers.
-
-The user rejected earlier installed results, including category saturation, menu hierarchy, and the overall portrait composition. Actual Android captures also exposed individual text background rectangles on products and a missing checkout rail. The latest checkpoint replaces the text rectangles with a continuous category-colored scrim, confines product labels to its protected region, and searches past nested header pages for the permitted checkout navigation. These corrections require another native comparison.
-
-## Native workflow evidence
-
-Android execution used an isolated app and a synthetic local database/API. The parent recorded:
-
-- Native enrollment and PIN authentication.
-- Seating two guests at M2 and receiving a public digital Americano/Croissant order for MXN 93. Replay produced exactly one order and one table link.
-- Opening a cash shift with MXN 1,000 through the denomination counter.
-- Blocking Latte addition without its required variant, then adding the medium/oat selection for MXN 87 and paying with MXN 100, change MXN 13.
-- Respecting the cashier's absent order-fire permission. A supervisor sent takeaway account 004; sent-line quantity and edit actions remained disabled.
-- Completing the Croissant at its kitchen station while the Americano remained queued at Barra.
-- Resuming account 004 from the actual account list, collecting MXN 45 with MXN 100 received, and confirming MXN 55 change through the real local API.
-
-These are functional observations. They do not establish visual acceptance. Earlier “tablet” captures used an 800×1340 logical viewport on a resized phone emulator with a 78.5-pixel cutout inset. That was an unsuitable presentation reference. Subsequent Android review uses a restored phone and an independent 2560×1600/320dpi tablet profile (1280×800 logical pixels) without viewport overrides.
-
-The iOS app built and installed, but authenticated runtime remains unverified. Ordinary ad-hoc credential reads failed before entry, and the simulator rejected restricted keychain entitlements with AMFI error −424. The workstation has no valid signing identity. No authentication or credential-storage requirement was weakened.
-
-## Current functional controls
-
-- Exact Lucide control paths; actual variant price deltas and Included labels; shared persistent photo/menu-label preferences; Settings Back and real Printing policy controls.
-- Opaque phone account workspace and continuous tablet pane. Ledger-backed paid/remaining values are separate from the commercial total. Parent Android evidence confirms account 005 at MXN 135 total, MXN 45 paid and MXN 90 remaining with a persistent UMI header. After returning from payment, stale paid/remaining values are removed immediately while the new ledger query is pending; a deferred-response regression verifies replacement with the new amounts.
-- Incoming list/selected detail on tablet and selection/detail navigation on phone. Reference, customer, status and known age are separate. Header and navigation counts use the existing controller with entitlement/permission gating, 30-second refresh, scope/generation protection and disposal cleanup.
-- List includes actual free physical tables separately from commercial accounts. Selected table accounts have read-only product and balance previews through existing account/ledger owners, with honest loading/unavailable states. Geometry and table operation handlers remain unchanged.
-- Full and partial payment share the same icon/label/selected method tile. Product-photo scrims fully cover the left image seam before fading. These presentation changes await native comparison and do not establish aesthetic acceptance.
+Incoming orders remain summary-only with manual ring-up. Binding links the source reference to the current POS cart.
+It does not import source lines, options, notes or catalog IDs. Source total stays separate from the POS cart amount.
+No dashboard-only route is called. Complete source-order import needs a separate contract decision.
+Entry contracts supply no staff picker or protected shift metrics. The PIN console adds neither invented metrics nor protected sales data.
 
 ## Verification
 
-The latest complete Flutter suite passed **1,240 tests**, with **five skipped** and **zero failures**, in 23 seconds using `flutter test --no-pub`. Added checks cover incoming entitlement/count/polling/disposal, free table presence without open commercial accounts, read-only account lines and deferred authoritative balance, phone incoming detail/adoption, and ledger visibility. Full checkout, partial payment uncertainty/retries/finalization, role access, map operations, and keyboard/200% text regressions remain covered.
+SDK: official Flutter 3.47.5, tag `6a19cca564`, engine `af7e796e16`, Dart 3.13.4.
+Checkpoint A: `d960db64`; 109 focused tests passed. Its scoped analyzer found no issues.
+Checkpoint B: **1,266 full-suite tests passed, five skipped, zero failures**, in 23 seconds.
+A final copy-only follow-up passed 19 focused tests for incoming, display preferences and grid geometry.
 
-Both iOS workflows run the full `flutter test --no-pub` suite before their existing build/signing steps. No workflow was dispatched. Reproducible commands, checkpoint commits, logs and reviewer findings are recorded in `.superpowers/sdd/2026-11-02-redesign-parity/task-3b-report.md`. Widget tests establish behavior and layout safety; screenshots determine visual acceptance.
+Commands and logs:
 
-## Contract limits and remaining work
+- `flutter test --no-pub`: `/private/tmp/umi-design2-native-full-final2.log`.
+- `flutter test --no-pub test/incoming_orders_surface_test.dart test/display_preferences_test.dart test/product_key_layout_test.dart`: `/private/tmp/umi-design2-final-label-checks.log`.
+- Checkpoint A analyzer, eight changed owners: `/private/tmp/umi-design2-analyze-a-final.log`.
+- Checkpoint B analyzer, 19 changed owners: `/private/tmp/umi-design2-analyzer-scoped-final.log`; no issues.
+- `flutter analyze --no-pub --no-fatal-infos`: `/private/tmp/umi-design2-analyzer-full.log`; zero errors/warnings and three existing infos.
+- `git diff --check`: clean.
 
-Incoming-order contracts contain summaries, not product lines/options/notes or fulfillment details. Binding an incoming order does not hydrate its lines into the cart. Entry contracts do not provide the prototype's sample shift metrics or staff picker. Counts use loaded catalog data; no estimated counts, invented table geometry, or persistent favorites were added.
+The three existing analyzer infos are `inventory_repository.dart:76`, `cash_keyboard_test.dart:63` and `pos_entry_brand_test.dart:3`.
+The five skips are Linux-only AppImage updater cases: unset APPIMAGE, replacement, current release, failed download and absent asset.
+No test skip was added.
 
-Before acceptance: compare the selected Rediseño 2 with affected native screens and actual content. The iOS signing/runtime limitation remains explicit. No PR or completion claim is supported by this report yet.
+New regressions cover grid spans, regular/empty keys, stable local emphasis, real station lanes, ready visibility/counts and the floor dock.
+The floor test also verifies published dimensions, element coordinates and touch access to both fixture tables.
+Red evidence exists for category placement, modifier stacking, frequency changes, ready visibility, preparation placement, floor docking and empty grid geometry.
+The complete suite covers payment policy, mixed tender, tip, manual/integrated terminal, unknown outcomes, transfers, receipts and retry guards.
 
-## Scoped review follow-up
-
-Round 2 restores the UMI wordmark in the phone partial-payment header and shares one read-only account-line widget between full and partial checkout. The phone assertion reproduced the missing mark before the fix. All 97 covering full/partial/terminal/local-first checkout tests passed, and analyzer reported no issues in the four scoped files. The preceding complete-suite count belongs to checkpoint `7e80993e`; this follow-up does not establish native visual acceptance.
-
-## Ledger correctness follow-up I1
-
-The regression reproduced the old MXN 90 remaining after a successful additional MXN 45 partial payment with unchanged cart version. The fix invalidates displayed amounts on both checkout return paths before awaiting the ledger. The test verifies loading without old paid/remaining/button amounts, then MXN 90 paid and MXN 45 remaining after the delayed response. All **102 focused tests** passed; the two-file analyzer and diff check were clean. The full-suite count above belongs to checkpoint `209a6c55`. No footer restyling or further branding/KDS changes are included.
+Widget tests establish behavior and layout safety. They do not establish native visual acceptance.
+The root agent must judge actual native captures against the selected source at the task's target sizes.
+The prior iOS signing/runtime limitation remains separate. This task does not weaken credential storage or signing requirements.

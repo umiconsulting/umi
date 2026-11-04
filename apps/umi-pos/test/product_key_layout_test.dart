@@ -5,11 +5,12 @@ import 'package:umi_pos/features/catalog/product_key_layout.dart';
 void main() {
   SliverGridLayout layout({
     int columns = 4,
+    int count = 8,
     Set<int> frequent = const {0, 1},
   }) =>
       ProductKeyGridDelegate(
         columns: columns,
-        count: 8,
+        count: count,
         frequent: frequent,
         rowExtent: 112,
       ).getLayout(
@@ -48,6 +49,14 @@ void main() {
         greaterThanOrEqualTo(index),
       );
     }
+  });
+
+  test('a filtered catalog with no chargeable keys has zero extent', () {
+    final grid = layout(count: 0);
+    expect(grid.getMinChildIndexForScrollOffset(0), 0);
+    expect(grid.getMaxChildIndexForScrollOffset(0), 0);
+    expect(grid.getGeometryForChildIndex(0).scrollOffset, 0);
+    expect(grid.computeMaxScrollOffset(0), 0);
   });
 
   test('keys stay regular when the device has no frequency signal', () {

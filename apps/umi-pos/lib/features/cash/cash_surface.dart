@@ -1991,17 +1991,56 @@ final class _ActiveShiftSectionState extends State<_ActiveShiftSection> {
             ),
           );
         }
-        return Row(
+        return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(flex: 3, child: drawerColumn),
-            const SizedBox(width: UmiSpacing.lg),
+            CashEquation(
+              account: CashDrawerAccount.fromLedger(
+                snapshot.ledger,
+                currency:
+                    (snapshot.currentShift?['currency'] as String?) ?? 'MXN',
+              ),
+              expectedCash: snapshot.expectedCash,
+            ),
+            const SizedBox(height: 24),
             Expanded(
-              flex: 2,
-              // The rail holds more cards than a 720 px terminal has rows.
-              // Scrolling it keeps every card at its own height instead of
-              // stretching one until the others fit.
-              child: SingleChildScrollView(child: buildClose()),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (count != null && snapshot.summary == null) ...[
+                            _VarianceCard(
+                              variance: variance!,
+                              count: count.count,
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (operations.isNotEmpty) ...[
+                            _SectionCard(
+                              title: spanish
+                                  ? 'Movimientos de caja'
+                                  : 'Cash movements',
+                              child: _ActionGrid(actions: operations),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                          buildClose(),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    flex: 6,
+                    child: CashJournal(lines: snapshot.ledger, expand: true),
+                  ),
+                ],
+              ),
             ),
           ],
         );
@@ -2209,11 +2248,16 @@ final class _ActionGrid extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       const gap = UmiSpacing.sm;
-      final width = (constraints.maxWidth - gap) / 2;
+      final columns =
+          constraints.maxWidth >=
+              520 * MediaQuery.textScalerOf(context).scale(1)
+          ? 3
+          : 2;
+      final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
       // An odd number of actions leaves a ragged last row. The last tile takes
       // the full width instead, so the set reads as a grid rather than as a
       // mistake.
-      final odd = actions.length.isOdd;
+      final odd = actions.length % columns == 1;
       return Wrap(
         spacing: gap,
         runSpacing: gap,
@@ -2268,36 +2312,35 @@ final class _Action extends StatelessWidget {
         semanticLabel: label,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 72),
+          constraints: const BoxConstraints(minHeight: 104),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: fill,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               PosIcon(icon, size: 20, color: ink),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: ink,
-                        fontWeight: FontWeight.w500,
-                      ),
+              const SizedBox(height: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: ink,
+                      fontWeight: FontWeight.w500,
                     ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle!,
-                        style: theme.textTheme.bodySmall?.copyWith(color: ink),
-                      ),
-                    ],
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle!,
+                      style: theme.textTheme.bodySmall?.copyWith(color: ink),
+                    ),
                   ],
-                ),
+                ],
               ),
             ],
           ),

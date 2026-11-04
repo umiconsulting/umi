@@ -269,7 +269,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
           const SizedBox(height: 8),
           if (devices.isEmpty)
             Text(text('No assigned hardware.', 'No hay hardware asignado.')),
-          ...devices.map(_deviceCard),
+          _deviceGrid(devices),
         ],
         if (widget.section == 'print') ...[
           Text(
@@ -333,10 +333,9 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
                 'Sin impresora de recibos asignada.',
               ),
             ),
-          for (final device in devices.where(
-            (device) => device.type == 'printer',
-          ))
-            _deviceCard(device),
+          _deviceGrid(
+            devices.where((device) => device.type == 'printer').toList(),
+          ),
         ],
         if (widget.section != 'devices') ...[
           const SizedBox(height: 24),
@@ -388,6 +387,25 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
       ],
     );
   }
+
+  Widget _deviceGrid(List<HardwareDevice> devices) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns =
+          constraints.maxWidth >=
+              720 * MediaQuery.textScalerOf(context).scale(1)
+          ? 2
+          : 1;
+      final width = (constraints.maxWidth - 16 * (columns - 1)) / columns;
+      return Wrap(
+        spacing: 16,
+        runSpacing: 16,
+        children: [
+          for (final device in devices)
+            SizedBox(width: width, child: _deviceCard(device)),
+        ],
+      );
+    },
+  );
 
   Widget _deviceCard(HardwareDevice device) => PosCard(
     child: Padding(

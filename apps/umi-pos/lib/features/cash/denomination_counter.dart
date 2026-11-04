@@ -199,7 +199,7 @@ class _DenominationCounterState extends State<DenominationCounter> {
         // in the same dialog, the operator could not tell the rows apart.
         final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
         final field = 64.0 * scale;
-        final minRow = 88.0 * scale + UmiSpacing.xs + 48 + field + 48;
+        final minRow = 88.0 * scale + UmiSpacing.xs + 48 + field + 48 + 16;
         final columns = constraints.maxWidth >= minRow * 2 + gap ? 2 : 1;
         final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
         // The name cell is capped rather than stretched: on a wide card the row
@@ -207,7 +207,7 @@ class _DenominationCounterState extends State<DenominationCounter> {
         // its own buttons. Capped, every row's buttons start at the same offset
         // and the row reads as one line. The cap grows with the text, so a large
         // scale gets the width the money needs instead of an ellipsis.
-        final labelWidth = (width - UmiSpacing.xs - 48 - field - 48).clamp(
+        final labelWidth = (width - UmiSpacing.xs - 48 - field - 48 - 16).clamp(
           88.0 * scale,
           170.0 * scale,
         );
@@ -323,8 +323,14 @@ class _DenominationCounterState extends State<DenominationCounter> {
         icon: const PosIcon(PosGlyphs.add),
       ),
     ];
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: stacked ? UmiSpacing.sm : 2),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: stacked
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

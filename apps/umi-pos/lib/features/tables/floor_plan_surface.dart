@@ -276,6 +276,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         .toList(growable: false);
     _elementsById = {for (final table in tables) table.id: table};
     final visuals = room == null ? null : _visuals(room, tables);
+    final dock =
+        MediaQuery.sizeOf(context).width >= 1100 &&
+        MediaQuery.textScalerOf(context).scale(16) < 24;
     return PosPage(
       body: SafeArea(
         child: Column(
@@ -424,6 +427,19 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                           child: _roomView(area, visuals, l10n, es),
                         ),
                         _detailPanel(area, l10n, es, stacked: true),
+                      ],
+                    )
+                  : dock
+                  ? Column(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: _roomView(area, visuals, l10n, es),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: _detailPanel(area, l10n, es, docked: true),
+                        ),
                       ],
                     )
                   : Row(
@@ -751,13 +767,22 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          Expanded(
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
-          Text(value, style: theme.textTheme.bodySmall),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
         ],
       ),
     );
@@ -768,6 +793,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     AppLocalizations l10n,
     bool es, {
     bool stacked = false,
+    bool docked = false,
   }) {
     final theme = PosTheme.of(context);
     final palette = _FloorPlanPalette.of(context);
@@ -779,15 +805,12 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         area.elements
             .map(FloorPlanElement.fromJson)
             .any((candidate) => candidate.id == selected.id);
-
-    final children = <Widget>[];
+    Widget content;
     if (selected == null || !inArea) {
-      children.add(
-        Text(
-          l10n.tableStatePanelEmpty,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+      content = Text(
+        l10n.tableStatePanelEmpty,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
         ),
       );
     } else {
@@ -797,142 +820,127 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
           : entry?.state ?? tableStateOpen;
       final elapsed = room?.elapsedOf(selected.id);
       final groupId = entry?.groupId;
-      final groupSize = (room != null && groupId != null)
+      final groupSize = room != null && groupId != null
           ? room.group(groupId).length
           : 0;
       final partySize = entry?.partySize;
-      children.addAll([
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                l10n.tableStatePanelTitle(selected.label),
-                style: theme.textTheme.titleLarge,
-              ),
-            ),
-            Text(
-              '${selected.capacity} ${es ? 'lugares' : 'seats'}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: UmiSpacing.xs),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: UmiSpacing.sm,
-              vertical: UmiSpacing.xs,
-            ),
+      final facts = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.tableStatePanelTitle(selected.label),
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${selected.capacity} ${es ? 'lugares' : 'seats'}',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: palette.stateAccent(state).withValues(alpha: .16),
-              borderRadius: BorderRadius.circular(UmiRadius.surface),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: palette.stateAccent(state),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: UmiSpacing.xs),
-                Text(
-                  _stateLabel(state, es),
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: palette.stateAccent(state),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+            child: Text(
+              _stateLabel(state, es),
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: palette.stateAccent(state),
+              ),
             ),
           ),
-        ),
-        if (entry?.openAccountId != null && widget.readAccount != null) ...[
-          const SizedBox(height: 12),
-          AccountPreview(
-            key: ValueKey('table-account-${entry!.openAccountId}'),
-            load: () => widget.readAccount!(selected),
-            balance: widget.readBalance,
-          ),
-          const PosDivider(),
+          if (entry?.openAccountFolio != null)
+            _panelRow(es ? 'Cuenta' : 'Account', entry!.openAccountFolio!),
+          if (partySize != null)
+            _panelRow(l10n.tableStatePartySizeField, '$partySize'),
+          if (elapsed != null)
+            _panelRow(l10n.tableStateElapsedField, formatTableTurn(elapsed)),
+          if (groupSize > 1) _panelRow(l10n.tableStateGroupField, '$groupSize'),
         ],
-        if (entry?.openAccountFolio != null)
-          _panelRow(es ? 'Cuenta' : 'Account', entry!.openAccountFolio!),
-        if (partySize != null)
-          _panelRow(l10n.tableStatePartySizeField, '$partySize'),
-        if (elapsed != null)
-          _panelRow(l10n.tableStateElapsedField, formatTableTurn(elapsed)),
-        if (groupSize > 1) _panelRow(l10n.tableStateGroupField, '$groupSize'),
-        const PosDivider(),
-        Text(
-          l10n.tableStatePanelActions,
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+      );
+      final preview = entry?.openAccountId != null && widget.readAccount != null
+          ? AccountPreview(
+              key: ValueKey('table-account-${entry!.openAccountId}'),
+              load: () => widget.readAccount!(selected),
+              balance: widget.readBalance,
+            )
+          : null;
+      final actions = room == null
+          ? null
+          : _tableActions(selected, room, l10n, es);
+      final operations = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            l10n.tableStatePanelActions,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
-        const SizedBox(height: UmiSpacing.sm),
-      ]);
-      if (room != null) {
-        final actions = _tableActions(selected, room, l10n, es);
-        children.add(
-          Wrap(
-            spacing: UmiSpacing.sm,
-            runSpacing: UmiSpacing.sm,
-            children: [
-              for (var index = 0; index < actions.length; index++)
-                if (index == 0 && widget.onOpenAccount != null)
-                  PosButton.icon(
-                    onPressed: actions[index].onTap,
-                    icon: PosIcon(actions[index].icon, size: 18),
-                    label: Text(actions[index].label),
-                  )
-                else
-                  PosOutlineButton.icon(
-                    onPressed: actions[index].onTap,
-                    icon: PosIcon(actions[index].icon, size: 18),
-                    label: Text(actions[index].label),
-                  ),
-            ],
-          ),
-        );
-      } else if (widget.onOpenAccount != null) {
-        children.add(
-          PosButton.icon(
-            onPressed: () => unawaited(widget.onOpenAccount!(selected)),
-            icon: const PosIcon(PosGlyphs.receiptLong),
-            label: Text(es ? 'Abrir cuenta' : 'Open account'),
-          ),
-        );
-      }
+          const SizedBox(height: 8),
+          if (actions != null)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (var index = 0; index < actions.length; index++)
+                  if (index == 0 && widget.onOpenAccount != null)
+                    PosButton.icon(
+                      onPressed: actions[index].onTap,
+                      icon: PosIcon(actions[index].icon, size: 18),
+                      label: Text(actions[index].label),
+                    )
+                  else
+                    PosOutlineButton.icon(
+                      onPressed: actions[index].onTap,
+                      icon: PosIcon(actions[index].icon, size: 18),
+                      label: Text(actions[index].label),
+                    ),
+              ],
+            )
+          else if (widget.onOpenAccount != null)
+            PosButton.icon(
+              onPressed: () => unawaited(widget.onOpenAccount!(selected)),
+              icon: const PosIcon(PosGlyphs.receiptLong),
+              label: Text(es ? 'Abrir cuenta' : 'Open account'),
+            ),
+        ],
+      );
+      content = docked
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 184, child: facts),
+                const SizedBox(width: 24),
+                if (preview != null) ...[
+                  Expanded(child: preview),
+                  const SizedBox(width: 24),
+                ],
+                Expanded(child: operations),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                facts,
+                if (preview != null) ...[const SizedBox(height: 12), preview],
+                const PosDivider(),
+                operations,
+              ],
+            );
     }
-
     return Container(
       key: const ValueKey('table-detail-panel'),
-      width: stacked ? double.infinity : 320,
-      margin: EdgeInsets.fromLTRB(
-        stacked ? UmiSpacing.md : 0,
-        0,
-        UmiSpacing.md,
-        UmiSpacing.md,
-      ),
-      padding: const EdgeInsets.all(UmiSpacing.md),
+      width: stacked || docked ? double.infinity : 320,
+      margin: EdgeInsets.fromLTRB(stacked || docked ? 16 : 0, 0, 16, 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(UmiRadius.surface),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: children,
-        ),
-      ),
+      child: SingleChildScrollView(child: content),
     );
   }
 

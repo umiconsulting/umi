@@ -425,6 +425,42 @@ Future<SurfaceHarness> pumpSurface(
 }
 
 void main() {
+  testWidgets('wide table detail docks below the complete published floor', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = await pumpSurface(tester);
+    final map = find.byType(FloorPlanMap);
+    final panel = find.byKey(const ValueKey('table-detail-panel'));
+    expect(
+      tester.getRect(panel).top,
+      greaterThanOrEqualTo(tester.getRect(map).bottom),
+    );
+    final area = tester.widget<FloorPlanMap>(map).area;
+    expect(area.width, 1200);
+    expect(area.height, 800);
+    expect(
+      area.elements
+          .map(FloorPlanElement.fromJson)
+          .map(
+            (table) => (table.id, table.x, table.y, table.width, table.height),
+          ),
+      [(t1, 300, 300, 200, 200), (t2, 800, 300, 180, 180)],
+    );
+    expect(
+      find.byKey(const ValueKey('floor-plan-element-$t1')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('floor-plan-element-$t2')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await harness.dispose(tester);
+  });
+
   testWidgets('a paid party stays seated until staff confirms departure', (
     tester,
   ) async {
@@ -1004,6 +1040,7 @@ void main() {
     expect(find.text('Mark served'), findsOneWidget);
     expect(find.text('Bill requested'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Order sent'));
     await tester.tap(find.text('Order sent'));
     await tester.pumpAndSettle();
     expect(harness.room.ordered!.tableId, t1);
@@ -1016,6 +1053,7 @@ void main() {
     // apart from the state heading, so a tap cannot hit the wrong one.
     await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Mark served'));
     await tester.tap(find.text('Mark served'));
     await tester.pumpAndSettle();
     expect(harness.room.served!.tableId, t1);
@@ -1023,6 +1061,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Bill requested'));
     await tester.tap(find.text('Bill requested'));
     await tester.pumpAndSettle();
     expect(harness.room.awaitingPayment!.tableId, t1);

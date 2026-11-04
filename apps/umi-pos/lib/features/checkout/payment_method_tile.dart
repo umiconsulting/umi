@@ -27,7 +27,7 @@ final class PaymentMethodTile extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            constraints: const BoxConstraints(minHeight: 48),
+            constraints: const BoxConstraints(minHeight: 88),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
@@ -36,7 +36,9 @@ final class PaymentMethodTile extends StatelessWidget {
                 width: 1,
               ),
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 PosIcon(
                   icon,
@@ -44,24 +46,17 @@ final class PaymentMethodTile extends StatelessWidget {
                       ? scheme.onPrimaryContainer
                       : scheme.onSurfaceVariant,
                 ),
-                const SizedBox(width: UmiSpacing.sm),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
-                      color: selected
-                          ? scheme.onPrimaryContainer
-                          : scheme.onSurface,
-                      fontWeight: FontWeight.w500,
-                    ),
+                const SizedBox(height: UmiSpacing.sm),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+                    color: selected
+                        ? scheme.onPrimaryContainer
+                        : scheme.onSurface,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                if (selected)
-                  PosIcon(
-                    PosGlyphs.checkCircle,
-                    color: scheme.primary,
-                    size: 20,
-                  ),
               ],
             ),
           ),
