@@ -85,3 +85,7 @@ El audit posterior tiene24filas. El código ahora cubre sus composiciones. El in
 P2 separado: `0a90e721`. CheckpointA: `51eaab72`. B incluye superficies restantes, importes largos al200%, shell de pago y retorno al catálogo. Las pruebas enfocadas aprobaron295casos. Caja aprobó46casos después de conservar el propietario del anuncio accesible.
 
 La suite completa final y la aceptación visual nativa quedan en verificación. Root conserva APK, emuladores, datos y capturas.
+
+El checkpoint B es `aee849ae`: 1,271 pruebas aprobadas y 5 omisiones existentes. El analizador no informa errores ni advertencias. Conserva tres infos anteriores.
+
+C añade el selector de servicio en línea, la navegación real de las rutas de cuenta y pago, y las correcciones de recuperación y estado inicial. Sus 262 pruebas enfocadas aprueban. Su analizador conserva las mismas tres infos. La suite completa C sigue en curso.

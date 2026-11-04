@@ -2273,6 +2273,21 @@ final class _ActionGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
+      final financial = actions
+          .whereType<_Action>()
+          .where((action) => action.tone != null)
+          .toList();
+      if (financial.isNotEmpty && financial.length < actions.length) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _ActionGrid(actions: financial),
+            const SizedBox(height: 8),
+            for (final action in actions)
+              if (!financial.contains(action)) action,
+          ],
+        );
+      }
       const gap = UmiSpacing.sm;
       final columns =
           constraints.maxWidth >=
@@ -2290,7 +2305,11 @@ final class _ActionGrid extends StatelessWidget {
         children: [
           for (final (index, action) in actions.indexed)
             SizedBox(
-              width: odd && index == actions.length - 1
+              width:
+                  (columns == 2 &&
+                          action is _Action &&
+                          action.tone == 'safe') ||
+                      (odd && index == actions.length - 1)
                   ? constraints.maxWidth
                   : width,
               child: action,
@@ -2997,7 +3016,12 @@ Future<void> _count(BuildContext context, CashController controller) async {
     }
     return true;
   });
-  final register = snapshot?.currentShift?['registerName'] as String?;
+  final registerId = snapshot?.currentShift?['registerId'];
+  final register =
+      snapshot?.registers
+              .where((value) => value['id'] == registerId)
+              .firstOrNull?['displayName']
+          as String?;
   final accepted = await Navigator.of(context).push<bool>(
     PosPageRoute<bool>(
       builder: (countContext) => StatefulBuilder(
@@ -3012,34 +3036,58 @@ Future<void> _count(BuildContext context, CashController controller) async {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  es ? 'Total contado' : 'Counted total',
-                  style: PosTheme.of(context).textTheme.bodySmall,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        es ? 'Total contado' : 'Counted total',
+                        style: PosTheme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          formatMinorUnits(
+                            totalOnly
+                                ? totalMinorUnits ?? 0
+                                : tally.totalMinorUnits,
+                            currency,
+                          ),
+                          key: const ValueKey('count-workspace-total'),
+                          style: PosTheme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  formatMinorUnits(
-                    totalOnly ? totalMinorUnits ?? 0 : tally.totalMinorUnits,
-                    currency,
-                  ),
-                  key: const ValueKey('count-workspace-total'),
-                  style: PosTheme.of(context).textTheme.displaySmall,
-                ),
-                const SizedBox(height: 16),
-                PosButton(
-                  compact: true,
-                  style: PosButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
-                  ),
-                  onPressed: valid
-                      ? () => Navigator.pop(countContext, true)
-                      : null,
-                  child: Text(
-                    blind ? l.submitBlindCountAction : l.submitCountAction,
-                  ),
-                ),
-                PosTextButton(
-                  onPressed: () => Navigator.pop(countContext, false),
-                  child: Text(l.closeAction),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    PosTextButton(
+                      compact: true,
+                      onPressed: () => Navigator.pop(countContext, false),
+                      child: Text(l.closeAction),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: PosButton(
+                        compact: true,
+                        style: PosButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                        ),
+                        onPressed: valid
+                            ? () => Navigator.pop(countContext, true)
+                            : null,
+                        child: Text(
+                          blind
+                              ? l.submitBlindCountAction
+                              : l.submitCountAction,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -3089,9 +3137,23 @@ Future<void> _count(BuildContext context, CashController controller) async {
           return PosPage(
             appBar: PosHeader(
               automaticallyImplyLeading: false,
-              title: StationHeading(
-                title: blind ? l.blindCountAction : l.countDrawerAction,
-                subtitle: register,
+              actionsInline: true,
+              title: Row(
+                children: [
+                  Text(
+                    'umi',
+                    style: PosTheme.of(
+                      context,
+                    ).textTheme.headlineSmall?.copyWith(fontSize: 22),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      l.cashCenterTitle,
+                      style: PosTheme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
               ),
             ),
             bottomNavigationBar: navigation == null
@@ -3102,45 +3164,76 @@ Future<void> _count(BuildContext context, CashController controller) async {
                   ),
             body: SafeArea(
               key: const ValueKey('cash-count-workspace'),
-              child: LayoutBuilder(
-                builder: (context, box) {
-                  final wide =
-                      box.maxWidth >= 900 &&
-                      MediaQuery.textScalerOf(context).scale(16) < 24;
-                  final submit = DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: PosTheme.of(context).colorScheme.surface,
-                      border: Border(
-                        top: BorderSide(
-                          color: PosTheme.of(
-                            context,
-                          ).colorScheme.outlineVariant,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          [
+                            if (register != null && register.isNotEmpty)
+                              register,
+                            if (snapshot?.businessDate != null)
+                              snapshot!.businessDate,
+                          ].join(' · '),
+                          style: PosTheme.of(context).textTheme.bodySmall,
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        Text(
+                          blind ? l.blindCountAction : l.countDrawerAction,
+                          style: PosTheme.of(
+                            context,
+                          ).textTheme.titleLarge?.copyWith(fontSize: 18),
+                        ),
+                      ],
                     ),
-                    child: controls,
-                  );
-                  return wide
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(child: content),
-                            SizedBox(
-                              width: 304,
-                              child: Align(
-                                alignment: Alignment.bottomCenter,
-                                child: submit,
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, box) {
+                        final wide =
+                            box.maxWidth >= 900 &&
+                            MediaQuery.textScalerOf(context).scale(16) < 24;
+                        final submit = DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: PosTheme.of(context).colorScheme.surface,
+                            border: Border(
+                              top: BorderSide(
+                                color: PosTheme.of(
+                                  context,
+                                ).colorScheme.outlineVariant,
                               ),
                             ),
-                          ],
-                        )
-                      : Column(
-                          children: [
-                            Expanded(child: content),
-                            submit,
-                          ],
+                          ),
+                          child: controls,
                         );
-                },
+                        return wide
+                            ? Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(child: content),
+                                  SizedBox(
+                                    width: 304,
+                                    child: Align(
+                                      alignment: Alignment.bottomCenter,
+                                      child: submit,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                children: [
+                                  Expanded(child: content),
+                                  submit,
+                                ],
+                              );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
           );

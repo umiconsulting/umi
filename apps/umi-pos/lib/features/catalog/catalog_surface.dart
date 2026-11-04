@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show SystemChannels;
+import 'package:flutter/services.dart' show LogicalKeyboardKey, SystemChannels;
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
 
@@ -32,7 +32,6 @@ import '../cash/cash_controller.dart';
 import '../cash/cash_surface.dart';
 import '../checkout/checkout_controller.dart';
 import '../checkout/checkout_surface.dart';
-import '../checkout/partial_checkout_surface.dart' show checkoutNavigationOf;
 import '../customer_value/customer_value_controller.dart';
 import '../customer_value/customer_value_surface.dart';
 import '../entry/device_channel_socket_client.dart';
@@ -161,6 +160,52 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   String? _preparedMobileCartId;
   String? _promptedMobileCartId;
   Future<bool>? _orderStart;
+  PosNavigation? _visibleNavigation;
+  Completer<String?>? _serviceChoice;
+  String? _serviceChoiceScope;
+  String? _serviceChoiceCartId;
+  bool _serviceChoiceChooseTable = false;
+
+  String get _serviceScope =>
+      '${widget.entry.state.selectedTenant?.id}/${widget.entry.state.selectedBranch?.id}/${widget.entry.state.operator?.id}';
+
+  void _finishServiceChoice(String? value, {bool rebuild = true}) {
+    final pending = _serviceChoice;
+    _serviceChoice = null;
+    _serviceChoiceScope = null;
+    _serviceChoiceCartId = null;
+    _serviceChoiceChooseTable = false;
+    if (pending != null && !pending.isCompleted) pending.complete(value);
+    if (rebuild && mounted) setState(() {});
+  }
+
+  Future<String?> _chooseServiceType({bool newOrder = false}) async {
+    if (!mounted) return null;
+    if (!(ModalRoute.of(context)?.isCurrent ?? true) ||
+        _inlineDetail != null ||
+        (_section != null && _section != TillSurface.order)) {
+      return showOrderTypePicker(context);
+    }
+    if (_serviceChoice != null) return _serviceChoice!.future;
+    final scope = _serviceScope;
+    final previousFocus = FocusManager.instance.primaryFocus;
+    final pending = Completer<String?>();
+    setState(() {
+      _serviceChoice = pending;
+      _serviceChoiceScope = _serviceScope;
+      _serviceChoiceCartId = widget.cart.state.cart?.id;
+      _serviceChoiceChooseTable = newOrder && widget.floorPlan != null;
+    });
+    final result = await pending.future;
+    if (!mounted || scope != _serviceScope) return null;
+    if (previousFocus?.context != null) {
+      previousFocus!.requestFocus();
+    } else {
+      _newSaleFocus.requestFocus();
+    }
+    return result;
+  }
+
   String? _pendingOrderType;
   DateTime _suppressMenuTapUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -329,7 +374,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     final cart = widget.cart.state.cart;
     if (cart == null) {
       unawaited(_warmOrderTableData());
-      final type = await showOrderTypePicker(context);
+      final type = await _chooseServiceType();
       if (type == null || !mounted) return false;
       _consumeModalPointer();
       return _openTablelessAccount(type);
@@ -342,7 +387,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       return true;
     }
     unawaited(_warmOrderTableData());
-    final type = await showOrderTypePicker(context);
+    final type = await _chooseServiceType();
     if (type == null || !mounted) return false;
     _consumeModalPointer();
     final opened = await _openTablelessAccount(type);
@@ -808,6 +853,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
 
   void _incomingEntryChanged() {
     if (mounted) {
+      if (_serviceChoice != null && _serviceChoiceScope != _serviceScope) {
+        _finishServiceChoice(null, rebuild: false);
+      }
       _refreshFrequent();
       unawaited(_refreshIncoming());
       setState(() {});
@@ -991,7 +1039,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     OperatorPermissions permissions, {
     required bool canWriteCart,
   }) async {
-    final navigation = checkoutNavigationOf(context);
+    _finishServiceChoice(null);
+    final navigation = _visibleNavigation;
     await Navigator.of(context).push(
       PosPageRoute<void>(
         builder: (sheetContext) => AnimatedBuilder(
@@ -999,6 +1048,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           builder: (sheetContext, _) {
             return PosPage(
               appBar: PosHeader(
+                actionsInline: true,
                 automaticallyImplyLeading: false,
                 toolbarHeight: 56,
                 title: _merchantHeading(sheetContext, showWordmark: true),
@@ -1486,7 +1536,11 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   }
 
   bool get _scanActive {
-    if (!mounted || _leaving || _kdsDevice || _inlineDetail != null) {
+    if (!mounted ||
+        _leaving ||
+        _kdsDevice ||
+        _inlineDetail != null ||
+        _serviceChoice != null) {
       return false;
     }
     final operator = widget.entry.state.operator;
@@ -1502,6 +1556,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       _scanActive && generation == _scanGeneration;
 
   void _setSection(TillSurface section) {
+    if (section != TillSurface.order) {
+      _finishServiceChoice(null, rebuild: false);
+    }
     if (section == TillSurface.settings && _section != TillSurface.settings) {
       _settingsReturnSection = _section;
     }
@@ -1554,6 +1611,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
 
   void _changed() {
     if (!mounted) return;
+    if (_serviceChoice != null &&
+        _serviceChoiceCartId != widget.cart.state.cart?.id) {
+      _finishServiceChoice(null, rebuild: false);
+    }
     final cart = widget.cart.state.cart;
     final room = widget.tableState;
     if (cart != null && room != null) {
@@ -1733,6 +1794,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
 
   @override
   void dispose() {
+    _finishServiceChoice(null, rebuild: false);
     _readyTicker?.cancel();
     _incomingTicker?.cancel();
     widget.incomingOrders?.removeListener(_changed);
@@ -1781,6 +1843,28 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       _showAccountRestoreNotice();
       return;
     }
+    String? selectedService;
+    FloorPlanElement? selectedTable;
+    final inline =
+        widget.cart.supportsOpenAccounts &&
+        (ModalRoute.of(this.context)?.isCurrent ?? true) &&
+        (_section == null || _section == TillSurface.order) &&
+        _inlineDetail == null;
+    if (inline) {
+      if (_accountTransition || _serviceChoice != null) return;
+      final scope = _serviceScope;
+      selectedService = await _chooseServiceType(newOrder: true);
+      if (selectedService == null ||
+          !mounted ||
+          scope != _serviceScope ||
+          _accountRestoring) {
+        return;
+      }
+      if (selectedService == 'dine_in' && widget.floorPlan != null) {
+        selectedTable = await _chooseOrderTable();
+        if (selectedTable == null || !mounted || scope != _serviceScope) return;
+      }
+    }
     if (widget.cart.supportsOpenAccounts) {
       if (_accountTransition) return;
       final open = widget.cart.state.cart;
@@ -1796,7 +1880,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           _inlineDetail = null;
           _notice = null;
         });
-        await _startOrderAfterParking();
+        await _startOrderAfterParking(
+          type: selectedService,
+          table: selectedTable,
+        );
         return;
       }
       if (accountIsBare(open)) {
@@ -1817,7 +1904,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           widget.catalog.search('');
           if (_scroll.hasClients) _scroll.jumpTo(0);
         }
-        await _startOrderAfterParking();
+        await _startOrderAfterParking(
+          type: selectedService,
+          table: selectedTable,
+        );
         return;
       }
       setState(() => _accountTransition = true);
@@ -1859,9 +1949,13 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       } finally {
         if (mounted) setState(() => _accountTransition = false);
       }
-      await _startOrderAfterParking();
+      await _startOrderAfterParking(
+        type: selectedService,
+        table: selectedTable,
+      );
       return;
     }
+    if (!context.mounted) return;
     final lines = widget.cart.state.cart?.items.length ?? 0;
     if (lines > 0) {
       final confirmed = await showPosDialog<bool>(
@@ -1894,13 +1988,20 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   /// before the first product. Takeaway keeps the account tableless. The form
   /// uses one action and one vocabulary; fulfillment remains the server's
   /// existing `dine_in` or `takeout` fact.
-  Future<void> _startOrderAfterParking() async {
+  Future<void> _startOrderAfterParking({
+    String? type,
+    FloorPlanElement? table,
+  }) async {
     if (!mounted || !widget.cart.supportsOpenAccounts) return;
     unawaited(_warmOrderTableData());
-    final type = await showOrderTypePicker(context);
-    if (type == null || !mounted) return;
+    final selected = type ?? await _chooseServiceType();
+    if (selected == null || !mounted) return;
     _consumeModalPointer();
-    await _openTablelessAccount(type);
+    if (table != null) {
+      await _openTableAccount(table);
+    } else {
+      await _openTablelessAccount(selected);
+    }
   }
 
   Future<bool> _openTablelessAccount(String type) async {
@@ -2027,93 +2128,101 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           (surface) =>
               surface == TillSurface.kitchen || surface == TillSurface.settings,
         );
-    return PosPage(
-      appBar: !orderVisible
-          ? PosHeader(
-              toolbarHeight: 56,
-              automaticallyImplyLeading: false,
-              title: _merchantHeading(
-                context,
-                showWordmark:
-                    MediaQuery.sizeOf(context).width < 700 ||
-                    MediaQuery.sizeOf(context).height < 600 ||
-                    stationOnly,
-              ),
-              actions: [
-                if (_incomingAllowed) _incomingShortcut(context),
-                if (stationOnly)
-                  PosIconButton(
-                    tooltip: spanish ? 'Configuración' : 'Settings',
-                    onPressed: () => setState(
-                      () => _setSection(
-                        selected == TillSurface.settings
-                            ? TillSurface.kitchen
-                            : TillSurface.settings,
+    final navigation = _primaryNav(context, spanish, surfaces, selected);
+    _visibleNavigation = navigation;
+    return PopScope(
+      canPop: _serviceChoice == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _serviceChoice != null) _finishServiceChoice(null);
+      },
+      child: PosPage(
+        appBar: !orderVisible
+            ? PosHeader(
+                toolbarHeight: 56,
+                automaticallyImplyLeading: false,
+                title: _merchantHeading(
+                  context,
+                  showWordmark:
+                      MediaQuery.sizeOf(context).width < 700 ||
+                      MediaQuery.sizeOf(context).height < 600 ||
+                      stationOnly,
+                ),
+                actions: [
+                  if (_incomingAllowed) _incomingShortcut(context),
+                  if (stationOnly)
+                    PosIconButton(
+                      tooltip: spanish ? 'Configuración' : 'Settings',
+                      onPressed: () => setState(
+                        () => _setSection(
+                          selected == TillSurface.settings
+                              ? TillSurface.kitchen
+                              : TillSurface.settings,
+                        ),
                       ),
+                      icon: const PosIcon(PosGlyphs.settingsOutlined),
                     ),
-                    icon: const PosIcon(PosGlyphs.settingsOutlined),
-                  ),
-              ],
-            )
-          : null,
-      bottomNavigationBar: _primaryNav(context, spanish, surfaces, selected),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (landing == TillSurface.order)
-            Offstage(
-              key: const ValueKey('workspace-order'),
-              offstage: !orderVisible,
-              child: ExcludeFocus(
-                excluding: !orderVisible,
-                child: TickerMode(
-                  enabled: orderVisible,
-                  child: _orderPage(context, l, state, permissions, access),
-                ),
-              ),
-            ),
-          if (surfaces.contains(TillSurface.cash) &&
-              (_cashVisited || selected == TillSurface.cash))
-            Offstage(
-              key: const ValueKey('workspace-cash'),
-              offstage: selected != TillSurface.cash,
-              child: ExcludeFocus(
-                excluding: selected != TillSurface.cash,
-                child: TickerMode(
-                  enabled: selected == TillSurface.cash,
-                  child: _destinationPage(
-                    context,
-                    l,
-                    permissions,
-                    TillSurface.cash,
+                ],
+              )
+            : null,
+        bottomNavigationBar: navigation,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (landing == TillSurface.order)
+              Offstage(
+                key: const ValueKey('workspace-order'),
+                offstage: !orderVisible,
+                child: ExcludeFocus(
+                  excluding: !orderVisible,
+                  child: TickerMode(
+                    enabled: orderVisible,
+                    child: _orderPage(context, l, state, permissions, access),
                   ),
                 ),
               ),
-            ),
-          if (surfaces.contains(TillSurface.sales) &&
-              (_salesVisited || selected == TillSurface.sales))
-            Offstage(
-              key: const ValueKey('workspace-sales'),
-              offstage: selected != TillSurface.sales,
-              child: ExcludeFocus(
-                excluding: selected != TillSurface.sales,
-                child: TickerMode(
-                  enabled: selected == TillSurface.sales,
-                  child: _saleCenter(
-                    permissions,
-                    active: selected == TillSurface.sales,
+            if (surfaces.contains(TillSurface.cash) &&
+                (_cashVisited || selected == TillSurface.cash))
+              Offstage(
+                key: const ValueKey('workspace-cash'),
+                offstage: selected != TillSurface.cash,
+                child: ExcludeFocus(
+                  excluding: selected != TillSurface.cash,
+                  child: TickerMode(
+                    enabled: selected == TillSurface.cash,
+                    child: _destinationPage(
+                      context,
+                      l,
+                      permissions,
+                      TillSurface.cash,
+                    ),
                   ),
                 ),
               ),
-            ),
-          if (!orderVisible &&
-              selected != TillSurface.cash &&
-              selected != TillSurface.sales)
-            KeyedSubtree(
-              key: ValueKey(selected),
-              child: _destinationPage(context, l, permissions, selected),
-            ),
-        ],
+            if (surfaces.contains(TillSurface.sales) &&
+                (_salesVisited || selected == TillSurface.sales))
+              Offstage(
+                key: const ValueKey('workspace-sales'),
+                offstage: selected != TillSurface.sales,
+                child: ExcludeFocus(
+                  excluding: selected != TillSurface.sales,
+                  child: TickerMode(
+                    enabled: selected == TillSurface.sales,
+                    child: _saleCenter(
+                      permissions,
+                      active: selected == TillSurface.sales,
+                    ),
+                  ),
+                ),
+              ),
+            if (!orderVisible &&
+                selected != TillSurface.cash &&
+                selected != TillSurface.sales)
+              KeyedSubtree(
+                key: ValueKey(selected),
+                child: _destinationPage(context, l, permissions, selected),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -2912,7 +3021,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     );
   }
 
-  Widget? _primaryNav(
+  PosNavigation? _primaryNav(
     BuildContext context,
     bool spanish,
     List<TillSurface> surfaces,
@@ -3162,7 +3271,32 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         ],
       ),
     );
-    final scrollingProducts = scrollingHeader == null
+    final serviceChoice = _serviceChoice == null
+        ? null
+        : CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.escape): () =>
+                  _finishServiceChoice(null),
+            },
+            child: OrderServiceChoice(
+              chooseTable: _serviceChoiceChooseTable,
+              onSelect: (type) => _finishServiceChoice(type),
+              onCancel: () => _finishServiceChoice(null),
+            ),
+          );
+    final scrollingProducts = serviceChoice != null && scrollingHeader != null
+        ? ListView(
+            children: [
+              scrollingHeader,
+              catalogHeading,
+              search,
+              const SizedBox(height: 8),
+              categories,
+              const SizedBox(height: 8),
+              serviceChoice,
+            ],
+          )
+        : scrollingHeader == null
         ? null
         : _content(
             context,
@@ -3196,7 +3330,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         if (!keyboard) categories,
         if (frequent != null) ...[const SizedBox(height: 12), frequent],
         productTools,
-        Expanded(child: _content(context, state)),
+        Expanded(child: serviceChoice ?? _content(context, state)),
         if (landscape)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -4726,15 +4860,30 @@ final class _DetailState extends State<_Detail> {
       const SizedBox(height: UmiSpacing.md),
       LayoutBuilder(
         builder: (context, box) {
-          final quantityControl = Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l.cartQuantityLabel,
+          final sideBySide =
+              box.maxWidth >= 312 * MediaQuery.textScalerOf(context).scale(1);
+          var labelHeight = 0.0;
+          if (sideBySide) {
+            for (final label in [l.cartQuantityLabel, l.cartCourseLabel]) {
+              final painter = TextPainter(
+                text: TextSpan(
+                  text: label,
                   style: PosTheme.of(context).textTheme.titleSmall,
                 ),
-              ),
-              const SizedBox(width: UmiSpacing.sm),
+                textDirection: Directionality.of(context),
+                textScaler: MediaQuery.textScalerOf(context),
+              )..layout(maxWidth: (box.maxWidth - 16) / 2);
+              labelHeight = math.max(labelHeight, painter.height);
+              painter.dispose();
+            }
+          }
+          final quantityLabel = Text(
+            l.cartQuantityLabel,
+            style: PosTheme.of(context).textTheme.titleSmall,
+          );
+          final quantityStepper = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               PosIconButton(
                 tooltip: l.decreaseQuantity,
                 onPressed: quantity > 1
@@ -4762,19 +4911,51 @@ final class _DetailState extends State<_Detail> {
               ),
             ],
           );
+          final quantityControl = sideBySide
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: labelHeight),
+                      child: quantityLabel,
+                    ),
+                    const SizedBox(height: 8),
+                    quantityStepper,
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(child: quantityLabel),
+                    const SizedBox(width: 8),
+                    quantityStepper,
+                  ],
+                );
           final courseControl = CourseControl(
             course: course,
             enabled: widget.canWrite,
-            hint: l.cartCourseHint,
+            stacked: sideBySide,
+            labelHeight: labelHeight,
+            hint: sideBySide ? null : l.cartCourseHint,
             onChanged: (value) => setState(() => course = value),
           );
-          if (box.maxWidth >= 640 * MediaQuery.textScalerOf(context).scale(1)) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (sideBySide) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(child: quantityControl),
-                const SizedBox(width: 24),
-                Expanded(child: courseControl),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: quantityControl),
+                    const SizedBox(width: 16),
+                    Expanded(child: courseControl),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l.cartCourseHint,
+                  style: PosTheme.of(context).textTheme.bodySmall,
+                ),
               ],
             );
           }

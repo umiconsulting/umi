@@ -838,7 +838,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       );
     } else {
       final entry = room?.stateOf(selected.id);
-      final state = room?.isPaidAndOccupied(selected.id) == true
+      final state = room != null && room.map == null
+          ? tableVisualUnknown
+          : room?.isPaidAndOccupied(selected.id) == true
           ? tableVisualPaid
           : entry?.state ?? tableStateOpen;
       final elapsed = room?.elapsedOf(selected.id);
@@ -934,7 +936,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                     ),
               ],
             )
-          else if (widget.onOpenAccount != null)
+          else if (room == null && widget.onOpenAccount != null)
             PosButton.icon(
               onPressed: () => unawaited(widget.onOpenAccount!(selected)),
               icon: const PosIcon(PosGlyphs.receiptLong),
@@ -995,7 +997,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     final room = widget.tableState;
     final facts = <String>[
       _stateLabel(
-        room?.isPaidAndOccupied(selected.id) == true
+        room != null && room.map == null
+            ? tableVisualUnknown
+            : room?.isPaidAndOccupied(selected.id) == true
             ? tableVisualPaid
             : room?.stateOf(selected.id).state ?? tableStateOpen,
         es,
@@ -1053,6 +1057,16 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     TableStateController room,
     List<FloorPlanElement> tables,
   ) {
+    if (room.map == null) {
+      return {
+        for (final table in tables)
+          table.id: FloorPlanTableVisual(
+            state: tableStateOpen,
+            known: false,
+            selected: _selectedId == table.id,
+          ),
+      };
+    }
     final groupSize = <String, int>{};
     for (final table in tables) {
       final groupId = room.stateOf(table.id).groupId;
@@ -1105,6 +1119,8 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   String _stateLabel(String state, bool es) {
     final l10n = AppLocalizations.of(context);
     return switch (state) {
+      tableVisualUnknown =>
+        es ? 'Estado por consultar' : 'Status not yet available',
       tableStateSeated => l10n.tableStateSeatedLabel,
       tableStateOrdered => l10n.tableStateOrderedLabel,
       tableStateServed => l10n.tableStateServedLabel,
@@ -1448,6 +1464,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     AppLocalizations l10n,
     bool es,
   ) {
+    if (room.map == null) return const [];
     final entry = room.stateOf(element.id);
     final present = tablePartyStates.contains(entry.state);
     final paid = room.isPaidAndOccupied(element.id);
@@ -1622,7 +1639,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
             children: [
               Text(
                 _stateLabel(
-                  room.isPaidAndOccupied(element.id)
+                  room.map == null
+                      ? tableVisualUnknown
+                      : room.isPaidAndOccupied(element.id)
                       ? tableVisualPaid
                       : entry.state,
                   es,
@@ -1699,6 +1718,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
 
 /// Estado visual del pago. Los seis estados físicos del contrato se conservan.
 const tableVisualPaid = 'paid_occupied';
+const tableVisualUnknown = 'room_unknown';
 
 /// What one table looks like beyond its published geometry. [state] is always
 /// one of the contract's six names.
@@ -1713,6 +1733,7 @@ final class FloorPlanTableVisual {
     this.partySize,
     this.accountFolio,
     this.paid = false,
+    this.known = true,
   });
 
   final String state;
@@ -1724,8 +1745,13 @@ final class FloorPlanTableVisual {
   final bool selected;
   final bool moving;
   final bool paid;
+  final bool known;
 
-  String get displayState => paid ? tableVisualPaid : state;
+  String get displayState => !known
+      ? tableVisualUnknown
+      : paid
+      ? tableVisualPaid
+      : state;
 
   bool get partyPresent => tablePartyStates.contains(state);
 }
@@ -2128,7 +2154,7 @@ class _FloorPlanElement extends StatelessWidget {
   Widget build(BuildContext context) {
     final isTable = element.kind == 'table';
     final visual = state;
-    final accent = visual == null || visual.state == tableStateOpen
+    final accent = visual == null || visual.displayState == tableStateOpen
         ? null
         : palette.stateAccent(visual.displayState);
     final selected = visual?.selected == true || visual?.moving == true;
@@ -2182,6 +2208,8 @@ class _FloorPlanElement extends StatelessWidget {
   }
 
   String _stateName(String state, bool spanish) => switch (state) {
+    tableVisualUnknown =>
+      spanish ? 'Estado por consultar' : 'Status not yet available',
     tableStateSeated => spanish ? 'Ocupada' : 'Seated',
     tableStateOrdered => spanish ? 'Pedido tomado' : 'Order taken',
     tableStateServed => spanish ? 'Servido' : 'Served',
@@ -2283,6 +2311,7 @@ class _FloorPlanElement extends StatelessWidget {
 
 /// The glyph that carries a state, so the state is never colour alone.
 PosGlyph tableStateGlyph(String state) => switch (state) {
+  tableVisualUnknown => PosGlyphs.helpOutline,
   tableStateSeated => PosGlyphs.eventSeat,
   tableStateOrdered => PosGlyphs.receiptLong,
   tableStateServed => PosGlyphs.restaurant,
@@ -2485,9 +2514,14 @@ class _FloorPlanPalette {
   final Color stateTint;
   final Map<String, Color> stateAccents;
 
-  Color stateAccent(String state) => stateAccents[state] ?? scheme.primary;
+  Color stateAccent(String state) => state == tableVisualUnknown
+      ? scheme.onSurfaceVariant
+      : stateAccents[state] ?? scheme.primary;
 
   Color fillFor(String kind, [String? state]) {
+    if (kind == 'table' && state == tableVisualUnknown) {
+      return scheme.surfaceContainerHigh;
+    }
     if (kind != 'table' || state == null || state == tableStateOpen) {
       return switch (kind) {
         'table' => tableFill,

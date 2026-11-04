@@ -1202,8 +1202,12 @@ final class _TicketCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (kitchenStationStatus(order) == 'preparing')
-              Container(height: 3, color: accent),
+            if (kitchenStationStatus(order) == 'in_preparation')
+              Container(
+                key: const ValueKey('kitchen-active-ticket-accent'),
+                height: 3,
+                color: accent,
+              ),
             Padding(
               padding: const EdgeInsets.all(UmiSpacing.md),
               child: Column(

@@ -92,6 +92,28 @@ final class _LedgerRepo
     'confirmationReferences': <String, String>{},
   };
   @override
+  Future<CheckoutRecoverySnapshot> recovery(
+    String merchantId,
+    String cartId,
+    CheckoutRecoveryQuery query,
+  ) async => CheckoutRecoverySnapshot(
+    checkoutId: 'checkout',
+    cartId: cartId,
+    checkoutVersion: 1,
+    state: 'draft',
+    tenderDrafts: const [],
+    tipDraft: null,
+    discountDrafts: const [],
+    receiptDelivery: const {},
+    paymentSummary: null,
+    paymentOutcome: null,
+    result: null,
+    recoveryState: 'none',
+    checkoutFingerprint: null,
+    updatedAt: '2026-11-04T00:00:00Z',
+  );
+
+  @override
   Future<CheckoutPartialPaymentResult> collectPartialPayment(
     String merchantId,
     String cartId,
@@ -232,6 +254,13 @@ class _AccountCartRepo extends _CartRepo implements OpenAccountCartRepository {
   /// 2026-10-13 — "solo se acumulan si spamean el botón" — was this counter
   /// climbing once per tap on a cart that held nothing.
   int suspends = 0;
+
+  @override
+  Future<Cart> account(
+    String merchantId,
+    String cartId,
+    CartQuery query,
+  ) async => cart;
 
   @override
   Future<Cart> suspendAccount(
@@ -863,6 +892,59 @@ void main() {
     fixture.dispose();
   });
 
+  testWidgets(
+    'catalog phone account passes its permitted locked navigation to split and full checkout',
+    (tester) async {
+      tester.view.physicalSize = const Size(412, 915);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final fixture = await _fixture(
+        lines: 1,
+        ledger: _LedgerRepo(),
+        accountName: 'Counter',
+      );
+      await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+      await tester.pumpAndSettle();
+      final original = tester.widget<PosNavigation>(find.byType(PosNavigation));
+      final destinations = original.destinations;
+      expect(original.onDestinationSelected, isNotNull);
+      await tester.tap(find.byType(PosOrderButton));
+      await tester.pumpAndSettle();
+      void expectNavigation() {
+        final navigation = tester.widget<PosNavigation>(
+          find.byType(PosNavigation),
+        );
+        expect(navigation.destinations, destinations);
+        expect(navigation.onDestinationSelected, isNull);
+        expect(
+          tester.getRect(find.byType(PosNavigation)).bottom,
+          lessThanOrEqualTo(915),
+        );
+      }
+
+      expectNavigation();
+      await tester.tap(find.byKey(const ValueKey('account-split-check')));
+      await tester.pumpAndSettle();
+      expectNavigation();
+      expect(
+        tester.getRect(find.byType(PosHeader).last).height,
+        closeTo(56, 1.01),
+      );
+      await tester.tap(find.text('Volver a la cuenta'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(PosButton, 'Cobrar'));
+      await tester.pumpAndSettle();
+      expectNavigation();
+      expect(
+        tester.getRect(find.byType(PosHeader).last).height,
+        closeTo(56, 1.01),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      fixture.dispose();
+    },
+  );
+
   testWidgets('the open mobile cart sheet follows authoritative cart changes', (
     tester,
   ) async {
@@ -1440,11 +1522,11 @@ void main() {
 
       await tester.tap(find.widgetWithText(PosButton, 'Iniciar pedido'));
       await tester.pumpAndSettle();
-      expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
-      expect(fixture.cart.state.phase, CartPhase.idle);
-      expect(fixture.cart.state.errorCode, isNull);
+      expect(find.text('Servicio del nuevo pedido'), findsOneWidget);
+      expect(fixture.cart.state.phase, CartPhase.validationFailure);
+      expect(fixture.cart.state.errorCode, 'CART_VALIDATION_FAILED');
 
-      await tester.tap(find.text('Cancelar'));
+      await tester.tap(find.text('Volver'));
       await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
@@ -1547,38 +1629,47 @@ void main() {
     fixture.dispose();
   });
 
-  testWidgets('Nueva cuenta parks the account locally while the API is down', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(1920, 1014);
-    tester.view.devicePixelRatio = 1.375;
-    addTearDown(tester.view.reset);
-    await fonts();
-    final fixture = await _fixture(
-      openAccounts: true,
-      lines: 2,
-      accountFolio: 'Cuenta 078',
-    );
-    await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
-    await tester.pump();
+  testWidgets(
+    'inline new-order cancellation preserves the account while the API is down',
+    (tester) async {
+      tester.view.physicalSize = const Size(1920, 1014);
+      tester.view.devicePixelRatio = 1.375;
+      addTearDown(tester.view.reset);
+      await fonts();
+      final fixture = await _fixture(
+        openAccounts: true,
+        lines: 2,
+        accountFolio: 'Cuenta 078',
+      );
+      await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+      await tester.pump();
 
-    fixture.connectivity.networkDown();
-    await tester.tap(find.text('Nuevo pedido').first);
-    await tester.pumpAndSettle();
+      fixture.connectivity.networkDown();
+      await tester.tap(find.text('Nuevo pedido').first);
+      await tester.pumpAndSettle();
 
-    expect((fixture.repository as _AccountCartRepo).suspends, 0);
-    expect(fixture.cart.state.cart, isNull);
-    expect(
-      find.textContaining('No se completó la operación'),
-      findsNothing,
-      reason: 'a local-first new account does not report a failed remote save',
-    );
-    expect(tester.takeException(), isNull);
+      expect(
+        find.byKey(const ValueKey('catalog-service-choice')),
+        findsOneWidget,
+      );
+      expect(fixture.cart.state.cart!.items, hasLength(2));
+      await tester.tap(find.text('Volver'));
+      await tester.pumpAndSettle();
+      expect((fixture.repository as _AccountCartRepo).suspends, 0);
+      expect(fixture.cart.state.cart!.items, hasLength(2));
+      expect(
+        find.textContaining('No se completó la operación'),
+        findsNothing,
+        reason:
+            'a local-first new account does not report a failed remote save',
+      );
+      expect(tester.takeException(), isNull);
 
-    await tester.pumpWidget(const SizedBox());
-    await tester.pump();
-    fixture.dispose();
-  });
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+      fixture.dispose();
+    },
+  );
 
   test('an account is bare only when nothing identifies it', () {
     // The four facts the API asks before it lists an account as open

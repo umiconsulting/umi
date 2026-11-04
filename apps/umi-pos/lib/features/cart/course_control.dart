@@ -22,6 +22,8 @@ final class CourseControl extends StatelessWidget {
     required this.course,
     required this.onChanged,
     this.enabled = true,
+    this.stacked = false,
+    this.labelHeight = 0,
     this.hint,
     super.key,
   });
@@ -39,6 +41,8 @@ final class CourseControl extends StatelessWidget {
   final int course;
   final ValueChanged<int> onChanged;
   final bool enabled;
+  final bool stacked;
+  final double labelHeight;
 
   /// One line under the label saying what the number MEANS. The label alone
   /// ("Tiempo de servicio") reads like a duration to anyone who is not a waiter, and
@@ -55,81 +59,96 @@ final class CourseControl extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final scheme = PosTheme.of(context).colorScheme;
     final textTheme = PosTheme.of(context).textTheme;
+    final label = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(l10n.cartCourseLabel, style: textTheme.titleSmall),
+        if (hint case final String line)
+          Text(
+            line,
+            style: textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+      ],
+    );
+    final stepper = Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(UmiRadius.control),
+        border: Border.all(
+          color: enabled
+              ? scheme.outlineVariant
+              : scheme.outlineVariant.withValues(alpha: .5),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          PosIconButton(
+            key: decreaseKey,
+            tooltip: l10n.cartCoursePrevious,
+            onPressed: _canDecrease ? () => onChanged(course - 1) : null,
+            constraints: const BoxConstraints(
+              minWidth: UmiTouchTarget.minimum,
+              minHeight: UmiTouchTarget.minimum,
+            ),
+            icon: const PosIcon(PosGlyphs.remove, size: 20),
+          ),
+          // The number is a statement, not a field: the screen reader gets
+          // the whole sentence rather than a bare digit.
+          Semantics(
+            container: true,
+            label: l10n.cartCourseCurrent(course),
+            child: ExcludeSemantics(
+              child: SizedBox(
+                width: 32,
+                child: Text(
+                  '$course',
+                  key: valueKey,
+                  textAlign: TextAlign.center,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    color: enabled ? null : scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          PosIconButton(
+            key: increaseKey,
+            tooltip: l10n.cartCourseNext,
+            onPressed: _canIncrease ? () => onChanged(course + 1) : null,
+            constraints: const BoxConstraints(
+              minWidth: UmiTouchTarget.minimum,
+              minHeight: UmiTouchTarget.minimum,
+            ),
+            icon: const PosIcon(PosGlyphs.add, size: 20),
+          ),
+        ],
+      ),
+    );
+    if (stacked) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(minHeight: labelHeight),
+            child: label,
+          ),
+          const SizedBox(height: 8),
+          stepper,
+        ],
+      );
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(l10n.cartCourseLabel, style: textTheme.titleSmall),
-              if (hint case final String line)
-                Text(
-                  line,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-            ],
-          ),
-        ),
+        Expanded(child: label),
         const SizedBox(width: UmiSpacing.sm),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(UmiRadius.control),
-            border: Border.all(
-              color: enabled
-                  ? scheme.outlineVariant
-                  : scheme.outlineVariant.withValues(alpha: .5),
-            ),
-          ),
-          child: Row(
-            children: [
-              PosIconButton(
-                key: decreaseKey,
-                tooltip: l10n.cartCoursePrevious,
-                onPressed: _canDecrease ? () => onChanged(course - 1) : null,
-                constraints: const BoxConstraints(
-                  minWidth: UmiTouchTarget.minimum,
-                  minHeight: UmiTouchTarget.minimum,
-                ),
-                icon: const PosIcon(PosGlyphs.remove, size: 20),
-              ),
-              // The number is a statement, not a field: the screen reader gets
-              // the whole sentence rather than a bare digit.
-              Semantics(
-                container: true,
-                label: l10n.cartCourseCurrent(course),
-                child: ExcludeSemantics(
-                  child: SizedBox(
-                    width: 32,
-                    child: Text(
-                      '$course',
-                      key: valueKey,
-                      textAlign: TextAlign.center,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        color: enabled ? null : scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              PosIconButton(
-                key: increaseKey,
-                tooltip: l10n.cartCourseNext,
-                onPressed: _canIncrease ? () => onChanged(course + 1) : null,
-                constraints: const BoxConstraints(
-                  minWidth: UmiTouchTarget.minimum,
-                  minHeight: UmiTouchTarget.minimum,
-                ),
-                icon: const PosIcon(PosGlyphs.add, size: 20),
-              ),
-            ],
-          ),
-        ),
+        stepper,
       ],
     );
   }

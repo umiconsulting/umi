@@ -313,6 +313,10 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('kitchen-active-ticket-accent')),
+      findsOneWidget,
+    );
     expect(harness.kitchen.sent, isEmpty);
     await harness.dispose(tester);
   });

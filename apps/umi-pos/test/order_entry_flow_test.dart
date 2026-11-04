@@ -291,6 +291,9 @@ final class _CartRepo
       'id': '00000000-0000-4000-8000-0000000000c2',
       'operatorSessionId': request.operatorSessionId,
       'lifecycleState': 'building_cart',
+      'items': <Map<String, Object?>>[],
+      'tableId': null,
+      'tableName': null,
       'version': cart.version + 1,
     });
   }
@@ -341,6 +344,7 @@ final class _CartRepo
     return cart = Cart.fromJson({
       ...cart.toJson(),
       'id': 'table-account',
+      'items': <Map<String, Object?>>[],
       'tableId': tableId,
       'tableName': 'Mesa 1',
       'lifecycleState': 'building_cart',
@@ -819,21 +823,108 @@ Future<void> _mount(
 }
 
 void main() {
+  for (final type in ['takeout', 'dine_in']) {
+    testWidgets(
+      'inline new order preserves the current account until $type is confirmed',
+      (tester) async {
+        final f = await _fixture(lines: 2, withProduct: true);
+        addTearDown(f.dispose);
+        await _mount(tester, f.surface, size: const Size(402, 874));
+        final original = f.cart.state.cart!.toJson();
+        await tester.tap(find.byTooltip('Nuevo pedido'));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('catalog-service-choice')),
+          findsOneWidget,
+        );
+        expect(find.byType(PosAlertDialog), findsNothing);
+        expect(f.cart.state.cart!.toJson(), original);
+        expect(f.repo.creations, 0);
+        if (type == 'takeout') {
+          await tester.tap(find.text('Para llevar'));
+        } else {
+          await tester.tap(find.text('Comer aquí · Elegir mesa'));
+          await tester.pumpAndSettle();
+          expect(find.byType(OrderTablePicker), findsOneWidget);
+          expect(f.cart.state.cart!.toJson(), original);
+          await tester.tap(
+            find.byKey(const ValueKey('floor-plan-element-table')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('confirm-table')));
+        }
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('catalog-service-choice')),
+          findsNothing,
+        );
+        expect(f.cart.state.cart!.fulfillmentType, type);
+        expect(f.cart.state.cart!.items, isEmpty);
+        expect(
+          type == 'dine_in' ? f.cart.state.cart!.tableId : null,
+          type == 'dine_in' ? 'table' : null,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+  testWidgets(
+    'inline service cancellation, escape and disposal preserve the account',
+    (tester) async {
+      final f = await _fixture(lines: 2, withProduct: true);
+      addTearDown(f.dispose);
+      await _mount(tester, f.surface, size: const Size(402, 874));
+      final original = f.cart.state.cart!.toJson();
+      await tester.tap(find.byTooltip('Nuevo pedido'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Volver'));
+      await tester.pumpAndSettle();
+      expect(f.cart.state.cart!.toJson(), original);
+      await tester.tap(find.byTooltip('Nuevo pedido'));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('catalog-service-choice')),
+        findsNothing,
+      );
+      expect(f.cart.state.cart!.toJson(), original);
+      await tester.tap(find.byTooltip('Nuevo pedido'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mesas').last);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('catalog-service-choice')),
+        findsNothing,
+      );
+      expect(f.cart.state.cart!.toJson(), original);
+      await tester.tap(find.text('Venta').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Nuevo pedido'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+      expect(f.cart.state.cart!.toJson(), original);
+      expect(f.repo.creations, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('fresh mobile account asks for type immediately and once', (
     tester,
   ) async {
     final f = await _fixture(mobility: 'mobile');
     addTearDown(f.dispose);
     await _mount(tester, f.surface);
-    expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
+    expect(find.text('Servicio del nuevo pedido'), findsOneWidget);
     await tester.pump();
-    expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
+    expect(find.text('Servicio del nuevo pedido'), findsOneWidget);
     expect(f.repo.fulfillmentWrites, 0);
-    await tester.tap(find.text('Cancelar'));
+    await tester.tap(find.text('Volver'));
     await tester.pumpAndSettle();
     await f.cart.refresh();
     await tester.pumpAndSettle();
-    expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+    expect(find.text('Servicio del nuevo pedido'), findsNothing);
   });
   testWidgets('fixed fresh account starts without a type dialog', (
     tester,
@@ -841,7 +932,7 @@ void main() {
     final f = await _fixture();
     addTearDown(f.dispose);
     await _mount(tester, f.surface);
-    expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+    expect(find.text('Servicio del nuevo pedido'), findsNothing);
     expect(f.repo.fulfillmentWrites, 0);
     expect(f.plan.loads, 0);
   });
@@ -907,7 +998,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(
         find.descendant(
-          of: find.byType(PosAlertDialog),
+          of: find.byKey(const ValueKey('catalog-service-choice')),
           matching: find.text('Para llevar'),
         ),
       );
@@ -927,7 +1018,7 @@ void main() {
     await _mount(tester, f.surface);
     await f.cart.refresh();
     await tester.pumpAndSettle();
-    expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+    expect(find.text('Servicio del nuevo pedido'), findsNothing);
     expect(f.cart.state.cart!.items, hasLength(1));
     expect(f.repo.fulfillmentWrites, 0);
   });
@@ -939,7 +1030,7 @@ void main() {
       await _mount(tester, f.surface);
       await tester.tap(
         find.descendant(
-          of: find.byType(PosAlertDialog),
+          of: find.byKey(const ValueKey('catalog-service-choice')),
           matching: find.text('Para llevar'),
         ),
       );
@@ -949,7 +1040,7 @@ void main() {
       await f.cart.refresh();
       await tester.pumpAndSettle();
       expect(f.cart.state.cart!.fulfillmentType, 'takeout');
-      expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+      expect(find.text('Servicio del nuevo pedido'), findsNothing);
       expect(f.plan.loads, 1);
     },
   );
@@ -961,8 +1052,8 @@ void main() {
     await _mount(tester, f.surface);
     await tester.tap(
       find.descendant(
-        of: find.byType(PosAlertDialog),
-        matching: find.text('Comer aquí'),
+        of: find.byKey(const ValueKey('catalog-service-choice')),
+        matching: find.textContaining('Comer aquí'),
       ),
     );
     await tester.pumpAndSettle();
@@ -970,7 +1061,7 @@ void main() {
     expect(f.repo.tableOpens, 0);
     expect(f.cart.state.cart!.tableId, isNull);
     expect(f.cart.state.cart!.fulfillmentType, 'dine_in');
-    expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+    expect(find.text('Servicio del nuevo pedido'), findsNothing);
   });
   testWidgets(
     'fixed dine in checkout cancel keeps the account and never opens checkout',
@@ -1078,8 +1169,8 @@ void main() {
       await _mount(tester, f.surface);
       await tester.tap(
         find.descendant(
-          of: find.byType(PosAlertDialog),
-          matching: find.text('Comer aquí'),
+          of: find.byKey(const ValueKey('catalog-service-choice')),
+          matching: find.textContaining('Comer aquí'),
         ),
       );
       await tester.pumpAndSettle();
@@ -1114,7 +1205,7 @@ void main() {
       await f.cart.refresh();
       await tester.pumpAndSettle();
       expect(f.cart.state.cart!.tableId, 'created-table-2');
-      expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+      expect(find.text('Servicio del nuevo pedido'), findsNothing);
     },
   );
   testWidgets(
@@ -1166,16 +1257,16 @@ void main() {
       addTearDown(f.dispose);
       expect(f.cart.state.cart, isNull);
       await _mount(tester, f.surface);
-      expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+      expect(find.text('Servicio del nuevo pedido'), findsNothing);
       expect(f.repo.creations, 0);
       await tester.tap(find.text('Latte').first);
       await tester.pumpAndSettle();
-      expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
+      expect(find.text('Servicio del nuevo pedido'), findsOneWidget);
       expect(f.cart.state.cart, isNull);
       expect(f.repo.creations, 0);
       await tester.tap(
         find.descendant(
-          of: find.byType(PosAlertDialog),
+          of: find.byKey(const ValueKey('catalog-service-choice')),
           matching: find.text('Para llevar'),
         ),
       );
@@ -1185,7 +1276,7 @@ void main() {
       expect(f.repo.additions, 1);
       expect(f.cart.state.cart!.fulfillmentType, 'takeout');
       expect(f.cart.state.cart!.items, hasLength(1));
-      expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+      expect(find.text('Servicio del nuevo pedido'), findsNothing);
     },
   );
   testWidgets(
@@ -1204,8 +1295,8 @@ void main() {
       expect(f.repo.creations, 0);
       await tester.tap(
         find.descendant(
-          of: find.byType(PosAlertDialog),
-          matching: find.text('Comer aquí'),
+          of: find.byKey(const ValueKey('catalog-service-choice')),
+          matching: find.textContaining('Comer aquí'),
         ),
       );
       await tester.pumpAndSettle();
@@ -1237,17 +1328,17 @@ void main() {
     expect(f.cart.state.cart, isNull);
     expect(f.repo.startAttempts, 0);
     expect(f.repo.creations, 0);
-    expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+    expect(find.text('Servicio del nuevo pedido'), findsNothing);
     await tester.pump();
     expect(f.repo.startAttempts, 0);
     await tester.tap(find.text('Iniciar pedido').first);
     await tester.pumpAndSettle();
-    expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
-    await tester.tap(find.text('Cancelar'));
+    expect(find.text('Servicio del nuevo pedido'), findsOneWidget);
+    await tester.tap(find.text('Volver'));
     await tester.pumpAndSettle();
     expect(f.repo.startAttempts, 0);
     expect(f.cart.state.cart, isNull);
-    expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+    expect(find.text('Servicio del nuevo pedido'), findsNothing);
   });
   testWidgets(
     'mobile startup requests a frame after its last async task finishes while idle',
@@ -1257,14 +1348,14 @@ void main() {
       addTearDown(f.dispose);
       await _mount(tester, f.surface);
       expect(recovery.requested, isTrue);
-      expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+      expect(find.text('Servicio del nuevo pedido'), findsNothing);
       expect(tester.binding.hasScheduledFrame, isFalse);
       recovery.pending.complete(null);
       // Flush async completion without supplying a frame or an operator gesture.
       await tester.idle();
       expect(tester.binding.hasScheduledFrame, isTrue);
       await tester.pumpAndSettle();
-      expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
+      expect(find.text('Servicio del nuevo pedido'), findsOneWidget);
       expect(f.repo.tableOpens, 0);
       expect(f.repo.fulfillmentWrites, 0);
     },
