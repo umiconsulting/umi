@@ -223,8 +223,9 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
             );
             final list = ListView.separated(
               key: const ValueKey('incoming-list'),
+              padding: const EdgeInsets.all(12),
               itemCount: state.orders.length,
-              separatorBuilder: (_, _) => const PosDivider(),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (_, index) {
                 final order = state.orders[index];
                 return PosListRow(
@@ -247,8 +248,23 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
             return Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(width: 310, child: list),
-                const SizedBox(width: 24),
+                SizedBox(
+                  width: 304,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: PosTheme.of(context).colorScheme.background,
+                      border: Border(
+                        right: BorderSide(
+                          color: PosTheme.of(
+                            context,
+                          ).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                    child: list,
+                  ),
+                ),
+                const SizedBox(width: 16),
                 Expanded(child: detail(effective!)),
               ],
             );
@@ -295,8 +311,12 @@ final class _OrderCard extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final theme = PosTheme.of(context);
     final es = Localizations.localeOf(context).languageCode == 'es';
-    return Padding(
-      padding: const EdgeInsets.all(20),
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -324,7 +344,9 @@ final class _OrderCard extends StatelessWidget {
           ),
           const PosDivider(),
           Text(
-            es ? '${order.itemCount} productos' : '${order.itemCount} items',
+            es
+                ? '${order.itemCount} líneas de productos'
+                : '${order.itemCount} product lines',
           ),
           const SizedBox(height: 16),
           Text(
@@ -333,7 +355,10 @@ final class _OrderCard extends StatelessWidget {
                 : 'Product details, notes and pickup time are unavailable on this terminal. Taking the order links its reference; enter and verify the items before charging.',
           ),
           const SizedBox(height: 24),
-          Text(l.totalLabel, style: theme.textTheme.bodySmall),
+          Text(
+            es ? 'Total del pedido de origen' : 'Source order total',
+            style: theme.textTheme.bodySmall,
+          ),
           Text(
             formatMinorUnits(order.totalMinorUnits, 'MXN'),
             style: theme.textTheme.headlineSmall,

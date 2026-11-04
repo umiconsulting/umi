@@ -66,7 +66,14 @@ final class _ProductKeyGridLayout extends SliverGridLayout {
   final List<SliverGridGeometry> geometry;
 
   @override
-  SliverGridGeometry getGeometryForChildIndex(int index) => geometry[index];
+  SliverGridGeometry getGeometryForChildIndex(int index) => geometry.isEmpty
+      ? const SliverGridGeometry(
+          scrollOffset: 0,
+          crossAxisOffset: 0,
+          mainAxisExtent: 0,
+          crossAxisExtent: 0,
+        )
+      : geometry[index];
 
   @override
   int getMinChildIndexForScrollOffset(double scrollOffset) {

@@ -826,6 +826,15 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 700;
+            _methodBankVertical =
+                wide &&
+                constraints.maxWidth >= 1000 &&
+                MediaQuery.textScalerOf(context).scale(16) < 24 &&
+                ledger != null &&
+                !canFinalize &&
+                !hasUnknown &&
+                !uncertain &&
+                !finalizationUnknown;
             final editor = Column(
               children: [
                 Padding(
@@ -896,10 +905,19 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(flex: 6, child: editor),
+                  if (_methodBankVertical) ...[
+                    SizedBox(
+                      width: 168,
+                      child: SingleChildScrollView(
+                        child: _paymentMethods(vertical: true),
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                  ],
+                  Expanded(child: editor),
                   const SizedBox(width: 24),
-                  Expanded(
-                    flex: 4,
+                  SizedBox(
+                    width: 304,
                     child: Container(
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surface,
@@ -923,6 +941,8 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
       ),
     );
   }
+
+  bool _methodBankVertical = false;
 
   Widget _paymentControls() {
     final theme = PosTheme.of(context);
@@ -1117,39 +1137,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                 ],
               ),
             const SizedBox(height: UmiSpacing.md),
-            Text(
-              label('Método de pago', 'Payment method'),
-              style: theme.textTheme.titleMedium,
-            ),
-            if (lockedMethod != null)
-              Text(
-                label(
-                  'Esta cuenta continúa con el mismo método. El local no permite combinar métodos.',
-                  'This account keeps the same method. This location does not allow mixed methods.',
-                ),
-              ),
-            const SizedBox(height: UmiSpacing.sm),
-            Wrap(
-              spacing: UmiSpacing.sm,
-              runSpacing: UmiSpacing.sm,
-              children: [
-                if (widget.cashShiftId != null &&
-                    (lockedMethod == null || lockedMethod == 'cash'))
-                  _methodButton('cash', label('Efectivo', 'Cash')),
-                if (manualAllowed &&
-                    (lockedMethod == null || lockedMethod == 'manual_terminal'))
-                  _methodButton(
-                    'manual_terminal',
-                    label('Terminal externa', 'External terminal'),
-                  ),
-                if (bankAllowed &&
-                    (lockedMethod == null || lockedMethod == 'bank_transfer'))
-                  _methodButton(
-                    'bank_transfer',
-                    label('Transferencia', 'Bank transfer'),
-                  ),
-              ],
-            ),
+            if (!_methodBankVertical) _paymentMethods(),
             if (method == 'bank_transfer')
               PosTextButton(
                 key: const ValueKey('partial-bank-view-details'),
@@ -1172,6 +1160,46 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
       ],
     );
   }
+
+  Widget _paymentMethods({bool vertical = false}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(
+        label('Método de pago', 'Payment method'),
+        style: PosTheme.of(context).textTheme.titleMedium,
+      ),
+      if (lockedMethod != null)
+        Text(
+          label(
+            'Esta cuenta continúa con el mismo método. El local no permite combinar métodos.',
+            'This account keeps the same method. This location does not allow mixed methods.',
+          ),
+        ),
+      const SizedBox(height: UmiSpacing.sm),
+      Wrap(
+        direction: vertical ? Axis.vertical : Axis.horizontal,
+        spacing: UmiSpacing.sm,
+        runSpacing: UmiSpacing.sm,
+        children: [
+          if (widget.cashShiftId != null &&
+              (lockedMethod == null || lockedMethod == 'cash'))
+            _methodButton('cash', label('Efectivo', 'Cash')),
+          if (manualAllowed &&
+              (lockedMethod == null || lockedMethod == 'manual_terminal'))
+            _methodButton(
+              'manual_terminal',
+              label('Terminal externa', 'External terminal'),
+            ),
+          if (bankAllowed &&
+              (lockedMethod == null || lockedMethod == 'bank_transfer'))
+            _methodButton(
+              'bank_transfer',
+              label('Transferencia', 'Bank transfer'),
+            ),
+        ],
+      ),
+    ],
+  );
 
   Widget _accountSummary() {
     final theme = PosTheme.of(context);
@@ -1389,7 +1417,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
   }
 
   Widget _methodButton(String value, String title) => SizedBox(
-    width: 180,
+    width: _methodBankVertical ? 168 : 180,
     child: PaymentMethodTile(
       key: ValueKey('partial-method-$value'),
       icon: switch (value) {

@@ -176,6 +176,8 @@ void main() {
     expect(find.text('wa-1'), findsNWidgets(2));
     expect(find.textContaining('Recibido'), findsWidgets);
     expect(find.textContaining('Al atender se vincula'), findsOneWidget);
+    expect(find.text('Total del pedido de origen'), findsOneWidget);
+    expect(find.textContaining('líneas de productos'), findsOneWidget);
     expect(find.text('Atender'), findsOneWidget);
 
     await tester.tap(find.text('Atender'));
@@ -251,6 +253,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('incoming-list')), findsNothing);
         expect(find.textContaining('Al atender se vincula'), findsOneWidget);
+        expect(find.text('Total del pedido de origen'), findsOneWidget);
+        expect(find.textContaining('líneas de productos'), findsOneWidget);
         await tester.ensureVisible(find.text('Atender'));
         final rect = tester.getRect(find.text('Atender'));
         expect(rect.right, lessThanOrEqualTo(375));

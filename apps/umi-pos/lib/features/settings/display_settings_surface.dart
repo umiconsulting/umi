@@ -85,8 +85,8 @@ final class DisplaySettingsSurface extends StatelessWidget {
                   key: const ValueKey('settings-product-photos'),
                   title: Text(
                     Localizations.localeOf(context).languageCode == 'es'
-                        ? 'Fotos de productos'
-                        : 'Product photos',
+                        ? 'Fotos en el detalle del producto'
+                        : 'Product detail photos',
                   ),
                   value: prefs.showProductPhotos,
                   onChanged: prefs.busy ? null : prefs.setShowProductPhotos,
@@ -305,20 +305,25 @@ final class _PosSettingsWorkspaceState extends State<PosSettingsWorkspace> {
       ),
     };
     Widget sectionButton((String, String) tab, {required bool wide}) => Padding(
-      padding: EdgeInsets.only(right: wide ? 0 : 4, bottom: wide ? 4 : 0),
+      padding: const EdgeInsets.only(right: 8),
       child: PosTapRegion(
         selected: selected == tab.$1,
         semanticLabel: tab.$2,
         onTap: () => setState(() => _selected = tab.$1),
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          alignment: wide ? Alignment.centerLeft : Alignment.center,
+          constraints: const BoxConstraints(minHeight: 56),
+          alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             color: selected == tab.$1
-                ? theme.colorScheme.surfaceContainerHigh
-                : null,
+                ? theme.colorScheme.primaryContainer
+                : theme.colorScheme.surface,
+            border: Border.all(
+              color: selected == tab.$1
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.outlineVariant,
+            ),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(tab.$2, style: theme.textTheme.bodySmall),
@@ -340,29 +345,11 @@ final class _PosSettingsWorkspaceState extends State<PosSettingsWorkspace> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 800;
-          if (wide) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: 200,
-                  child: ListView(
-                    key: const ValueKey('settings-sections'),
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      for (final tab in tabs) sectionButton(tab, wide: true),
-                    ],
-                  ),
-                ),
-                Expanded(child: content),
-              ],
-            );
-          }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SingleChildScrollView(
+                key: const ValueKey('settings-sections'),
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
@@ -371,7 +358,7 @@ final class _PosSettingsWorkspaceState extends State<PosSettingsWorkspace> {
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 24),
               Expanded(child: content),
             ],
           );

@@ -807,6 +807,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
 
   void _incomingEntryChanged() {
     if (mounted) {
+      _refreshFrequent();
       unawaited(_refreshIncoming());
       setState(() {});
     }

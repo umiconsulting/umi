@@ -290,6 +290,92 @@ loadedBoard({List<KitchenOrderProjection>? orders}) async {
 }
 
 void main() {
+  testWidgets('preparation lanes use the actual station work state', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = await pumpBoard(
+      tester,
+      orders: [
+        order(
+          status: 'in_preparation',
+          reference: 'Active prep',
+          items: [itemJson(itemLatte, 'Latte', status: 'preparing')],
+        ),
+      ],
+    );
+    expect(
+      find.ancestor(
+        of: find.text('Active prep'),
+        matching: find.byKey(const ValueKey('kitchen-lane-preparing')),
+      ),
+      findsOneWidget,
+    );
+    expect(harness.kitchen.sent, isEmpty);
+    await harness.dispose(tester);
+  });
+
+  testWidgets(
+    'ready visibility changes presentation and retains a live station count',
+    (tester) async {
+      tester.view.physicalSize = const Size(1440, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final ready = order(status: 'ready', reference: 'Ready order');
+      final pending = KitchenOrderProjection.fromJson({
+        ...order(reference: 'Pending order').toJson(),
+        'id': 'pending-order',
+      });
+      final harness = await pumpBoard(tester, orders: [pending, ready]);
+      expect(find.text('Ready order'), findsOneWidget);
+      expect(find.text('Hide ready (1)'), findsOneWidget);
+      final reads = harness.room.reads;
+      await tester.tap(find.byKey(const ValueKey('kitchen-ready-visibility')));
+      await tester.pump();
+      expect(find.text('Ready order'), findsNothing);
+      expect(find.text('Pending order'), findsOneWidget);
+      expect(find.text('Show ready (1)'), findsOneWidget);
+      expect(harness.room.reads, reads);
+      expect(harness.kitchen.sent, isEmpty);
+      harness.room.orders = [pending];
+      await harness.board.refresh();
+      await tester.pump();
+      expect(find.text('Show ready (0)'), findsOneWidget);
+      expect(harness.kitchen.sent, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('kitchen-ready-visibility')));
+      await tester.pump();
+      expect(find.text('Hide ready (0)'), findsOneWidget);
+      await harness.dispose(tester);
+    },
+  );
+
+  testWidgets(
+    'ready lane follows the actual station status of a partial order',
+    (tester) async {
+      tester.view.physicalSize = const Size(1440, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final harness = await pumpBoard(
+        tester,
+        orders: [
+          order(
+            status: 'partially_ready',
+            reference: 'Station ready',
+            items: [itemJson(itemLatte, 'Latte', status: 'ready')],
+          ),
+        ],
+      );
+      expect(find.text('Hide ready (1)'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('kitchen-ready-visibility')));
+      await tester.pump();
+      expect(find.text('Station ready'), findsNothing);
+      expect(harness.kitchen.sent, isEmpty);
+      await harness.dispose(tester);
+    },
+  );
+
   testWidgets(
     'a queued ticket crosses its station threshold without a refresh',
     (tester) async {
@@ -1756,6 +1842,7 @@ void main() {
         ],
       );
 
+      await tester.ensureVisible(find.text('Fire course 2'));
       await tester.tap(find.text('Fire course 2'));
       await _settle(tester);
 

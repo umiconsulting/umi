@@ -11,9 +11,7 @@ import 'package:umi_pos/features/catalog/catalog_surface.dart';
 
 import 'support/fakes.dart';
 
-const _orange = Color(0xFFF28C28);
 const _neutral = Color(0xFF0D0D0D);
-const _ink = Color(0xFFF2F2F2);
 const _category = <String, Object?>{
   'id': 'bread',
   'name': 'Pan',
@@ -95,7 +93,7 @@ ShapeDecoration _buttonDecoration(WidgetTester tester) =>
 
 void main() {
   testWidgets(
-    'Midnight limits category color and retains accessible selection',
+    'Midnight photo-free keys retain readable category color and accessible selection',
     (tester) async {
       tester.view.physicalSize = const Size(1400, 900);
       tester.view.devicePixelRatio = 1;
@@ -138,34 +136,27 @@ void main() {
         );
         await tester.pump();
 
-        final initials = find.text('PI');
-        final background = tester
-            .widget<ColoredBox>(
-              find
-                  .ancestor(of: initials, matching: find.byType(ColoredBox))
-                  .first,
-            )
-            .color;
-        final foreground = tester.widget<Text>(initials).style!.color!;
-        expect(background, _neutral);
-        expect(foreground, _ink);
+        final product = find.byKey(const ValueKey('product-key-roll'));
+        final surface = tester.widget<Container>(
+          find
+              .descendant(
+                of: product,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Container && widget.decoration is BoxDecoration,
+                ),
+              )
+              .first,
+        );
+        final background = (surface.decoration! as BoxDecoration).color!;
+        final foreground = tester
+            .widget<Text>(find.text('Pan integral'))
+            .style!
+            .color!;
+        expect(background.computeLuminance(), lessThan(.1));
         expect(_contrast(foreground, background), greaterThanOrEqualTo(4.5));
-
-        final product = find
-            .ancestor(of: initials, matching: find.byType(PosTapRegion))
-            .first;
-        final band = find.descendant(
-          of: product,
-          matching: find.byWidgetPredicate(
-            (widget) => widget is ColoredBox && widget.color == _orange,
-          ),
-        );
-        expect(band, findsOneWidget);
-        expect(tester.getSize(band).height, 8);
-        expect(
-          tester.getSize(band).height,
-          lessThan(tester.getSize(product).height / 5),
-        );
+        expect(find.text('PI'), findsNothing);
+        expect(find.byType(Image), findsNothing);
 
         final tab = find.descendant(
           of: find.byKey(const ValueKey('catalog-category-index')),
@@ -175,7 +166,7 @@ void main() {
           of: tab,
           matching: find.byType(PosTapRegion),
         );
-        final surface = tester.widget<Container>(
+        final tabSurface = tester.widget<Container>(
           find
               .descendant(
                 of: tabRegion,
@@ -186,7 +177,7 @@ void main() {
               )
               .first,
         );
-        final fill = (surface.decoration! as BoxDecoration).color!;
+        final fill = (tabSurface.decoration! as BoxDecoration).color!;
         final ink = tester.widget<Text>(tab).style!.color!;
         expect(fill.computeLuminance(), lessThan(.1));
         expect(_contrast(ink, fill), greaterThanOrEqualTo(4.5));

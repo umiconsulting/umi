@@ -90,6 +90,7 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
   bool get _muted => _preferences?.kitchenSoundsMuted ?? _localMuted;
   String? _stationFilter;
   bool _filtersExpanded = false;
+  bool _showReady = true;
 
   @override
   void initState() {
@@ -426,6 +427,9 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
                   .where((order) => order.businessDate == businessDate)
                   .toList(),
     };
+    final readyCount = visible
+        .where((order) => kitchenStationStatus(order) == 'ready')
+        .length;
     final visibleCount = visible.length + unassignedVisible.length;
     final todayCount =
         today.length +
@@ -553,6 +557,31 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
                         ],
                       ),
                     ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: PosTextButton.icon(
+                        key: const ValueKey('kitchen-ready-visibility'),
+                        onPressed: () =>
+                            setState(() => _showReady = !_showReady),
+                        icon: PosIcon(
+                          _showReady
+                              ? PosGlyphs.visibilityOffOutlined
+                              : PosGlyphs.visibilityOutlined,
+                          size: 18,
+                        ),
+                        label: Text(
+                          spanish
+                              ? '${_showReady ? 'Ocultar' : 'Mostrar'} listos ($readyCount)'
+                              : '${_showReady ? 'Hide' : 'Show'} ready ($readyCount)',
+                        ),
+                      ),
+                    ),
+                  ),
                   if (state.errorCode != null)
                     _failureBanner(context, l10n, state.errorCode!),
                 ],
@@ -593,71 +622,145 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
                   ],
                 ),
               ),
-              _ => LayoutBuilder(
-                builder: (context, constraints) => SingleChildScrollView(
-                  padding: const EdgeInsets.all(UmiSpacing.md),
-                  child: Wrap(
-                    spacing: UmiSpacing.md,
-                    runSpacing: UmiSpacing.md,
-                    children: [
-                      for (final order in visible)
-                        _TicketCard(
-                          now: widget.clock(),
-                          currentBusinessDate: businessDate,
-                          permissions: OperatorPermissions(
-                            widget.entry.state.operator?.permissions ??
-                                const [],
-                          ),
-                          width:
-                              ((MediaQuery.sizeOf(context).width < 700
-                                          ? constraints.maxWidth -
-                                                2 * UmiSpacing.md
-                                          : 320) *
-                                      MediaQuery.textScalerOf(context).scale(1))
-                                  .clamp(
-                                    0.0,
-                                    (constraints.maxWidth - 2 * UmiSpacing.md)
-                                        .clamp(0.0, double.infinity),
-                                  )
-                                  .toDouble(),
-                          order: order,
-                          l10n: l10n,
-                          allDayFor: state.allDayFor,
-                          onItemTap: (itemId) =>
-                              widget.controller.markItemReady(order, itemId),
-                          onFire: (courseNumber) => widget.controller
-                              .fireCourse(order, courseNumber: courseNumber),
-                          onStart: () =>
-                              widget.controller.startPreparation(order),
-                          onComplete: () => widget.controller.complete(order),
-                          onDiscard: () => widget.controller.discard(order),
-                          onRecall: () => _recall(order),
-                        ),
-                      for (final order in unassignedVisible)
-                        _UnassignedTicketCard(
-                          width:
-                              ((MediaQuery.sizeOf(context).width < 700
-                                          ? constraints.maxWidth -
-                                                2 * UmiSpacing.md
-                                          : 320) *
-                                      MediaQuery.textScalerOf(context).scale(1))
-                                  .clamp(
-                                    0.0,
-                                    (constraints.maxWidth - 2 * UmiSpacing.md)
-                                        .clamp(0.0, double.infinity),
-                                  )
-                                  .toDouble(),
-                          order: order,
-                          onOpen: _openUnassigned,
-                        ),
-                    ],
-                  ),
-                ),
+              _ => _stateLanes(
+                context,
+                l10n,
+                state,
+                visible,
+                unassignedVisible,
               ),
             },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _stateLanes(
+    BuildContext context,
+    AppLocalizations l10n,
+    KitchenBoardState state,
+    List<KitchenOrderProjection> orders,
+    List<KitchenUnassignedOrderProjection> unassigned,
+  ) {
+    final es = l10n.localeName.startsWith('es');
+    final palette = PosTheme.of(context).colorScheme;
+    final queued = <KitchenOrderProjection>[];
+    final preparing = <KitchenOrderProjection>[];
+    final ready = <KitchenOrderProjection>[];
+    for (final order in orders) {
+      switch (kitchenStationStatus(order)) {
+        case 'ready':
+          ready.add(order);
+        case 'in_preparation' || 'partially_ready':
+          preparing.add(order);
+        default:
+          queued.add(order);
+      }
+    }
+    Widget ticket(KitchenOrderProjection order, double width) => _TicketCard(
+      now: widget.clock(),
+      currentBusinessDate: state.businessDate,
+      permissions: OperatorPermissions(
+        widget.entry.state.operator?.permissions ?? const [],
+      ),
+      width: width,
+      order: order,
+      l10n: l10n,
+      allDayFor: state.allDayFor,
+      onItemTap: (itemId) => widget.controller.markItemReady(order, itemId),
+      onFire: (courseNumber) =>
+          widget.controller.fireCourse(order, courseNumber: courseNumber),
+      onStart: () => widget.controller.startPreparation(order),
+      onComplete: () => widget.controller.complete(order),
+      onDiscard: () => widget.controller.discard(order),
+      onRecall: () => _recall(order),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 16.0;
+        final laneCount = _showReady ? 3 : 2;
+        final horizontal =
+            constraints.maxWidth >=
+            800 * MediaQuery.textScalerOf(context).scale(1);
+        final width = horizontal
+            ? (constraints.maxWidth - 32 - gap * (laneCount - 1)) / laneCount
+            : constraints.maxWidth - 32;
+        Widget lane(
+          String id,
+          String label,
+          List<KitchenOrderProjection> items, {
+          bool withUnassigned = false,
+        }) => Container(
+          key: ValueKey('kitchen-lane-$id'),
+          width: width,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: palette.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  '$label · ${items.length + (withUnassigned ? unassigned.length : 0)}',
+                  style: PosTheme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              for (final order in items) ...[
+                ticket(order, width - 24),
+                const SizedBox(height: 12),
+              ],
+              if (withUnassigned)
+                for (final order in unassigned) ...[
+                  _UnassignedTicketCard(
+                    width: width - 24,
+                    order: order,
+                    onOpen: _openUnassigned,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+            ],
+          ),
+        );
+        final lanes = [
+          lane(
+            'queued',
+            es ? 'Recibidos' : 'Received',
+            queued,
+            withUnassigned: true,
+          ),
+          lane(
+            'preparing',
+            es ? 'En preparación' : 'In preparation',
+            preparing,
+          ),
+          if (_showReady) lane('ready', es ? 'Listos' : 'Ready', ready),
+        ];
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: horizontal
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var index = 0; index < lanes.length; index++) ...[
+                      if (index > 0) const SizedBox(width: gap),
+                      lanes[index],
+                    ],
+                  ],
+                )
+              : Column(
+                  children: [
+                    for (var index = 0; index < lanes.length; index++) ...[
+                      if (index > 0) const SizedBox(height: gap),
+                      lanes[index],
+                    ],
+                  ],
+                ),
+        );
+      },
     );
   }
 
