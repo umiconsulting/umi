@@ -118,11 +118,13 @@ Future<void> showSplitCheckout(
   required CartController cart,
   required EntryController entry,
   required SaleLifecycleController sales,
+  Widget? headerAction,
 }) async {
   checkout.reset();
   await showPartialCheckout(
     context,
     checkout: checkout,
+    headerAction: headerAction,
     cart: cart,
     operatorSessionId:
         entry.state.operator?.id ?? cart.state.cart!.operatorSessionId,
@@ -195,6 +197,7 @@ Future<void> showCheckoutSheet(
   required EntryController entry,
   required SaleLifecycleController sales,
   CustomerValueController? customerValue,
+  Widget? headerAction,
   // The same call Ventas uses for a reprint, so the customer who asks for their
   // ticket at the counter gets it from the screen they are already standing at.
   // Null on a till with no hardware service, which is what makes the dialog offer
@@ -229,6 +232,7 @@ Future<void> showCheckoutSheet(
       builder: (routeContext) => PosPage(
         backgroundColor: PosTheme.of(context).scaffoldBackgroundColor,
         appBar: PosHeader(
+          actionsInline: true,
           automaticallyImplyLeading: false,
           toolbarHeight: 56,
           title: Row(
@@ -257,18 +261,26 @@ Future<void> showCheckoutSheet(
             ],
           ),
           actions: [
+            ?headerAction,
             if (entry.operatorName != null)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  entry.operatorName!,
-                  style: PosTheme.of(context).textTheme.bodySmall,
+                child: SizedBox(
+                  width: MediaQuery.sizeOf(routeContext).width < 700 ? 80 : 160,
+                  child: PosTooltip(
+                    message: entry.operatorName!,
+                    child: Text(
+                      entry.operatorName!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: PosTheme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
                 ),
               ),
           ],
         ),
-        bottomNavigationBar:
-            navigation == null || MediaQuery.sizeOf(routeContext).width < 700
+        bottomNavigationBar: navigation == null
             ? null
             : PosNavigation(
                 destinations: navigation.destinations,
@@ -276,6 +288,7 @@ Future<void> showCheckoutSheet(
               ),
         body: _CheckoutSheet(
           checkout: checkout,
+          headerAction: headerAction,
           cashShiftId: cashShiftId,
           cart: cart,
           entry: entry,
@@ -321,6 +334,7 @@ final class _CheckoutSheet extends StatefulWidget {
     required this.entry,
     required this.sales,
     required this.customerValue,
+    this.headerAction,
     this.onPrint,
     required this.onRecoverCashShift,
     required this.onOpenCashShift,
@@ -337,6 +351,7 @@ final class _CheckoutSheet extends StatefulWidget {
   final EntryController entry;
   final SaleLifecycleController sales;
   final CustomerValueController? customerValue;
+  final Widget? headerAction;
 
   /// Print this sale's receipt — the completion screen's own way in, and the same
   /// request Ventas makes. See `receiptPrintAction` for why the paper is a copy.
@@ -594,6 +609,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       await showPartialCheckout(
         context,
         checkout: widget.checkout,
+        headerAction: widget.headerAction,
         cart: widget.cart,
         operatorSessionId:
             widget.entry.state.operator?.id ??
@@ -876,6 +892,182 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         (state.result?.policy == null
             ? null
             : CheckoutPolicy.fromJson(state.result!.policy!));
+    final splitControl = _partialControlOffered(policy)
+        ? PosTextButton.icon(
+            key: const ValueKey('partial-checkout-open'),
+            onPressed: _openPartialCheckout,
+            icon: const PosIcon(PosGlyphs.callSplit),
+            label: Text(l.splitTenderAction),
+          )
+        : !widget.checkout.supportsPartialPayments &&
+              _splitControlOffered(policy)
+        ? PosTextButton.icon(
+            key: ValueKey(
+              splitArmed ? 'tender-split-disarm' : 'tender-split-arm',
+            ),
+            onPressed: () => _toggleSplit(!splitArmed, totals),
+            icon: PosIcon(
+              splitArmed ? PosGlyphs.mergeType : PosGlyphs.callSplit,
+            ),
+            label: Text(
+              splitArmed ? l.splitTenderCancelAction : l.splitTenderAction,
+            ),
+          )
+        : const SizedBox.shrink();
+
+    final compact =
+        MediaQuery.sizeOf(context).width < 700 &&
+        MediaQuery.textScalerOf(context).scale(16) < 24;
+    final adjustments = <Widget>[
+      if (policy?.tip['enabled'] == true)
+        PosDisclosure(
+          compact: compact,
+          key: const ValueKey('checkout-tip-disclosure'),
+          title: Text(l.tipLabel),
+          initiallyExpanded: tipKind != 'none',
+          children: [
+            Wrap(
+              spacing: UmiSpacing.sm,
+              children: [
+                PosChoice(
+                  label: Text(l.noTipAction),
+                  selected: tipKind == 'none',
+                  onSelected: (_) => _clearTip(),
+                ),
+                for (final raw
+                    in policy!.tip['presetBasisPoints']! as List<Object?>)
+                  PosChoice(
+                    label: Text('${(raw as num).toInt() ~/ 100}%'),
+                    selected:
+                        tipKind == 'percentage' &&
+                        tipBasisPoints == raw.toInt(),
+                    onSelected: (_) => _setTipPercentage(raw.toInt()),
+                  ),
+              ],
+            ),
+            const SizedBox(height: UmiSpacing.sm),
+            Row(
+              children: [
+                if (policy.tip['customPercentageEnabled'] == true)
+                  Expanded(
+                    child: PosField(
+                      key: const ValueKey('custom-tip-percentage'),
+                      controller: customTipPercent,
+                      // Same rule as the cash received: the keypad writes, the
+                      // field shows. Tapping it is what moves the keypad here.
+                      readOnly: true,
+                      showCursor: false,
+                      decoration: PosFieldDecoration(
+                        labelText: l.customTipPercentLabel,
+                      ),
+                      // Tapping the field is how the operator says "I am typing
+                      // this number now": it takes the keypad and starts a fresh
+                      // percentage, so a preset they had chosen is not appended
+                      // to (15 + 5 is not 155 %).
+                      onTap: () {
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        setState(() {
+                          _padTarget = 'tip_percent';
+                          customTipPercent.text = '';
+                          tipKind = 'percentage';
+                          tipBasisPoints = 0;
+                          dirty = true;
+                        });
+                      },
+                    ),
+                  ),
+                if (policy.tip['customPercentageEnabled'] == true &&
+                    policy.tip['customFixedEnabled'] == true)
+                  const SizedBox(width: UmiSpacing.md),
+                if (policy.tip['customFixedEnabled'] == true)
+                  Expanded(
+                    child: PosField(
+                      key: const ValueKey('custom-tip-fixed'),
+                      controller: customTipFixed,
+                      readOnly: true,
+                      showCursor: false,
+                      decoration: PosFieldDecoration(
+                        labelText: l.customTipFixedLabel,
+                      ),
+                      onTap: () {
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        setState(() {
+                          _padTarget = 'tip_fixed';
+                          customTipFixed.clear();
+                          tipKind = 'fixed';
+                          dirty = true;
+                        });
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      if (policy?.discount['enabled'] == true)
+        PosDisclosure(
+          compact: compact,
+          key: const ValueKey('checkout-discount-disclosure'),
+          title: Text(l.discountLabel),
+          initiallyExpanded: discountPercent.text.isNotEmpty,
+          children: [
+            Wrap(
+              spacing: UmiSpacing.sm,
+              children: [
+                PosChoice(
+                  label: Text(l.percentageDiscountAction),
+                  selected: discountType == 'order_percentage',
+                  onSelected: (_) => _setDiscountType('order_percentage'),
+                ),
+                PosChoice(
+                  label: Text(l.fixedDiscountAction),
+                  selected: discountType == 'order_fixed',
+                  onSelected: (_) => _setDiscountType('order_fixed'),
+                ),
+              ],
+            ),
+            const SizedBox(height: UmiSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: PosField(
+                    controller: discountPercent,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: false,
+                    ),
+                    decoration: PosFieldDecoration(
+                      labelText: discountType == 'order_fixed'
+                          ? l.discountAmountLabel
+                          : l.discountPercentLabel,
+                    ),
+                    // A discount moves the amount due (and the base the tip is
+                    // computed on), so the tenders are re-seeded with it.
+                    onChanged: (_) {
+                      setState(() => dirty = true);
+                      _rebalanceForDraftChange();
+                    },
+                  ),
+                ),
+                const SizedBox(width: UmiSpacing.md),
+                Expanded(
+                  child: PosField(
+                    controller: discountReason,
+                    decoration: PosFieldDecoration(
+                      labelText: l.discountReasonLabel,
+                    ),
+                    // The reason is what makes the discount travel (`_discountDrafts`
+                    // drops one without it), so it can turn the discount on and off.
+                    onChanged: (_) {
+                      setState(() => dirty = true);
+                      _rebalanceForDraftChange();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+    ];
     final paymentSummary = state.result?.paymentSummary == null
         ? null
         : PaymentSummary.fromJson(state.result!.paymentSummary!);
@@ -939,20 +1131,26 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           // Phones share one scroll. Larger screens keep the bill beside the tender.
           // The final action remains outside both scroll areas.
           _ => _CheckoutLayout(
+            split: splitControl,
             methods: LayoutBuilder(
               builder: (context, constraints) {
-                final columns = constraints.maxWidth < 200
+                final compact = MediaQuery.sizeOf(context).width < 700;
+                final count = _methodsOffered(policy);
+                final columns = compact
+                    ? (MediaQuery.textScalerOf(context).scale(16) < 24
+                          ? (constraints.maxWidth ~/ 96).clamp(1, count)
+                          : 2)
+                    : constraints.maxWidth < 200
                     ? 1
-                    : constraints.maxWidth >= 330 &&
-                          MediaQuery.textScalerOf(context).scale(16) < 24
+                    : constraints.maxWidth >= 330
                     ? 3
                     : 2;
+                final gap = compact ? 4.0 : 16.0;
                 final width =
-                    (constraints.maxWidth - UmiSpacing.md * (columns - 1)) /
-                    columns;
+                    (constraints.maxWidth - gap * (columns - 1)) / columns;
                 return Wrap(
-                  spacing: UmiSpacing.md,
-                  runSpacing: UmiSpacing.md,
+                  spacing: gap,
+                  runSpacing: gap,
                   children: [
                     SizedBox(
                       width: width,
@@ -1064,29 +1262,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                   }),
                 ),
                 const SizedBox(height: 24),
-                if (_partialControlOffered(policy))
-                  PosTextButton.icon(
-                    key: const ValueKey('partial-checkout-open'),
-                    onPressed: _openPartialCheckout,
-                    icon: const PosIcon(PosGlyphs.callSplit),
-                    label: Text(l.splitTenderAction),
-                  )
-                else if (!widget.checkout.supportsPartialPayments &&
-                    _splitControlOffered(policy))
-                  PosTextButton.icon(
-                    key: ValueKey(
-                      splitArmed ? 'tender-split-disarm' : 'tender-split-arm',
-                    ),
-                    onPressed: () => _toggleSplit(!splitArmed, totals),
-                    icon: PosIcon(
-                      splitArmed ? PosGlyphs.mergeType : PosGlyphs.callSplit,
-                    ),
-                    label: Text(
-                      splitArmed
-                          ? l.splitTenderCancelAction
-                          : l.splitTenderAction,
-                    ),
-                  ),
+                if (MediaQuery.sizeOf(context).width >= 700) splitControl,
                 const SizedBox(height: 16),
                 Text(
                   '${l.businessDateLabel}: ${totals.businessDate}',
@@ -1094,14 +1270,65 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 ),
               ],
             ),
-            summary: Column(
+            summary: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (compact)
+                  PosIconButton(
+                    tooltip: l.localeName.startsWith('es')
+                        ? 'Volver a la cuenta'
+                        : 'Back to account',
+                    onPressed: () => _closeCheckout(context),
+                    icon: const PosIcon(PosGlyphs.arrowBack, size: 18),
+                  ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        accountDisplayTitle(
+                          cart,
+                          spanish: l.localeName.startsWith('es'),
+                        ),
+                        style: PosTheme.of(context).textTheme.titleSmall,
+                      ),
+                      if (MediaQuery.sizeOf(context).width >= 700)
+                        Text(
+                          l.checkoutTitle,
+                          style: PosTheme.of(context).textTheme.titleLarge,
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        l.remainingBalanceLabel,
+                        style: PosTheme.of(context).textTheme.labelSmall,
+                      ),
+                      Text(
+                        _money({
+                          'currency': totals.grandTotal['currency'],
+                          'minorUnits': grandTotal,
+                        }),
+                        style: PosTheme.of(context).textTheme.titleLarge,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            form: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: PosTooltip(
-                    message: l.closeAction,
+                if (!compact)
+                  Align(
+                    alignment: Alignment.centerLeft,
                     child: PosTextButton.icon(
+                      compact: true,
                       onPressed: () => _closeCheckout(context),
                       icon: const PosIcon(PosGlyphs.arrowBack, size: 16),
                       label: Text(
@@ -1111,27 +1338,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  accountDisplayTitle(
-                    cart,
-                    spanish: l.localeName.startsWith('es'),
-                  ),
-                  style: PosTheme.of(context).textTheme.bodySmall,
-                ),
-                Text(
-                  l.checkoutTitle,
-                  style: PosTheme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                _TotalHero(
-                  label: l.remainingBalanceLabel,
-                  amount: _money({
-                    'currency': totals.grandTotal['currency'],
-                    'minorUnits': grandTotal,
-                  }),
-                ),
                 // Loyalty and stored value only apply when a customer is
                 // attached. An anonymous sale showed a permanent "Consulta en
                 // curso." block and fired a lookup for a customer that does not
@@ -1139,14 +1345,14 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 // `_loadCustomerValuePreview`).
                 if (widget.customerValue != null && _hasCustomer)
                   _customerValueSection(totals),
-                const SizedBox(height: UmiSpacing.lg),
+                SizedBox(height: compact ? 8 : UmiSpacing.lg),
                 // What the terminal said about the card attempt, in its
                 // own words where it has any. It stays on screen after the
                 // tile is deselected (a refusal leaves the sale open, and
                 // the operator must be able to read why).
                 if (cardMessage != null) ...[
                   _cardTerminalNotice(context, cardMessage!),
-                  const SizedBox(height: UmiSpacing.lg),
+                  SizedBox(height: compact ? 8 : UmiSpacing.lg),
                 ],
                 _tenderReading(context, totals),
                 // One method per sale here, and more than one way to pay:
@@ -1161,157 +1367,25 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     ),
                   ),
                 ],
-                if (policy?.tip['enabled'] == true)
+                if (compact && adjustments.isNotEmpty)
                   PosDisclosure(
-                    key: const ValueKey('checkout-tip-disclosure'),
-                    title: Text(l.tipLabel),
-                    initiallyExpanded: tipKind != 'none',
-                    children: [
-                      Wrap(
-                        spacing: UmiSpacing.sm,
-                        children: [
-                          PosChoice(
-                            label: Text(l.noTipAction),
-                            selected: tipKind == 'none',
-                            onSelected: (_) => _clearTip(),
-                          ),
-                          for (final raw
-                              in policy!.tip['presetBasisPoints']!
-                                  as List<Object?>)
-                            PosChoice(
-                              label: Text('${(raw as num).toInt() ~/ 100}%'),
-                              selected:
-                                  tipKind == 'percentage' &&
-                                  tipBasisPoints == raw.toInt(),
-                              onSelected: (_) => _setTipPercentage(raw.toInt()),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: UmiSpacing.sm),
-                      Row(
-                        children: [
-                          if (policy.tip['customPercentageEnabled'] == true)
-                            Expanded(
-                              child: PosField(
-                                key: const ValueKey('custom-tip-percentage'),
-                                controller: customTipPercent,
-                                // Same rule as the cash received: the keypad writes, the
-                                // field shows. Tapping it is what moves the keypad here.
-                                readOnly: true,
-                                showCursor: false,
-                                decoration: PosFieldDecoration(
-                                  labelText: l.customTipPercentLabel,
-                                ),
-                                // Tapping the field is how the operator says "I am typing
-                                // this number now": it takes the keypad and starts a fresh
-                                // percentage, so a preset they had chosen is not appended
-                                // to (15 + 5 is not 155 %).
-                                onTap: () {
-                                  FocusManager.instance.primaryFocus?.unfocus();
-                                  setState(() {
-                                    _padTarget = 'tip_percent';
-                                    customTipPercent.text = '';
-                                    tipKind = 'percentage';
-                                    tipBasisPoints = 0;
-                                    dirty = true;
-                                  });
-                                },
-                              ),
-                            ),
-                          if (policy.tip['customPercentageEnabled'] == true &&
-                              policy.tip['customFixedEnabled'] == true)
-                            const SizedBox(width: UmiSpacing.md),
-                          if (policy.tip['customFixedEnabled'] == true)
-                            Expanded(
-                              child: PosField(
-                                key: const ValueKey('custom-tip-fixed'),
-                                controller: customTipFixed,
-                                readOnly: true,
-                                showCursor: false,
-                                decoration: PosFieldDecoration(
-                                  labelText: l.customTipFixedLabel,
-                                ),
-                                onTap: () {
-                                  FocusManager.instance.primaryFocus?.unfocus();
-                                  setState(() {
-                                    _padTarget = 'tip_fixed';
-                                    customTipFixed.clear();
-                                    tipKind = 'fixed';
-                                    dirty = true;
-                                  });
-                                },
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                if (policy?.discount['enabled'] == true)
-                  PosDisclosure(
-                    key: const ValueKey('checkout-discount-disclosure'),
-                    title: Text(l.discountLabel),
-                    initiallyExpanded: discountPercent.text.isNotEmpty,
-                    children: [
-                      Wrap(
-                        spacing: UmiSpacing.sm,
-                        children: [
-                          PosChoice(
-                            label: Text(l.percentageDiscountAction),
-                            selected: discountType == 'order_percentage',
-                            onSelected: (_) =>
-                                _setDiscountType('order_percentage'),
-                          ),
-                          PosChoice(
-                            label: Text(l.fixedDiscountAction),
-                            selected: discountType == 'order_fixed',
-                            onSelected: (_) => _setDiscountType('order_fixed'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: UmiSpacing.sm),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: PosField(
-                              controller: discountPercent,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: false,
-                                  ),
-                              decoration: PosFieldDecoration(
-                                labelText: discountType == 'order_fixed'
-                                    ? l.discountAmountLabel
-                                    : l.discountPercentLabel,
-                              ),
-                              // A discount moves the amount due (and the base the tip is
-                              // computed on), so the tenders are re-seeded with it.
-                              onChanged: (_) {
-                                setState(() => dirty = true);
-                                _rebalanceForDraftChange();
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: UmiSpacing.md),
-                          Expanded(
-                            child: PosField(
-                              controller: discountReason,
-                              decoration: PosFieldDecoration(
-                                labelText: l.discountReasonLabel,
-                              ),
-                              // The reason is what makes the discount travel (`_discountDrafts`
-                              // drops one without it), so it can turn the discount on and off.
-                              onChanged: (_) {
-                                setState(() => dirty = true);
-                                _rebalanceForDraftChange();
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                    compact: true,
+                    initiallyExpanded:
+                        tipKind != 'none' || discountPercent.text.isNotEmpty,
+                    title: Text(
+                      [
+                        if (policy?.tip['enabled'] == true) l.tipLabel,
+                        if (policy?.discount['enabled'] == true)
+                          l.discountLabel,
+                      ].join(' · '),
+                      style: PosTheme.of(context).textTheme.bodySmall,
+                    ),
+                    children: adjustments,
+                  )
+                else
+                  ...adjustments,
                 if (cashEnabled) ...[
-                  const SizedBox(height: UmiSpacing.lg),
+                  SizedBox(height: compact ? 8 : UmiSpacing.lg),
                   // Split tender only: how much of the bill goes on cash (the rest
                   // is charged to the card, whichever card tile is on). A
                   // single-method cash sale collects the whole total, so this field
@@ -1331,7 +1405,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       ),
                       onChanged: (_) => _editSplitAmount('cash'),
                     ),
-                    const SizedBox(height: UmiSpacing.md),
+                    SizedBox(height: compact ? 8 : UmiSpacing.md),
                   ],
                   // Cash received: a big right-aligned amount the keypad and the
                   // quick-cash notes both drive, so a barista never hunts for the
@@ -1345,8 +1419,16 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     showCursor: false,
                     inputFormatters: cashAmountFormatters,
                     textAlign: TextAlign.right,
-                    style: PosTheme.of(context).textTheme.headlineSmall,
+                    style: compact
+                        ? PosTheme.of(context).textTheme.titleLarge
+                        : PosTheme.of(context).textTheme.headlineSmall,
                     decoration: PosFieldDecoration(
+                      contentPadding: compact
+                          ? const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            )
+                          : null,
                       labelText: l.cashReceivedLabel,
                       errorText: parseMinorUnits(cashReceived.text) == null
                           ? l.invalidAmountMessage
@@ -1396,10 +1478,10 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       ],
                     ],
                   ),
-                  const SizedBox(height: UmiSpacing.md),
+                  SizedBox(height: compact ? 8 : UmiSpacing.md),
                 ],
                 if (terminalEnabled) ...[
-                  const SizedBox(height: UmiSpacing.lg),
+                  SizedBox(height: compact ? 8 : UmiSpacing.lg),
                   Text(
                     l.manualTerminalLabel,
                     style: PosTheme.of(context).textTheme.titleSmall,
@@ -1438,7 +1520,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 // NOTHING here: the terminal is the witness, and the till
                 // follows its attempt until it answers.
                 if (cardEnabled) ...[
-                  const SizedBox(height: UmiSpacing.lg),
+                  SizedBox(height: compact ? 8 : UmiSpacing.lg),
                   Text(
                     l.cardTerminalLabel,
                     style: PosTheme.of(context).textTheme.titleSmall,
@@ -1472,7 +1554,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                   ],
                 ],
                 if (bankEnabled) ...[
-                  const SizedBox(height: UmiSpacing.lg),
+                  SizedBox(height: compact ? 8 : UmiSpacing.lg),
                   Text(
                     l.bankTransferLabel,
                     style: PosTheme.of(context).textTheme.titleSmall,
@@ -1514,7 +1596,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 ],
                 if (state.phase == CheckoutPhase.confirmationRequired &&
                     !_chargeInFlight) ...[
-                  const SizedBox(height: UmiSpacing.lg),
+                  SizedBox(height: compact ? 8 : UmiSpacing.lg),
                   Semantics(
                     liveRegion: true,
                     child: Text(l.totalsConfirmedBody),
@@ -1574,6 +1656,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
               children: [
                 PosButton(
                   key: const ValueKey('checkout-charge'),
+                  compact: true,
                   // An unreadable amount never leaves the terminal. Sending it
                   // meant tendering a number the cashier did not type.
                   style: PosButton.styleFrom(
@@ -1619,11 +1702,12 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         : '${l.checkoutAction} · ${_money({'currency': totals.grandTotal['currency'], 'minorUnits': grandTotal})}',
                   ),
                 ),
-                const SizedBox(height: UmiSpacing.sm),
-                PosTextButton(
-                  onPressed: () => _closeCheckout(context),
-                  child: Text(l.closeAction),
-                ),
+                if (!compact) const SizedBox(height: UmiSpacing.sm),
+                if (!compact)
+                  PosTextButton(
+                    onPressed: () => _closeCheckout(context),
+                    child: Text(l.closeAction),
+                  ),
               ],
             ),
           ),
@@ -1743,35 +1827,37 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       final tone = owes ? scheme.errorContainer : scheme.primaryContainer;
       final ink = owes ? scheme.onErrorContainer : scheme.onPrimaryContainer;
       return Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: UmiSpacing.lg,
-          vertical: UmiSpacing.md,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
           color: tone,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(8),
         ),
-        child: Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          spacing: 16,
-          runSpacing: 8,
+        child: Row(
           children: [
-            Text(
-              owes
-                  ? (es ? 'Falta por cobrar' : 'Amount due')
-                  : (es ? 'Cambio' : 'Change due'),
-              style: PosTheme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: ink),
+            Expanded(
+              child: Text(
+                owes
+                    ? (es ? 'Falta por cobrar' : 'Amount due')
+                    : (es ? 'Cambio' : 'Change due'),
+                style: PosTheme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: ink),
+              ),
             ),
-            Text(
-              _money({
-                'currency': totals.grandTotal['currency'] as String? ?? '',
-                'minorUnits': change.abs(),
-              }),
-              style: PosTheme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: ink,
+            const SizedBox(width: 8),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  _money({
+                    'currency': totals.grandTotal['currency'] as String? ?? '',
+                    'minorUnits': change.abs(),
+                  }),
+                  style: PosTheme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: ink,
+                  ),
+                ),
               ),
             ),
           ],
@@ -4426,52 +4512,74 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       'minorUnits': minor,
     };
     final theme = PosTheme.of(context);
+    final cashResult =
+        summary?.tenders.any((tender) => tender['type'] == 'cash') ??
+        cashEnabled;
+    final methods = summary?.tenders
+        .map(
+          (tender) => switch (tender['type']) {
+            'cash' => l.cashPayment,
+            'manual_terminal' => l.manualTerminalLabel,
+            'card_terminal' => l.cardTerminalLabel,
+            'bank_transfer' => l.bankTransferLabel,
+            _ => tender['type']?.toString() ?? '',
+          },
+        )
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .join(' · ');
+    final paidCart = widget.cart.state.cart;
     final payoff = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: PosIcon(
-            PosGlyphs.checkCircle,
-            size: 48,
-            color: theme.colorScheme.primary,
+        if (paidCart != null)
+          Text(
+            accountDisplayTitle(paidCart, spanish: es),
+            style: theme.textTheme.bodySmall,
           ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            PosIcon(
+              PosGlyphs.checkCircle,
+              size: 20,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(es ? 'Pagado' : 'Paid', style: theme.textTheme.titleLarge),
+          ],
         ),
-        const SizedBox(height: 16),
-        Text(es ? 'Pagado' : 'Paid', style: theme.textTheme.headlineSmall),
+        if (methods != null && methods.isNotEmpty)
+          Text(methods, style: theme.textTheme.bodySmall),
+        const SizedBox(height: 24),
+        Text(
+          cashResult
+              ? (es ? 'Cambio a dar' : 'Change due')
+              : (es ? 'Importe cobrado' : 'Amount charged'),
+          style: theme.textTheme.bodyMedium,
+        ),
         const SizedBox(height: 8),
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
-          child: Text(_money(total), style: theme.textTheme.displayLarge),
-        ),
-        const SizedBox(height: 24),
-        if (changeMinor > 0) ...[
-          const PosDivider(),
-          Text(
-            es ? 'Cambio a dar' : 'Change due',
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              _money(money(changeMinor)),
-              style: theme.textTheme.displayLarge?.copyWith(
-                color: theme.colorScheme.primary,
-              ),
+          child: Text(
+            _money(cashResult ? money(changeMinor) : total),
+            style: theme.textTheme.displayLarge?.copyWith(
+              color: theme.colorScheme.primary,
             ),
           ),
-          const PosDivider(),
-          const SizedBox(height: 16),
-        ],
+        ),
+        const SizedBox(height: 24),
         Text(
-          '${es ? 'Recibiste' : 'Received'}: ${_money(money(receivedMinor))}   ·   '
           '${es ? 'Consumo' : 'Total'}: ${_money(total)}',
           style: theme.textTheme.bodySmall,
         ),
+        if (cashResult)
+          Text(
+            '${es ? 'Recibiste' : 'Received'}: ${_money(money(receivedMinor))}',
+            style: theme.textTheme.bodySmall,
+          ),
       ],
     );
     final actions = Wrap(
@@ -4519,6 +4627,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       ),
                       child: ReceiptDocument(
                         receipt: receipt,
+                        scrollable: wide,
                         padding: const EdgeInsets.all(24),
                       ),
                     );
@@ -4536,7 +4645,14 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     ),
                     if (document != null) ...[
                       const SizedBox(width: 24),
-                      Expanded(child: document),
+                      Expanded(
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 400),
+                            child: document,
+                          ),
+                        ),
+                      ),
                     ],
                   ],
                 );
@@ -4546,7 +4662,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                   payoff,
                   if (document != null) ...[
                     const SizedBox(height: 24),
-                    SizedBox(height: 400, child: document),
+                    document,
                   ],
                 ],
               );
@@ -4561,7 +4677,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   }
 
   Widget _nextOrder(BuildContext context, bool committed, bool es) => PosButton(
-    style: PosButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+    compact: true,
+    style: PosButton.styleFrom(minimumSize: const Size.fromHeight(48)),
     onPressed: () async {
       if (!committed) {
         committed = true;
@@ -4696,32 +4813,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     // cannot speak for leaves nothing here to charge against.
     if (mounted && hold != 'held_by_this_device') Navigator.of(context).pop();
   }
-}
-
-/// The amount due, rendered extra-large in a tinted card — the anchor of the
-/// tender screen. It scales down rather than wrap so a four-figure total still
-/// fits on one line.
-final class _TotalHero extends StatelessWidget {
-  const _TotalHero({required this.label, required this.amount});
-  final String label, amount;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: PosTheme.of(context).textTheme.bodySmall),
-        const SizedBox(height: 4),
-        Text(
-          amount,
-          style: PosTheme.of(context).textTheme.headlineMedium?.copyWith(
-            fontSize: 30,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 /// A payment method as a big, labelled, tappable tile (not a chip): the two or
@@ -5022,12 +5113,14 @@ final class _Numpad extends StatelessWidget {
       '.', '0', 'back',
     ];
     return GridView(
+      key: const ValueKey('checkout-keypad'),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         mainAxisExtent:
-            52 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 1.5),
-        mainAxisSpacing: UmiSpacing.sm,
-        crossAxisSpacing: UmiSpacing.sm,
+            (MediaQuery.sizeOf(context).width < 700 ? 44 : 52) *
+            MediaQuery.textScalerOf(context).scale(1).clamp(1, 1.5),
+        mainAxisSpacing: 4,
+        crossAxisSpacing: 4,
       ),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -5095,13 +5188,15 @@ final class _AmountRow extends StatelessWidget {
 class _CheckoutLayout extends StatelessWidget {
   const _CheckoutLayout({
     required this.summary,
+    required this.form,
+    required this.split,
     required this.methods,
     required this.tender,
     required this.actions,
     required this.account,
     this.change,
   });
-  final Widget summary, methods, tender, actions, account;
+  final Widget summary, form, split, methods, tender, actions, account;
   final Widget? change;
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -5120,18 +5215,28 @@ class _CheckoutLayout extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   summary,
-                  if (!methodBank) ...[methods, const SizedBox(height: 16)],
-                  const SizedBox(height: 12),
-                  tender,
                   if (!wide)
-                    PosDisclosure(
-                      title: Text(
-                        Localizations.localeOf(context).languageCode == 'es'
-                            ? 'Detalle de la cuenta'
-                            : 'Account details',
-                      ),
-                      children: [account],
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: PosDisclosure(
+                            compact: !wide,
+                            title: Text(
+                              Localizations.localeOf(context).languageCode ==
+                                      'es'
+                                  ? 'Detalle de la cuenta'
+                                  : 'Account details',
+                            ),
+                            children: [account],
+                          ),
+                        ),
+                        split,
+                      ],
                     ),
+                  if (!methodBank) ...[methods, const SizedBox(height: 8)],
+                  form,
+                  tender,
                   const SizedBox(height: 16),
                 ],
               ),

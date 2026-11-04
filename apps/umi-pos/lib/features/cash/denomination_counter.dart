@@ -66,6 +66,7 @@ class DenominationCounter extends StatefulWidget {
     required this.denominations,
     required this.onChanged,
     this.showTotal = true,
+    this.grouped = false,
     super.key,
   });
 
@@ -73,6 +74,7 @@ class DenominationCounter extends StatefulWidget {
   final List<int> denominations;
   final ValueChanged<DenominationTally> onChanged;
   final bool showTotal;
+  final bool grouped;
 
   @override
   State<DenominationCounter> createState() => _DenominationCounterState();
@@ -180,6 +182,65 @@ class _DenominationCounterState extends State<DenominationCounter> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = PosTheme.of(context);
+    if (widget.grouped) {
+      final es = Localizations.localeOf(context).languageCode == 'es';
+      final groups = widget.currency == 'MXN'
+          ? <(String, List<int>)>[
+              (
+                es ? 'Billetes' : 'Bills',
+                widget.denominations.where((value) => value >= 2000).toList(),
+              ),
+              (
+                es ? 'Monedas' : 'Coins',
+                widget.denominations.where((value) => value < 2000).toList(),
+              ),
+            ]
+          : <(String, List<int>)>[
+              (es ? 'Denominaciones' : 'Denominations', widget.denominations),
+            ];
+      return LayoutBuilder(
+        builder: (context, box) {
+          final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+          final columns = box.maxWidth >= 312 && scale < 1.5
+              ? (box.maxWidth >= 700 ? 3 : 2)
+              : 1;
+          final width = (box.maxWidth - 8 * (columns - 1)) / columns;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final group in groups)
+                if (group.$2.isNotEmpty) ...[
+                  Text(group.$1, style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final denomination in group.$2)
+                        SizedBox(
+                          width: width,
+                          child: _denominationRow(
+                            context,
+                            l,
+                            theme,
+                            denomination,
+                            width,
+                            stacked: true,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              if (widget.showTotal)
+                Text(
+                  '${es ? 'Total contado' : 'Counted total'} · ${_money(_total)}',
+                ),
+            ],
+          );
+        },
+      );
+    }
     // Every denomination in the drawer, laid out in two columns whenever there
     // is room for them.
     //
@@ -288,7 +349,7 @@ class _DenominationCounterState extends State<DenominationCounter> {
           maxLines: stacked ? null : 2,
           overflow: stacked ? null : TextOverflow.ellipsis,
         ),
-        if (quantity > 0)
+        if (quantity > 0 || widget.grouped)
           Text(
             '= ${_money(denomination * quantity)}',
             maxLines: stacked ? null : 1,
@@ -324,8 +385,11 @@ class _DenominationCounterState extends State<DenominationCounter> {
       ),
     ];
     return Container(
-      margin: const EdgeInsets.only(bottom: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      margin: EdgeInsets.only(bottom: widget.grouped ? 0 : 2),
+      padding: EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: widget.grouped ? 8 : 0,
+      ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         border: Border.all(color: theme.colorScheme.outlineVariant),

@@ -222,17 +222,54 @@ final class _CashCenterState extends State<CashCenter> {
         if (constraints.maxWidth >= 1000 ||
             snapshot.currentShift == null ||
             expired)
-          _StatusCard(
-            title: _statusHeadline(l, snapshot),
-            register: _registerName(snapshot),
-            businessDate: snapshot.businessDate,
-            openedAt:
-                (snapshot.currentShift ?? snapshot.adoptableShift)?['openedAt']
-                    as String?,
-            closedAt: snapshot.currentShift?['closedAt'] as String?,
-            lastReadAt: widget.controller.lastReadAt,
-            policy: snapshot.policy,
-          ),
+          if (snapshot.currentShift != null &&
+              constraints.maxWidth >= 1000 &&
+              !expired)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _StatusCard(
+                    title: _statusHeadline(l, snapshot),
+                    register: _registerName(snapshot),
+                    businessDate: snapshot.businessDate,
+                    openedAt:
+                        (snapshot.currentShift ??
+                                snapshot.adoptableShift)?['openedAt']
+                            as String?,
+                    closedAt: snapshot.currentShift?['closedAt'] as String?,
+                    lastReadAt: widget.controller.lastReadAt,
+                    policy: snapshot.policy,
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  flex: 2,
+                  child: CashEquation(
+                    account: CashDrawerAccount.fromLedger(
+                      snapshot.ledger,
+                      currency:
+                          snapshot.currentShift?['currency'] as String? ??
+                          'MXN',
+                    ),
+                    expectedCash: snapshot.expectedCash,
+                  ),
+                ),
+              ],
+            )
+          else
+            _StatusCard(
+              title: _statusHeadline(l, snapshot),
+              register: _registerName(snapshot),
+              businessDate: snapshot.businessDate,
+              openedAt:
+                  (snapshot.currentShift ??
+                          snapshot.adoptableShift)?['openedAt']
+                      as String?,
+              closedAt: snapshot.currentShift?['closedAt'] as String?,
+              lastReadAt: widget.controller.lastReadAt,
+              policy: snapshot.policy,
+            ),
         if (snapshot.summary != null) ...[
           const SizedBox(height: UmiSpacing.md),
           if (snapshot.currentShift?['status'] == 'closed')
@@ -1907,10 +1944,7 @@ final class _ActiveShiftSectionState extends State<_ActiveShiftSection> {
                         const SizedBox(height: 16),
                         const PosDivider(),
                         const SizedBox(height: 16),
-                        for (final operation in operations) ...[
-                          operation,
-                          const SizedBox(height: 8),
-                        ],
+                        _ActionGrid(actions: operations),
                         if (readOnly) buildReadOnlyRail(),
                       ],
                       if (_tab == 1) ...[
@@ -1994,14 +2028,6 @@ final class _ActiveShiftSectionState extends State<_ActiveShiftSection> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            CashEquation(
-              account: CashDrawerAccount.fromLedger(
-                snapshot.ledger,
-                currency:
-                    (snapshot.currentShift?['currency'] as String?) ?? 'MXN',
-              ),
-              expectedCash: snapshot.expectedCash,
-            ),
             const SizedBox(height: 24),
             Expanded(
               child: Row(
@@ -2313,9 +2339,10 @@ final class _Action extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: Container(
           constraints: const BoxConstraints(minHeight: 104),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: fill,
+            border: Border.all(color: ink),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
@@ -2960,39 +2987,68 @@ Future<void> _count(BuildContext context, CashController controller) async {
   var tally = const DenominationTally(0, <Map<String, Object?>>[]);
   final total = TextEditingController();
   int? totalMinorUnits;
-  final accepted = await showPosDialog<bool>(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setState) => PosAlertDialog(
-        title: Text(blind ? l.blindCountAction : l.countDrawerAction),
-        // A teller counting on a small window gets the whole drawer. PosSurface's
-        // default 40 px inset on each side left the quantity rows 10 px wider
-        // than the content box, and the dialog reported it as an overflow stripe
-        // across the steppers.
-        insetPadding: const EdgeInsets.symmetric(
-          horizontal: UmiSpacing.md,
-          vertical: UmiSpacing.lg,
-        ),
-        // Wide enough for the counter's two columns, so the whole drawer and its
-        // total are on one screen with nothing to scroll. It used to be a
-        // 420-wide box with a scroll view, which cut the small coins and the
-        // running total off the bottom of the count.
-        content: SizedBox(
-          width: 660,
-          // A short window scrolls the count instead of clipping it: eleven
-          // denominations are taller than a laptop in landscape. The dialog's own
-          // `scrollable: true` is not the tool here — it wraps the actions in an
-          // intrinsic-width bar that overflows at phone width — so the count
-          // scrolls inside the content box the dialog already bounds.
-          child: SingleChildScrollView(
+  PosNavigation? navigation;
+  context.visitAncestorElements((element) {
+    if (element.widget case PosPage(
+      bottomNavigationBar: final PosNavigation value,
+    )) {
+      navigation = value;
+      return false;
+    }
+    return true;
+  });
+  final register = snapshot?.currentShift?['registerName'] as String?;
+  final accepted = await Navigator.of(context).push<bool>(
+    PosPageRoute<bool>(
+      builder: (countContext) => StatefulBuilder(
+        builder: (context, setState) {
+          final es = Localizations.localeOf(context).languageCode == 'es';
+          final valid = totalOnly
+              ? (totalMinorUnits ?? 0) > 0
+              : tally.totalMinorUnits > 0;
+          final controls = Padding(
+            padding: const EdgeInsets.all(16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // What the count is, before the counting starts: blind means the
-                // expected amount is not on this screen, and a recount means this
-                // one replaces the last. Both are facts the operator has to know
-                // *before* they add up the drawer, not after they submit it.
+                Text(
+                  es ? 'Total contado' : 'Counted total',
+                  style: PosTheme.of(context).textTheme.bodySmall,
+                ),
+                Text(
+                  formatMinorUnits(
+                    totalOnly ? totalMinorUnits ?? 0 : tally.totalMinorUnits,
+                    currency,
+                  ),
+                  key: const ValueKey('count-workspace-total'),
+                  style: PosTheme.of(context).textTheme.displaySmall,
+                ),
+                const SizedBox(height: 16),
+                PosButton(
+                  compact: true,
+                  style: PosButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  onPressed: valid
+                      ? () => Navigator.pop(countContext, true)
+                      : null,
+                  child: Text(
+                    blind ? l.submitBlindCountAction : l.submitCountAction,
+                  ),
+                ),
+                PosTextButton(
+                  onPressed: () => Navigator.pop(countContext, false),
+                  child: Text(l.closeAction),
+                ),
+              ],
+            ),
+          );
+          final content = SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 _Note(
                   icon: blind
                       ? PosGlyphs.visibilityOffOutlined
@@ -3003,7 +3059,7 @@ Future<void> _count(BuildContext context, CashController controller) async {
                             : l.countDialogVisibleHint)
                       : l.countDialogRecountHint(attempt),
                 ),
-                const SizedBox(height: UmiSpacing.md),
+                const SizedBox(height: 16),
                 if (totalOnly)
                   PosField(
                     controller: total,
@@ -3023,27 +3079,72 @@ Future<void> _count(BuildContext context, CashController controller) async {
                   DenominationCounter(
                     currency: currency,
                     denominations: denominationsFromPolicy(snapshot?.policy),
+                    grouped: true,
+                    showTotal: false,
                     onChanged: (value) => setState(() => tally = value),
                   ),
               ],
             ),
-          ),
-        ),
-        actions: [
-          PosTextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(l.closeAction),
-          ),
-          PosButton(
-            onPressed:
-                (totalOnly
-                    ? (totalMinorUnits ?? 0) <= 0
-                    : tally.totalMinorUnits <= 0)
+          );
+          return PosPage(
+            appBar: PosHeader(
+              automaticallyImplyLeading: false,
+              title: StationHeading(
+                title: blind ? l.blindCountAction : l.countDrawerAction,
+                subtitle: register,
+              ),
+            ),
+            bottomNavigationBar: navigation == null
                 ? null
-                : () => Navigator.pop(dialogContext, true),
-            child: Text(blind ? l.submitBlindCountAction : l.submitCountAction),
-          ),
-        ],
+                : PosNavigation(
+                    destinations: navigation!.destinations,
+                    selectedIndex: navigation!.selectedIndex,
+                  ),
+            body: SafeArea(
+              key: const ValueKey('cash-count-workspace'),
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  final wide =
+                      box.maxWidth >= 900 &&
+                      MediaQuery.textScalerOf(context).scale(16) < 24;
+                  final submit = DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: PosTheme.of(context).colorScheme.surface,
+                      border: Border(
+                        top: BorderSide(
+                          color: PosTheme.of(
+                            context,
+                          ).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                    child: controls,
+                  );
+                  return wide
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: content),
+                            SizedBox(
+                              width: 304,
+                              child: Align(
+                                alignment: Alignment.bottomCenter,
+                                child: submit,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            Expanded(child: content),
+                            submit,
+                          ],
+                        );
+                },
+              ),
+            ),
+          );
+        },
       ),
     ),
   );

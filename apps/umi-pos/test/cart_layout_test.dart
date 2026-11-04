@@ -609,6 +609,43 @@ void _completeText(WidgetTester tester, String label) {
 }
 
 void main() {
+  testWidgets(
+    'large account line amount preserves product text at doubled scale',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final fixture = await _fixture(lines: 1);
+      final cart = fixture.cart.state.cart!;
+      fixture.cart.restore(
+        Cart.fromJson({
+          ...cart.toJson(),
+          'items': [
+            {
+              ...cart.items.single,
+              'productName': 'Café de especialidad para compartir',
+              'price': {
+                ...cart.items.single['price']! as Map<String, Object?>,
+                'lineTotal': {'minorUnits': 99999999, 'currency': 'MXN'},
+              },
+            },
+          ],
+        }),
+      );
+      await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 2));
+      await tester.pumpAndSettle();
+      final name = find.text('Café de especialidad para compartir');
+      expect(name, findsOneWidget);
+      final title = tester.renderObject<RenderParagraph>(name);
+      expect(title.size.width, greaterThan(70));
+      expect(title.didExceedMaxLines, isFalse);
+      expect(find.text('MXN 999,999.99'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      fixture.dispose();
+    },
+  );
+
   testWidgets('local frequency emphasis stays fixed during adds and search', (
     tester,
   ) async {
@@ -662,7 +699,7 @@ void main() {
       final account = find.byKey(const ValueKey('account-workspace'));
       Finder amount(String value) =>
           find.descendant(of: account, matching: find.text(value));
-      expect(amount('MXN 90.00'), findsNWidgets(2));
+      expect(amount('MXN 90.00'), findsOneWidget);
       final version = fixture.cart.state.cart!.version;
       await tester.tap(find.byKey(const ValueKey('account-split-check')));
       await tester.pumpAndSettle();
@@ -692,7 +729,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(amount('MXN 90.00'), findsOneWidget);
-      expect(amount('MXN 45.00'), findsNWidgets(2));
+      expect(amount('MXN 45.00'), findsOneWidget);
       expect(find.text('Consultando saldo…'), findsNothing);
       await tester.pumpWidget(const SizedBox());
       fixture.dispose();
@@ -765,7 +802,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('MXN 90.00'), findsNWidgets(2));
+      expect(find.text('MXN 90.00'), findsOneWidget);
       expect(ledger.reads, 1);
       ledger.fail = true;
       fixture.cart.restore(
@@ -789,6 +826,39 @@ void main() {
     await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
     await tester.pumpAndSettle();
     expect(ledger.reads, 0);
+    await tester.pumpWidget(const SizedBox());
+    fixture.dispose();
+  });
+
+  testWidgets('finished checkout returns from the phone account to the menu', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final fixture = await _fixture(
+      lines: 1,
+      ledger: _LedgerRepo(),
+      accountName: 'Counter',
+    );
+    await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(PosOrderButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('account-split-check')));
+    await tester.pumpAndSettle();
+    fixture.sales.finishCheckoutPresentation(force: true);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Volver a la cuenta'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('account-workspace')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('catalog-category-index')),
+      findsOneWidget,
+    );
+    expect(find.text('Iniciar pedido'), findsNothing);
+    expect(fixture.cart.state.cart, isNull);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     fixture.dispose();
   });

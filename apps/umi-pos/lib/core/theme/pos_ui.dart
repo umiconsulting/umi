@@ -697,6 +697,7 @@ class PosButton extends StatefulWidget {
     required this.onPressed,
     required this.child,
     this.style,
+    this.compact = false,
     this.autofocus = false,
     this.focusNode,
     this.onLongPress,
@@ -709,6 +710,7 @@ class PosButton extends StatefulWidget {
     required Widget label,
     required this.icon,
     this.style,
+    this.compact = false,
     this.autofocus = false,
     this.focusNode,
     this.onLongPress,
@@ -720,6 +722,7 @@ class PosButton extends StatefulWidget {
     required this.onPressed,
     required this.child,
     this.style,
+    this.compact = false,
     this.autofocus = false,
     this.focusNode,
     this.onLongPress,
@@ -732,6 +735,7 @@ class PosButton extends StatefulWidget {
     required Widget label,
     required this.icon,
     this.style,
+    this.compact = false,
     this.autofocus = false,
     this.focusNode,
     this.onLongPress,
@@ -744,6 +748,7 @@ class PosButton extends StatefulWidget {
     required this.child,
     this.icon,
     this.style,
+    this.compact = false,
     this.autofocus = false,
     this.focusNode,
     this.onLongPress,
@@ -755,6 +760,7 @@ class PosButton extends StatefulWidget {
   final Widget child;
   final Widget? icon;
   final PosButtonStyle? style;
+  final bool compact;
   final bool autofocus;
   final bool? selected;
   final FocusNode? focusNode;
@@ -815,7 +821,10 @@ class PosButton extends StatefulWidget {
           48,
           minimum?.width.isFinite == true ? minimum!.width : 0,
         ),
-        minHeight: math.max(kind == 0 ? 56 : 48, minimum?.height ?? 0),
+        minHeight: math.max(
+          compact ? 44 : (kind == 0 ? 56 : 48),
+          minimum?.height ?? 0,
+        ),
       ),
       child: DecoratedBox(
         decoration: ShapeDecoration(color: fill, shape: shape),
@@ -894,6 +903,7 @@ class PosOutlineButton extends PosButton {
     required super.onPressed,
     required super.child,
     super.style,
+    super.compact,
     super.autofocus,
     super.focusNode,
     super.onLongPress,
@@ -904,6 +914,7 @@ class PosOutlineButton extends PosButton {
     required Widget label,
     required Widget icon,
     super.style,
+    super.compact,
     super.autofocus,
     super.focusNode,
     super.key,
@@ -916,6 +927,7 @@ class PosTextButton extends PosButton {
     required super.onPressed,
     required super.child,
     super.style,
+    super.compact,
     super.autofocus,
     super.focusNode,
     super.onLongPress,
@@ -926,6 +938,7 @@ class PosTextButton extends PosButton {
     required Widget label,
     required Widget icon,
     super.style,
+    super.compact,
     super.autofocus,
     super.focusNode,
     super.key,

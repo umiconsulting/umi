@@ -832,13 +832,20 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     );
   }
 
-  Widget _incomingShortcut(BuildContext context) => PosIconButton(
+  Widget _incomingShortcut(
+    BuildContext context, {
+    VoidCallback? onPressed,
+    bool locked = false,
+  }) => PosIconButton(
     key: const ValueKey('incoming-header-shortcut'),
     tooltip: AppLocalizations.of(context).incomingOrdersTitle,
-    onPressed: () {
-      FocusManager.instance.primaryFocus?.unfocus();
-      setState(() => _setSection(TillSurface.orders));
-    },
+    onPressed: locked
+        ? null
+        : onPressed ??
+              () {
+                FocusManager.instance.primaryFocus?.unfocus();
+                setState(() => _setSection(TillSurface.orders));
+              },
     icon: PosBadge.count(
       count: _incomingCount ?? 0,
       isLabelVisible: _incomingCount != null && _incomingCount! > 0,
@@ -996,6 +1003,16 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 automaticallyImplyLeading: false,
                 toolbarHeight: 56,
                 title: _merchantHeading(sheetContext, showWordmark: true),
+                actions: [
+                  if (_incomingAllowed)
+                    _incomingShortcut(
+                      sheetContext,
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        setState(() => _setSection(TillSurface.orders));
+                      },
+                    ),
+                ],
               ),
               bottomNavigationBar: navigation == null
                   ? null
@@ -1009,6 +1026,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                   customerControl: _accountCustomer?.call(),
                   controller: widget.cart,
                   restoringAccount: _restoringAccount,
+                  checkoutHeaderAction: _incomingAllowed
+                      ? _incomingShortcut(context, locked: true)
+                      : null,
                   onNewSale: () => _newSale(context),
                   lineStatuses: _currentLineStatuses,
                   checkout: widget.checkout,
@@ -3186,7 +3206,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              '${state.products.where((product) => CatalogMoney.fromJson(product.price).minorUnits > 0).length} ${spanish ? 'productos disponibles' : 'available products'}',
+              '${state.products.where((product) => CatalogMoney.fromJson(product.price).minorUnits > 0).length} ${spanish ? 'productos' : 'products'} · ${state.products.map((product) => CatalogMoney.fromJson(product.price).currency).toSet().join(' / ')}',
               style: PosTheme.of(context).textTheme.labelSmall,
             ),
           ),
@@ -3274,6 +3294,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                   customerControl: _accountCustomer?.call(),
                   controller: widget.cart,
                   restoringAccount: _restoringAccount,
+                  checkoutHeaderAction: _incomingAllowed
+                      ? _incomingShortcut(context, locked: true)
+                      : null,
                   onNewSale: () => _newSale(context),
                   lineStatuses: _currentLineStatuses,
                   checkout: widget.checkout,
@@ -3827,8 +3850,8 @@ final class _BarAction extends StatelessWidget {
         focusNode: focusNode,
         tooltip: label,
         style: PosIconButton.styleFrom(
-          foregroundColor: palette.onAction,
-          backgroundColor: palette.action,
+          foregroundColor: palette.onPrimary,
+          backgroundColor: palette.primary,
           minimumSize: const Size(0, UmiTouchTarget.minimum),
           padding: compact
               ? const EdgeInsets.all(12)
@@ -3847,7 +3870,7 @@ final class _BarAction extends StatelessWidget {
                   Text(
                     label,
                     style: theme.textTheme.labelLarge?.copyWith(
-                      color: palette.onAction,
+                      color: palette.onPrimary,
                     ),
                   ),
                 ],
@@ -4779,6 +4802,8 @@ final class _DetailState extends State<_Detail> {
       const SizedBox(height: UmiSpacing.md),
     ];
     final submit = PosButton(
+      compact: true,
+      style: PosButton.styleFrom(minimumSize: const Size.fromHeight(48)),
       onPressed:
           !widget.canWrite ||
               (detail.variants.isNotEmpty && variantId == null) ||
@@ -5057,9 +5082,11 @@ final class _CartPanel extends StatefulWidget {
     this.beforeFire,
     this.serviceControls,
     this.customerControl,
+    this.checkoutHeaderAction,
   });
   final Widget? serviceControls;
   final Widget? customerControl;
+  final Widget? checkoutHeaderAction;
   final CartController controller;
   final bool restoringAccount;
   final Future<void> Function()? onNewSale;
@@ -5201,7 +5228,14 @@ final class _CartPanelState extends State<_CartPanel> {
         cart: controller,
         entry: entry,
         sales: sales,
+        headerAction: widget.checkoutHeaderAction,
       );
+      if (mounted &&
+          sales.state.readyForNextCustomer &&
+          controller.state.cart == null) {
+        onClose?.call();
+        return;
+      }
       if (mounted) await _refreshLedger(invalidate: true);
       return;
     }
@@ -5213,6 +5247,7 @@ final class _CartPanelState extends State<_CartPanel> {
       entry: entry,
       sales: sales,
       customerValue: customerValue,
+      headerAction: widget.checkoutHeaderAction,
       deviceChannel: deviceChannel,
       // The sale's completion screen prints through the same call
       // Ventas uses. It is the customer asking for their receipt at
@@ -5273,6 +5308,12 @@ final class _CartPanelState extends State<_CartPanel> {
         canAdopt: permissions.allows('cash.shift.resume'),
       ),
     );
+    if (mounted &&
+        sales.state.readyForNextCustomer &&
+        controller.state.cart == null) {
+      onClose?.call();
+      return;
+    }
     if (mounted) await _refreshLedger(invalidate: true);
   }
 
@@ -5695,29 +5736,40 @@ final class _CartPanelState extends State<_CartPanel> {
                 ),
                 child: Column(
                   children: [
-                    PosListRow(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Text('${item.quantity}'),
-                      title: Text(
-                        item.productName,
-                        style: PosTheme.of(context).textTheme.titleSmall,
+                    LayoutBuilder(
+                      builder: (context, lineBox) => PosListRow(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Text('${item.quantity}'),
+                        title: Text(
+                          item.productName,
+                          style: PosTheme.of(context).textTheme.titleSmall,
+                        ),
+                        subtitle: Text(
+                          [
+                            // A course other than the first is said on
+                            // the line itself, because it is a fact
+                            // about the dish and the operator has to be
+                            // able to check it without opening the
+                            // sheet again. Course 1 stays quiet.
+                            if (item.courseNumber != 1)
+                              l.cartCourseCurrent(item.courseNumber),
+                            if (item.variant != null)
+                              item.variant!['name'] as String,
+                            ...item.modifiers.map((m) => m['name'] as String),
+                            if (item.note != null) item.note!,
+                          ].join(' · '),
+                        ),
+                        trailing: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: lineBox.maxWidth * .42,
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text(_money(price.lineTotal)),
+                          ),
+                        ),
                       ),
-                      subtitle: Text(
-                        [
-                          // A course other than the first is said on
-                          // the line itself, because it is a fact
-                          // about the dish and the operator has to be
-                          // able to check it without opening the
-                          // sheet again. Course 1 stays quiet.
-                          if (item.courseNumber != 1)
-                            l.cartCourseCurrent(item.courseNumber),
-                          if (item.variant != null)
-                            item.variant!['name'] as String,
-                          ...item.modifiers.map((m) => m['name'] as String),
-                          if (item.note != null) item.note!,
-                        ].join(' · '),
-                      ),
-                      trailing: Text(_money(price.lineTotal)),
                     ),
                     if (item.fired)
                       Align(
@@ -5980,7 +6032,9 @@ final class _CartPanelState extends State<_CartPanel> {
             ),
           if (permissions.allows('checkout.commit'))
             PosButton.icon(
+              compact: true,
               style: PosButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
                 backgroundColor: PosTheme.of(context).colorScheme.action,
                 foregroundColor: PosTheme.of(context).colorScheme.onAction,
                 disabledBackgroundColor: PosTheme.of(

@@ -17,6 +17,7 @@ final class PaymentMethodTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = PosTheme.of(context).colorScheme;
+    final compact = MediaQuery.sizeOf(context).width < 700;
     return Semantics(
       selected: selected,
       enabled: onTap != null,
@@ -27,7 +28,7 @@ final class PaymentMethodTile extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            constraints: const BoxConstraints(minHeight: 88),
+            constraints: BoxConstraints(minHeight: compact ? 48 : 88),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
@@ -40,13 +41,14 @@ final class PaymentMethodTile extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                PosIcon(
-                  icon,
-                  color: selected
-                      ? scheme.onPrimaryContainer
-                      : scheme.onSurfaceVariant,
-                ),
-                const SizedBox(height: UmiSpacing.sm),
+                if (!compact)
+                  PosIcon(
+                    icon,
+                    color: selected
+                        ? scheme.onPrimaryContainer
+                        : scheme.onSurfaceVariant,
+                  ),
+                if (!compact) const SizedBox(height: UmiSpacing.sm),
                 Text(
                   label,
                   textAlign: TextAlign.center,

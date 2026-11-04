@@ -100,51 +100,56 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final state = widget.incoming.state;
-    return PosPage(
-      appBar: PosHeader(
-        automaticallyImplyLeading: false,
-        title: StationHeading(
-          title: l.incomingOrdersTitle,
-          subtitle: Localizations.localeOf(context).languageCode == 'es'
-              ? 'Menú digital'
-              : 'Digital menu',
-        ),
-        leading: widget.embedded
-            ? null
-            : PosIconButton(
-                tooltip: l.closeAction,
-                onPressed: () => Navigator.pop(context),
-                icon: const PosIcon(PosGlyphs.arrowBack),
-              ),
-        actions: [
-          if (state.phase == IncomingOrdersPhase.ready)
-            PosTag(
-              label: Text(
-                Localizations.localeOf(context).languageCode == 'es'
-                    ? '${state.orders.length} por revisar'
-                    : '${state.orders.length} to review',
-              ),
-            ),
-          PosIconButton(
-            tooltip: l.refreshAction,
-            onPressed:
-                state.phase == IncomingOrdersPhase.loading || state.binding
-                ? null
-                : _reload,
-            icon: const PosIcon(PosGlyphs.refresh),
-          ),
-        ],
+    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final queueHeader = PosHeader(
+      automaticallyImplyLeading: false,
+      title: StationHeading(
+        title: l.incomingOrdersTitle,
+        subtitle: Localizations.localeOf(context).languageCode == 'es'
+            ? 'Menú digital'
+            : 'Digital menu',
       ),
+      leading: widget.embedded
+          ? null
+          : PosIconButton(
+              tooltip: l.closeAction,
+              onPressed: () => Navigator.pop(context),
+              icon: const PosIcon(PosGlyphs.arrowBack),
+            ),
+      actions: [
+        if (state.phase == IncomingOrdersPhase.ready)
+          PosTag(
+            label: Text(
+              Localizations.localeOf(context).languageCode == 'es'
+                  ? '${state.orders.length} por revisar'
+                  : '${state.orders.length} to review',
+            ),
+          ),
+        PosIconButton(
+          tooltip: l.refreshAction,
+          onPressed: state.phase == IncomingOrdersPhase.loading || state.binding
+              ? null
+              : _reload,
+          icon: const PosIcon(PosGlyphs.refresh),
+        ),
+      ],
+    );
+    return PosPage(
+      appBar: wide ? null : queueHeader,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: _body(l, state),
+          child: _body(l, state, queueHeader: wide ? queueHeader : null),
         ),
       ),
     );
   }
 
-  Widget _body(AppLocalizations l, IncomingOrdersState state) {
+  Widget _body(
+    AppLocalizations l,
+    IncomingOrdersState state, {
+    Widget? queueHeader,
+  }) {
     switch (state.phase) {
       case IncomingOrdersPhase.idle:
       case IncomingOrdersPhase.loading:
@@ -214,6 +219,7 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
                       ),
                     ),
                   _OrderCard(
+                    minHeight: wide ? box.maxHeight : 0,
                     order: order,
                     binding: state.binding,
                     onTake: () => _take(order),
@@ -240,7 +246,13 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
                     ].join(' · '),
                   ),
                   onTap: () => setState(() => _selectedId = order.orderId),
-                  trailing: const PosIcon(PosGlyphs.chevronRight, size: 18),
+                  trailing: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 100),
+                    child: Text(
+                      formatMinorUnits(order.totalMinorUnits, 'MXN'),
+                      style: PosTheme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
                 );
               },
             );
@@ -261,7 +273,13 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
                         ),
                       ),
                     ),
-                    child: list,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ?queueHeader,
+                        Expanded(child: list),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -301,10 +319,12 @@ final class _OrderCard extends StatelessWidget {
     required this.order,
     required this.binding,
     required this.onTake,
+    this.minHeight = 0,
   });
   final PosIncomingOrder order;
   final bool binding;
   final VoidCallback onTake;
+  final double minHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -312,61 +332,73 @@ final class _OrderCard extends StatelessWidget {
     final theme = PosTheme.of(context);
     final es = Localizations.localeOf(context).languageCode == 'es';
     return Container(
+      constraints: BoxConstraints(minHeight: minHeight),
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(8),
-      ),
+      decoration: BoxDecoration(color: theme.colorScheme.surface),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(switch (order.channel) {
-            'whatsapp' => 'WhatsApp',
-            'web' => 'Web',
-            'aggregator' => 'Delivery',
-            _ => order.channel,
-          }, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 8),
-          Text(
-            order.reference ?? order.orderId,
-            style: theme.textTheme.headlineSmall,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(switch (order.channel) {
+                'whatsapp' => 'WhatsApp',
+                'web' => 'Web',
+                'aggregator' => 'Delivery',
+                _ => order.channel,
+              }, style: theme.textTheme.bodySmall),
+              const SizedBox(height: 8),
+              Text(
+                order.reference ?? order.orderId,
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                order.customerName ??
+                    (es ? 'Cliente no indicado' : 'Customer not provided'),
+                style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _incomingStatus(order, context),
+                style: theme.textTheme.bodyMedium,
+              ),
+              const PosDivider(),
+              Text(
+                es
+                    ? '${order.itemCount} líneas de productos'
+                    : '${order.itemCount} product lines',
+              ),
+              const SizedBox(height: 16),
+              Text(
+                es
+                    ? 'El detalle de productos, notas y horario de entrega no está disponible en esta terminal. Al atender se vincula la referencia; captura y verifica los productos antes de cobrar.'
+                    : 'Product details, notes and pickup time are unavailable on this terminal. Taking the order links its reference; enter and verify the items before charging.',
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            order.customerName ??
-                (es ? 'Cliente no indicado' : 'Customer not provided'),
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _incomingStatus(order, context),
-            style: theme.textTheme.bodyMedium,
-          ),
-          const PosDivider(),
-          Text(
-            es
-                ? '${order.itemCount} líneas de productos'
-                : '${order.itemCount} product lines',
-          ),
-          const SizedBox(height: 16),
-          Text(
-            es
-                ? 'El detalle de productos, notas y horario de entrega no está disponible en esta terminal. Al atender se vincula la referencia; captura y verifica los productos antes de cobrar.'
-                : 'Product details, notes and pickup time are unavailable on this terminal. Taking the order links its reference; enter and verify the items before charging.',
-          ),
-          const SizedBox(height: 24),
-          Text(
-            es ? 'Total del pedido de origen' : 'Source order total',
-            style: theme.textTheme.bodySmall,
-          ),
-          Text(
-            formatMinorUnits(order.totalMinorUnits, 'MXN'),
-            style: theme.textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 24),
-          PosButton(
-            onPressed: binding ? null : onTake,
-            child: Text(l.incomingOrdersTake),
+          Padding(
+            padding: const EdgeInsets.only(top: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const PosDivider(),
+                Text(
+                  es ? 'Total del pedido de origen' : 'Source order total',
+                  style: theme.textTheme.bodySmall,
+                ),
+                Text(
+                  formatMinorUnits(order.totalMinorUnits, 'MXN'),
+                  style: theme.textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 24),
+                PosButton(
+                  onPressed: binding ? null : onTake,
+                  child: Text(l.incomingOrdersTake),
+                ),
+              ],
+            ),
           ),
         ],
       ),

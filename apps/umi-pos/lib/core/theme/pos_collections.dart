@@ -282,7 +282,9 @@ class PosListRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = PosTheme.of(context);
     final body = ConstrainedBox(
-      constraints: BoxConstraints(minHeight: math.max(48, minTileHeight)),
+      constraints: BoxConstraints(
+        minHeight: math.max(dense ? 44 : 48, minTileHeight),
+      ),
       child: Container(
         color:
             tileColor ?? (selected ? theme.colorScheme.primaryContainer : null),
@@ -1229,6 +1231,7 @@ class PosDisclosure extends StatefulWidget {
     this.leading,
     this.trailing,
     this.initiallyExpanded = false,
+    this.compact = false,
     this.onExpansionChanged,
     this.childrenPadding,
     this.tilePadding,
@@ -1237,7 +1240,7 @@ class PosDisclosure extends StatefulWidget {
   final Widget title;
   final Widget? subtitle, leading, trailing;
   final List<Widget> children;
-  final bool initiallyExpanded;
+  final bool initiallyExpanded, compact;
   final ValueChanged<bool>? onExpansionChanged;
   final EdgeInsetsGeometry? childrenPadding, tilePadding;
   @override
@@ -1251,12 +1254,16 @@ class _PosDisclosureState extends State<PosDisclosure> {
     mainAxisSize: MainAxisSize.min,
     children: [
       PosListRow(
+        dense: widget.compact,
+        minTileHeight: widget.compact ? 44 : 56,
         title: widget.title,
         subtitle: widget.subtitle,
         leading: widget.leading,
         trailing:
             widget.trailing ?? PosIcon(open ? PosGlyphs.remove : PosGlyphs.add),
-        contentPadding: widget.tilePadding,
+        contentPadding:
+            widget.tilePadding ??
+            (widget.compact ? const EdgeInsets.symmetric(vertical: 4) : null),
         onTap: () {
           setState(() => open = !open);
           widget.onExpansionChanged?.call(open);

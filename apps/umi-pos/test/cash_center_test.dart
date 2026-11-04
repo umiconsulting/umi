@@ -532,14 +532,14 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(DenominationCounter), findsNothing);
         final field = find.descendant(
-          of: find.byType(PosAlertDialog),
+          of: find.byKey(const ValueKey('cash-count-workspace')),
           matching: find.byType(PosField),
         );
         expect(field, findsOneWidget);
         await tester.enterText(field, '1234.56');
         await tester.pump();
         final action = find.descendant(
-          of: find.byType(PosAlertDialog),
+          of: find.byKey(const ValueKey('cash-count-workspace')),
           matching: find.text(cancel ? 'Cerrar' : 'Enviar conteo'),
         );
         await tester.ensureVisible(action);
