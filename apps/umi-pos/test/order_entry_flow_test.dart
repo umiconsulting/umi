@@ -876,6 +876,36 @@ void main() {
     );
   }
   testWidgets(
+    'landscape keyboard retains one inline service choice and a visible guarded catalog',
+    (tester) async {
+      final f = await _fixture(lines: 2, withProduct: true);
+      addTearDown(f.dispose);
+      addTearDown(tester.view.resetViewInsets);
+      await _mount(tester, f.surface, size: const Size(1340, 800));
+      final original = f.cart.state.cart!.toJson();
+      await tester.tap(find.byTooltip('Nuevo pedido'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('hardware-barcode-search')));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(find.byKey(const ValueKey('workspace-order'))).height,
+        greaterThanOrEqualTo(440),
+      );
+      final choice = find.byKey(const ValueKey('catalog-service-choice'));
+      expect(choice, findsOneWidget);
+      expect(tester.getRect(choice).height, lessThan(240));
+      expect(find.text('Latte').hitTestable(), findsOneWidget);
+      await tester.tap(find.text('Latte'));
+      await tester.pumpAndSettle();
+      expect(f.repo.additions, 0);
+      expect(f.cart.state.cart!.toJson(), original);
+      expect(choice, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'inline service cancellation, escape and disposal preserve the account',
     (tester) async {
       final f = await _fixture(lines: 2, withProduct: true);

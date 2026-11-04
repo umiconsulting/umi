@@ -3321,7 +3321,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           ],
           search,
         ],
-        if (landscape && serviceChoice != null) serviceChoice,
+        if (landscape && !keyboard && serviceChoice != null) serviceChoice,
         const SizedBox(height: 8),
         if (!keyboard) categories,
         if (frequent != null) ...[const SizedBox(height: 12), frequent],
