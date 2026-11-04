@@ -42,9 +42,19 @@ export class TableMapService {
     private readonly integrity: IntegrityService,
   ) {}
 
-  read(access: MerchantAccess, locationId: string) {
+  async read(access: MerchantAccess, locationId: string) {
     resolveLocationAuthority(access, locationId);
-    return this.repo.read(access.merchantId, locationId);
+    const room = await this.repo.read(access.merchantId, locationId);
+    // La ruta del dashboard conserva el contrato estricto de sus clientes anteriores.
+    // El POS recibe el pago de la visita mediante readForPos.
+    return {
+      ...room,
+      states: room.states.map((entry) => {
+        const legacy = { ...entry };
+        delete legacy.paidAt;
+        return legacy;
+      }),
+    };
   }
 
   async readForPos(user: AuthUser, merchantId: string, query: PosTableStateQuery) {
@@ -287,6 +297,11 @@ export class TableMapService {
             throw new ConflictException({ code: 'TABLE_HAS_OPEN_ACCOUNT' });
           throw error;
         }
+        // La respuesta incluye el saldo nuevo de la visita. Así evita mostrarla
+        // pagada mientras todavía existe una cuenta abierta en otra mesa del grupo.
+        const room = await this.repo.readInTransaction(context.client, merchantId, dto.locationId);
+        const changedIds = new Set(changed.map((entry) => entry.tableId));
+        changed = room.states.filter((entry) => changedIds.has(entry.tableId));
         await context.appendAudit({
           eventType: `${commandType}.applied`,
           entityType: 'table_state',

@@ -51,12 +51,12 @@ case "${1:-check}" in
     cat /tmp/ddl-freeze.diff
     echo
     echo "The live database does NOT get this edit. Write a migration instead:"
-    echo "  docs/migration/build-v3/migrations/  (see its README)"
+    echo "  db/migrations/  (see its README)"
     exit 1
     ;;
   freeze)
     {
-      echo "# The build-v3 DDL as applied at the cutover. Written by freeze.sh."
+      echo "# The base PostgreSQL DDL as applied at the cutover. Written by freeze.sh."
       echo "# Do not edit a numbered file after this. Write a migration."
       hashes
     } > "$STAMP"

@@ -2,7 +2,7 @@
 
 -- An administrator at ONCA, with a local credential.
 --
--- WHY THIS EXISTS. `docs/migration/build-v3/migrations/002_onca_onboarding.sql` seeded ONCA
+-- WHY THIS EXISTS. `db/migrations/002_onca_onboarding.sql` seeded ONCA
 -- with four logins, and every one of them is `staff`: caja, barra, cocina and mesero. That
 -- is the right shape for the people who stand at the till and the pass, and it means the
 -- café has nobody who can do the two things that need `merchant.manage` — the owner's own

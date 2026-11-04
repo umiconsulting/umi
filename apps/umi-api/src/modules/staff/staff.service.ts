@@ -78,6 +78,7 @@ export interface StaffInput {
 }
 
 export interface StaffAuthority {
+  membershipId?: string | null;
   roles: string[];
   permissions: string[];
 }
@@ -177,7 +178,10 @@ export class StaffService {
   ): Promise<StaffDto> {
     if (authority && !this.canManageAdmin(authority)) {
       const targetRole = await this.repo.findRoleKey(merchantId, staffId);
-      if (targetRole === 'owner' || targetRole === 'admin') {
+      if (
+        targetRole === 'owner' ||
+        (targetRole === 'admin' && !this.canSelfManageAdmin(staffId, body, authority))
+      ) {
         throw new ForbiddenException('Only an owner can manage an ADMIN account');
       }
     }
@@ -198,7 +202,7 @@ export class StaffService {
         ? (body.status as string)
         : null;
     }
-    if (has(body, 'roleId') || has(body, 'role')) {
+    if (hasRolePatch(body)) {
       const selectedRole = await this.resolveRole(merchantId, body.roleId, body.role);
       patch.roleId = selectedRole.id;
       patch.roleKey = this.compatibilityRoleKey(selectedRole.key);
@@ -301,6 +305,22 @@ export class StaffService {
       authority?.roles.includes('super_admin') === true
     );
   }
+
+  private canSelfManageAdmin(
+    staffId: string,
+    body: StaffInput,
+    authority?: StaffAuthority,
+  ): boolean {
+    if (!authority?.membershipId || authority.membershipId !== staffId) return false;
+    if (!authority.roles.includes('admin')) return false;
+    return !hasRolePatch(body) && !has(body, 'status');
+  }
+}
+
+function hasRolePatch(body: StaffInput): boolean {
+  const roleId = has(body, 'roleId') ? String(body.roleId ?? '').trim() : '';
+  const role = has(body, 'role') ? String(body.role ?? '').trim() : '';
+  return Boolean(roleId || role);
 }
 
 /**

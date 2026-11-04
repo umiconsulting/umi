@@ -1,0 +1,45 @@
+{
+  "version": "8.30.1",
+  "archiveSha256": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb",
+  "scope": "Remote GitHub refs, same scope as PR CI; local support refs excluded",
+  "beforeExit": 1,
+  "beforeFindings": 4,
+  "afterExit": 0,
+  "afterFindings": 0,
+  "syntheticControlExit": 1,
+  "syntheticControlFindings": 1,
+  "findings": [
+    {
+      "rule": "generic-api-key",
+      "file": "docs/reports/evidence/2026-10-30-inventory-preparation/api-evidence.json",
+      "line": 19,
+      "fingerprint": "0f28292c425621129868dc3d6e2a164fee3701a5:docs/reports/evidence/2026-10-30-inventory-preparation/api-evidence.json:generic-api-key:19",
+      "field": "idempotencyKey",
+      "format": "UUID"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": "docs/reports/evidence/2026-10-30-inventory-preparation/api-evidence.json",
+      "line": 65,
+      "fingerprint": "0f28292c425621129868dc3d6e2a164fee3701a5:docs/reports/evidence/2026-10-30-inventory-preparation/api-evidence.json:generic-api-key:65",
+      "field": "idempotencyKey",
+      "format": "UUID"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": "docs/reports/evidence/2026-10-30-inventory-preparation/api-evidence.json",
+      "line": 134,
+      "fingerprint": "0f28292c425621129868dc3d6e2a164fee3701a5:docs/reports/evidence/2026-10-30-inventory-preparation/api-evidence.json:generic-api-key:134",
+      "field": "idempotencyKey",
+      "format": "UUID"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": "docs/reports/evidence/2026-10-30-inventory-preparation/api-evidence.json",
+      "line": 157,
+      "fingerprint": "0f28292c425621129868dc3d6e2a164fee3701a5:docs/reports/evidence/2026-10-30-inventory-preparation/api-evidence.json:generic-api-key:157",
+      "field": "idempotencyKey",
+      "format": "UUID"
+    }
+  ]
+}

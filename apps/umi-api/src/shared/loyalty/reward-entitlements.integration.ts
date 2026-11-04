@@ -149,10 +149,7 @@ describe('single-cycle reward entitlements · real PostgreSQL', () => {
     'runs the canonical SQL twice through pg without psql commands',
     async () => {
       const sql = readFileSync(
-        resolve(
-          process.cwd(),
-          '../../supabase/migrations/20261007000000_stamp_reward_entitlements.sql',
-        ),
+        resolve(process.cwd(), '../../db/migrations/055_stamp_reward_entitlements.sql'),
         'utf8',
       );
       await admin.query(sql);
@@ -784,10 +781,7 @@ describe('single-cycle reward entitlements · real PostgreSQL', () => {
     'migration reruns preserve selected facts, residual progress, and original deadlines',
     async () => {
       const sql = readFileSync(
-        resolve(
-          process.cwd(),
-          '../../supabase/migrations/20261007000000_stamp_reward_entitlements.sql',
-        ),
+        resolve(process.cwd(), '../../db/migrations/055_stamp_reward_entitlements.sql'),
         'utf8',
       );
       const rows = async () => ({

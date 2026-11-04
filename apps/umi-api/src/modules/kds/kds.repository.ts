@@ -1236,51 +1236,55 @@ export class KdsRepository {
     stationIds: string[],
   ): Promise<TicketRow[]> {
     const { rows } = await this.pg.query<TicketRow>(
-      `SELECT v.id::text AS ticket_id,v.source_order_id::text AS source_transaction_id,
-              v.public_reference,v.fulfillment_type,
-              v.merchant_id::text AS merchant_id,v.source AS source_channel,
-              CASE WHEN cancellation.cancelled THEN 'cancelled' ELSE v.status END AS status,
-              v.location_id::text,v.priority,v.business_date::text,
-              v.preparation_started_at,v.version,
-              v.station_id::text AS station_id,s.name AS station_name,
+      `SELECT ko.id::text AS ticket_id,ko.source_order_id::text AS source_transaction_id,
+              ko.public_reference,ko.fulfillment_type,
+              ko.merchant_id::text AS merchant_id,ko.source AS source_channel,
+              CASE WHEN cancellation.cancelled THEN 'cancelled' ELSE ko.status END AS status,
+              ko.location_id::text,ko.priority,ko.business_date::text,
+              ko.preparation_started_at,ko.version,
+              i.station_id::text AS station_id,s.name AS station_name,
               s.alert_settings,
-              v.queued_at AS created_at,
-              v.updated_at AS updated_at,v.last_event_sequence,
-              -- §8.5 and D8, the SECOND place a ticket projection is built. The view is
-              -- the source of every other key, the order and the derived fired flag;
-              -- this read adds ONLY the allergen list, so the board and the dashboard
-              -- list cannot disagree about it. The line's product_id is read here
-              -- because kds.station_order does not carry it, and the list is derived
-              -- from the recipe on every read rather than stored on the line.
-              coalesce((
-                select jsonb_agg(item
-                       || CASE WHEN cancellation.cancelled THEN '{"status":"cancelled"}'::jsonb ELSE '{}'::jsonb END
-                       || jsonb_build_object('allergens',
-                         case when i.product_id is null then '[]'::jsonb else coalesce((
-                           select jsonb_agg(jsonb_build_object('code',a.code,'label',a.label)
-                                            order by a.code)
-                             from merchant.product_allergen_labels(v.merchant_id,i.product_id,null) a
-                         ),'[]'::jsonb) end)
-                       order by i.display_order,i.id)
-                  from jsonb_array_elements(v.items) item
-                  left join merchant.kitchen_order_item i
-                    on i.id=(item->>'id')::uuid
-                   and i.merchant_id=v.merchant_id and i.kitchen_order_id=v.id
-              ),'[]'::jsonb) AS items,
-              v.fired_through_course
-         FROM kds.station_order v
-         JOIN merchant.station s ON s.id=v.station_id AND s.merchant_id=v.merchant_id
-         CROSS JOIN LATERAL (SELECT ${commercialCancellationSql('v')} OR v.status='cancelled' AS cancelled) cancellation
-        WHERE v.merchant_id=$1::uuid AND v.location_id=$2::uuid
-          AND v.station_id=ANY($3::uuid[])
-          AND v.status IN ('queued','in_preparation','partially_ready','ready','exception','cancelled')
+              ko.queued_at AS created_at,
+              ko.updated_at AS updated_at,
+              coalesce(e.last_event_sequence,0) AS last_event_sequence,
+              -- §8.5 and D8: compose the station ticket items and allergen labels
+              -- directly from merchant.kitchen_order_item in a single pass.
+              coalesce(jsonb_agg(jsonb_build_object(
+                'id',i.id::text,'sourceOrderItemId',i.source_order_item_id::text,
+                'status',CASE WHEN cancellation.cancelled THEN 'cancelled' ELSE i.status END,
+                'productName',i.product_name,'variantName',i.variant_name,
+                'modifiers',i.modifiers,'quantity',i.quantity,'preparationNote',i.preparation_note,
+                'displayOrder',i.display_order,'targetSeconds',i.target_seconds,'version',i.version,
+                'courseNumber',i.course_number,
+                'fired',(i.course_number <= ko.fired_through_course),
+                'allergens',case when i.product_id is null then '[]'::jsonb else coalesce((
+                  select jsonb_agg(jsonb_build_object('code',a.code,'label',a.label)
+                                   order by a.code)
+                    from merchant.product_allergen_labels(ko.merchant_id,i.product_id,null) a
+                ),'[]'::jsonb) end
+              ) order by i.display_order,i.id) filter (where i.id is not null),'[]'::jsonb) AS items,
+              ko.fired_through_course
+         FROM merchant.kitchen_order ko
+         JOIN merchant.kitchen_order_item i
+           ON i.kitchen_order_id=ko.id AND i.merchant_id=ko.merchant_id
+         JOIN merchant.station s ON s.id=i.station_id AND s.merchant_id=ko.merchant_id
+         LEFT JOIN LATERAL (
+           SELECT max(event.sequence) AS last_event_sequence
+             FROM merchant.kitchen_event event
+            WHERE event.kitchen_order_id=ko.id AND event.merchant_id=ko.merchant_id
+         ) e ON true
+         CROSS JOIN LATERAL (SELECT ${commercialCancellationSql('ko')} OR ko.status='cancelled' AS cancelled) cancellation
+        WHERE ko.merchant_id=$1::uuid AND ko.location_id=$2::uuid
+          AND i.station_id=ANY($3::uuid[])
+          AND ko.status IN ('queued','in_preparation','partially_ready','ready','exception','cancelled')
           AND EXISTS (SELECT 1 FROM merchant.kitchen_order_item pending
-            WHERE pending.merchant_id=v.merchant_id AND pending.kitchen_order_id=v.id
-              AND pending.station_id=v.station_id
+            WHERE pending.merchant_id=ko.merchant_id AND pending.kitchen_order_id=ko.id
+              AND pending.station_id=i.station_id
               AND (cancellation.cancelled OR pending.status<>'cancelled')
               AND pending.station_completed_at IS NULL)
-        ORDER BY CASE v.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,
-                 v.queued_at,v.id`,
+        GROUP BY ko.id,i.station_id,s.id,e.last_event_sequence,cancellation.cancelled
+        ORDER BY CASE ko.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,
+                 ko.queued_at,ko.id`,
       [merchantId, locationId, stationIds],
     );
     return rows;
@@ -1366,7 +1370,7 @@ export class KdsRepository {
               e.kind,e.status,e.occurred_at::text AS occurred_at,'umi_api'::text AS source,
               e.safe_payload AS payload,e.location_id::text,e.station_id::text,
               e.aggregate_version,e.correlation_id
-         FROM kds.station_event e
+         FROM merchant.kitchen_event e
          JOIN merchant.kitchen_order ko ON ko.id=e.kitchen_order_id AND ko.merchant_id=e.merchant_id
         WHERE e.merchant_id=$1::uuid AND e.location_id=$2::uuid
           AND e.sequence > $4
@@ -1436,7 +1440,7 @@ export class KdsRepository {
                 'modifiers',i.modifiers,'quantity',i.quantity,'preparationNote',i.preparation_note,
                 'displayOrder',i.display_order,'targetSeconds',i.target_seconds,
                 'status',i.status,'version',i.version,
-                -- §8H step 4, derived exactly as kds.station_order derives it: a held
+                -- §8H step 4, derived with the same rule as boardSnapshot: a held
                 -- item is returned with fired=false, never filtered out.
                 'courseNumber',i.course_number,
                 'fired',(i.course_number <= ko.fired_through_course),

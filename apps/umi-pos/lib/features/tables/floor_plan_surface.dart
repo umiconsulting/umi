@@ -711,6 +711,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                   tableStateOrdered,
                   tableStateServed,
                   tableStateAwaitingPayment,
+                  tableVisualPaid,
                   tableStateDirty,
                 ]) ...[
                   PosIcon(
@@ -791,7 +792,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       );
     } else {
       final entry = room?.stateOf(selected.id);
-      final state = entry?.state ?? tableStateOpen;
+      final state = room?.isPaidAndOccupied(selected.id) == true
+          ? tableVisualPaid
+          : entry?.state ?? tableStateOpen;
       final elapsed = room?.elapsedOf(selected.id);
       final groupId = entry?.groupId;
       final groupSize = (room != null && groupId != null)
@@ -944,7 +947,12 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     }
     final room = widget.tableState;
     final facts = <String>[
-      _stateLabel(room?.stateOf(selected.id).state ?? tableStateOpen, es),
+      _stateLabel(
+        room?.isPaidAndOccupied(selected.id) == true
+            ? tableVisualPaid
+            : room?.stateOf(selected.id).state ?? tableStateOpen,
+        es,
+      ),
     ];
     final party = room?.stateOf(selected.id).partySize;
     if (party != null) facts.add(l10n.tableStatePartySizeLabel(party));
@@ -1007,6 +1015,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       for (final table in tables)
         table.id: FloorPlanTableVisual(
           state: room.stateOf(table.id).state,
+          paid: room.isPaidAndOccupied(table.id),
           partySize: room.stateOf(table.id).partySize,
           accountFolio: room.stateOf(table.id).openAccountFolio,
           turn: switch (room.elapsedOf(table.id)) {
@@ -1036,7 +1045,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     final visual = visuals?[element.id];
     if (visual == null) return _stateLabel(tableStateOpen, es);
     return [
-      _stateLabel(visual.state, es),
+      _stateLabel(visual.displayState, es),
       if (visual.partySize != null)
         AppLocalizations.of(
           context,
@@ -1053,6 +1062,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       tableStateOrdered => l10n.tableStateOrderedLabel,
       tableStateServed => l10n.tableStateServedLabel,
       tableStateAwaitingPayment => l10n.tableStateAwaitingPaymentLabel,
+      tableVisualPaid => l10n.tableStatePaidOccupiedLabel,
       tableStateDirty => l10n.tableStateDirtyLabel,
       _ => l10n.tableStateOpenLabel,
     };
@@ -1393,6 +1403,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   ) {
     final entry = room.stateOf(element.id);
     final present = tablePartyStates.contains(entry.state);
+    final paid = room.isPaidAndOccupied(element.id);
     final groupId = entry.groupId;
     final groupSize = groupId == null ? 0 : room.group(groupId).length;
     final actions = <({String label, PosGlyph icon, VoidCallback onTap})>[];
@@ -1408,7 +1419,13 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     // The first action is the state's obvious next step. The remaining actions
     // are consequences or exceptions, and the panel renders them with less
     // weight.
-    if (entry.openAccountId != null && openAccount != null) {
+    if (paid && canManage) {
+      actions.add((
+        label: l10n.tableStateClearAction,
+        icon: PosGlyphs.cleaningServicesOutlined,
+        onTap: () => unawaited(_clearTable(element, l10n, es)),
+      ));
+    } else if (entry.openAccountId != null && openAccount != null) {
       actions.add((
         label: es ? 'Continuar cuenta' : 'Resume account',
         icon: PosGlyphs.receiptLong,
@@ -1441,6 +1458,13 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     }
 
     if (present && canManage) {
+      if (paid && openAccount != null) {
+        actions.add((
+          label: l10n.tableStateNewConsumptionAction,
+          icon: PosGlyphs.receiptLong,
+          onTap: () => unawaited(openAccount(element)),
+        ));
+      }
       actions.add((
         label: l10n.tableStateMoveAction,
         icon: PosGlyphs.arrowForward,
@@ -1468,16 +1492,18 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         icon: PosGlyphs.restaurant,
         onTap: () => unawaited(room.markServed(element.id)),
       ));
-      actions.add((
-        label: l10n.tableStateAwaitingPaymentAction,
-        icon: PosGlyphs.requestQuote,
-        onTap: () => unawaited(room.markAwaitingPayment(element.id)),
-      ));
-      actions.add((
-        label: l10n.tableStateClearAction,
-        icon: PosGlyphs.cleaningServicesOutlined,
-        onTap: () => unawaited(_clearTable(element, l10n, es)),
-      ));
+      if (!paid) {
+        actions.add((
+          label: l10n.tableStateAwaitingPaymentAction,
+          icon: PosGlyphs.requestQuote,
+          onTap: () => unawaited(room.markAwaitingPayment(element.id)),
+        ));
+        actions.add((
+          label: l10n.tableStateClearAction,
+          icon: PosGlyphs.cleaningServicesOutlined,
+          onTap: () => unawaited(_clearTable(element, l10n, es)),
+        ));
+      }
     } else if (!present && canManage) {
       if (entry.openAccountId == null && openAccount != null) {
         actions.add((
@@ -1548,7 +1574,12 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _stateLabel(entry.state, es),
+                _stateLabel(
+                  room.isPaidAndOccupied(element.id)
+                      ? tableVisualPaid
+                      : entry.state,
+                  es,
+                ),
                 style: PosTheme.of(dialog).textTheme.titleMedium,
               ),
               const SizedBox(height: UmiSpacing.xs),
@@ -1619,6 +1650,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   );
 }
 
+/// Estado visual del pago. Los seis estados físicos del contrato se conservan.
+const tableVisualPaid = 'paid_occupied';
+
 /// What one table looks like beyond its published geometry. [state] is always
 /// one of the contract's six names.
 final class FloorPlanTableVisual {
@@ -1631,6 +1665,7 @@ final class FloorPlanTableVisual {
     this.moving = false,
     this.partySize,
     this.accountFolio,
+    this.paid = false,
   });
 
   final String state;
@@ -1641,6 +1676,9 @@ final class FloorPlanTableVisual {
   final String? accountFolio;
   final bool selected;
   final bool moving;
+  final bool paid;
+
+  String get displayState => paid ? tableVisualPaid : state;
 
   bool get partyPresent => tablePartyStates.contains(state);
 }
@@ -2045,7 +2083,7 @@ class _FloorPlanElement extends StatelessWidget {
     final visual = state;
     final accent = visual == null || visual.state == tableStateOpen
         ? null
-        : palette.stateAccent(visual.state);
+        : palette.stateAccent(visual.displayState);
     final selected = visual?.selected == true || visual?.moving == true;
     final border = BorderSide(
       color: selected
@@ -2054,7 +2092,10 @@ class _FloorPlanElement extends StatelessWidget {
       width: selected ? 3 : (accent == null ? 1 : 2),
     );
     final spanish = Localizations.localeOf(context).languageCode == 'es';
-    final stateLabel = _stateName(visual?.state ?? tableStateOpen, spanish);
+    final stateLabel = _stateName(
+      visual?.displayState ?? tableStateOpen,
+      spanish,
+    );
     final label = [
       element.label,
       if (isTable) '${element.capacity} ${spanish ? 'lugares' : 'seats'}',
@@ -2071,7 +2112,7 @@ class _FloorPlanElement extends StatelessWidget {
     );
     return PosSurface(
       key: ValueKey('floor-plan-element-${element.id}'),
-      color: palette.fillFor(element.kind, visual?.state),
+      color: palette.fillFor(element.kind, visual?.displayState),
       shape: element.shape == 'round'
           ? CircleBorder(side: border)
           : RoundedRectangleBorder(
@@ -2098,6 +2139,7 @@ class _FloorPlanElement extends StatelessWidget {
     tableStateOrdered => spanish ? 'Pedido tomado' : 'Order taken',
     tableStateServed => spanish ? 'Servido' : 'Served',
     tableStateAwaitingPayment => spanish ? 'Por cobrar' : 'Awaiting payment',
+    tableVisualPaid => spanish ? 'Pagada y ocupada' : 'Paid and occupied',
     tableStateDirty => spanish ? 'Por limpiar' : 'Needs cleaning',
     _ => spanish ? 'Libre' : 'Open',
   };
@@ -2141,7 +2183,7 @@ class _FloorPlanElement extends StatelessWidget {
                   fontSize: math.min(band * 0.32, width * 0.3).clamp(6.0, 15.0),
                   color: accountFolio != null
                       ? palette.scheme.primary
-                      : palette.stateAccent(visual!.state),
+                      : palette.stateAccent(visual!.displayState),
                 ),
               ),
           ],
@@ -2159,7 +2201,9 @@ class _FloorPlanElement extends StatelessWidget {
         ? FloorPlanSeatDots(
             key: ValueKey('floor-plan-seats-${element.id}'),
             count: element.capacity,
-            color: present ? palette.stateAccent(visual!.state) : palette.seat,
+            color: present
+                ? palette.stateAccent(visual!.displayState)
+                : palette.seat,
             filled: present,
           )
         : const SizedBox.expand();
@@ -2175,9 +2219,9 @@ class _FloorPlanElement extends StatelessWidget {
                   child: Row(
                     children: [
                       PosIcon(
-                        tableStateGlyph(visual.state),
+                        tableStateGlyph(visual.displayState),
                         size: math.min(width, height) * .18,
-                        color: palette.stateAccent(visual.state),
+                        color: palette.stateAccent(visual.displayState),
                       ),
                       Expanded(child: seats),
                     ],
@@ -2196,6 +2240,7 @@ PosGlyph tableStateGlyph(String state) => switch (state) {
   tableStateOrdered => PosGlyphs.receiptLong,
   tableStateServed => PosGlyphs.restaurant,
   tableStateAwaitingPayment => PosGlyphs.paymentsOutlined,
+  tableVisualPaid => PosGlyphs.checkCircleOutline,
   tableStateDirty => PosGlyphs.cleaningServices,
   _ => PosGlyphs.checkCircleOutline,
 };
@@ -2368,6 +2413,9 @@ class _FloorPlanPalette {
         tableStateAwaitingPayment: dark
             ? const Color(0xffffd479)
             : const Color(0xffb45309),
+        tableVisualPaid: dark
+            ? const Color(0xff7dd3d8)
+            : const Color(0xff0e6973),
         tableStateDirty: dark
             ? const Color(0xffffb078)
             : const Color(0xffc2410c),

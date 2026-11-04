@@ -2,10 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const migration = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/42_pos_kitchen.sql'),
-  'utf8',
-);
+const migration = readFileSync(resolve(process.cwd(), '../../db/42_pos_kitchen.sql'), 'utf8');
 const concurrencyHarness = readFileSync(
   resolve(process.cwd(), '../../scripts/umi-pos-kds-concurrency-check.sh'),
   'utf8',

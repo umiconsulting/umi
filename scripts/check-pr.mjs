@@ -71,23 +71,27 @@ if (newRangeFindings.length > 0) {
 // A numbered file that stamps `runtime.schema_migration` has run against a live
 // database. Editing it changes what a NEW database gets and does nothing to the
 // one that holds the customers, so the two drift silently. That is the plan's
-// D3 defect and the rule `docs/migration/build-v3/freeze.sh` states. The applied
+// D3 defect and the rule `db/freeze.sh` states. The applied
 // set is read from the files themselves — every stamping file names its own
 // version — so this check needs no database. ADDING a new numbered file is a
 // migration and stays allowed; only an edit, delete, rename or copy of an
 // already-applied one fails.
-const migrationDirectory = 'docs/migration/build-v3';
-const numberedMigration = /^docs\/migration\/build-v3\/[^/]+\.sql$/u;
+const migrationDirectory = 'db';
+const numberedMigration = /^(?:db|docs\/migration\/build-v3)\/[^/]+\.sql$/u;
 const migrationVersionOf = (source) =>
   /insert\s+into\s+runtime\.schema_migration[^;]*?values\s*\(\s*'([^']+)'/isu.exec(source)?.[1] ??
   null;
 
 const appliedMigrations = new Map();
+const appliedMigrationSources = new Map();
 for (const name of (await readdir(migrationDirectory)).sort()) {
   if (!name.endsWith('.sql')) continue;
   const source = await readFile(`${migrationDirectory}/${name}`, 'utf8');
   const version = migrationVersionOf(source);
-  if (version !== null) appliedMigrations.set(`${migrationDirectory}/${name}`, version);
+  if (version !== null) {
+    appliedMigrations.set(`${migrationDirectory}/${name}`, version);
+    appliedMigrationSources.set(`${migrationDirectory}/${name}`, source);
+  }
 }
 
 // A deleted or renamed file is no longer in the tree above, so its stamp is read
@@ -113,6 +117,17 @@ const appliedMigrationsEditedIn = (entries, lookupRef) => {
     const [status, ...paths] = entry.split('\t');
     // A = added and U = unmerged stay allowed: a new numbered file is the fix.
     if (!/^[MDCR]/u.test(status)) continue;
+    // Allow a byte-identical directory move from docs/migration/build-v3/<file> to db/<file>.
+    if (
+      status.startsWith('R') &&
+      paths.length === 2 &&
+      /^docs\/migration\/build-v3\/([^/]+\.sql)$/u.test(paths[0]) &&
+      paths[1] === `db/${paths[0].split('/').pop()}`
+    ) {
+      const oldSource = migrationSourceAt(lookupRef, paths[0]);
+      const newSource = appliedMigrationSources.get(paths[1]);
+      if (oldSource !== null && newSource === oldSource) continue;
+    }
     for (const path of paths) {
       const version = appliedVersionOf(path, lookupRef);
       if (version !== null) touched.push(`${status}\t${path}\t(applied as ${version})`);
@@ -147,7 +162,7 @@ if (touchedApplied.length > 0) {
       ...touchedApplied.map((entry) => `  ${entry}`),
       '',
       'The live database does NOT get this edit. The fix is a migration, never an edit:',
-      '  docs/migration/build-v3/migrations/  (see its README)',
+      '  db/migrations/  (see its README)',
     ].join('\n'),
   );
 }

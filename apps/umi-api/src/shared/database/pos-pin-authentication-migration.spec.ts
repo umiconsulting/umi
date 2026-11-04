@@ -2,10 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const sql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/20_merchant.sql'),
-  'utf8',
-);
+const sql = readFileSync(resolve(process.cwd(), '../../db/20_merchant.sql'), 'utf8');
 
 describe('UmiPOS operator PIN migration', () => {
   it('stores a keyed lookup hash and keeps the salted verifier', () => {

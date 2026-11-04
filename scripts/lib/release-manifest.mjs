@@ -10,7 +10,7 @@ export async function sha256File(file) {
 }
 
 export async function migrationDigest(root) {
-  const directory = path.join(root, 'docs/migration/build-v3');
+  const directory = path.join(root, 'db');
   const files = (await readdir(directory)).filter((file) => file.endsWith('.sql')).sort();
   const hash = createHash('sha256');
   for (const file of files) {

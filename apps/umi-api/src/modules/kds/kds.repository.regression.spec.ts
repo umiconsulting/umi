@@ -21,7 +21,7 @@ describe('KDS device location query regression', () => {
   // a single-station café and unusable in a two-station one.
   it('names the station on the board row, so a till can tell its cards apart', () => {
     expect(source).toContain('s.name AS station_name');
-    expect(source).toContain('JOIN merchant.station s ON s.id=v.station_id');
+    expect(source).toContain('JOIN merchant.station s ON s.id=i.station_id');
   });
 
   it('uses the device registry location with a legacy session fallback', () => {

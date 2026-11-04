@@ -1,5 +1,3 @@
-BEGIN;
-
 ALTER TABLE merchant.inventory_item
   ADD COLUMN IF NOT EXISTS initial_unit_cost_minor bigint;
 DO $$
@@ -14,5 +12,3 @@ BEGIN
   END IF;
 END;
 $$;
-
-COMMIT;

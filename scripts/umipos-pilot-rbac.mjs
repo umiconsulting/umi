@@ -7,12 +7,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const matrixPath = resolve(root, 'config/umipos-pilot-role-grants.json');
 const inventoryPath = resolve(root, 'config/umipos-permission-inventory.json');
 const approvalPath = resolve(root, 'config/umipos-pilot-approval-boundaries.json');
-const sqlPath = resolve(root, 'docs/migration/build-v3/35_pos_pilot_rbac.sql');
+const sqlPath = resolve(root, 'db/35_pos_pilot_rbac.sql');
 
-const merchantRoleSchema = readFileSync(
-  resolve(root, 'docs/migration/build-v3/49_merchant_roles.sql'),
-  'utf8',
-);
+const merchantRoleSchema = readFileSync(resolve(root, 'db/49_merchant_roles.sql'), 'utf8');
 const resolverStart = merchantRoleSchema.indexOf(
   'create or replace function umi.resolve_staff_permissions',
 );

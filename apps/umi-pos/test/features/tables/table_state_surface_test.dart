@@ -112,6 +112,7 @@ Map<String, Object?> entryJson(
   String? group,
   String? openAccountId,
   String? openAccountFolio,
+  String? paidAt,
 }) => {
   'tableId': tableId,
   'state': state,
@@ -120,6 +121,7 @@ Map<String, Object?> entryJson(
   'groupId': group,
   'openAccountId': openAccountId,
   'openAccountFolio': openAccountFolio,
+  'paidAt': paidAt,
 };
 
 final class RoomRepository implements TableStateRepository {
@@ -423,6 +425,90 @@ Future<SurfaceHarness> pumpSurface(
 }
 
 void main() {
+  testWidgets('a paid party stays seated until staff confirms departure', (
+    tester,
+  ) async {
+    var newAccounts = 0;
+    final harness = await pumpSurface(
+      tester,
+      repository: RoomRepository(
+        states: [
+          entryJson(
+            t1,
+            tableStateServed,
+            seatedAt: '2026-09-16T17:58:00.000Z',
+            partySize: 2,
+            paidAt: '2026-09-16T17:59:00.000Z',
+          ),
+        ],
+      ),
+      onOpenAccount: (table, {partySize}) async {
+        newAccounts++;
+        return true;
+      },
+    );
+    await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
+    await tester.pumpAndSettle();
+    final panel = find.byKey(const ValueKey('table-detail-panel'));
+    expect(
+      find.descendant(of: panel, matching: find.text('Paid and occupied')),
+      findsOneWidget,
+    );
+    expect(harness.tableState.partyPresent(t1), isTrue);
+    expect(harness.tableState.elapsedOf(t1), const Duration(minutes: 2));
+    expect(find.text('Bill requested'), findsNothing);
+    expect(
+      find.ancestor(
+        of: find.text('Clear table'),
+        matching: find.byType(PosButton),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('New consumption'), findsOneWidget);
+    expect(newAccounts, 0);
+    await tester.tap(find.text('Clear table'));
+    await tester.pumpAndSettle();
+    expect(harness.tableState.partyPresent(t1), isTrue);
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+    expect(harness.tableState.stateOf(t1).state, tableStateDirty);
+    expect(harness.tableState.partyPresent(t1), isFalse);
+    expect(newAccounts, 0);
+    await harness.dispose(tester);
+  });
+
+  testWidgets('a new open account takes priority over an earlier payment', (
+    tester,
+  ) async {
+    final harness = await pumpSurface(
+      tester,
+      repository: RoomRepository(
+        states: [
+          entryJson(
+            t1,
+            tableStateOrdered,
+            seatedAt: '2026-09-16T17:58:00.000Z',
+            partySize: 2,
+            paidAt: '2026-09-16T17:59:00.000Z',
+            openAccountId: 'new-account',
+            openAccountFolio: 'Cuenta 002',
+          ),
+        ],
+      ),
+      onOpenAccount: (table, {partySize}) async => true,
+    );
+    await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
+    await tester.pumpAndSettle();
+    final panel = find.byKey(const ValueKey('table-detail-panel'));
+    expect(
+      find.descendant(of: panel, matching: find.text('Paid and occupied')),
+      findsNothing,
+    );
+    expect(find.text('Resume account'), findsOneWidget);
+    expect(harness.tableState.partyPresent(t1), isTrue);
+    await harness.dispose(tester);
+  });
+
   testWidgets('a full room can still open a tableless temporary account', (
     tester,
   ) async {

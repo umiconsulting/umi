@@ -104,6 +104,40 @@ Future<void> _open(
 }
 
 void main() {
+  testWidgets('a paid visit stays occupied in the table selector', (
+    tester,
+  ) async {
+    final room = await _room(
+      RoomRepository(
+        states: [
+          entryJson(
+            'table',
+            tableStateServed,
+            seatedAt: '2026-11-02T18:00:00.000Z',
+            partySize: 2,
+            paidAt: '2026-11-02T18:10:00.000Z',
+          ),
+        ],
+      ),
+    );
+    await _open(
+      tester,
+      areas: [
+        _area([_table('table', 'Mesa 1')]),
+      ],
+      room: room,
+      canManage: true,
+      result: (_) {},
+    );
+    await tester.tap(find.byKey(const ValueKey('floor-plan-element-table')));
+    await tester.pumpAndSettle();
+    expect(find.text('Pagada y ocupada · 4 lugares'), findsOneWidget);
+    expect(room.partyPresent('table'), isTrue);
+    expect(find.text('Los clientes se fueron'), findsOneWidget);
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('confirmation is blocked while a room poll is still pending', (
     tester,
   ) async {

@@ -191,6 +191,42 @@ describe('StaffService.update / remove', () => {
     );
   });
 
+  it('lets an administrator change their own PIN', async () => {
+    h.repo.findRoleKey.mockResolvedValue('admin');
+    h.repo.update.mockResolvedValue({
+      ...ROW,
+      role: 'ADMIN',
+      roleKey: 'admin',
+      hasOperatorPin: true,
+    });
+    await h.svc.update(
+      't1',
+      's1',
+      { roleId: '', operatorPin: '2468' },
+      { membershipId: 's1', roles: ['admin'], permissions: ['merchant.manage'] },
+    );
+    expect(h.repo.update).toHaveBeenCalledWith('t1', 's1', {
+      pinMaterial: {
+        salt: 'a'.repeat(32),
+        hash: 'b'.repeat(128),
+        lookupHash: expect.any(String),
+      },
+    });
+  });
+
+  it('stops an administrator from disabling or changing their own role', async () => {
+    h.repo.findRoleKey.mockResolvedValue('admin');
+    await expect(
+      h.svc.update(
+        't1',
+        's1',
+        { status: 'disabled' },
+        { membershipId: 's1', roles: ['admin'], permissions: ['merchant.manage'] },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(h.repo.update).not.toHaveBeenCalled();
+  });
+
   it('stops an administrator from changing another administrator', async () => {
     h.repo.findRoleKey.mockResolvedValue('admin');
     await expect(
@@ -198,7 +234,7 @@ describe('StaffService.update / remove', () => {
         't1',
         's1',
         { operatorPin: '2468' },
-        { roles: ['admin'], permissions: ['merchant.manage'] },
+        { membershipId: 's2', roles: ['admin'], permissions: ['merchant.manage'] },
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(h.repo.update).not.toHaveBeenCalled();

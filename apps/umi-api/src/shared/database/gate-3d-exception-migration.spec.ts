@@ -2,10 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const sql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/34_pos_exception.sql'),
-  'utf8',
-);
+const sql = readFileSync(resolve(process.cwd(), '../../db/34_pos_exception.sql'), 'utf8');
 const repository = readFileSync(
   resolve(process.cwd(), 'src/modules/pos-exception/pos-exception.repository.ts'),
   'utf8',

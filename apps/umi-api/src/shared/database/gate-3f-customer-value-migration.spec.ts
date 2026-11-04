@@ -2,20 +2,17 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const sql = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/37_pos_customer_value.sql'),
-  'utf8',
-);
+const sql = readFileSync(resolve(process.cwd(), '../../db/37_pos_customer_value.sql'), 'utf8');
 const closeout = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/38_pos_customer_value_closeout.sql'),
+  resolve(process.cwd(), '../../db/38_pos_customer_value_closeout.sql'),
   'utf8',
 );
 const finalCloseout = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/39_pos_customer_value_final_closeout.sql'),
+  resolve(process.cwd(), '../../db/39_pos_customer_value_final_closeout.sql'),
   'utf8',
 );
 const workerScope = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/48_customer_value_worker_scope.sql'),
+  resolve(process.cwd(), '../../db/48_customer_value_worker_scope.sql'),
   'utf8',
 );
 const checkout = readFileSync(
@@ -34,16 +31,10 @@ const cashWriteRepository = readFileSync(
   resolve(process.cwd(), 'src/modules/cash/cash-write.repository.ts'),
   'utf8',
 );
-const rls = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/90_rls.sql'),
-  'utf8',
-);
+const rls = readFileSync(resolve(process.cwd(), '../../db/90_rls.sql'), 'utf8');
 // The gift-card table itself lives in build-v3's merchant DDL (#127/#128); 37 is
 // additive on top of it. Secrets assertions read the table where it is defined.
-const merchantDdl = readFileSync(
-  resolve(process.cwd(), '../../docs/migration/build-v3/20_merchant.sql'),
-  'utf8',
-);
+const merchantDdl = readFileSync(resolve(process.cwd(), '../../db/20_merchant.sql'), 'utf8');
 
 describe('Gate 3F customer and value authority', () => {
   it('keeps customer identity inside one merchant', () => {
