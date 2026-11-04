@@ -170,4 +170,26 @@ Comandos:
 git diff --check
 ```
 
-Herramienta: Flutter oficial 3.47.5, SDK autorizado por root. Las pruebas verifican conducta y geometría del cliente nativo. Root conserva el APK y la aceptación visual en Android. La suite completa de E espera esa aceptación por instrucción de root. El último resultado completo sigue en M1, `4bc6589a`.
+Herramienta: Flutter oficial 3.47.5, SDK autorizado por root. Las pruebas verifican conducta y geometría del cliente nativo. Root conserva el APK y la aceptación visual en Android. La primera entrega de E dejó la suite completa pendiente de esa aceptación.
+
+### Verificación completa de E tras la aceptación de root
+
+Root aprobó la cuenta y el cobro parcial en teléfono tras dos cuadros estables por superficie. `e-account-partial-phone.png` presenta ambas líneas enviadas, la nota y los importes 93/31/62 completos. Root verificó las acciones disponibles del menú. `e-partial-phone.png` presenta los métodos antes del formulario. Root registró una porción de 31 con efectivo exacto de 31. La revisión del código de E quedó aprobada.
+
+Después de esa aceptación, se ejecutaron la suite completa y el analizador completo una vez sobre el producto exacto `2fd267ed`.
+
+| Comprobación final | Resultado | Evidencia |
+| --- | --- | --- |
+| Suite completa Flutter | 1,292 aprobadas, 5 omisiones existentes, 0 fallos | `/private/tmp/umi-design2-corrections-full-e-final.log` |
+| Analizador completo | 0 errores, 0 advertencias, 3 infos anteriores | `/private/tmp/umi-design2-e-analyze-full.log` |
+| Producto sin cambios posteriores | Coincide con `2fd267ed` | `git diff --exit-code 2fd267ed -- apps/umi-pos` |
+| Espacios y conflictos del diff | Correcto | `git diff --check` |
+
+```sh
+/Users/moon/.local/opt/flutter-3.47.5/bin/flutter test --no-pub
+/Users/moon/.local/opt/flutter-3.47.5/bin/flutter analyze --no-pub --no-fatal-infos
+git diff --exit-code 2fd267ed -- apps/umi-pos
+git diff --check
+```
+
+Las cinco omisiones siguen en Linux AppImage. Las tres infos siguen en `inventory_repository.dart:76`, `cash_keyboard_test.dart:63` y `pos_entry_brand_test.dart:3`. Root conserva las verificaciones restantes de inicio en frío, finalización y captura nativa de E3. Este cierre registra las pruebas del producto y la aceptación comunicada por root.

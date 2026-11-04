@@ -1,6 +1,6 @@
 # Native POS: selected Rediseño 2
 
-Status: E source checkpoint `2fd267ed` is ready for Android review. Root owns final screenshot acceptance.
+Status: final product `2fd267ed` passed the full suite. Root approved E phone visuals and the source review. Root owns remaining runtime acceptance.
 
 The native POS now covers the 24 audit rows and the approved inline service follow-up. The work corrects composition and density across the existing operational surfaces. The final matrix is `.superpowers/sdd/2026-11-02-redesign-parity/task-3n-corrections-report.md`.
 
@@ -31,8 +31,8 @@ SDK: official Flutter 3.47.5 at `/Users/moon/.local/opt/flutter-3.47.5/bin/flutt
 | --- | --- | --- |
 | E covering tests | 148 passed, 0 failures | `/private/tmp/umi-design2-e-focused.log` |
 | E scoped analyzer, 7 modified files | No issues | `/private/tmp/umi-design2-e-analyze-scoped.log` |
-| M1 full suite, source `4bc6589a` | 1,288 passed, 5 existing skips, 0 failures | `/private/tmp/umi-design2-corrections-full-m1-final.log` |
-| M1 full analyzer | 0 errors, 0 warnings, 3 existing infos | `/private/tmp/umi-design2-m1-analyze-full.log` |
+| Final full suite, source `2fd267ed` | 1,292 passed, 5 existing skips, 0 failures | `/private/tmp/umi-design2-corrections-full-e-final.log` |
+| Final full analyzer | 0 errors, 0 warnings, 3 existing infos | `/private/tmp/umi-design2-e-analyze-full.log` |
 | D focused checks | 158 passed | `/private/tmp/umi-design2-d-focused.log` |
 | Diff whitespace | Clean | `git diff --check` |
 
@@ -44,6 +44,6 @@ P2: `0a90e721`. A: `51eaab72`. B: `aee849ae`. C: `05794250`. D: `417129ce`.
 
 Minor D review follow-up: `4bc6589a` makes the landscape service-selector insertions mutually exclusive when the keyboard is present. The added 1340 × 800 route case with a 200 px inset verifies one compact chooser, visible products and blocked additions with the account preserved. That route also passed before the guard because the outer shell consumes the inset; it does not provide RED/GREEN evidence for the internal conditional. The corrections report records this limit. The full suite ran once on the final source.
 
-E: `2fd267ed` corrects native phone account density and partial payment composition. Two sent lines remain visible with the pinned balance and collection actions. The phone partial route places methods before the form. Count shows one wordmark when the rail is present. The corrections report records the route tests, moved actions and limits. E awaits native visual acceptance before its full suite, as instructed by root.
+E: `2fd267ed` corrects native phone account density and partial payment composition. Two sent lines remain visible with the pinned balance and collection actions. The phone partial route places methods before the form. Count shows one wordmark when the rail is present. The corrections report records the route tests, moved actions and limits. Root approved the phone account and partial payment frames, verified menu actions and recorded an exact cash portion of 31. The source review approved E. The full suite and full analyzer then ran once on the exact final product.
 
 Root owns APK builds, emulators, fixtures, authenticated Android capture and final visual comparison. Widget tests establish their stated native client behavior and geometry. Physical device and provider outcomes remain separate runtime evidence. No backend, schema, fixture or production change is included.
