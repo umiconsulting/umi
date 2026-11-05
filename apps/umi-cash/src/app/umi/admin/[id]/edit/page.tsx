@@ -42,7 +42,7 @@ export default function EditTenantPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const DAY_NAMES: Record<string, string> = { mon: 'Lun', tue: 'Mar', wed: 'Mié', thu: 'Jue', fri: 'Vie', sat: 'Sáb', sun: 'Dom' };
   const defaultHours: HoursGrid = {};
 
   const [form, setForm] = useState({
