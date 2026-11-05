@@ -33,6 +33,9 @@ export class ApplePushService {
   private readonly teamId?: string;
   private readonly topic: string;
   private readonly key: Buffer | null;
+  private readonly certificate?: Buffer;
+  private readonly signingKey?: Buffer;
+  private readonly passphrase?: string;
   private cached: { jwt: string; expiresAt: number } | null = null;
 
   constructor(
@@ -45,11 +48,24 @@ export class ApplePushService {
     this.topic = (config.get('APPLE_PASS_TYPE_ID', { infer: true }) ?? '').trim();
     const raw = config.get('APPLE_APN_KEY', { infer: true });
     this.key = raw ? Buffer.from(raw, 'base64') : null;
+    const cert = config.get('APPLE_SIGNER_CERT', { infer: true });
+    const intermediate = config.get('APPLE_WWDR_CERT', { infer: true });
+    const signingKey = config.get('APPLE_SIGNER_KEY', { infer: true });
+    this.certificate = cert
+      ? Buffer.concat([
+          Buffer.from(cert, 'base64'),
+          ...(intermediate ? [Buffer.from('\n'), Buffer.from(intermediate, 'base64')] : []),
+        ])
+      : undefined;
+    this.signingKey = signingKey ? Buffer.from(signingKey, 'base64') : undefined;
+    this.passphrase = config.get('APPLE_KEY_PASSPHRASE', { infer: true });
   }
 
   isConfigured(): boolean {
     return (
-      this.isolation.deliveryEnabled && !!this.key && !!this.keyId && !!this.teamId && !!this.topic
+      this.isolation.deliveryEnabled &&
+      !!this.topic &&
+      ((!!this.key && !!this.keyId && !!this.teamId) || (!!this.certificate && !!this.signingKey))
     );
   }
 
@@ -61,6 +77,12 @@ export class ApplePushService {
    */
   async pushCard(cardId: string): Promise<{ sent: number; failed: number }> {
     if (!this.isolation.deliveryEnabled) return { sent: 0, failed: 0 };
+    if (
+      this.isolation.requiresMerchantCheck &&
+      !this.isolation.canDeliver(await this.repo.merchantForCard(cardId))
+    ) {
+      return { sent: 0, failed: 0 };
+    }
     if (!this.isConfigured()) {
       // WARN, not debug. A production log level does not print debug, so an
       // unconfigured APNs was invisible: every push returned "sent 0" and
@@ -69,8 +91,8 @@ export class ApplePushService {
       this.logger.warn(`apn_not_configured card=${cardId}`);
       return { sent: 0, failed: 0 };
     }
-    const token = await this.providerToken();
-    if (!token) return { sent: 0, failed: 0 };
+    const token = this.key ? await this.providerToken() : null;
+    if (this.key && !token) return { sent: 0, failed: 0 };
 
     const devices = await this.repo.pushTokensForCard(cardId);
     if (devices.length === 0) return { sent: 0, failed: 0 };
@@ -100,6 +122,7 @@ export class ApplePushService {
    * is more than an hour. The batch keeps the connection count to Apple small.
    */
   async pushMerchant(merchantId: string): Promise<{ cards: number; sent: number }> {
+    if (!this.isolation.canDeliver(merchantId)) return { cards: 0, sent: 0 };
     if (!this.isConfigured()) return { cards: 0, sent: 0 };
 
     const cardIds = await this.repo.cardsWithApplePass(merchantId);
@@ -135,6 +158,13 @@ export class ApplePushService {
    */
   async pushCards(cardIds: string[]): Promise<{ cards: number; sent: number }> {
     if (!this.isConfigured() || cardIds.length === 0) return { cards: 0, sent: 0 };
+    if (this.isolation.requiresMerchantCheck) {
+      const allowed = await Promise.all(
+        cardIds.map(async (id) => this.isolation.canDeliver(await this.repo.merchantForCard(id))),
+      );
+      cardIds = cardIds.filter((_, index) => allowed[index]);
+      if (cardIds.length === 0) return { cards: 0, sent: 0 };
+    }
 
     await this.repo.touchCards(cardIds);
 
@@ -166,9 +196,19 @@ export class ApplePushService {
     }
   }
 
-  private send(providerToken: string, pushToken: string): Promise<boolean> {
+  private send(providerToken: string | null, pushToken: string): Promise<boolean> {
     return new Promise((resolve) => {
-      const client = http2.connect(APN_HOST);
+      // Wallet supports the same certificate and key that signed the original pass.
+      const client = http2.connect(
+        APN_HOST,
+        providerToken
+          ? undefined
+          : {
+              cert: this.certificate,
+              key: this.signingKey,
+              passphrase: this.passphrase,
+            },
+      );
       let status = 0;
       let body = '';
       let settled = false;
@@ -202,7 +242,7 @@ export class ApplePushService {
       const req = client.request({
         ':method': 'POST',
         ':path': `/3/device/${pushToken}`,
-        authorization: `bearer ${providerToken}`,
+        ...(providerToken ? { authorization: `bearer ${providerToken}` } : {}),
         'apns-topic': this.topic,
         'apns-push-type': 'background',
         'apns-priority': '5',

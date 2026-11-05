@@ -111,8 +111,9 @@ Actual Apple and Google Wallet delivery remains a device check before production
 The staging database contains 1,053 wallet-pass records outside the synthetic café.
 Treat these as copied live identities. Never enable staging updates for them.
 
-Staging Compose forces `WALLET_MODE=isolated` for both the API and the worker.
-The provider services block every APN update and Google object update in this mode.
+Staging Compose forces `WALLET_MODE=test` for the API and `WALLET_MODE=isolated` for the worker.
+Test mode permits APN and Google updates only for the synthetic café in the allowlist.
+The worker blocks every outbound wallet update.
 The Apple and Google signing builders accept only `WALLET_TEST_MERCHANT_IDS`.
 Apple poll downloads use the same guarded builder.
 The synthetic café uses `3a010ff6-0bea-4b4b-9801-d9e63e25962c`.
@@ -153,7 +154,7 @@ Its callback URL uses the staging Worker origin.
 A second synthetic café receives HTTP 403 from both providers because it is outside the allowlist.
 That negative test café was deleted after the check.
 
-The API and worker both report isolated mode at runtime.
+The initial API and worker checks both reported isolated mode at runtime.
 The API has signing keys. The worker has no signing keys, and both services have no APN key.
 The backend suite passes 2,159 tests. Ten database checks pass for compatibility and SQL parsing.
 
@@ -171,3 +172,23 @@ The permanent platform administrator remains active.
 The synthetic café and its business login remain available for review.
 The disposable local PostgreSQL and Redis containers were stopped.
 Actual installation in Apple Wallet or Google Wallet remains a physical-device check.
+
+## Test delivery, 2026-11-05
+
+The user installed an Apple pass and scanned its card through the old business interface.
+API logs confirm device registration, pass downloads, and a committed scan.
+The initial isolated mode blocked the update signal, so the phone retained its earlier content.
+
+The API now uses test mode to permit delivery only for the synthetic café.
+Single-card pushes and merchant pushes check ownership before any provider request.
+Mixed Apple batches exclude other merchants before they touch card timestamps.
+Google updates apply the same allowlist before OAuth or provider requests.
+The worker remains isolated, and production retains its existing configuration.
+
+Apple uses the pass signing certificate and key when no APN token key exists.
+The certificate includes its WWDR chain. Existing token authentication keeps its precedence.
+Staging still receives no APN token key.
+New cafés without stamp artwork receive basic empty and earned stamp images instead of HTTP 500.
+
+The backend suite passes 2,164 tests. Type checks, lint, and focused wallet checks pass.
+See [protocol research](../research/2026-11-05-staging-wallet-updates.md) for delivery and notification limits.

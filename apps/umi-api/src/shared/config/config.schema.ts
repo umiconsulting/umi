@@ -58,8 +58,8 @@ export const configSchema = z
     APPLE_APN_KEY: z.string().optional(),
     APPLE_APN_KEY_ID: z.string().optional(),
 
-    // Isolated staging signs only test merchants and blocks all wallet updates.
-    WALLET_MODE: z.enum(['live', 'isolated']).default('live'),
+    // Test mode permits updates only for allowlisted synthetic merchants.
+    WALLET_MODE: z.enum(['live', 'isolated', 'test']).default('live'),
     WALLET_TEST_MERCHANT_IDS: z.string().default(''),
 
     // ── Google Wallet ───────────────────────────────────────────────────────

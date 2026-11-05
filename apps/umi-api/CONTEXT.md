@@ -31,9 +31,11 @@ _Avoid_: Gift Card, account
 
 ## Isolated wallet tests
 
-Staging enforces `WALLET_MODE=isolated` in both API and worker containers.
-This mode blocks outbound APN and Google updates at the provider services.
-The signing builders accept only `WALLET_TEST_MERCHANT_IDS`.
+The staging API uses `WALLET_MODE=test`; the worker retains `WALLET_MODE=isolated`.
+Test mode permits signing and updates only for `WALLET_TEST_MERCHANT_IDS`.
+The provider services reject other merchants before any outbound update or batch touch.
+Isolated mode permits test signing but blocks every outbound update.
+Apple push supports the original signing certificate when no APN token key is configured.
 New merchants use their UUID as the public wallet reference. Existing handles stay unchanged.
 Signing credentials belong only to the API container through a private optional file.
 See `docs/deployment/cash-cloudflare-staging.md` before a backend rollback.
