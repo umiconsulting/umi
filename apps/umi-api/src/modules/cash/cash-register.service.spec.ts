@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  HttpException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException } from '@nestjs/common';
 import { CashRegisterService } from './cash-register.service';
 
 function make() {
@@ -85,15 +80,17 @@ describe('CashRegisterService.register', () => {
     );
   });
 
-  it('409 + session when the phone already has a card', async () => {
+  it('returns the existing customer session without creating a second card', async () => {
     h.repo.findExisting.mockResolvedValue({
       personId: 'p9',
       displayName: 'Existing',
       hasCard: true,
     });
-    await expect(h.svc.register('t1', 'Kala', INPUT, null)).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    await expect(h.svc.register('t1', 'Kala', INPUT, null)).resolves.toMatchObject({
+      alreadyRegistered: true,
+      accessToken: expect.any(String),
+      user: { id: 'p9', role: 'CUSTOMER' },
+    });
     expect(h.session.createSession).toHaveBeenCalledWith('p9', 'CUSTOMER', 't1');
     expect(h.repo.createCard).not.toHaveBeenCalled();
   });
