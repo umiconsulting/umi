@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "umi-cash-staging",
+  "account_id": "8aef562d6d0c51b70f1b83fa1d2912a4",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-04",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "umi-cash-staging" }],
+  "observability": { "enabled": true },
+  "vars": {
+    "CASH_API_ORIGIN": "https://api-staging.umiconsulting.co",
+    "NEXT_PUBLIC_APP_URL": "https://umi-cash-staging.hola-8ae.workers.dev"
+  }
+}

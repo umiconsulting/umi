@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 const UMI_NAVY = '#223979';
@@ -21,24 +21,38 @@ function UmiMark({ size = 22 }: { size?: number }) {
 
 export default function UmiLoginPage() {
   const router = useRouter();
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [challengeToken, setChallengeToken] = useState('');
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    void fetch('/api/umi/session').then((response) => {
+      if (response.ok) router.replace('/umi/admin');
+    }).catch(() => undefined);
+  }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError('');
-    const res = await fetch('/api/umi/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
-    });
-    if (res.ok) {
-      router.push('/umi/admin');
-    } else {
+    try {
+      const res = await fetch(challengeToken ? '/api/umi/mfa/verify' : '/api/umi/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(challengeToken ? { challengeToken, code } : { username, password }),
+      });
       const data = await res.json();
-      setError(data.error || 'Error al iniciar sesión');
+      if (!res.ok) { setError(data.error || 'Error al iniciar sesión'); return; }
+      if (data.mfaRequired) { setChallengeToken(data.challengeToken); return; }
+      const access = await fetch('/api/umi/session');
+      if (access.ok) router.push('/umi/admin');
+      else setError('Tu cuenta no tiene acceso al panel de Umi.');
+    } catch {
+      setError('No se pudo conectar con Umi. Intenta de nuevo.');
+    } finally {
       setLoading(false);
     }
   }
@@ -64,6 +78,14 @@ export default function UmiLoginPage() {
           className="u-fade-up d1 rounded-2xl p-6 space-y-4"
           style={{ background: '#fff', border: `1px solid ${UMI_SURFACE_DARK}` }}
         >
+          {!challengeToken && <div>
+            <label htmlFor="umi-username" className="u-eyebrow" style={{ color: UMI_INK_LIGHT }}>Correo de tu cuenta Umi</label>
+            <input id="umi-username" type="email" value={username} onChange={(e) => setUsername(e.target.value)} className="u-input" autoComplete="username" required />
+          </div>}
+          {challengeToken ? <div>
+            <label htmlFor="umi-code" className="u-eyebrow" style={{ color: UMI_INK_LIGHT }}>Código de verificación</label>
+            <input id="umi-code" value={code} onChange={(e) => setCode(e.target.value)} className="u-input" inputMode="numeric" autoComplete="one-time-code" required />
+          </div> :
           <div>
             <div className="u-eyebrow" style={{ color: UMI_INK_LIGHT, marginBottom: 6 }}>Contraseña</div>
             <input
@@ -76,7 +98,7 @@ export default function UmiLoginPage() {
               required
               style={{ borderColor: UMI_SURFACE_DARK }}
             />
-          </div>
+          </div>}
 
           {error && (
             <p className="text-sm text-center" style={{ color: 'var(--color-danger)' }}>{error}</p>
@@ -84,7 +106,7 @@ export default function UmiLoginPage() {
 
           <button
             type="submit"
-            disabled={loading || !password}
+            disabled={loading || (challengeToken ? !code : !username || !password)}
             className="u-btn"
             style={{ width: '100%', background: UMI_NAVY, color: '#fff' }}
           >

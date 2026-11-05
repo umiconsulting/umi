@@ -2,14 +2,14 @@ import BackButton from '@/components/ui/BackButton';
 import { getTenant } from '@/lib/tenant';
 import { notFound } from 'next/navigation';
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
-  const tenant = await getTenant(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const tenant = await getTenant((await params).slug);
   if (!tenant) return {};
   return { title: `Aviso de Privacidad — ${tenant.name}` };
 }
 
-export default async function AvisoPrivacidadPage({ params }: { params: { slug: string } }) {
-  const tenant = await getTenant(params.slug);
+export default async function AvisoPrivacidadPage({ params }: { params: Promise<{ slug: string }> }) {
+  const tenant = await getTenant((await params).slug);
   if (!tenant) notFound();
   const name = tenant.name;
 
