@@ -2,6 +2,15 @@
 
 This context defines the Cash terms that the canonical backend owns.
 
+## Cash web compatibility
+
+Cash preserves its public, business admin, and internal UMI admin interfaces.
+The API owns their data access on the canonical schemas.
+`CashPublicController` exposes an explicit public projection.
+`CashPlatformController` requires canonical authentication and the `super_admin` role.
+Business interfaces retain their canonical merchant permissions.
+Provider tools live in `scripts/`. Cash holds no provider keys or database credentials.
+
 ## Language
 
 **Gift Card**:

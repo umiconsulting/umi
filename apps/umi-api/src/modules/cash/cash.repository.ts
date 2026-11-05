@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 import { EFFECTIVE_VISITS_REQUIRED_SQL } from '../../shared/loyalty/card-state.sql';
@@ -92,6 +93,55 @@ const CUST_CTE = `
 export class CashRepository {
   constructor(private readonly pg: PgService) {}
 
+  async messageHistory(merchantId: string, page: number, limit: number, journey: string | null) {
+    return this.pg.workerTx(async (c) => {
+      const where = 'r.merchant_id = $1::uuid AND ($2::text IS NULL OR r.reminder_type = $2)';
+      const events = await c.query(
+        `SELECT r.id::text, r.reminder_type AS journey, NULL::text AS body, r.sent_at AS "sentAt",
+                json_build_object('cardId', card.id, 'cardNumber', card.card_number,
+                  'name', customer.name,
+                  'phone', (SELECT contact.normalized_value FROM merchant.contact contact
+                    JOIN umi.channel_type channel ON channel.id = contact.channel_id
+                    WHERE contact.merchant_id = $1::uuid AND contact.customer_id = customer.id
+                      AND channel.key IN ('phone','whatsapp','sms')
+                    ORDER BY contact.is_primary DESC, contact.updated_at DESC LIMIT 1)) AS customer
+         FROM runtime.reminder_sent r
+         JOIN merchant.loyalty_card card ON card.merchant_id = r.merchant_id AND card.id = r.card_id
+         JOIN merchant.customer customer ON customer.merchant_id = card.merchant_id AND customer.id = card.customer_id
+         WHERE ${where} ORDER BY r.sent_at DESC, r.id DESC LIMIT $3 OFFSET $4`,
+        [merchantId, journey, limit, (page - 1) * limit],
+      );
+      const total = await c.query(
+        `SELECT count(*)::int AS total FROM runtime.reminder_sent r WHERE ${where}`,
+        [merchantId, journey],
+      );
+      const counts = await c.query(
+        `SELECT reminder_type, count(*)::int AS total FROM runtime.reminder_sent WHERE merchant_id = $1::uuid GROUP BY reminder_type`,
+        [merchantId],
+      );
+      return {
+        page,
+        limit,
+        total: total.rows[0].total,
+        counts: Object.fromEntries(counts.rows.map((r) => [r.reminder_type, r.total])),
+        events: events.rows,
+      };
+    });
+  }
+
+  async publicLocations(merchantId: string): Promise<Row[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<Row>(
+        `SELECT id::text, name, address, lat::float8 AS latitude, lng::float8 AS longitude,
+              true AS "isActive"
+       FROM merchant.location WHERE merchant_id = $1::uuid AND status = 'active'
+       ORDER BY created_at, id`,
+        [merchantId],
+      ),
+    );
+    return rows;
+  }
+
   /** Branding/program composite for settings (server.js getMerchant), by id. */
   async branding(merchantId: string): Promise<Row | null> {
     const { rows } = await this.pg.withMerchant((c) =>
@@ -99,6 +149,7 @@ export class CashRepository {
         `SELECT
            t.id::text, t.handle, t.name, t.timezone, t.status,
            t.city,
+           t.open_hours                  AS "businessHours",
            -- The program is keyed BY the merchant (merchant_id is its primary key), so
            -- the merchant id IS the program id. Callers only test it for null — "does
            -- this café run loyalty at all" — and the LEFT JOIN keeps that answer honest.
@@ -107,6 +158,7 @@ export class CashRepository {
            p.pass_style                   AS "passStyle",
            p.self_registration            AS "selfRegistration",
            p.topup_enabled                AS "topupEnabled",
+           p.multi_seal_enabled           AS "multiSealEnabled",
            p.birthday_reward_enabled      AS "birthdayRewardEnabled",
            p.birthday_reward_name         AS "birthdayRewardName",
            -- Typed columns, not a branding jsonb blob. The blob was replaced when the
@@ -438,6 +490,7 @@ export class CashRepository {
    */
   async rewardConfig(
     merchantId: string,
+    client?: PoolClient,
   ): Promise<{ active: Row[]; upgrade: Row[]; history: Row[] }> {
     // Maps build-v3's loyalty_reward onto the frozen umi-cash response names.
     // activated_at was dropped — each config save inserts a NEW row, so created_at
@@ -451,7 +504,7 @@ export class CashRepository {
       ...r,
       rewardCostCentavos: Number(r.rewardCostCentavos ?? 0),
     });
-    return this.pg.withMerchant(async (c) => {
+    const work = async (c: PoolClient) => {
       const [active, upgrade, history] = await Promise.all([
         c.query<Row>(
           `SELECT ${select} FROM merchant.loyalty_reward
@@ -480,7 +533,8 @@ export class CashRepository {
         upgrade: upgrade.rows.map(toApi),
         history: history.rows.map(toApi),
       };
-    });
+    };
+    return client ? work(client) : this.pg.withMerchant(work);
   }
 
   /**
@@ -549,6 +603,7 @@ export class CashRepository {
         rewardCostCentavos: number;
       } | null;
     },
+    client?: PoolClient,
   ): Promise<Row> {
     const insert = (kind: string) => ({
       text: `INSERT INTO merchant.loyalty_reward
@@ -560,7 +615,7 @@ export class CashRepository {
                        active AS "isActive", created_at AS "activatedAt"`,
       kind,
     });
-    return this.pg.withMerchant(async (c) => {
+    const work = async (c: PoolClient) => {
       // Serialize concurrent reward-rule saves per merchant so the
       // deactivate-then-insert can't interleave into two active rows of one kind.
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`reward_config:${merchantId}`]);
@@ -702,7 +757,8 @@ export class CashRepository {
         ...rows[0],
         rewardCostCentavos: Number(rows[0]?.rewardCostCentavos ?? 0),
       };
-    });
+    };
+    return client ? work(client) : this.pg.withMerchant(work);
   }
 
   async giftCards(

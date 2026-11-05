@@ -15,7 +15,7 @@ This file defines product boundaries, ownership, architecture rules, and the res
 | ----------------------- | ------------------------------------------------------------------------------------------------------- |
 | `apps/umi-api`          | Canonical backend for auth, cash, KDS, conversations, leads, passes, sales, inventory, and stored value |
 | `apps/umi-pos`          | Flutter UmiPOS client for operator access, sales, checkout, shifts, hardware, and offline replay        |
-| `apps/umi-cash`         | Cash compatibility client and Cash-specific Prisma. It forwards the frozen wallet-pass URL to `umi-api` |
+| `apps/umi-cash`         | Cash compatibility UI and Cloudflare proxy. `umi-api` owns data, auth, and wallet passes                |
 | `apps/umi-dashboard`    | Owner dashboard app shell and live-data UI                                                              |
 | `apps/umi-landing-page` | Public landing and lead capture                                                                         |
 | `db/`                   | Canonical PostgreSQL schema definitions and forward migrations (`db/migrations/`)                       |

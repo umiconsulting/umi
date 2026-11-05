@@ -7,9 +7,9 @@ export default async function TenantLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const tenant = await getTenant(params.slug);
+  const tenant = await getTenant((await params).slug);
   if (!tenant) notFound();
 
   // Defense-in-depth: sanitize colors even though DB schema validates on write
@@ -30,7 +30,7 @@ export default async function TenantLayout({
   `;
 
   const tenantValue = {
-    slug: params.slug,
+    slug: (await params).slug,
     name: tenant.name,
     city: tenant.city,
     primaryColor: tenant.primaryColor,

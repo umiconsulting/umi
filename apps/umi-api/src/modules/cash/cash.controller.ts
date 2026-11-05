@@ -135,6 +135,12 @@ export class CashController {
     return this.cash.getSettings(t.merchantId);
   }
 
+  @Get('messages')
+  @RequirePermission('merchant.manage')
+  getMessages(@Merchant() t: MerchantAccess, @Query() query: Record<string, unknown>) {
+    return this.cash.getMessages(t.merchantId, query);
+  }
+
   @Patch('settings')
   @RequirePermission('merchant.manage')
   async updateSettings(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
