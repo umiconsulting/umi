@@ -113,7 +113,7 @@ export class GooglePassService {
    * be undone by an unreachable Google. Nothing here throws.
    */
   async updateObject(data: GooglePassData): Promise<GoogleUpdateOutcome> {
-    if (!this.isolation.deliveryEnabled) return 'disabled';
+    if (!this.isolation.canDeliver(data.merchantHandle)) return 'disabled';
     if (!this.isConfigured()) return 'failed';
     // ⚠️ THE ID THE OBJECT ACTUALLY HAS. Every object in circulation was created by
     // umi-cash under a Prisma cuid (…card_cmnuuglu40004oyt5s8bve44e); the id a NEW

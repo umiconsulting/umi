@@ -69,7 +69,7 @@ services:
         required: false
         format: raw
     environment:
-      WALLET_MODE: isolated
+      WALLET_MODE: test
     ports:
       - '172.17.0.1:3001:3000'
     volumes:

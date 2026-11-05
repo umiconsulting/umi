@@ -15,6 +15,62 @@ const config = (extra: Record<string, string> = {}) =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe('isolated wallet tests', () => {
+  it('allows delivery only to the test merchant in test mode', () => {
+    const policy = new WalletIsolation(config({ WALLET_MODE: 'test' }));
+    expect(policy.deliveryEnabled).toBe(true);
+    expect(policy.canDeliver(testMerchant)).toBe(true);
+    expect(policy.canDeliver('copied-merchant')).toBe(false);
+    expect(policy.canDeliver(null)).toBe(false);
+    expect(() => policy.assertCanIssue('copied-merchant')).toThrow();
+    expect(new WalletIsolation(config()).canDeliver(testMerchant)).toBe(false);
+  });
+
+  it('blocks Google updates outside the allowlist before any provider request in test mode', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const google = new GooglePassService(config({ WALLET_MODE: 'test' }), {} as never);
+    expect(await google.updateObject({ merchantHandle: 'copied-merchant' } as never)).toBe(
+      'disabled',
+    );
+    expect(await google.updateObject({ merchantHandle: null } as never)).toBe('disabled');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('filters copied cards before touching or pushing a mixed Apple batch in test mode', async () => {
+    const { privateKey } = generateKeyPairSync('ec', {
+      namedCurve: 'prime256v1',
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    });
+    const repo = {
+      merchantForCard: vi.fn(async (id: string) =>
+        id === 'test-card' ? testMerchant : 'copied-merchant',
+      ),
+      pushTokensForCard: vi.fn(async () => []),
+      touchCards: vi.fn(),
+      cardsWithApplePass: vi.fn(),
+    };
+    const apple = new ApplePushService(
+      config({
+        WALLET_MODE: 'test',
+        APPLE_APN_KEY: Buffer.from(privateKey).toString('base64'),
+        APPLE_APN_KEY_ID: 'test-key',
+        APPLE_TEAM_ID: 'test-team',
+        APPLE_PASS_TYPE_ID: 'pass.example.test',
+      }),
+      repo as never,
+    );
+    expect(apple.isConfigured()).toBe(true);
+    expect(await apple.pushCard('copied-card')).toEqual({ sent: 0, failed: 0 });
+    expect(await apple.pushMerchant('copied-merchant')).toEqual({ cards: 0, sent: 0 });
+    expect(repo.cardsWithApplePass).not.toHaveBeenCalled();
+    expect(await apple.pushCards(['test-card', 'copied-card'])).toEqual({ cards: 1, sent: 0 });
+    expect(repo.touchCards).toHaveBeenCalledTimes(1);
+    expect(repo.touchCards).toHaveBeenCalledWith(['test-card']);
+    expect(repo.pushTokensForCard).toHaveBeenCalledTimes(1);
+    expect(repo.pushTokensForCard).toHaveBeenCalledWith('test-card');
+  });
+
   it('allows only the synthetic merchant and leaves live mode unchanged', () => {
     const policy = new WalletIsolation(config());
     expect(policy.deliveryEnabled).toBe(false);

@@ -5,10 +5,13 @@ import type { AppConfig } from '../../shared/config/config.schema';
 /** Signing for test merchants is separate from delivery to installed wallets. */
 export class WalletIsolation {
   readonly deliveryEnabled: boolean;
+  readonly requiresMerchantCheck: boolean;
   private readonly merchants: Set<string>;
 
   constructor(config: ConfigService<AppConfig, true>) {
-    this.deliveryEnabled = config.get('WALLET_MODE', { infer: true }) !== 'isolated';
+    const mode = config.get('WALLET_MODE', { infer: true });
+    this.deliveryEnabled = mode !== 'isolated';
+    this.requiresMerchantCheck = mode === 'test';
     this.merchants = new Set(
       (config.get('WALLET_TEST_MERCHANT_IDS', { infer: true }) ?? '')
         .split(',')
@@ -17,8 +20,18 @@ export class WalletIsolation {
     );
   }
 
+  canDeliver(reference: string | null): boolean {
+    return (
+      this.deliveryEnabled &&
+      (!this.requiresMerchantCheck || (!!reference && this.merchants.has(reference)))
+    );
+  }
+
   assertCanIssue(reference: string | null): void {
-    if (!this.deliveryEnabled && (!reference || !this.merchants.has(reference))) {
+    if (
+      (!this.deliveryEnabled || this.requiresMerchantCheck) &&
+      (!reference || !this.merchants.has(reference))
+    ) {
       throw new ForbiddenException({ error: 'wallet_test_merchant_required' });
     }
   }
