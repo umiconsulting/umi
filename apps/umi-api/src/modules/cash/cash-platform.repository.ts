@@ -83,47 +83,57 @@ export class CashPlatformRepository {
         [id],
       );
       if (!merchant.rowCount) throw new NotFoundException({ error: 'Cafetería no encontrada.' });
-      const patch = async (
-        table: 'merchant.merchant' | 'merchant.loyalty_program' | 'umi.subscription',
-        key: string,
-        values: Record<string, unknown>,
-      ) => {
-        const entries = Object.entries(values).filter(([, value]) => value !== undefined);
-        if (!entries.length) return;
-        const assignments = entries.map(([column], i) => `${column}=$${i + 2}`).join(',');
+      await c.query(
+        `UPDATE merchant.merchant SET name=coalesce($2,name),city=coalesce($3,city),
+           timezone=coalesce($4,timezone),brand_color=coalesce($5,brand_color),
+           secondary_color=CASE WHEN $6::boolean THEN $7 ELSE secondary_color END,
+           open_hours=CASE WHEN $8::boolean THEN $9::jsonb ELSE open_hours END,
+           status=coalesce($10,status),updated_at=now() WHERE id=$1::uuid`,
+        [
+          id,
+          dto.name,
+          dto.city,
+          dto.timezone,
+          dto.primaryColor,
+          dto.secondaryColor !== undefined,
+          dto.secondaryColor,
+          dto.businessHours !== undefined,
+          dto.businessHours === undefined
+            ? null
+            : JSON.stringify(
+                fromGrid(dto.businessHours ?? {}, parseOpenHours(merchant.rows[0].open_hours)),
+              ),
+          dto.subscriptionStatus
+            ? dto.subscriptionStatus === 'SUSPENDED'
+              ? 'suspended'
+              : 'active'
+            : null,
+        ],
+      );
+      if (
+        [dto.primaryColor, dto.secondaryColor, dto.selfRegistration, dto.topupEnabled].some(
+          (value) => value !== undefined,
+        )
+      ) {
         const result = await c.query(
-          `UPDATE ${table} SET ${assignments},updated_at=now() WHERE ${key}=$1::uuid`,
-          [id, ...entries.map(([, value]) => value)],
+          `UPDATE merchant.loyalty_program SET primary_color=coalesce($2,primary_color),
+             secondary_color=CASE WHEN $3::boolean THEN $4 ELSE secondary_color END,
+             self_registration=coalesce($5,self_registration),topup_enabled=coalesce($6,topup_enabled),
+             updated_at=now() WHERE merchant_id=$1::uuid`,
+          [
+            id,
+            dto.primaryColor,
+            dto.secondaryColor !== undefined,
+            dto.secondaryColor,
+            dto.selfRegistration,
+            dto.topupEnabled,
+          ],
         );
         if (!result.rowCount)
           throw new ConflictException({
             error: 'La configuración de la cafetería está incompleta.',
           });
-      };
-      await patch('merchant.merchant', 'id', {
-        name: dto.name,
-        city: dto.city,
-        timezone: dto.timezone,
-        brand_color: dto.primaryColor,
-        secondary_color: dto.secondaryColor,
-        open_hours:
-          dto.businessHours === undefined
-            ? undefined
-            : JSON.stringify(
-                fromGrid(dto.businessHours ?? {}, parseOpenHours(merchant.rows[0].open_hours)),
-              ),
-        status: dto.subscriptionStatus
-          ? dto.subscriptionStatus === 'SUSPENDED'
-            ? 'suspended'
-            : 'active'
-          : undefined,
-      });
-      await patch('merchant.loyalty_program', 'merchant_id', {
-        primary_color: dto.primaryColor,
-        secondary_color: dto.secondaryColor,
-        self_registration: dto.selfRegistration,
-        topup_enabled: dto.topupEnabled,
-      });
+      }
       const trial = dto.subscriptionStatus === 'TRIAL';
       if (trial) {
         const existing = await c.query(
@@ -134,15 +144,28 @@ export class CashPlatformRepository {
           dto.trialEndsAt === undefined ? existing.rows[0]?.current_period_end : dto.trialEndsAt;
         if (!end) throw new BadRequestException({ error: 'La prueba necesita una fecha de fin.' });
       }
-      await patch('umi.subscription', 'merchant_id', {
-        status:
-          dto.subscriptionStatus && dto.subscriptionStatus !== 'SUSPENDED'
-            ? trial
-              ? 'trialing'
-              : 'active'
-            : undefined,
-        current_period_end: dto.trialEndsAt,
-      });
+      if (
+        (dto.subscriptionStatus && dto.subscriptionStatus !== 'SUSPENDED') ||
+        dto.trialEndsAt !== undefined
+      ) {
+        const result = await c.query(
+          `UPDATE umi.subscription SET status=coalesce($2,status),
+             current_period_end=CASE WHEN $3::boolean THEN $4::timestamptz ELSE current_period_end END,
+             updated_at=now() WHERE merchant_id=$1::uuid`,
+          [
+            id,
+            dto.subscriptionStatus && dto.subscriptionStatus !== 'SUSPENDED'
+              ? trial
+                ? 'trialing'
+                : 'active'
+              : null,
+            dto.trialEndsAt !== undefined,
+            dto.trialEndsAt,
+          ],
+        );
+        if (!result.rowCount)
+          throw new ConflictException({ error: 'La suscripción de la cafetería está incompleta.' });
+      }
       if (dto.locations) {
         const ids = dto.locations.flatMap((location) => (location.id ? [location.id] : []));
         await c.query(
