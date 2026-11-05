@@ -1,3 +1,4 @@
+import { WalletPassRepository } from '../wallet/wallet-pass.repository';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ConfigService } from '@nestjs/config';
@@ -95,6 +96,12 @@ describe('old Cash interfaces on the canonical schema', () => {
         ).rows[0].id,
       );
     }
+  });
+
+  it('resolves new wallet URLs by UUID and renders the same public reference', async () => {
+    const wallet = new WalletPassRepository(pg);
+    expect(await wallet.merchantByHandle(merchants[0])).toMatchObject({ id: merchants[0] });
+    expect((await wallet.renderData(merchants[0], cards[0]))?.merchantHandle).toBe(merchants[0]);
   });
 
   afterAll(async () => {

@@ -63,7 +63,13 @@ services:
       - --require
       - '@opentelemetry/auto-instrumentations-node/register'
       - dist/main.js
-    env_file: .env
+    env_file:
+      - .env
+      - path: .wallet-staging.env
+        required: false
+        format: raw
+    environment:
+      WALLET_MODE: isolated
     ports:
       - '172.17.0.1:3001:3000'
     volumes:
@@ -83,6 +89,8 @@ services:
       - '@opentelemetry/auto-instrumentations-node/register'
       - dist/worker.js
     env_file: .env
+    environment:
+      WALLET_MODE: isolated
     volumes:
       - ./certs:/certs:ro
     depends_on:

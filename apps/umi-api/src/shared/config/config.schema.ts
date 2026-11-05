@@ -58,6 +58,10 @@ export const configSchema = z
     APPLE_APN_KEY: z.string().optional(),
     APPLE_APN_KEY_ID: z.string().optional(),
 
+    // Isolated staging signs only test merchants and blocks all wallet updates.
+    WALLET_MODE: z.enum(['live', 'isolated']).default('live'),
+    WALLET_TEST_MERCHANT_IDS: z.string().default(''),
+
     // ── Google Wallet ───────────────────────────────────────────────────────
     // Classes are pre-created through the REST API and are named
     // `{issuer}.{handle}_{classIdPrefix}`; only the loyalty OBJECT travels in the
