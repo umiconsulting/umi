@@ -57,6 +57,9 @@ No work-item contents or IDs are assumed. This file records implementation steps
 - Cash tests passed: 57 tests. Contract tests passed: 110 tests. Token tests passed: eight tests.
 - Generated TypeScript and Dart checks passed, including Dart optional-field behavior.
 - `pnpm check:pr` passed with the existing baseline of 68 lint warnings.
+- The affected Turbo build, lint, and test commands passed all seven tasks under Node 22.
+- Those tests included 633 Dashboard tests and the API unit suite.
+- A fresh checkout passed the filtered Dashboard install and build under Node 22.
 - actionlint 1.7.12 and ShellCheck passed within the documented scope.
 - Selection examples passed with picomatch, the matcher used by paths-filter.
 - The actual aggregate commands passed 2,064 CI scenarios and 304 release scenarios.
