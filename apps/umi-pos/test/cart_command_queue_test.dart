@@ -13,6 +13,8 @@ import 'package:umi_pos/features/offline/connectivity_controller.dart';
 import 'package:umi_pos/features/offline/offline_journal.dart';
 import 'package:umi_pos/features/offline/replay_engine.dart';
 
+import 'support/settled_journal_fixture.dart';
+
 const _merchantId = '00000000-0000-4000-8000-000000000002';
 const _locationId = '00000000-0000-4000-8000-000000000003';
 const _operatorSessionId = '00000000-0000-4000-8000-000000000004';
@@ -491,6 +493,39 @@ Future<void> _settle() =>
     Future<void>.delayed(const Duration(milliseconds: 20));
 
 void main() {
+  test('settled history does not block preserving the next account', () async {
+    final value = _setup();
+    addTearDown(value.controller.dispose);
+    await value.controller.open(_merchantId, _locationId, _operatorSessionId);
+    await seedSettledJournalHistory(
+      value.journal,
+      deviceId: _deviceId,
+      merchantId: _merchantId,
+      locationId: _locationId,
+      operatorSessionId: _operatorSessionId,
+    );
+    expect((await value.journal.load()).pendingCount, 0);
+    expect(
+      await value.controller.add(
+        productId: _productA,
+        provisional: _provisionalA,
+      ),
+      isTrue,
+    );
+    await _settle();
+    expect(value.repository.requests, hasLength(1));
+    expect(
+      await value.controller.preserveForAccountSwitch(),
+      isTrue,
+      reason: 'preserve refusal=${value.controller.state.errorCode}',
+    );
+    final snapshot = await value.journal.load();
+    expect(snapshot.entries, hasLength(251));
+    expect(snapshot.pendingCount, 1);
+    expect(snapshot.entries.last.command.commandType, 'pos.cart.line.add');
+    expect(snapshot.entries.last.command.deviceSequence, 251);
+  });
+
   test(
     'sync preserves exact line IDs for different notes on one product',
     () async {

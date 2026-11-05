@@ -264,3 +264,18 @@ El control con una credencial sintética en el mismo archivo de prueba siguió r
 La prueba usa refs remotas; el checkout de soporte conserva refs locales adicionales.
 La nueva ejecución de CI queda pendiente tras publicar la corrección.
 Evidencia: [metadatos del escaneo](./evidence/2026-11-02-onca-paid-tables/gitleaks-ci-metadata.json).
+
+## 2026-11-04 — D3: historial confirmado bloquea el siguiente pedido
+
+Recuperación mostró historial hasta la secuencia 250, con cero pendientes.
+La build 336 contaba también el historial confirmado dentro del límite de 250 del journal.
+La reproducción con el journal y la cola reales falló al conservar el siguiente pedido con queue_capacity_exceeded.
+El efectivo mostró OFFLINE_SYNC_PENDING antes de llamar a la API.
+
+La corrección cuenta sólo trabajo activo y aplica la retención existente sin perder comandos sin resolver ni referencias oficiales.
+Las 1,239 pruebas Flutter y el análisis de los cuatro archivos aprobaron.
+La revisión independiente aprobó la corrección. El CI queda pendiente antes de integrar el PR.
+El [PR #253](https://github.com/umiconsulting/umi/pull/253) corrige por separado policy_invalid durante el replay.
+La prueba combinada completa un único efectivo con un historial de 250 confirmados.
+No se requiere migración. No se generó ni instaló otra build.
+Informe: [Capacidad del journal](2026-11-04-onca-journal-capacity.md).

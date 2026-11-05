@@ -419,7 +419,9 @@ final class EncryptedOfflineJournal {
       }
       throw const OfflineJournalException('fingerprint_mismatch');
     }
-    final createdAt = DateTime.now().toUtc().toIso8601String();
+    final now = DateTime.now().toUtc();
+    final createdAt = now.toIso8601String();
+    final retained = _retainedEntries(current, now);
     final unsigned = OfflineCommand(
       commandId: commandId,
       provisionalId: provisionalId,
@@ -443,10 +445,9 @@ final class EncryptedOfflineJournal {
     ).toJson()..remove('fingerprint');
     final canonical = jsonEncode(_canonical(unsigned));
     final fingerprint = sha256.convert(utf8.encode(canonical)).toString();
-    if (current.entries
-            .where((e) => e.status != JournalStatus.archived)
-            .length >=
-        offlineJournalMaxDepth) {
+    // Retained receipts and settled commands are history, not unsynced work.
+    final activeCount = retained.where(_isActive).length;
+    if (activeCount >= offlineJournalMaxDepth) {
       throw const OfflineJournalException('queue_capacity_exceeded');
     }
     final command = OfflineCommand(
@@ -474,7 +475,7 @@ final class EncryptedOfflineJournal {
       nextSequence: current.nextSequence + 1,
       lastAcknowledgedSequence: current.lastAcknowledgedSequence,
       entries: [
-        ...current.entries,
+        ...retained,
         JournalEntry(
           command: command,
           status: JournalStatus.pending,
@@ -913,24 +914,7 @@ final class EncryptedOfflineJournal {
       });
 
   Future<void> compact(DateTime now) => _mutate((current) async {
-    final retained = current.entries
-        .where((entry) {
-          if (entry.status == JournalStatus.pending ||
-              entry.status == JournalStatus.unknown ||
-              entry.status == JournalStatus.conflict) {
-            return true;
-          }
-          final deadline = entry.retentionDeadline;
-          if ((entry.status == JournalStatus.accepted ||
-                  entry.status == JournalStatus.duplicate) &&
-              entry.command.commandType == 'pos.checkout.cash' &&
-              (entry.command.provisionalId == null ||
-                  !current.mappings.containsKey(entry.command.provisionalId))) {
-            return true;
-          }
-          return deadline == null || deadline.isAfter(now);
-        })
-        .toList(growable: false);
+    final retained = _retainedEntries(current, now);
     return _MutationResult<void>(
       snapshot: OfflineJournalSnapshot(
         nextSequence: current.nextSequence,
@@ -945,6 +929,32 @@ final class EncryptedOfflineJournal {
       value: null,
     );
   });
+
+  bool _isActive(JournalEntry entry) =>
+      entry.status != JournalStatus.accepted &&
+      entry.status != JournalStatus.duplicate &&
+      entry.status != JournalStatus.resolved &&
+      entry.status != JournalStatus.archived;
+
+  List<JournalEntry> _retainedEntries(
+    OfflineJournalSnapshot current,
+    DateTime now,
+  ) {
+    return current.entries
+        .where((entry) {
+          if (_isActive(entry)) return true;
+          final deadline = entry.retentionDeadline;
+          if ((entry.status == JournalStatus.accepted ||
+                  entry.status == JournalStatus.duplicate) &&
+              entry.command.commandType == 'pos.checkout.cash' &&
+              (entry.command.provisionalId == null ||
+                  !current.mappings.containsKey(entry.command.provisionalId))) {
+            return true;
+          }
+          return deadline == null || deadline.isAfter(now);
+        })
+        .toList(growable: false);
+  }
 
   Future<void> recordRecoveryAction(RecoveryAction action, String outcome) =>
       _mutate((current) async {
@@ -1021,15 +1031,7 @@ final class EncryptedOfflineJournal {
 
   void _publishPending(OfflineJournalSnapshot snapshot) {
     _lastSnapshot = snapshot;
-    pendingCount.value = snapshot.entries
-        .where(
-          (entry) =>
-              entry.status != JournalStatus.accepted &&
-              entry.status != JournalStatus.duplicate &&
-              entry.status != JournalStatus.resolved &&
-              entry.status != JournalStatus.archived,
-        )
-        .length;
+    pendingCount.value = snapshot.entries.where(_isActive).length;
   }
 
   Future<SecretKey> _key({required bool create}) async {
