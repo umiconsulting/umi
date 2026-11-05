@@ -72,7 +72,13 @@ export class CashPlatformRepository {
           !DAY_KEYS.includes(day as (typeof DAY_KEYS)[number]) ||
           !hours ||
           typeof hours.open !== 'boolean' ||
-          (hours.open && (timeToMinutes(hours.from) === null || timeToMinutes(hours.to) === null))
+          (hours.open &&
+            (typeof hours.from !== 'string' ||
+              typeof hours.to !== 'string' ||
+              !/^\d{2}:\d{2}$/.test(hours.from) ||
+              !/^\d{2}:\d{2}$/.test(hours.to) ||
+              timeToMinutes(hours.from) === null ||
+              timeToMinutes(hours.to) === null))
         ) {
           throw new BadRequestException({ error: 'Horario inválido.' });
         }

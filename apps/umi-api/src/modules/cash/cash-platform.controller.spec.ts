@@ -5,6 +5,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AuthGuard } from '../auth/auth.guard';
 import { PlatformAdminGuard } from '../auth/platform-admin.guard';
+import { CashPlatformRepository } from './cash-platform.repository';
 import { CashPlatformController } from './cash-platform.controller';
 import { CashPlatformUpdateDto } from './dto/cash-platform-update.dto';
 
@@ -25,5 +26,19 @@ describe('Cash internal administration boundary', () => {
     expect(errors.map((error) => error.property)).toEqual(
       expect.arrayContaining(['visitsRequired', 'locations']),
     );
+  });
+  it('rejects malformed opening hours before a database write', async () => {
+    const repo = new CashPlatformRepository({} as never);
+    for (const from of [123, '08:30extra']) {
+      await expect(
+        repo.update(
+          'unused',
+          {
+            businessHours: { mon: { open: true, from, to: '20:00' } },
+          } as unknown as CashPlatformUpdateDto,
+          async () => undefined,
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+    }
   });
 });
