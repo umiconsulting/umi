@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -5,12 +6,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
+import 'package:umi_pos/features/cart/cart_command_queue.dart';
+import 'package:umi_pos/features/cart/cart_repository.dart';
 import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
 import 'package:umi_pos/features/offline/connectivity_controller.dart';
 import 'package:umi_pos/features/offline/offline_checkout_service.dart';
 import 'package:umi_pos/features/offline/offline_journal.dart';
 import 'package:umi_pos/features/offline/offline_policy.dart';
+import 'package:umi_pos/features/offline/replay_engine.dart';
 
 const _merchant = '00000000-0000-4000-8000-000000000001';
 const _location = '00000000-0000-4000-8000-000000000002';
@@ -20,6 +24,176 @@ const _cartId = '00000000-0000-4000-8000-000000000005';
 const _shift = '00000000-0000-4000-8000-000000000006';
 
 void main() {
+  for (final (name, fastPath, wantedPhase, wantedCashCount) in [
+    (
+      'pending replay handshake permits online cash with native fast path',
+      true,
+      CheckoutPhase.completed,
+      1,
+    ),
+    (
+      'pending replay handshake does not enable online local cash without opt-in',
+      false,
+      CheckoutPhase.failure,
+      0,
+    ),
+  ]) {
+    test(name, () async {
+      final now = DateTime.now().toUtc();
+      final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+      final policyCache = OfflinePolicyCache(journal, web: false);
+      await policyCache.save(_policy(now), now);
+      final connectivity = ConnectivityController()
+        ..apiReachable(authorityValid: true)
+        ..apiReachable(authorityValid: true);
+      await policyCache.validated(
+        authority: _authority(),
+        now: DateTime.now().toUtc(),
+      );
+      final cart = _cart(now);
+      final cartRepository = _PendingFulfillment();
+      final gateway = _PendingReplayBegin();
+      final recovery = OfflineRecoveryController(
+        journal: journal,
+        gateway: gateway,
+        connectivity: connectivity,
+      );
+      final errors = <AppException>[];
+      final queue = CartCommandQueue(
+        repository: cartRepository,
+        journal: journal,
+        scope: () => const CartCommandScope(
+          merchantId: _merchant,
+          locationId: _location,
+          operatorSessionId: _operator,
+          deviceId: _device,
+          credentialVersion: 1,
+        ),
+        onCart: (_) {},
+        onError: errors.add,
+        onEvent: (_) {},
+        onBusy: (_) {},
+        connectivity: connectivity,
+        recovery: recovery,
+      );
+      queue.initialize(cart);
+      const commandId = '00000000-0000-4000-8000-000000000019';
+      queue.submit(
+        QueuedCartCommand(
+          commandId: commandId,
+          commandType: 'pos.cart.fulfillment.set',
+          idempotencyKey: commandId,
+          payload: SetCartFulfillmentRequest(
+            cartId: _cartId,
+            locationId: _location,
+            operatorSessionId: _operator,
+            expectedVersion: cart.version,
+            fulfillmentType: 'takeout',
+            idempotencyKey: commandId,
+          ).toJson(),
+          event: 'fulfillment_set',
+          predict: (base, _) => base,
+        ),
+      );
+      await cartRepository.started.future;
+      expect(queue.hasPending, isTrue);
+      final repository = _NeverCheckout();
+      final checkout = CheckoutController(
+        repository: repository,
+        connectivity: connectivity,
+        recovery: recovery,
+        pendingLocalCommands: () => queue.hasPending,
+        preserveLocalCommands: () async {
+          final preserved = await queue.preservePendingCommands();
+          await gateway.started.future;
+          expect(recovery.status.phase, RecoveryPhase.validatingAuthority);
+          expect(connectivity.state, PosConnectivity.online);
+          expect(errors, isEmpty);
+          return preserved;
+        },
+        offlineCheckout: OfflineCheckoutService(
+          journal: journal,
+          policyCache: policyCache,
+          eligibility: const OfflineCheckoutEligibilityEngine(),
+        ),
+        telemetry: const SafeTelemetry(
+          enabled: false,
+          context: TelemetryContext(
+            appVersion: 'test',
+            environment: 'test',
+            platform: 'test',
+          ),
+          exporter: NoopTelemetryExporter(),
+        ),
+        localFirstFastPathEnabled: fastPath,
+      );
+      addTearDown(() async {
+        if (!cartRepository.response.isCompleted) {
+          cartRepository.response.complete(cart);
+        }
+        if (!gateway.response.isCompleted) {
+          gateway.response.completeError(
+            const AppException(
+              category: AppErrorCategory.transport,
+              code: 'TEST_REPLAY_HANDSHAKE_ENDED',
+              recoverable: true,
+            ),
+          );
+        }
+        await Future<void>.delayed(Duration.zero);
+        checkout.dispose();
+        queue.dispose();
+        recovery.dispose();
+        connectivity.dispose();
+      });
+      await checkout.preview(
+        merchantId: _merchant,
+        locationId: _location,
+        operatorSessionId: _operator,
+        cartId: _cartId,
+        cartVersion: cart.version,
+        paymentMethod: 'cash',
+        cashShiftId: _shift,
+        cart: cart,
+        authority: _authority(),
+        cashReceivedMinorUnits: 5000,
+        tenderDrafts: const [
+          {
+            'id': '00000000-0000-4000-8000-000000000007',
+            'type': 'cash',
+            'amount': {'minorUnits': 5000, 'currency': 'MXN'},
+            'amountReceived': {'minorUnits': 5000, 'currency': 'MXN'},
+          },
+        ],
+      );
+      await checkout.confirm();
+      expect(
+        checkout.state.phase,
+        wantedPhase,
+        reason:
+            'cash refusal=${checkout.state.errorCode}; '
+            'connectivity=${connectivity.state.name}; '
+            'recovery=${recovery.status.phase.name}; pending=${queue.pendingCount}',
+      );
+      expect(repository.checkouts, 0);
+      if (wantedCashCount == 1) {
+        await checkout.confirm();
+      }
+      final snapshot = await journal.load();
+      expect(snapshot.pendingCashCount, wantedCashCount);
+      expect(snapshot.entries.map((entry) => entry.command.commandType), [
+        'pos.cart.fulfillment.set',
+        if (wantedCashCount == 1) 'pos.checkout.cash',
+      ]);
+      if (wantedCashCount == 1) {
+        expect(
+          snapshot.entries.first.command.deviceSequence,
+          lessThan(snapshot.entries.last.command.deviceSequence),
+        );
+      }
+    });
+  }
+
   test(
     'local preview follows changed totals at the same cart version',
     () async {
@@ -383,6 +557,37 @@ void main() {
     checkout.dispose();
     connectivity.dispose();
   });
+}
+
+final class _PendingFulfillment implements CartRepository {
+  final started = Completer<void>();
+  final response = Completer<Cart>();
+
+  @override
+  Future<Cart> setFulfillment(
+    String merchantId,
+    SetCartFulfillmentRequest request,
+  ) {
+    started.complete();
+    return response.future;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+final class _PendingReplayBegin implements ReplayGateway {
+  final started = Completer<void>();
+  final response = Completer<BeginReplayResponse>();
+
+  @override
+  Future<BeginReplayResponse> begin(ReplayScope scope) {
+    started.complete();
+    return response.future;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
 final class _NeverCheckout implements CheckoutRepository {
