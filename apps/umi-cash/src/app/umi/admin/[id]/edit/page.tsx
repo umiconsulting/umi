@@ -374,19 +374,19 @@ export default function EditTenantPage() {
                 <input aria-label="Zona horaria" className="text-xs border rounded px-2 py-1" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} required />
               </div>
               <div className="space-y-2">
-                {['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((key, day) => {
+                {['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((key) => {
                   const hours = form.businessHours[key] ?? { open: false, from: '08:00', to: '20:00' };
                   const setHours = (patch: Partial<typeof hours>) => setForm({ ...form,
                     businessHours: { ...form.businessHours, [key]: { ...hours, ...patch } } });
                   return <div key={key} className="flex items-center gap-2">
                     <label className="w-20 text-xs font-medium flex gap-2">
                       <input type="checkbox" checked={hours.open} onChange={(e) => setHours({ open: e.target.checked })} />
-                      {DAY_NAMES[day]}
+                      {DAY_NAMES[key]}
                     </label>
                     {hours.open ? <>
-                      <input aria-label={`Apertura ${DAY_NAMES[day]}`} type="time" value={hours.from} onChange={(e) => setHours({ from: e.target.value })} required />
+                      <input aria-label={`Apertura ${DAY_NAMES[key]}`} type="time" value={hours.from} onChange={(e) => setHours({ from: e.target.value })} required />
                       <span className="text-xs text-gray-400">a</span>
-                      <input aria-label={`Cierre ${DAY_NAMES[day]}`} type="time" value={hours.to} onChange={(e) => setHours({ to: e.target.value })} required />
+                      <input aria-label={`Cierre ${DAY_NAMES[key]}`} type="time" value={hours.to} onChange={(e) => setHours({ to: e.target.value })} required />
                     </> : <span className="text-xs text-gray-400">Cerrado</span>}
                   </div>;
                 })}
