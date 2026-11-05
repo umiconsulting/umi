@@ -262,3 +262,24 @@ The adapter toolchain still has audit findings. They require a separate upgrade 
 Do not use `npm audit fix --force`: it proposes an obsolete adapter release.
 
 Deployment and browser results belong in `docs/deployment/cash-cloudflare-staging.md` after validation.
+
+## Isolated wallet testing decision
+
+The user approved isolated wallet tests with live updates blocked.
+Local evidence found 1,053 other wallet-pass records in staging.
+The signing credentials can therefore run only with explicit merchant isolation and provider delivery blocked.
+
+The implementation blocks delivery inside `ApplePushService` and `GooglePassService`.
+This covers direct expiry jobs as well as adapter calls.
+Both signing builders enforce the synthetic merchant allowlist, including Apple poll downloads.
+The staging worker holds no signing keys. The API receives no APN key.
+The Google class uses a separate suffix and an explicit staging label.
+
+The canonical wallet repository previously resolved only frozen handles.
+It now also resolves a merchant UUID and renders `handle ?? id` for new merchants.
+Existing handles and issued URLs retain their values.
+A database integration check verifies UUID lookup and rendering.
+
+The backend suite passes 2,157 tests, including four isolation checks.
+The isolation checks prove that configured provider services make no outbound update call.
+Ten additional database checks pass for compatibility and SQL parsing.

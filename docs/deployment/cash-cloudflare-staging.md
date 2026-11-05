@@ -105,3 +105,42 @@ upper reward tiers, broadcast dry runs, SQL parsing, and application startup.
 The production dependency audit reports zero known vulnerabilities.
 The adapter development toolchain retains audit findings that need a separate upgrade review.
 Actual Apple and Google Wallet delivery remains a device check before production cutover.
+
+## Isolated wallet setup
+
+The staging database contains 1,053 wallet-pass records outside the synthetic café.
+Treat these as copied live identities. Never enable staging updates for them.
+
+Staging Compose forces `WALLET_MODE=isolated` for both the API and the worker.
+The provider services block every APN update and Google object update in this mode.
+The Apple and Google signing builders accept only `WALLET_TEST_MERCHANT_IDS`.
+Apple poll downloads use the same guarded builder.
+The synthetic café uses `3a010ff6-0bea-4b4b-9801-d9e63e25962c`.
+
+Only the API loads `/home/juan/umi-api-test/.wallet-staging.env` on the VPS.
+This private file has mode 0600 and supplies signing credentials and test configuration.
+The worker receives no signing credentials. Neither service receives an APN key.
+The file uses Compose `format: raw` to preserve key bytes and literal newline escapes.
+The VPS Compose release supports this format.
+
+The test configuration uses these public values:
+
+```dotenv
+WALLET_TEST_MERCHANT_IDS=3a010ff6-0bea-4b4b-9801-d9e63e25962c
+WALLET_PUBLIC_ORIGIN=https://umi-cash-staging.hola-8ae.workers.dev
+GOOGLE_WALLET_CLASS_ID=loyalty_staging_20261104
+```
+
+Google uses a separate class with explicit `Umi Cash Staging` labels.
+The issuer remains the existing issuer. A separate class is not a separate provider sandbox.
+Only fresh synthetic cards from the allowed café can receive signed save links.
+The class has its own branding and card template. Existing classes are unchanged.
+
+Before a backend rollback, rename the private `.wallet-staging.env` file.
+Recreate the API without that file before you deploy an older image.
+Older images do not enforce `WALLET_MODE`.
+Restore the file only after the isolation guards run again.
+
+See the [Compose env-file reference](https://docs.docker.com/reference/compose-file/services/#env_file),
+[Google class creation guide](https://developers.google.com/wallet/retail/loyalty-cards/use-cases/create),
+and [Google testing rules](https://developers.google.com/wallet/retail/loyalty-cards/test-and-go-live/request-publishing-access).

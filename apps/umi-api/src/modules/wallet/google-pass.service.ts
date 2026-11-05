@@ -1,3 +1,4 @@
+import { WalletIsolation } from './wallet-isolation';
 import {
   policyRewardCopy,
   type PolicyPresentation,
@@ -27,7 +28,7 @@ const GOOGLE_TIMEOUT_MS = 8_000;
  * could not update it" and "there is nothing to update" — a distinction that was worth
  * 19 permanent 404s on every café-wide refresh.
  */
-export type GoogleUpdateOutcome = 'updated' | 'missing' | 'failed';
+export type GoogleUpdateOutcome = 'updated' | 'missing' | 'failed' | 'disabled';
 const TOKEN_TTL_MS = 50 * 60 * 1000;
 
 /**
@@ -58,6 +59,7 @@ const TOKEN_TTL_MS = 50 * 60 * 1000;
 @Injectable()
 export class GooglePassService {
   private readonly logger = new Logger(GooglePassService.name);
+  private readonly isolation: WalletIsolation;
   private readonly issuerId: string;
   private readonly classPrefix: string;
   private readonly serviceAccountEmail: string;
@@ -69,6 +71,7 @@ export class GooglePassService {
     config: ConfigService<AppConfig, true>,
     private readonly qr: QrService,
   ) {
+    this.isolation = new WalletIsolation(config);
     this.issuerId = (config.get('GOOGLE_WALLET_ISSUER_ID', { infer: true }) ?? '').trim();
     this.classPrefix = (config.get('GOOGLE_WALLET_CLASS_ID', { infer: true }) ?? '').trim();
     this.serviceAccountEmail = (
@@ -86,6 +89,7 @@ export class GooglePassService {
 
   /** `https://pay.google.com/gp/v/save/<jwt>` — the Add to Google Wallet link. */
   async saveUrl(data: GooglePassData): Promise<string> {
+    this.isolation.assertCanIssue(data.merchantHandle);
     if (!this.isConfigured() || !this.privateKeyPem) {
       throw new Error('Google Wallet is not configured');
     }
@@ -109,6 +113,7 @@ export class GooglePassService {
    * be undone by an unreachable Google. Nothing here throws.
    */
   async updateObject(data: GooglePassData): Promise<GoogleUpdateOutcome> {
+    if (!this.isolation.deliveryEnabled) return 'disabled';
     if (!this.isConfigured()) return 'failed';
     // ⚠️ THE ID THE OBJECT ACTUALLY HAS. Every object in circulation was created by
     // umi-cash under a Prisma cuid (…card_cmnuuglu40004oyt5s8bve44e); the id a NEW
@@ -184,7 +189,15 @@ export class GooglePassService {
     entries: { cardId: string; objectId: string }[],
     refresh: (cardId: string, objectId: string) => Promise<GoogleUpdateOutcome>,
     concurrency = 4,
-  ): Promise<{ total: number; refreshed: number; missing: number; failed: number }> {
+  ): Promise<{
+    total: number;
+    refreshed: number;
+    missing: number;
+    failed: number;
+    disabled?: boolean;
+  }> {
+    if (!this.isolation.deliveryEnabled)
+      return { total: entries.length, refreshed: 0, missing: 0, failed: 0, disabled: true };
     if (!this.isConfigured())
       return { total: entries.length, refreshed: 0, missing: 0, failed: entries.length };
     const queue = [...entries];

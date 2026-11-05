@@ -1,3 +1,4 @@
+import { WalletIsolation } from './wallet-isolation';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createPrivateKey } from 'node:crypto';
@@ -27,6 +28,7 @@ const PUSH_BATCH = 25;
 @Injectable()
 export class ApplePushService {
   private readonly logger = new Logger(ApplePushService.name);
+  private readonly isolation: WalletIsolation;
   private readonly keyId?: string;
   private readonly teamId?: string;
   private readonly topic: string;
@@ -37,6 +39,7 @@ export class ApplePushService {
     config: ConfigService<AppConfig, true>,
     private readonly repo: WalletPassRepository,
   ) {
+    this.isolation = new WalletIsolation(config);
     this.keyId = config.get('APPLE_APN_KEY_ID', { infer: true })?.trim();
     this.teamId = config.get('APPLE_TEAM_ID', { infer: true })?.trim();
     this.topic = (config.get('APPLE_PASS_TYPE_ID', { infer: true }) ?? '').trim();
@@ -45,7 +48,9 @@ export class ApplePushService {
   }
 
   isConfigured(): boolean {
-    return !!this.key && !!this.keyId && !!this.teamId && !!this.topic;
+    return (
+      this.isolation.deliveryEnabled && !!this.key && !!this.keyId && !!this.teamId && !!this.topic
+    );
   }
 
   /**
@@ -55,6 +60,7 @@ export class ApplePushService {
    * write, and a failed push must never undo it. Nothing here throws.
    */
   async pushCard(cardId: string): Promise<{ sent: number; failed: number }> {
+    if (!this.isolation.deliveryEnabled) return { sent: 0, failed: 0 };
     if (!this.isConfigured()) {
       // WARN, not debug. A production log level does not print debug, so an
       // unconfigured APNs was invisible: every push returned "sent 0" and
