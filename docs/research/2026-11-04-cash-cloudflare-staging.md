@@ -280,6 +280,16 @@ It now also resolves a merchant UUID and renders `handle ?? id` for new merchant
 Existing handles and issued URLs retain their values.
 A database integration check verifies UUID lookup and rendering.
 
-The backend suite passes 2,157 tests, including four isolation checks.
+The backend suite passes 2,159 tests, including four isolation checks and two registration response checks.
 The isolation checks prove that configured provider services make no outbound update call.
 Ten additional database checks pass for compatibility and SQL parsing.
+
+Runtime checks confirm isolated mode in both staging services.
+Cloudflare returns HTTP 200 for both test wallet formats and HTTP 403 outside the merchant allowlist.
+The Apple archive passes manifest checksum and CMS signature checks.
+The staging callback URL remains separate from the production origin.
+
+A returning customer exposed a compatibility gap during the wallet check.
+The registration service threw its existing session through the global error filter, which removed the session.
+The controller now returns that session directly with the existing HTTP 409 contract.
+This preserves the old registration screen without changing the global error filter.

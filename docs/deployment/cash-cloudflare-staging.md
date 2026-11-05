@@ -144,3 +144,30 @@ Restore the file only after the isolation guards run again.
 See the [Compose env-file reference](https://docs.docker.com/reference/compose-file/services/#env_file),
 [Google class creation guide](https://developers.google.com/wallet/retail/loyalty-cards/use-cases/create),
 and [Google testing rules](https://developers.google.com/wallet/retail/loyalty-cards/test-and-go-live/request-publishing-access).
+
+## Isolated wallet verification
+
+The Cloudflare proxy returns an Apple pass and a Google save URL with HTTP 200.
+The Apple archive passes manifest checksum and CMS signature checks.
+Its callback URL uses the staging Worker origin.
+A second synthetic café receives HTTP 403 from both providers because it is outside the allowlist.
+That negative test café was deleted after the check.
+
+The API and worker both report isolated mode at runtime.
+The API has signing keys. The worker has no signing keys, and both services have no APN key.
+The backend suite passes 2,159 tests. Ten database checks pass for compatibility and SQL parsing.
+
+The returning-customer registration route retains HTTP 409 and returns the existing customer session.
+It returns this payload directly so the global error filter cannot remove the session.
+The global error filter retains its protection for actual errors.
+The staging API health endpoint reports release `966c39a2ce419002a3771d5c91c3889789715456` after the fix.
+The [staging deployment](https://github.com/umiconsulting/umi/actions/runs/41979391723) passes its checks.
+Real Chromium checks confirm the returning-customer success screen and an Apple pass download through the button.
+The Google button receives HTTP 200 and opens the signed save URL.
+The browser test blocks navigation to Google before any provider account or installed object changes.
+
+The temporary platform administrator grant was revoked, and its account was suspended after the checks.
+The permanent platform administrator remains active.
+The synthetic café and its business login remain available for review.
+The disposable local PostgreSQL and Redis containers were stopped.
+Actual installation in Apple Wallet or Google Wallet remains a physical-device check.
