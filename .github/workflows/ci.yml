@@ -1,0 +1,249 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [staging, main]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy after validation (staging or main only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    outputs:
+      api: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.api == 'true' }}
+      dashboard: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.dashboard == 'true' }}
+      landing: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.landing == 'true' }}
+      cash: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.cash == 'true' }}
+      pos: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.pos == 'true' }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Find the last successful release on this branch
+        if: github.event_name == 'push'
+        id: base
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+        run: |
+          BASE_SHA=''
+          RELEASES=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs" --method GET \
+            -f branch="$RELEASE_BRANCH" -f event=push -f status=success -f per_page=100 \
+            --jq '.workflow_runs[] | select(.path == ".github/workflows/ci.yml") | [.id, .head_sha] | @tsv')
+          while IFS=$'\t' read -r RUN_ID RUN_SHA; do
+            [ -n "$RUN_ID" ] || continue
+            COMPLETE=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs" \
+              --paginate --jq '.jobs[] | select(.name == "Release complete" and .conclusion == "success") | .id')
+            if [ -n "$COMPLETE" ]; then
+              BASE_SHA="$RUN_SHA"
+              break
+            fi
+          done <<< "$RELEASES"
+          echo "sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          if [ -z "$BASE_SHA" ]; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
+        if: github.event_name != 'push' || steps.base.outputs.sha != ''
+        id: paths
+        with:
+          base: ${{ steps.base.outputs.sha || github.ref }}
+          filters: .github/ci-paths.yml
+
+  workflows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Validate workflow syntax and expressions
+        env:
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -shellcheck=''
+
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Scan fetched Git history
+        env:
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -fsSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz -o "$RUNNER_TEMP/gitleaks.tar.gz"
+          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+          if ! "$RUNNER_TEMP/gitleaks" git --no-banner --redact --exit-code 1 --log-opts='--all' \
+            --report-format json --report-path "$RUNNER_TEMP/gitleaks.json"; then
+            jq -r '.[] | [.RuleID, .File, .StartLine, .Commit, .Fingerprint] | @tsv' "$RUNNER_TEMP/gitleaks.json"
+            exit 1
+          fi
+
+  lint:
+    uses: ./.github/workflows/lint.yml
+  contract:
+    uses: ./.github/workflows/contract-ci.yml
+  tokens:
+    uses: ./.github/workflows/tokens-ci.yml
+
+  api:
+    needs: [changes, workflows, secrets, lint, contract, tokens]
+    if: needs.changes.outputs.api == 'true' || inputs.deploy
+    uses: ./.github/workflows/umi-api-ci.yml
+
+  dashboard:
+    needs: [changes, workflows, secrets, lint, contract, tokens]
+    if: needs.changes.outputs.dashboard == 'true' || inputs.deploy
+    uses: ./.github/workflows/web-ci.yml
+    with:
+      app: dashboard
+
+  landing:
+    needs: [changes, workflows, secrets, lint, tokens]
+    if: needs.changes.outputs.landing == 'true' || inputs.deploy
+    uses: ./.github/workflows/web-ci.yml
+    with:
+      app: landing
+
+  cash:
+    needs: [changes, workflows, secrets, lint]
+    if: needs.changes.outputs.cash == 'true'
+    uses: ./.github/workflows/cash-ci.yml
+
+  pos:
+    needs: [changes, workflows, secrets, lint, contract, tokens]
+    if: needs.changes.outputs.pos == 'true'
+    uses: ./.github/workflows/umi-pos-ios.yml
+
+  ready:
+    name: CI ready
+    needs: [changes, workflows, secrets, lint, contract, tokens, api, dashboard, landing, cash, pos]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every selected check to pass
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          REDEPLOY: ${{ inputs.deploy || false }}
+        run: |
+          jq -e --arg redeploy "$REDEPLOY" '
+            def passed: .result == "success";
+            def selected($name; $selected):
+              .[$name].result == (if $selected then "success" else "skipped" end);
+            (.changes | passed) and
+            ([.workflows, .secrets, .lint, .contract, .tokens] | all(passed)) and
+            selected("api"; .changes.outputs.api == "true" or $redeploy == "true") and
+            selected("dashboard"; .changes.outputs.dashboard == "true" or $redeploy == "true") and
+            selected("landing"; .changes.outputs.landing == "true" or $redeploy == "true") and
+            selected("cash"; .changes.outputs.cash == "true") and
+            selected("pos"; .changes.outputs.pos == "true")
+          ' <<< "$RESULTS"
+
+  deploy-api-staging:
+    needs: [ready, changes]
+    if: >-
+      (github.event_name == 'push' || inputs.deploy) &&
+      github.ref == 'refs/heads/staging' &&
+      (needs.changes.outputs.api == 'true' || inputs.deploy)
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/umi-api-deploy-staging.yml
+    secrets:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+
+  deploy-api-production:
+    needs: [ready, changes]
+    if: >-
+      (github.event_name == 'push' || inputs.deploy) &&
+      github.ref == 'refs/heads/main' && vars.UMI_REWARD_RELEASE_HOLD != 'true' &&
+      (needs.changes.outputs.api == 'true' || inputs.deploy)
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/umi-api-deploy.yml
+    secrets:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+
+  deploy-dashboard:
+    needs: [ready, changes]
+    if: >-
+      (needs.changes.outputs.dashboard == 'true' || inputs.deploy) &&
+      (github.ref != 'refs/heads/main' || vars.UMI_REWARD_RELEASE_HOLD != 'true') &&
+      (((github.event_name == 'push' || inputs.deploy) &&
+        (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')) ||
+       (github.event_name == 'pull_request' && !github.event.pull_request.draft &&
+        github.event.pull_request.head.repo.full_name == github.repository && github.head_ref != 'main'))
+    uses: ./.github/workflows/deploy-dashboard.yml
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+  deploy-landing:
+    needs: [ready, changes]
+    if: >-
+      (needs.changes.outputs.landing == 'true' || inputs.deploy) &&
+      (((github.event_name == 'push' || inputs.deploy) &&
+        (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')) ||
+       (github.event_name == 'pull_request' && !github.event.pull_request.draft &&
+        github.event.pull_request.head.repo.full_name == github.repository && github.head_ref != 'main'))
+    uses: ./.github/workflows/deploy-landing.yml
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+  release-complete:
+    name: Release complete
+    needs:
+      [ready, changes, deploy-api-staging, deploy-api-production, deploy-dashboard, deploy-landing]
+    if: >-
+      always() && !cancelled() && github.event_name == 'push' &&
+      (github.ref != 'refs/heads/main' || vars.UMI_REWARD_RELEASE_HOLD != 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Record a complete release baseline
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+        run: |
+          jq -e --arg branch "$RELEASE_BRANCH" '
+            def deployed($name; $selected):
+              .[$name].result == (if $selected then "success" else "skipped" end);
+            .ready.result == "success" and .changes.result == "success" and
+            deployed("deploy-api-staging"; $branch == "staging" and .changes.outputs.api == "true") and
+            deployed("deploy-api-production"; $branch == "main" and .changes.outputs.api == "true") and
+            deployed("deploy-dashboard"; .changes.outputs.dashboard == "true") and
+            deployed("deploy-landing"; .changes.outputs.landing == "true")
+          ' <<< "$RESULTS"

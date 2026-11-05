@@ -1,0 +1,35 @@
+name: Cash validation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/umi-cash
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/umi-cash/package-lock.json
+      - name: Install from the Cash lockfile
+        run: npm ci
+      - name: Test loyalty and compatibility behavior
+        run: npm test
+      - name: Build
+        run: |
+          export JWT_ACCESS_SECRET="$(openssl rand -hex 32)"
+          export JWT_REFRESH_SECRET="$(openssl rand -hex 32)"
+          export UMI_ADMIN_JWT_SECRET="$(openssl rand -hex 32)"
+          export APP_QR_SECRET="$(openssl rand -hex 32)"
+          npm run build

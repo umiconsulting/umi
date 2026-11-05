@@ -1,0 +1,54 @@
+name: Web build
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
+      - name: Build
+        id: build
+        env:
+          APP: ${{ inputs.app }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          case "$APP" in
+            dashboard)
+              pnpm install --frozen-lockfile --filter @umi/dashboard...
+              bash apps/umi-dashboard/scripts/build-ci.sh
+              echo "path=apps/umi-dashboard/dist" >> "$GITHUB_OUTPUT"
+              ;;
+            landing)
+              pnpm install --frozen-lockfile --filter @umi/landing...
+              pnpm --filter @umi/landing build
+              echo "path=apps/umi-landing-page/out" >> "$GITHUB_OUTPUT"
+              ;;
+            *) echo "Unknown web app: $APP" >&2; exit 1 ;;
+          esac
+      - name: Preserve the built release
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ inputs.app }}-static
+          path: ${{ steps.build.outputs.path }}
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
