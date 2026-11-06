@@ -98,7 +98,10 @@
     "ux:trace": "node tools/ux-sweep/trace-flow.mjs --trace --out /tmp/ux/trace.json --md /tmp/ux/trace.md",
     "ux:screencast": "node tools/ux-sweep/trace-screencast.mjs --screencast --dir /tmp/ux/screencast --out /tmp/ux/screencast.json --md /tmp/ux/screencast.md",
     "ux:lighthouse": "node tools/ux-sweep/perf-lighthouse.mjs --out /tmp/ux/lighthouse.json --md /tmp/ux/lighthouse.md",
-    "ux:verify": "pnpm ux:inventory && pnpm ux:click-audit && pnpm ux:flows && pnpm ux:a11y && pnpm ux:first-paint && pnpm ux:visual"
+    "ux:verify": "pnpm ux:inventory && pnpm ux:click-audit && pnpm ux:flows && pnpm ux:a11y && pnpm ux:first-paint && pnpm ux:visual",
+    "ci:db": "bash db/check.sh",
+    "ci:migrations": "bash db/test/migrate.sh",
+    "ci:release": "node --test scripts/deploy-release.spec.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

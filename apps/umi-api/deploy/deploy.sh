@@ -5,7 +5,7 @@
 # Invoked over SSH by .github/workflows/deploy-backend.yml, e.g.:
 #   ssh vps "APP_NAME='umi-api' bash -s 'sha-<gitsha>'" < apps/umi-api/deploy/deploy.sh
 #
-# Args:   $1  image tag to deploy (default: latest)
+# Args:   $1  image tag to deploy (sha-<40-character commit>)
 # Env:    APP_NAME          service / apps-subdir name      (default: umi-api)
 #         UMI_REPO_DIR      repo checkout on the VPS        (default: $HOME/umi)
 #         UMI_DEPLOY_BRANCH branch that checkout tracks     (default: main)
@@ -23,7 +23,12 @@
 #   script and docker-compose.yml on one box).
 set -euo pipefail
 
-TAG="${1:-latest}"
+TAG="${1:?Pass the immutable image tag sha-<40-character commit>}"
+if [[ ! "$TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
+  echo "FATAL: deployment requires an immutable sha-<40-character commit> tag" >&2
+  exit 1
+fi
+RELEASE_COMMIT="${TAG#sha-}"
 APP_NAME="${APP_NAME:-umi-api}"
 REPO_DIR="${UMI_REPO_DIR:-$HOME/umi}"
 BRANCH="${UMI_DEPLOY_BRANCH:-main}"
@@ -55,10 +60,11 @@ compose() {
 echo "==> Deploying $APP_NAME  tag=$TAG  ($TAG_VAR)  branch=$BRANCH"
 echo "    compose=$COMPOSE_FILE  project_dir=$PROJECT_DIR"
 
-# 1) Sync the checkout to $BRANCH so compose/Caddyfile match the shipped code.
+# 1) Use the image commit for deployment files and migrations.
 #    .env is gitignored, so the reset never touches local secrets/config.
 cd "$REPO_DIR"
-git fetch --depth=1 origin "$BRANCH"
+git fetch --depth=1 origin "$RELEASE_COMMIT"
+test "$(git rev-parse FETCH_HEAD)" = "$RELEASE_COMMIT"
 git reset --hard FETCH_HEAD
 
 # 1b) Make sure the compose file is actually on disk.

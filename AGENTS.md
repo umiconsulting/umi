@@ -36,7 +36,8 @@ This file defines product boundaries, ownership, architecture rules, and the res
 - Create each feature or fix branch from `origin/staging`.
 - Open each feature pull request into `staging` (`gh pr create --base staging`).
 - Do not stack an unmerged feature branch on another unmerged feature branch.
-- Pass all CI gates (`lint`, `contract`, `tokens`, `build-and-test`, `gate`) before merge.
+- Pass `CI ready` before merge. It requires shared checks and all selected app checks.
+- See `docs/development/CI.md` for selection rules, release order, and local verification commands.
 - Validate the merged change on the `staging` environment before promotion to `main`.
 - Promote `staging` to `main` with a pull request (`staging` into `main`) and use a merge commit (`--merge`) so `staging` and `main` share commit history.
 

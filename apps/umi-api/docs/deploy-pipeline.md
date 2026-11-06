@@ -1,28 +1,23 @@
-# umi-api deploy pipeline (GitHub Actions → GHCR → VPS pull)
+# API deployment pipeline
 
-Automates the old manual flow (`git pull && docker compose up -d --build` on the
-VPS) into push-button CD, **without building on the live box**.
+The CI entry point is `.github/workflows/ci.yml`.
+See [the monorepo CI guide](../../../docs/development/CI.md) for app selection and release rules.
 
-## How it works
+## Release order
 
-```
-PR opened ─────────────▶ umi-api-ci.yml         typecheck + build + test (gate)
-merge to main ─────────▶ umi-api-deploy.yml
-                           └─ deploy-backend.yml (reusable)
-                               1. typecheck + build + test
-                               2. docker build  → push ghcr.io/umiconsulting/umi-api:sha-<git> + :latest
-                               3. ssh VPS → apps/umi-api/deploy/deploy.sh
-                                    git reset --hard origin/main   (refresh compose/Caddyfile; .env untouched)
-                                    pin UMI_API_TAG=sha-<git> in .env
-                                    docker compose pull && up -d    (no build)
-                               4. curl https://api.umiconsulting.co/health
-```
+1. Run shared checks and selected API validation.
+2. Require `CI ready` to pass.
+3. Build and push the image as `ghcr.io/umiconsulting/umi-api:sha-<40-character commit>`.
+4. Run `apps/umi-api/deploy/deploy.sh` through SSH.
+5. Fetch that exact commit for deployment files and migrations.
+6. Apply unapplied migrations through `db/migrate.sh`.
+7. Pull the image and start the services.
+8. Check the API health endpoint.
 
-The image is built once in CI and the VPS only **pulls** it, so deploys don't
-compete with the live API/worker for CPU/RAM. Caddy, Redis, and TLS are
-untouched. `docker-compose.yml` carries both `image:` (what the VPS pulls) and
-`build:` (local-dev fallback), so `docker compose up -d --build` still works for
-local development.
+The VPS pulls the prebuilt image.
+It does not build the application.
+The local `.env` and state directories remain outside Git.
+Production also publishes `latest` as a reference; the running image uses the commit tag.
 
 ## One-time setup
 
@@ -60,52 +55,52 @@ gh secret set VPS_SSH_PORT --body "22"                      # optional; omit to 
 
 ## Routine deploys
 
-Merge to `main`. That's it. Watch progress under the repo's **Actions** tab; the
-run fails (and does not flip traffic blindly) if tests fail, the SSH/pull fails,
-or `/health` doesn't come back.
+Merge a feature PR into `staging`.
+The push validates and deploys the selected API release to the staging environment.
+Promote validated staging changes to `main` through a PR.
+The main push validates and deploys production unless `UMI_REWARD_RELEASE_HOLD=true`.
 
-## Release identity and required env
+To deploy without another push, run `CI` on the release branch with `deploy=true`.
+This option validates and deploys API, Dashboard, and Landing.
+A manual run without this option performs validation only.
+Deployment credentials are available only to deployment jobs.
 
-The image carries its own identity — `deploy-backend.yml` bakes these at build
-time, and `/health/live` reports them:
+## Release identity and environment
 
-- `RELEASE_VERSION` — `git describe --tags --always` of the built commit.
-- `RELEASE_GIT_COMMIT` — the 40-char build SHA.
-- `RELEASE_BUILD_TIMESTAMP` — UTC build time.
-- `CONTRACT_VERSION` — read from `packages/contract/src/catalog.ts`.
+The image includes these values:
 
-Do **not** set those four in the VPS `.env`. Two values are deployment state
-and DO belong in `apps/umi-api/.env` on the box:
+- `RELEASE_VERSION`: the Git description of the image commit.
+- `RELEASE_GIT_COMMIT`: the full commit SHA.
+- `RELEASE_BUILD_TIMESTAMP`: the UTC build time.
+- `CONTRACT_VERSION`: the value from `packages/contract/src/catalog.ts`.
 
-- `UMI_ENVIRONMENT=production` (with `NODE_ENV=production`) — the config
-  refuses to boot without it, and in a deployed environment it also demands
-  the full secret set (`config.schema.ts` lists them).
-- `EXPECTED_SCHEMA_VERSION` — the last applied migration
-  (`runtime.schema_migration`; `build-v3-48` today). `/health` answers
-  degraded until it matches the database, so the post-deploy health check
-  fails closed on a schema/code mismatch. After applying a new migration,
-  update the value and restart.
+`/health/live` reports the image identity.
+Keep these values in the image rather than the VPS `.env`.
+Set `UMI_ENVIRONMENT` and the required service configuration in the environment state directory.
+Set `EXPECTED_SCHEMA_VERSION` to the intended schema version.
+The health check rejects a schema mismatch.
 
 ## Rollback
 
-Every deploy is an immutable `:sha-<git>` tag. To roll back, on the VPS:
+Select a previous immutable image tag from the package history.
+Confirm that its code supports the current database schema.
+Forward migrations are not automatically reversed.
 
-```bash
+For a production image rollback:
+
+```sh
 cd ~/umi/apps/umi-api
-sed -i 's/^UMI_API_TAG=.*/UMI_API_TAG=sha-<previous>/' .env
-docker compose pull && docker compose up -d
+sed -i 's/^UMI_API_TAG=.*/UMI_API_TAG=sha-<previous-40-character-commit>/' .env
+docker compose pull
+docker compose up -d
 ```
 
-(or re-run the deploy workflow on the older commit). Find prior tags in the
-repo's **Packages → umi-api** list.
+This operation changes the image only.
+For deployment files from that release, use the deploy script with the same immutable tag and environment paths.
+The deploy script requires the full commit tag; it rejects `latest` and an empty argument.
 
-## Adding another backend service later (e.g. umi-logs)
+## Other apps
 
-The reusable workflow is service-agnostic. To onboard a new VPS backend:
-
-1. Give it a `Dockerfile` + `docker-compose.yml` (with `image: ghcr.io/umiconsulting/<app>:${<APP>_TAG:-latest}`).
-2. Copy `apps/umi-api/deploy/deploy.sh` to `apps/<app>/deploy/deploy.sh` (it's generic — keys off `APP_NAME`).
-3. Copy `.github/workflows/umi-api-deploy.yml` to `<app>-deploy.yml` and change `app_name`, `app_dir`, `image`, `health_url`.
-
-No change to `deploy-backend.yml`. Frontends (cash, landing, dashboard) stay on
-Vercel — this pipeline is only for self-hosted Docker backends.
+Dashboard and Landing use Cloudflare Pages through the GitHub CI entry point.
+Cash retains its existing external deployment configuration.
+Their app directories share this Git repository.
