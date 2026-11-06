@@ -66,3 +66,8 @@ apps/umi-cash/
 
 # Lingui compiled catalogs (generated)
 apps/umi-dashboard/src/locales/**/*.mjs
+
+# Umi Menu handoff archive: copied sources, skills, and captured evidence.
+# Preserve the original bytes of this historical delivery.
+# Active sources and current documentation under apps/umi-menu remain checked.
+apps/umi-menu/docs/entrega-2026-11-04/

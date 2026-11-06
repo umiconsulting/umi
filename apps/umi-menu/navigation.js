@@ -13,16 +13,19 @@ navigationToggle.addEventListener('click', () => {
   navigationToggle.setAttribute('aria-label', opening ? 'Cerrar menú' : 'Abrir menú');
   if (opening) navigationPanel.querySelector('button:not([hidden])').focus();
 });
-navigationPanel.addEventListener('click', e => {
+navigationPanel.addEventListener('click', (e) => {
   if (e.target.closest('button')) closeNavigation(!!e.target.closest('[data-mode]'));
 });
-document.addEventListener('click', e => {
+document.addEventListener('click', (e) => {
   if (!e.target.closest('.header-menu')) closeNavigation();
 });
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !navigationPanel.hidden) { e.preventDefault(); closeNavigation(true); }
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !navigationPanel.hidden) {
+    e.preventDefault();
+    closeNavigation(true);
+  }
 });
-document.addEventListener('focusin', e => {
+document.addEventListener('focusin', (e) => {
   if (!e.target.closest('.header-menu')) closeNavigation();
 });
 if (tableLocked) {

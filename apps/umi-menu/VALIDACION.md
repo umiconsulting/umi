@@ -3,18 +3,18 @@
 Fecha: 5 de noviembre de 2026. Entorno: Linux local restringido, Node v22.23.4, Python 3.10.
 Revisión: hashes SHA-256 por archivo en `revision.json`. Esta carpeta no es un checkout Git.
 
-| Comando / comprobación | Resultado |
-| --- | --- |
-| `node mvp-local/state.test.cjs` | 9 pruebas aprobadas; 0 fallos. |
-| `node --check mvp-local/base.js` | Aprobado. |
-| `node --check mvp-local/state.js` | Aprobado. |
-| `node --check mvp-local/app.js` | Aprobado. |
-| `node --check mvp-local/visual.js` | Aprobado. |
-| `python3 mvp-local/generar-qr.py` | Generados los SVG de mesas 1, 2 y 12 para `http://127.0.0.1:56455`. Lectura con cámara pendiente. |
-| Inspección de referencias estáticas locales | Recursos presentes. No acredita su renderizado. |
+| Comando / comprobación                                                | Resultado                                                                                              |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `node mvp-local/state.test.cjs`                                       | 9 pruebas aprobadas; 0 fallos.                                                                         |
+| `node --check mvp-local/base.js`                                      | Aprobado.                                                                                              |
+| `node --check mvp-local/state.js`                                     | Aprobado.                                                                                              |
+| `node --check mvp-local/app.js`                                       | Aprobado.                                                                                              |
+| `node --check mvp-local/visual.js`                                    | Aprobado.                                                                                              |
+| `python3 mvp-local/generar-qr.py`                                     | Generados los SVG de mesas 1, 2 y 12 para `http://127.0.0.1:56455`. Lectura con cámara pendiente.      |
+| Inspección de referencias estáticas locales                           | Recursos presentes. No acredita su renderizado.                                                        |
 | `python3 -m http.server 56455 --bind 127.0.0.1 --directory mvp-local` | Bloqueado: `PermissionError: Operation not permitted` al crear el socket. No quedó un servidor activo. |
-| Chrome mediante Playwright | No completó el arranque; proceso interrumpido. |
-| Chromium headless instalado, apertura directa del HTML | Bloqueado por sandbox: `shutdown: Operation not permitted`. |
+| Chrome mediante Playwright                                            | No completó el arranque; proceso interrumpido.                                                         |
+| Chromium headless instalado, apertura directa del HTML                | Bloqueado por sandbox: `shutdown: Operation not permitted`.                                            |
 
 Las pruebas de reglas cubren aceptación, finalización de varias estaciones, rechazo con motivo, vencimiento, cancelación pendiente, autorización posterior, programación y cobro único simulado.
 
