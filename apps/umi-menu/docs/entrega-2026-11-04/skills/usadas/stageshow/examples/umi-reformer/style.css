@@ -1,0 +1,716 @@
+/* The section ground is the stage: warm paper, no box. One gutter for the
+   window's top-left and the phone's right. */
+.rp .ss-stage {
+  --gutter: 32px;
+  --ss-accent: #5175BD;
+  --ss-accent-2: #3E5FA6;
+  --ss-accent-soft: rgba(81, 117, 189, 0.12);
+  overflow: hidden;
+  background: #E9E8E4;
+}
+
+.rp-hint {
+  max-width: 640px;
+  margin: 16px auto 0;
+  font-size: 13px;
+  color: #6E665B;
+  padding: 10px 14px;
+  border: 1px solid rgba(110, 102, 91, 0.25);
+  border-radius: 8px;
+  background: #F6F3EE;
+}
+
+.rp-hint--err {
+  color: #8F2F22;
+  border-color: rgba(143, 47, 34, 0.35);
+}
+
+.rp-restart {
+  display: block;
+  margin: 12px auto 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6E665B;
+  background: #F6F3EE;
+  border: 1px solid rgba(110, 102, 91, 0.3);
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.rp-restart:hover {
+  color: #4A443C;
+  border-color: rgba(110, 102, 91, 0.5);
+}
+
+/* Pinned top-left, runs about a quarter past the bottom. The right rail is
+   filler: the phone straddles it and never covers the row being acted on. */
+.rp-window {
+  position: absolute;
+  top: var(--gutter);
+  left: var(--gutter);
+  width: 500px;
+  height: 480px;
+  background: var(--ss-surface);
+  border-radius: 10px;
+  box-shadow: var(--ss-shadow-hero);
+}
+
+.rp-window .ss-window__body {
+  position: relative;
+  display: flex;
+}
+
+.rp-web {
+  flex: none;
+  width: 340px;
+  padding: 16px;
+}
+
+.rp-web__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.rp-word {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ss-text-strong);
+}
+
+.rp-web__chip {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ss-text);
+  background: var(--ss-canvas);
+  border: 1px solid var(--ss-line);
+  border-radius: 8px;
+  padding: 5px 10px;
+}
+
+.rp-week {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.rp-day {
+  flex: 1;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ss-text-faint);
+  padding: 5px 0;
+  border-radius: 8px;
+}
+
+.rp-day[data-active] {
+  background: var(--ss-text-strong);
+  color: var(--ss-surface);
+}
+
+.rp-list {
+  border-top: none;
+}
+
+.rp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 64px;
+  border: 1px solid #E2E0DA;
+  border-radius: 11px;
+  background: #FFFFFF;
+  padding: 0 12px;
+}
+
+.rp-row + .rp-row {
+  margin-top: 8px;
+}
+
+.rp-row__time {
+  flex: none;
+  width: 58px;
+  display: grid;
+  gap: 4px;
+}
+
+.rp-row__h {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ss-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-row__m {
+  font-size: 11px;
+  color: var(--ss-text-faint);
+}
+
+.rp-row__info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.rp-row__t {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ss-text-strong);
+}
+
+.rp-row__c {
+  font-size: 12px;
+  color: #5175BD;
+}
+
+.rp-row__btn {
+  flex: none;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #111111;
+  background: #C6D8FB;
+  border: none;
+  border-radius: 20px;
+  padding: 7px 13px;
+  cursor: pointer;
+  min-width: 64px;
+}
+
+.rp-row__btn[data-hover] {
+  background: #B9D0F7;
+}
+
+.rp-row__btn[data-booked] {
+  color: var(--ss-text-strong);
+  background: transparent;
+  border: 1px solid #C9C7C1;
+}
+
+.rp-row__lbl {
+  display: inline-block;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* Filler rail: the phone straddles it in the wide design */
+.rp-rail {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 20px 14px;
+  border-left: 1px solid var(--ss-line);
+  background: var(--ss-canvas);
+}
+
+.rp-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translate(-50%, 8px);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ss-surface);
+  background: var(--ss-text-strong);
+  border-radius: 8px;
+  padding: 8px 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.35s cubic-bezier(0.45, 0, 0.1, 1), opacity 0.35s ease;
+}
+
+.rp-toast[data-show] {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+/* Straddles the window's right rail, about half outside, top in the upper
+   half; the stage crops its base. A level above the window. */
+.rp-phone {
+  position: absolute;
+  top: 76px;
+  right: var(--gutter);
+  box-shadow: var(--ss-shadow-satellite), 0 30px 50px -20px rgba(35, 30, 25, 0.30);
+}
+
+.rp-app {
+  position: absolute;
+  inset: 0;
+  background: #F6F3EE;
+  padding: 64px 16px 16px;
+}
+
+.rp-app__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-left: 16px;
+}
+
+.rp-app__title {
+  padding-left: 0;
+}
+
+.rp-pass {
+  position: relative;
+  border-radius: 20px;
+  background: #111111;
+  color: #FFFFFF;
+  overflow: hidden;
+}
+
+.rp-pass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('./photo.jpg') center / cover;
+  filter: blur(14px) brightness(0.72);
+  transform: scale(1.15);
+}
+
+.rp-pass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(17, 17, 17, 0.28) 0%, rgba(17, 17, 17, 0.78) 100%);
+}
+
+.rp-pass__in {
+  position: relative;
+  padding: 16px;
+}
+
+.rp-pass__nivel {
+  text-align: right;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #C6D8FB;
+}
+
+.rp-pass__lbl {
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #C7C7C3;
+  margin-top: 10px;
+}
+
+.rp-pass__nextval {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+}
+
+.rp-pass__frow {
+  display: flex;
+  gap: 26px;
+  margin-top: 10px;
+}
+
+.rp-pass__frow .rp-pass__lbl {
+  margin-top: 0;
+}
+
+.rp-pass__val {
+  font-size: 11px;
+  font-weight: 600;
+  color: #FFFFFF;
+  margin-top: 2px;
+}
+
+.rp-pass__val--grey {
+  color: #C7C7C3;
+}
+
+.rp-pass__quedan {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.rp-pass__unit {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rp-pass__nextline {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #111111;
+  background: #C6D8FB;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin-top: 8px;
+}
+
+.rp-pass__nextwrap {
+  margin-top: 3px;
+}
+
+.rp-pass__qr {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 46px;
+  height: 46px;
+  background: #FFFFFF;
+  border-radius: 7px;
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+.rp-pass__qr::after {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  background: repeating-conic-gradient(#111111 0% 25%, #FFFFFF 0% 50%) 0 0 / 9px 9px;
+}
+
+/* The studio moment: the pass opens over itself with the QR and a quiet
+   caption. Only opacity and a small rise move; the card keeps its size. */
+.rp-pass__open {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(17, 17, 17, 0.96);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.45, 0, 0.1, 1);
+}
+
+.rp-pass[data-open] .rp-pass__open {
+  opacity: 1;
+  transform: none;
+}
+
+.rp-pass__openqr {
+  flex: none;
+  width: 80px;
+  height: 80px;
+  background: #FFFFFF;
+  border-radius: 8px;
+  padding: 6px;
+  box-sizing: border-box;
+}
+
+.rp-pass__openqr::after {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  background: repeating-conic-gradient(#111111 0% 25%, #FFFFFF 0% 50%) 0 0 / 10px 10px;
+}
+
+.rp-pass__openinfo {
+  display: grid;
+  gap: 4px;
+}
+
+.rp-pass__openlbl {
+  font-size: 11px;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.rp-pass__openhint {
+  font-size: 10px;
+  color: #C7C7C3;
+}
+
+.rp-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 16px;
+  background: #E2E0DA;
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.rp-tab {
+  flex: 1;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ss-text);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 0;
+  cursor: pointer;
+}
+
+.rp-tab[data-active] {
+  background: var(--ss-surface);
+  color: var(--ss-text-strong);
+  box-shadow: 0 1px 3px rgba(35, 30, 25, 0.12);
+}
+
+.rp-plans {
+  display: grid;
+  gap: 8px;
+}
+
+.rp-plan {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  font: inherit;
+  background: var(--ss-surface);
+  border: 1px solid var(--ss-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.rp-plan[data-selected] {
+  border-color: #111111;
+}
+
+.rp-plan__l {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ss-text-strong);
+}
+
+.rp-plan__p {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ss-text);
+}
+
+.rp-plan__tag {
+  display: inline-block;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ss-text);
+}
+
+.rp-plan__tag--on {
+  color: #111111;
+  background: #C6D8FB;
+  border-radius: 20px;
+  padding: 4px 9px;
+}
+
+.rp-hist {
+  border-top: 1px solid var(--ss-line);
+}
+
+.rp-hist__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--ss-line);
+}
+
+.rp-hist__when {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ss-text-strong);
+}
+
+.rp-hist__who {
+  font-size: 11px;
+  color: var(--ss-text);
+}
+
+.rp-hist__cost {
+  font-size: 11px;
+  color: var(--ss-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Compact: the rail hides; the window runs off the right showing the focal
+   row at the left; the phone stands over the filler rows' space. */
+.rp .ss-stage[data-layout='compact'] {
+  --gutter: 16px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-rail {
+  display: none;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-window {
+  width: 400px;
+  height: 342px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-web {
+  width: 118px;
+  padding: 12px 8px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-web__chip {
+  display: none;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-week {
+  display: none;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-list {
+  margin-top: 0;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-row:not([data-focal]) {
+  display: none;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-row[data-focal] {
+  height: 44px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-row {
+  height: 44px;
+  gap: 4px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-row__time {
+  width: 40px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-row__h {
+  font-size: 12px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-row__btn {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 0;
+  font-size: 11px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-row__info,
+.rp .ss-stage[data-layout='compact'] .rp-row__time,
+.rp .ss-stage[data-layout='compact'] .rp-row__time .rp-row__m {
+  display: none;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-row:not([data-focal]) .rp-row__t {
+  display: none;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-phone {
+  top: 132px;
+  right: 16px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-pass__qr {
+  display: none;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-pass__frow {
+  display: none;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-pass__in {
+  padding-right: 12px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-app {
+  padding-top: 52px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-app__title {
+  font-size: 22px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-pass__nivel,
+.rp .ss-stage[data-layout='compact'] .rp-pass__lbl {
+  font-size: 22px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-pass__nextval {
+  font-size: 36px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-pass__quedan {
+  font-size: 34px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-pass__unit {
+  font-size: 22px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-pass__nextline {
+  font-size: 22px;
+  padding: 6px 10px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-pass__open {
+  gap: 8px;
+  padding: 10px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-pass__openqr {
+  width: 56px;
+  height: 56px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-pass__openlbl,
+.rp .ss-stage[data-layout='compact'] .rp-pass__openhint {
+  font-size: 22px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-tab {
+  font-size: 22px;
+  padding: 8px 0;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-plan {
+  gap: 6px;
+  padding: 12px 10px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-plan__l,
+.rp .ss-stage[data-layout='compact'] .rp-plan__tag {
+  font-size: 22px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-plan__p {
+  display: none;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-hist__row {
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding: 8px 2px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-hist__when {
+  flex: 1 1 100%;
+  font-size: 22px;
+}
+
+.rp .ss-stage[data-layout='compact'] .rp-hist__who,
+.rp .ss-stage[data-layout='compact'] .rp-hist__cost {
+  font-size: 22px;
+}

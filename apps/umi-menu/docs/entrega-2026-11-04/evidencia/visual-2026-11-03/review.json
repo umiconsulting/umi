@@ -1,0 +1,244 @@
+{
+  "base": "https://umi-stageshow.pages.dev",
+  "capturedAt": "2026-11-04T05:05:21.821Z",
+  "screens": [
+    {
+      "name": "01-viewer-desktop",
+      "file": "/private/tmp/umi-menu-final-design-20261103/01-viewer-desktop.png",
+      "url": "https://umi-stageshow.pages.dev/?app=menu",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      },
+      "overflow": false
+    },
+    {
+      "name": "02-desktop-menu",
+      "file": "/private/tmp/umi-menu-final-design-20261103/02-desktop-menu.png",
+      "url": "https://umi-stageshow.pages.dev/menu-digital/menu",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      },
+      "overflow": false
+    },
+    {
+      "name": "03-desktop-product",
+      "file": "/private/tmp/umi-menu-final-design-20261103/03-desktop-product.png",
+      "url": "https://umi-stageshow.pages.dev/menu-digital/menu",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      },
+      "overflow": false
+    },
+    {
+      "name": "04-desktop-cart",
+      "file": "/private/tmp/umi-menu-final-design-20261103/04-desktop-cart.png",
+      "url": "https://umi-stageshow.pages.dev/menu-digital/menu",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      },
+      "overflow": false
+    },
+    {
+      "name": "05-desktop-checkout",
+      "file": "/private/tmp/umi-menu-final-design-20261103/05-desktop-checkout.png",
+      "url": "https://umi-stageshow.pages.dev/menu-digital/menu",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      },
+      "overflow": false
+    },
+    {
+      "name": "06-desktop-status",
+      "file": "/private/tmp/umi-menu-final-design-20261103/06-desktop-status.png",
+      "url": "https://umi-stageshow.pages.dev/menu-digital/menu",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      },
+      "overflow": false
+    },
+    {
+      "name": "02-mobile-menu",
+      "file": "/private/tmp/umi-menu-final-design-20261103/02-mobile-menu.png",
+      "url": "https://umi-stageshow.pages.dev/menu-digital/menu",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false
+    },
+    {
+      "name": "03-mobile-product",
+      "file": "/private/tmp/umi-menu-final-design-20261103/03-mobile-product.png",
+      "url": "https://umi-stageshow.pages.dev/menu-digital/menu",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false
+    },
+    {
+      "name": "04-mobile-cart",
+      "file": "/private/tmp/umi-menu-final-design-20261103/04-mobile-cart.png",
+      "url": "https://umi-stageshow.pages.dev/menu-digital/menu",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false
+    },
+    {
+      "name": "05-mobile-checkout",
+      "file": "/private/tmp/umi-menu-final-design-20261103/05-mobile-checkout.png",
+      "url": "https://umi-stageshow.pages.dev/menu-digital/menu",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false
+    },
+    {
+      "name": "06-mobile-status",
+      "file": "/private/tmp/umi-menu-final-design-20261103/06-mobile-status.png",
+      "url": "https://umi-stageshow.pages.dev/menu-digital/menu",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false
+    },
+    {
+      "name": "tour-config-failure",
+      "file": "/private/tmp/umi-menu-final-design-20261103/tour-config-failure.png",
+      "url": "https://umi-stageshow.pages.dev/?app=menu&menuView=tour&menuChapter=config&menuMode=pickup",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      },
+      "overflow": false
+    },
+    {
+      "name": "tour-accept-failure",
+      "file": "/private/tmp/umi-menu-final-design-20261103/tour-accept-failure.png",
+      "url": "https://umi-stageshow.pages.dev/?app=menu&menuView=tour&menuChapter=accept&menuMode=pickup",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      },
+      "overflow": false
+    },
+    {
+      "name": "tour-kitchen-failure",
+      "file": "/private/tmp/umi-menu-final-design-20261103/tour-kitchen-failure.png",
+      "url": "https://umi-stageshow.pages.dev/?app=menu&menuView=tour&menuChapter=kitchen&menuMode=pickup",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      },
+      "overflow": false
+    },
+    {
+      "name": "tour-notify-failure",
+      "file": "/private/tmp/umi-menu-final-design-20261103/tour-notify-failure.png",
+      "url": "https://umi-stageshow.pages.dev/?app=menu&menuView=tour&menuChapter=notify&menuMode=pickup",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      },
+      "overflow": false
+    },
+    {
+      "name": "08-viewer-mobile",
+      "file": "/private/tmp/umi-menu-final-design-20261103/08-viewer-mobile.png",
+      "url": "https://umi-stageshow.pages.dev/?app=menu",
+      "viewport": {
+        "width": 390,
+        "height": 1000
+      },
+      "overflow": false
+    }
+  ],
+  "errors": [],
+  "failures": [
+    {
+      "name": "tour-config",
+      "message": "TimeoutError: locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  \u001b[2m- waiting for locator('iframe[title=\"Recorrido del menú digital\"]').contentFrame().locator('.ss-stage[data-mark=\"fin\"]') to be visible\u001b[22m\n"
+    },
+    {
+      "name": "tour-accept",
+      "message": "TimeoutError: locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  \u001b[2m- waiting for locator('iframe[title=\"Recorrido del menú digital\"]').contentFrame().locator('.ss-stage[data-mark=\"fin\"]') to be visible\u001b[22m\n"
+    },
+    {
+      "name": "tour-kitchen",
+      "message": "TimeoutError: locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  \u001b[2m- waiting for locator('iframe[title=\"Recorrido del menú digital\"]').contentFrame().locator('.ss-stage[data-mark=\"fin\"]') to be visible\u001b[22m\n"
+    },
+    {
+      "name": "tour-notify",
+      "message": "TimeoutError: locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  \u001b[2m- waiting for locator('iframe[title=\"Recorrido del menú digital\"]').contentFrame().locator('.ss-stage[data-mark=\"fin\"]') to be visible\u001b[22m\n"
+    }
+  ],
+  "missing": [],
+  "assets": [
+    "https://umi-stageshow.pages.dev/assets/index-BGyiuBRa.js",
+    "https://umi-stageshow.pages.dev/assets/index-BBir0bbo.css"
+  ],
+  "desktopStyles": {
+    "font": "\"IBM Plex Sans\", sans-serif",
+    "color": "rgb(23, 36, 64)",
+    "background": "rgb(247, 247, 244)"
+  },
+  "desktopCheckoutFields": [
+    {
+      "id": "customer-name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "id": "customer-phone",
+      "type": "tel",
+      "required": true
+    },
+    {
+      "id": "",
+      "type": "radio",
+      "required": false
+    },
+    {
+      "id": "",
+      "type": "radio",
+      "required": false
+    }
+  ],
+  "mobileStyles": {
+    "font": "\"IBM Plex Sans\", sans-serif",
+    "color": "rgb(23, 36, 64)",
+    "background": "rgb(247, 247, 244)"
+  },
+  "mobileCheckoutFields": [
+    {
+      "id": "customer-name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "id": "customer-phone",
+      "type": "tel",
+      "required": true
+    },
+    {
+      "id": "",
+      "type": "radio",
+      "required": false
+    },
+    {
+      "id": "",
+      "type": "radio",
+      "required": false
+    }
+  ]
+}

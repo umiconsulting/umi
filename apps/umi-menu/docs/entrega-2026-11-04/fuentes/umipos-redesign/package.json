@@ -1,0 +1,42 @@
+{
+  "name": "umipos-redesign",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 56452 --strictPort",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "qa": "node scripts/redesign-qa.mjs",
+    "deploy:pages": "npm run build:menu && npm run typecheck && npm run build && wrangler pages deploy --project-name umi-stageshow --branch main",
+    "build:menu": "node scripts/build-digital-menu.mjs"
+  },
+  "dependencies": {
+    "@internationalized/date": "^3.12.4",
+    "@remixicon/react": "^4.9.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "exceljs": "4.4.0",
+    "lucide-react": "0.468.0",
+    "motion": "^12.43.0",
+    "papaparse": "5.7.0",
+    "react": "^18.3.1",
+    "react-aria-components": "^1.22.1",
+    "react-dom": "^18.3.1",
+    "read-excel-file": "9.3.14",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.7.0",
+    "playwright-core": "~1.48.2",
+    "postcss": "^8.5.6",
+    "typescript": "^5.6.3",
+    "vite": "^6.4.5",
+    "wrangler": "4.156.0"
+  },
+  "optionalDependencies": {
+    "portless": "^0.4.1"
+  }
+}

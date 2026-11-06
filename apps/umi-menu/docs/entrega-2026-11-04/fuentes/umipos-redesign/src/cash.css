@@ -1,0 +1,139 @@
+.u-cash-manager { width: 100%; display: flex; flex-direction: column; padding: 28px 36px; min-width: 0; }
+.u-cash-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; gap: 20px; }
+.u-cash-head h1 { font: 600 30px/1.2 'Bricolage Grotesque'; margin: 8px 0 0; }
+.u-cash-status { padding: 8px 12px; border-radius: 6px; background: var(--pale); font-size: 12px; }
+.u-cash-status[data-open=true] { background: var(--green-soft); color: var(--green); }
+.u-cash-scroll-wrap { position: relative; flex: 1; min-height: 0; }
+.u-cash-content { height: 100%; overflow: auto; padding-inline-end: 8px; }
+.u-cash-columns { display: grid; grid-template-columns: 1.3fr 1fr; gap: 48px; }
+.u-cash-expected { display: flex; flex-direction: column; gap: 12px; }
+.u-cash-expected > span { font-size: 14px; }
+.u-cash-expected > strong { font: 600 40px/1.2 'Bricolage Grotesque'; }
+.u-cash-expected > small { font-size: 12px; color: var(--muted); }
+.u-cash-equation { display: flex; flex-direction: column; gap: 16px; padding: 24px 0; margin: 0; }
+.u-cash-equation > div { display: flex; justify-content: space-between; gap: 20px; font-size: 14px; }
+.u-cash-equation dt { color: var(--muted); }
+.u-cash-equation dd { margin: 0; font-weight: 500; }
+.u-cash-manager h2 { font: 500 18px/1.4 'IBM Plex Sans'; margin: 0 0 16px; }
+.u-cash-manager p { font: 400 13px/1.6 'IBM Plex Sans'; color: var(--muted); margin: 0 0 20px; }
+.u-cash-book, .u-cash-section { border-top: 1px solid var(--line); padding-top: 24px; margin-top: 24px; }
+.u-cash-log-row { display: flex; align-items: flex-start; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.u-cash-log-row > span { color: var(--muted); }
+.u-cash-log-row > div { display: flex; flex-direction: column; gap: 6px; }
+.u-cash-log-row b { font-weight: 500; }
+.u-cash-log-row small { color: var(--muted); font-size: 11px; }
+.u-cash-log-row > strong { margin-inline-start: auto; font-weight: 500; white-space: nowrap; }
+.u-cash-action-list { display: flex; flex-direction: column; gap: 8px; }
+.u-cash-controls .u-cash-section { margin-top: 20px; padding-top: 20px; }
+.u-cash-policy { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 16px; }
+.u-cash-policy summary { font-size: 12px; color: var(--muted); cursor: pointer; }
+.u-cash-policy p { margin-top: 16px; }
+.u-cash-manager .u-cash-notice { padding: 12px 16px; background: var(--green-soft); color: var(--green); border-radius: 6px; }
+.u-cash-form-layout { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 64px; }
+.u-cash-form { max-width: 540px; }
+.u-cash-form > button:first-child { margin-bottom: 24px; }
+.u-cash-form h2 { font-size: 24px; margin-bottom: 24px; }
+.u-cash-form form { display: flex; flex-direction: column; gap: 20px; }
+.u-cash-form [role=alert] { color: var(--color-text-error-primary); margin: 0; }
+.u-cash-form-summary { padding-inline-start: 24px; border-inline-start: 1px solid var(--line); }
+.u-cash-form-summary h3 { font-size: 16px; font-weight: 500; margin: 0; }
+.u-cash-difference { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+.u-cash-difference > strong { font: 600 28px/1.2 'Bricolage Grotesque'; }
+.u-denominations { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.u-cash-form .u-cash-resolved { color: var(--green); margin-top: 20px; }
+.compact .u-cash-manager { padding: 20px 16px; }
+.compact .u-cash-head { gap: 12px; margin-bottom: 24px; }
+.compact .u-cash-head h1 { font-size: 25px; }
+.compact .u-cash-status { font-size: 10px; padding: 6px 8px; }
+.compact .u-cash-content { padding-inline-end: 0; }
+.compact .u-cash-columns, .compact .u-cash-form-layout { display: flex; flex-direction: column; gap: 28px; }
+.compact .u-cash-ledger-main { display: contents; }
+.compact .u-cash-expected { order: 0; }
+.compact .u-cash-controls { order: 1; }
+.compact .u-cash-ledger-main > .u-cash-equation { order: 2; }
+.compact .u-cash-book { order: 3; }
+.compact .u-cash-expected > strong { font-size: 32px; }
+.compact .u-cash-form-summary { order: -1; border-inline-start: 0; border-bottom: 1px solid var(--line); padding: 0 0 16px; }
+.compact .u-cash-form h2 { font-size: 22px; }
+.compact .u-cash-manager .u-config-actions { flex-direction: column; }
+
+.u-cash-manager { --cash-in-bg: var(--green-soft); --cash-in-ink: var(--green); --cash-out-bg: var(--amber-soft); --cash-out-ink: var(--amber); --cash-safe-bg: var(--blue-soft); --cash-safe-ink: var(--blue); }
+.u-cash-action-list { display: grid; grid-template-columns: 1fr 1fr; }
+.u-cash-action-list > :nth-child(n+3) { grid-column: 1 / -1; }
+.u-cash-action { gap: 8px; padding: 12px; height: auto; border-color: transparent; }
+.u-cash-action[data-kind=in] { background: var(--cash-in-bg); color: var(--cash-in-ink); }
+.u-cash-action[data-kind=out] { background: var(--cash-out-bg); color: var(--cash-out-ink); }
+.u-cash-action[data-kind=safe] { background: var(--cash-safe-bg); color: var(--cash-safe-ink); }
+.u-cash-action-copy { display: flex; flex-direction: column; gap: 6px; text-align: start; white-space: normal; }
+.u-cash-action-copy b { font-weight: 500; font-size: 13px; }
+.u-cash-action-copy small { font-weight: 400; font-size: 11px; }
+.u-cash-form h2[data-kind] { display: flex; width: fit-content; padding: 12px 16px; border-radius: 8px; font-size: 20px; }
+.u-cash-form h2[data-kind=in] { background: var(--cash-in-bg); color: var(--cash-in-ink); }
+.u-cash-form h2[data-kind=out] { background: var(--cash-out-bg); color: var(--cash-out-ink); }
+.u-cash-form h2[data-kind=safe] { background: var(--cash-safe-bg); color: var(--cash-safe-ink); }
+.compact .u-cash-action-list { grid-template-columns: 1fr; }
+.compact .u-cash-action-list > * { grid-column: 1; }
+.compact .u-cash-action-copy b { font-size: 14px; }
+
+.u-cash-hidden-total { font-weight: 500; color: var(--muted); font-size: 18px; }
+.u-cash-close-steps { display: flex; flex-direction: column; gap: 12px; padding: 0; margin: 0 0 24px; list-style: none; }
+.u-cash-close-steps li { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); }
+.u-cash-close-steps li > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--pale); font-size: 12px; }
+.u-cash-close-steps li[aria-current] { color: var(--blue); font-weight: 500; }
+.u-cash-close-steps li[aria-current] > span { background: var(--blue-soft); }
+.u-cash-close-steps li[data-complete=true] { color: var(--green); }
+.u-cash-close-steps li[data-complete=true] > span { background: var(--green-soft); }
+.u-cash-mobile-tabs { flex: 1; min-height: 0; }
+.compact .u-cash-manager { padding: 16px; }
+.compact .u-cash-head { margin-bottom: 16px; gap: 8px; }
+.compact .u-cash-head h1 { font-size: 24px; }
+.compact .u-cash-status { font-size: 11px; padding: 8px; white-space: nowrap; }
+.compact .u-cash-mobile-tabs [role=tablist] { justify-content: space-between; }
+.compact .u-cash-mobile-tabs [role=tab] { min-height: 48px; padding: 8px; justify-content: center; }
+.compact .u-cash-expected { gap: 4px; padding: 0 0 16px; border-bottom: 1px solid var(--line); }
+.compact .u-cash-expected > span { font-size: 12px; color: var(--muted); }
+.compact .u-cash-expected > strong { font-size: 28px; }
+.compact .u-cash-expected > small { display: none; }
+.compact .u-cash-hidden-total { font-size: 14px; }
+.compact .u-cash-movements > h2 { display: none; }
+.compact .u-cash-mobile-tabs .u-cash-section { margin-top: 0; padding-top: 0; border: 0; }
+.compact .u-cash-form-layout { gap: 16px; }
+.compact .u-cash-form-summary { padding-bottom: 12px; }
+.compact .u-cash-form-summary .u-cash-equation { padding: 12px 0 0; gap: 8px; }
+.compact .u-cash-form > button:first-child { margin-bottom: 12px; min-height: 44px; }
+.compact .u-cash-form h2 { margin-bottom: 16px; }
+
+/* The denomination list scrolls independently; counted cash and submit stay visible. */
+.u-cash-counter { display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; max-width: 800px; }
+.u-count-head { flex: none; }
+.u-count-head > button { margin-bottom: 8px; }
+.u-count-head h2 { font: 600 24px/1.25 'Bricolage Grotesque'; margin-bottom: 8px; }
+.u-count-head p { margin-bottom: 16px; }
+.u-count-scroll-wrap { position: relative; flex: 1; min-height: 0; }
+.u-count-scroll { overflow-y: auto; height: 100%; padding: 4px 4px 12px; }
+.u-denomination-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.u-denomination-groups fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.u-denomination-groups legend { font: 500 14px/1.5 'IBM Plex Sans'; margin-bottom: 12px; padding: 0; }
+.u-denomination-row { display: flex; gap: 8px; align-items: center; padding: 4px 0; min-height: 56px; }
+.u-denomination-value { min-width: 92px; flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.u-denomination-value b { font-weight: 500; }
+.u-denomination-value small { font-size: 11px; color: var(--muted); }
+.u-denomination-quantity { width: 64px; flex: none; }
+.u-denomination-quantity input { text-align: center; padding-inline: 0; }
+.u-denomination-step { width: 48px; flex: none; }
+.u-count-footer { padding-top: 16px; margin-top: 8px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 32px; flex: none; }
+.u-count-total { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex: 1; white-space: nowrap; }
+.u-count-total > span { font-size: 14px; }
+.u-count-total > strong { font: 600 28px/1.2 'Bricolage Grotesque'; }
+.u-count-footer > button { width: 280px; }
+.compact .u-count-head h2 { font-size: 22px; }
+.compact .u-count-head p { font-size: 12px; margin-bottom: 12px; }
+.compact .u-denomination-groups { grid-template-columns: 1fr; gap: 24px; }
+.compact .u-denomination-row { gap: 4px; }
+.compact .u-denomination-quantity { width: 56px; }
+.compact .u-count-footer { display: block; padding-top: 12px; }
+.compact .u-count-total { margin-bottom: 12px; }
+.compact .u-count-footer > button { width: 100%; }
+
+.u-cash-manager[data-counting=true] .u-cash-head { margin-bottom: 12px; }
+.u-count-head > button { margin-bottom: 0; }

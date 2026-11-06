@@ -1,0 +1,88 @@
+/* Operational additions keep the catalog geometry and use the same semantic surfaces. */
+.u-pos-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.u-pos-muted { color: var(--color-text-tertiary); }
+.u-pos-error { color: var(--color-text-error-primary); margin: 8px 0; }
+.u-pos-feedback { color: var(--color-text-secondary); padding: 12px; background: var(--color-background-secondary-default); border-radius: 8px; }
+.u-pos-callout { display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid var(--color-border-button-default); border-radius: 12px; background: var(--color-background-primary-default); }
+.u-new-order-choice { display: grid; gap: 12px; padding: 16px; margin-bottom: 16px; background: var(--color-background-primary-default); border: 1px solid var(--color-border-button-default); border-radius: 12px; }
+.u-app .u-operational-line { display: flex; opacity: 1; flex-wrap: wrap; gap: 4px; padding-inline-start: 36px; }
+.u-app .u-operational-line > button { width: auto; height: auto; min-height: 32px; padding: 4px 8px; }
+.u-app .u-operational-line > button[aria-label] { width: 32px; padding: 4px; }
+.u-line-state { display: block; margin: 8px 0 0; color: var(--color-text-tertiary); }
+.u-line[data-voided=true] .u-line-row { opacity: .65; }
+.u-sent-cancellation { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; padding: 12px; border: 1px solid var(--color-border-button-default); border-radius: 12px; background: var(--color-background-secondary-default); }
+.u-void-reasons { display: grid; gap: 8px; }
+.u-void-reasons button[aria-pressed=true], .u-pos-inline > button[aria-pressed=true] { border-color: var(--color-accent-600); background: var(--color-background-secondary-default); }
+.u-product-extra-options { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.u-product-extra-options > :last-child { grid-column: 1 / -1; }
+.u-table-panel { position: relative; flex: none; width: 354px; min-height: 0; }
+.u-app .u-operational-table { width: 100%; height: 100%; overflow: auto; gap: 0; }
+.u-operational-table .u-table-facts { margin: 16px 0 8px; }
+.u-table-line-list { width: 100%; }
+.u-table-operations { display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 20px; }
+.u-table-operations > button { width: 100%; }
+.u-table-form { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+.u-table-gesture { display: flex; align-items: center; gap: 8px; justify-content: space-between; background: var(--color-background-secondary-default); border: 1px solid var(--color-border-button-default); border-radius: 12px; padding: 12px; margin-bottom: 16px; }
+.u-table[data-state=dirty] { background: var(--color-background-tertiary-default); border-style: dashed; border-color: var(--color-text-tertiary); color: var(--color-text-secondary); }
+.u-table[data-state=dirty] .u-table-status { color: var(--color-text-tertiary); }
+.u-floor-legend [data-state=dirty]::before { background: var(--color-text-tertiary); }
+.u-pos-account-list { overflow-y: auto; }
+.u-pos-account-list > button { flex: none; width: 100%; white-space: normal; }
+.u-pos-account-list .ss-row { width: 100%; }
+.u-app .u-payment { height: 100%; min-height: 0; overflow: hidden; grid-template-rows: minmax(0, 1fr); }
+.u-payment-editor { position: relative; order: 1; min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; }
+.u-payment-editor .u-payment-right { grid-row: 1; order: 0; width: 100%; min-height: 0; overflow-y: auto; padding-top:16px; padding-bottom:0; }
+.u-payment-editor .u-payment-form { flex: none; }
+.u-payment-editor .u-payment-form > .u-back { margin-bottom:8px; }
+.u-payment-fixed-footer { grid-row: 2; order: 0; padding: 0 48px 16px; background: var(--color-background-full); }
+.u-payment-fixed-footer .u-change { margin-top:0; min-height:52px; padding:8px 16px; }
+.u-payment-left { overflow-y: auto; }
+.u-payment-form > * { flex-shrink: 0; }
+.u-payment-form .u-keypad { flex-grow: 1; }
+.u-payment-form .u-methods { gap:8px; margin-block:12px; }
+.u-payment-form .u-methods > button { min-width: 0; padding-inline: 8px; gap: 4px; }
+.u-payment-form .u-methods > button > svg:last-child { display: none; }
+.u-payment-form .u-tip-toggle { align-self: flex-end; min-height: 28px; margin: -4px 0 8px; padding: 0 4px; }
+.u-pos-cash-field input { text-align: end; }
+.u-payment-ledger { display: grid; gap: 8px; padding: 16px 0; border-top: 1px solid var(--color-separator-border); }
+.u-payment-ledger > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.u-payment-ledger small { display: block; color: var(--color-text-tertiary); }
+.u-payment-parts, .u-payment-tip { display: grid; gap: 12px; padding: 16px 0; }
+.u-payment-parts { border-bottom: 1px solid var(--color-separator-border); }
+.u-transfer-form, .u-terminal-controls { display: flex; flex-direction: column; gap: 16px; margin: 12px 0 24px; }
+.u-terminal-controls .u-card-state { padding: 16px; gap: 12px; }
+.u-exact-charge { margin: 0 0 16px; color: var(--color-text-secondary); }
+.u-terminal-pending { display: flex; flex-direction: column; align-items: center; gap: 16px; margin: 24px 0; text-align: center; }
+.u-terminal-pending h2, .u-terminal-pending p { margin: 0; }
+.u-terminal-simulation { display: grid; gap: 16px; margin-top: 16px; padding: 16px; border: 1px solid var(--color-border-button-default); border-radius: 12px; }
+.u-terminal-simulation .u-pos-inline { justify-content: center; }
+.u-done-ledger { width: min(100%, 360px); margin-top: 24px; }
+.u-kitchen-card .u-kds-action .button-press-motion { white-space: normal; }
+.u-app[data-tablet-portrait=true] .u-table-panel { width: 100%; }
+.u-app[data-tablet-portrait=true] .u-operational-table { height: auto; overflow: visible; }
+.u-app[data-tablet-portrait=true] .u-operational-table > * { order: initial; }
+.u-app[data-tablet-portrait=true] .u-operational-table > .u-table-facts,
+.u-app[data-tablet-portrait=true] .u-operational-table > .u-detail-label { order: initial; }
+.u-app[data-tablet-portrait=true] .u-payment-fixed-footer { padding-inline: 24px; }
+.compact .u-operational-line { padding-inline-start: 0; }
+.compact .u-operational-line > button, .compact .u-operational-line > button[aria-label] { min-height: 44px; }
+.compact[data-screen=tables] .u-workspace { display: block; overflow-y: auto; }
+.compact .u-floor-main { overflow: visible; }
+.compact .u-table-panel { width: 100%; }
+.compact .u-operational-table { display: flex; height: auto; overflow: visible; border-inline-start: 0; border-top: 1px solid var(--color-separator-border); padding: 20px 16px; }
+.u-app.compact .u-operational-table > .u-table-facts,
+.u-app.compact .u-operational-table > .u-detail-label { display:block; }
+.compact .u-operational-table .u-table-balance { margin-top: 16px; }
+.compact .u-floor-legend { flex-wrap: wrap; gap: 12px; }
+.compact .u-payment-editor { order: 2; flex: 1; min-height: 0; }
+.compact .u-payment-editor .u-payment-right { min-height: 0; padding: 12px 20px 16px; }
+.compact .u-payment-fixed-footer { padding: 0 20px 16px; }
+.compact .u-payment-left { flex: none; overflow: visible; }
+.compact .u-payment-left .u-payment-ledger { display: none; }
+.compact .u-payment-form .u-methods { margin-bottom: 8px; }
+.compact .u-payment-form .u-methods > button { gap: 4px; padding-inline: 4px; }
+.compact .u-payment-form .u-methods > button svg { width: 16px; }
+.compact .u-payment-form > .u-back { display: flex; margin: 0 0 8px; min-height: 32px; }
+.compact .u-payment-form .u-tip-toggle { margin-bottom: 4px; }
+.compact .u-payment-form .u-keypad { min-height: 156px; }
+.compact .u-product-extra-options { gap: 12px; }

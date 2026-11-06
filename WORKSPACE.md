@@ -21,6 +21,8 @@ Runtime ownership stays inside the narrowest existing app.
 - `apps/umi-dashboard` owns the owner dashboard shell and live-data UI.
 - `apps/umi-landing-page` owns the public landing site and lead capture.
 
+- `apps/umi-menu` contains the digital menu prototype and its delivery documentation. Business integration is pending.
+
 ## Cognitive layers
 
 - Workspace cognition: root `AGENTS.md`, `WORKSPACE.md`, root docs, ownership, governance, retrieval, and routing.

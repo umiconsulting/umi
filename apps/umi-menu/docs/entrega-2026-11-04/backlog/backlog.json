@@ -1,0 +1,2874 @@
+{
+  "version": 2,
+  "date": "2026-11-04",
+  "repository": "umiconsulting/umi",
+  "tracker": "GitHub Issues",
+  "status": "Borrador local; no publicado",
+  "development_pr_base": "staging",
+  "promotion_target": "main",
+  "common_decisions": [
+    "D18",
+    "D19"
+  ],
+  "stories": [
+    {
+      "id": "MD-H01",
+      "title": "Persistir la configuración del menú por negocio y sucursal",
+      "type": "historia",
+      "actor": "responsable del negocio",
+      "goal": "guardar y consultar si el menú está publicado y recibe pedidos",
+      "value": "controlar cada sucursal sin afectar otras",
+      "phase": "A",
+      "plan": [
+        "P01"
+      ],
+      "depends_on": [],
+      "decision_blockers": [
+        "MD-A01"
+      ],
+      "decisions": [
+        "D01",
+        "D07"
+      ],
+      "areas": [
+        "configuracion",
+        "contratos",
+        "permisos"
+      ],
+      "acceptance": [
+        "Una sucursal nueva obtiene los valores aprobados en MD-A01; la recepción incompleta permanece desactivada.",
+        "Publicación, recepción y modalidades son valores independientes y sobreviven al reinicio de la API.",
+        "Un actor sin permiso o de otro negocio no puede leer ajustes administrativos ni modificarlos.",
+        "La pausa de recepción no borra ni cambia pedidos existentes y no modifica el canal WhatsApp.",
+        "La lectura devuelve el alcance efectivo según la precedencia aprobada y conserva compatibilidad con clientes actuales."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H01-T01",
+          "title": "Definir el contrato de configuración",
+          "action": "Contrastar ajustes actuales y fijar la lectura/escritura de publicación, recepción y modalidades con alcance de negocio/sucursal.",
+          "done": "Contrato revisado con valores iniciales y matriz de permisos de MD-A01."
+        },
+        {
+          "id": "MD-H01-T02",
+          "title": "Persistir ajustes aislados del canal WhatsApp",
+          "action": "Implementar almacenamiento y migración aditiva si hace falta, con validación del alcance y del esquema existente.",
+          "done": "Lectura tras reinicio conserva los valores; columnas whatsapp_* no se usan como configuración genérica."
+        },
+        {
+          "id": "MD-H01-T03",
+          "title": "Aplicar permisos y precedencia",
+          "action": "Conectar los guardas de acceso y resolver el valor efectivo sin permitir IDs de sucursal ajenos.",
+          "done": "Casos autorizado, sin permiso y negocio ajeno tienen resultados explícitos."
+        },
+        {
+          "id": "MD-H01-T04",
+          "title": "Proteger pedidos y compatibilidad al pausar",
+          "action": "Hacer que la escritura de recepción solo cambie admisión futura y documentar la desactivación del canal.",
+          "done": "Un pedido sintético existente conserva estado, total e identificador después de la pausa."
+        },
+        {
+          "id": "MD-H01-T05",
+          "title": "Probar persistencia y aislamiento",
+          "action": "Añadir pruebas con dos negocios y dos sucursales del primero; ejecutar contratos, API y PostgreSQL pertinente.",
+          "done": "Guardar/leer, reinicio, herencia aprobada, permisos y pausa pasan con evidencia; migración probada sobre esquema nuevo y existente."
+        }
+      ],
+      "staging": "Crear dos negocios sintéticos; alternar publicación y recepción de una sucursal, reiniciar API y comprobar aislamiento y pedidos previos.",
+      "out_of_scope": "Interfaz del Dashboard, nuevos pedidos y programación.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H02",
+      "title": "Definir productos y modalidades visibles en el menú",
+      "type": "historia",
+      "actor": "responsable del catálogo",
+      "goal": "elegir qué productos se ofrecen en mesa y para recoger",
+      "value": "publicar solo lo que la sucursal puede atender",
+      "phase": "A",
+      "plan": [
+        "P02"
+      ],
+      "depends_on": [
+        "MD-H01"
+      ],
+      "decision_blockers": [],
+      "decisions": [
+        "D01",
+        "D07"
+      ],
+      "areas": [
+        "catalogo",
+        "configuracion",
+        "contratos"
+      ],
+      "acceptance": [
+        "Visibilidad digital y modalidades permitidas se guardan sobre el catálogo existente, sin duplicar productos.",
+        "La política rechaza productos ocultos o excluidos para una modalidad. Se comprueba en la entrada pública existente de mesa; MD-H07 integra y prueba la entrada de recogida.",
+        "Cambiar la regla de un negocio no afecta otro; se respeta la sucursal según MD-A01.",
+        "No se altera automáticamente su venta presencial ni las reglas de otro canal.",
+        "Productos ya presentes en pedidos conservan su representación histórica."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H02-T01",
+          "title": "Modelar reglas digitales por producto",
+          "action": "Definir visibilidad y modalidades en el contrato del catálogo con el alcance aprobado.",
+          "done": "Reglas explícitas para producto existente y producto nuevo."
+        },
+        {
+          "id": "MD-H02-T02",
+          "title": "Persistir reglas sin duplicar el catálogo",
+          "action": "Añadir lectura/escritura de reglas a los dueños actuales de producto y sucursal.",
+          "done": "Se conserva el ID canónico y no se crean precios paralelos."
+        },
+        {
+          "id": "MD-H02-T03",
+          "title": "Aplicar reglas al validar pedidos públicos",
+          "action": "Aplicar la política en la entrada existente de mesa y dejarla reutilizable para la recogida de MD-H07.",
+          "done": "Una solicitud de mesa manipulada se rechaza; la política cubre también la modalidad de recogida en pruebas de dominio."
+        },
+        {
+          "id": "MD-H02-T04",
+          "title": "Conservar canales y pedidos previos",
+          "action": "Limitar los cambios a admisión digital y mantener snapshots de pedidos ya creados.",
+          "done": "Venta presencial y pedido previo siguen válidos."
+        },
+        {
+          "id": "MD-H02-T05",
+          "title": "Probar exclusiones y alcance",
+          "action": "Cubrir producto oculto, modalidad prohibida, sucursal ajena y modificación tras crear un pedido.",
+          "done": "Las pruebas demuestran rechazo y conservación del histórico."
+        }
+      ],
+      "staging": "Ocultar un producto para mesa o excluir esa modalidad; enviar una solicitud directa al endpoint existente y verificar rechazo. La venta presencial y otra sucursal conservan sus reglas. MD-H07 comprueba recogida cuando exista su API.",
+      "out_of_scope": "Orden visual de categorías y programación por producto.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H03",
+      "title": "Pedir variantes válidas desde el QR de mesa",
+      "type": "historia",
+      "actor": "cliente en mesa",
+      "goal": "elegir una variante y sus opciones",
+      "value": "recibir el producto correcto con el precio correcto",
+      "phase": "A",
+      "plan": [
+        "P03"
+      ],
+      "depends_on": [],
+      "decision_blockers": [],
+      "decisions": [
+        "D01",
+        "D04"
+      ],
+      "areas": [
+        "table_order",
+        "catalogo",
+        "contratos",
+        "kds"
+      ],
+      "acceptance": [
+        "Una variante válida del producto de la mesa puede enviarse y sustituye el rechazo actual VARIANT_NOT_AVAILABLE para ese caso.",
+        "El servidor calcula precio y valida opciones obligatorias, límites y combinaciones.",
+        "Una variante de otro producto o negocio se rechaza, incluso si el cliente modifica la solicitud.",
+        "POS y KDS conservan la identidad de la variante y los modificadores.",
+        "Reintentar el mismo envío produce un pedido; los productos sin variantes mantienen su comportamiento."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H03-T01",
+          "title": "Extender el contrato público de mesa",
+          "action": "Revisar table-order y representar la selección de variante sin romper clientes de productos simples.",
+          "done": "Contrato y consumidores compatibles; limitación anterior actualizada."
+        },
+        {
+          "id": "MD-H03-T02",
+          "title": "Resolver variante y precio en servidor",
+          "action": "Consultar la variante canónica dentro del negocio/sucursal y validar que pertenece al producto.",
+          "done": "Precio independiente de los importes enviados por el navegador."
+        },
+        {
+          "id": "MD-H03-T03",
+          "title": "Validar modificadores y disponibilidad",
+          "action": "Aplicar grupos obligatorios, máximos y disponibilidad a la combinación elegida.",
+          "done": "Se rechazan selección incompleta y combinación no permitida."
+        },
+        {
+          "id": "MD-H03-T04",
+          "title": "Conservar opciones hasta POS y KDS",
+          "action": "Transmitir la selección por el escritor/proyector existente y el contrato de lectura.",
+          "done": "La variante y extras aparecen en el mismo pedido comercial y sus estaciones."
+        },
+        {
+          "id": "MD-H03-T05",
+          "title": "Ampliar integración de mesa",
+          "action": "Añadir casos válidos, inválidos y repetidos a la suite HTTP/PostgreSQL de mesa.",
+          "done": "Pasan variante, aislamiento, total, idempotencia y regresión de producto simple."
+        }
+      ],
+      "staging": "Usar un QR de prueba para pedir una variante con un extra; comprobar el total y su detalle en POS y en la estación.",
+      "out_of_scope": "Recogida, aceptación nueva y cambios de diseño.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H04",
+      "title": "Consultar el catálogo público de una sucursal",
+      "type": "historia",
+      "actor": "cliente",
+      "goal": "consultar el menú publicado del negocio correcto",
+      "value": "ver productos, precios y modalidades vigentes",
+      "phase": "A",
+      "plan": [
+        "P04"
+      ],
+      "depends_on": [
+        "MD-H01",
+        "MD-H02",
+        "MD-H03"
+      ],
+      "decision_blockers": [
+        "MD-A10"
+      ],
+      "decisions": [
+        "D01",
+        "D07"
+      ],
+      "areas": [
+        "table_order",
+        "catalogo",
+        "horarios",
+        "contratos"
+      ],
+      "acceptance": [
+        "La ruta pública resuelve una sola sucursal y devuelve solo los campos públicos acordados.",
+        "Un menú no publicado no expone su catálogo; un menú publicado con recepción pausada sigue visible como consulta.",
+        "Categorías, variantes, opciones, precios y disponibilidad proceden del catálogo canónico.",
+        "La respuesta identifica negocio, sucursal, moneda, horario y modalidades sin exponer contactos de clientes o configuración privada.",
+        "La política de caché no mezcla sucursales ni mantiene una admisión obsoleta al enviar un pedido."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H04-T01",
+          "title": "Definir identidad pública y DTO mínimo",
+          "action": "Aplicar MD-A10 para ruta/sucursal y fijar la respuesta pública separada del DTO administrativo.",
+          "done": "Lista de campos revisada y exclusión explícita de datos privados."
+        },
+        {
+          "id": "MD-H04-T02",
+          "title": "Componer el catálogo canónico",
+          "action": "Unir categorías, productos, variantes y opciones con las reglas digitales vigentes.",
+          "done": "Sin precios o categorías paralelos al catálogo existente."
+        },
+        {
+          "id": "MD-H04-T03",
+          "title": "Resolver publicación, pausa y horario",
+          "action": "Devolver el estado consultable y de admisión sin convertir una pausa en borrado del menú.",
+          "done": "Estados publicado, oculto, abierto y pausado distinguibles."
+        },
+        {
+          "id": "MD-H04-T04",
+          "title": "Definir caché e invalidación por alcance",
+          "action": "Configurar lectura pública por sucursal y validar nuevamente al crear el pedido.",
+          "done": "Prueba de cambio de visibilidad no entrega el catálogo de otra sucursal."
+        },
+        {
+          "id": "MD-H04-T05",
+          "title": "Probar el contrato público",
+          "action": "Ejecutar casos de publicación, filtros de modalidad, campos privados y aislamiento.",
+          "done": "Respuesta mínima y coherente con precio/opciones del escritor."
+        }
+      ],
+      "staging": "Abrir dos enlaces de sucursal; pausar solo uno y comprobar que ambos catálogos conservan su identidad y que solo cambia la admisión correspondiente.",
+      "out_of_scope": "Diseño del frontend y envío de pedidos nuevos.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H05",
+      "title": "Publicar y pausar el menú desde Dashboard",
+      "type": "historia",
+      "actor": "administrador del negocio",
+      "goal": "controlar publicación, recepción y modalidades desde Menú digital",
+      "value": "operar el canal por sucursal",
+      "phase": "A",
+      "plan": [
+        "P05"
+      ],
+      "depends_on": [
+        "MD-H01",
+        "MD-H04"
+      ],
+      "decision_blockers": [],
+      "decisions": [
+        "D07"
+      ],
+      "areas": [
+        "dashboard",
+        "configuracion",
+        "permisos"
+      ],
+      "acceptance": [
+        "Menú digital aparece en la navegación acordada junto al catálogo y conserva negocio/sucursal visibles.",
+        "Publicación, recepción y modalidades usan controles independientes conectados a la API.",
+        "Guardar muestra éxito solo tras confirmación del servidor y conserva errores de validación visibles.",
+        "Cambiar sucursal carga su configuración y no guarda accidentalmente el formulario anterior.",
+        "Los permisos se reflejan en UI y servidor; pausar no oculta ni cancela pedidos existentes."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H05-T01",
+          "title": "Integrar sección y alcance en Dashboard",
+          "action": "Añadir la entrada con los patrones existentes y contexto de negocio/sucursal visible.",
+          "done": "Navegación y permisos coherentes con el Dashboard vigente."
+        },
+        {
+          "id": "MD-H05-T02",
+          "title": "Conectar lectura y edición de controles",
+          "action": "Usar el contrato de MD-H01 para publicación, recepción y modalidades.",
+          "done": "No quedan valores de Bruma ni estado local como autoridad."
+        },
+        {
+          "id": "MD-H05-T03",
+          "title": "Resolver carga, error y guardado",
+          "action": "Mostrar respuesta real y conservar campos ante fallo; prevenir guardado sobre otra sucursal.",
+          "done": "Error de red no muestra éxito ni pierde silenciosamente cambios."
+        },
+        {
+          "id": "MD-H05-T04",
+          "title": "Mostrar estado efectivo del canal",
+          "action": "Mostrar publicación, recepción y alcance persistidos, explicando la pausa sin simular una vista pública todavía inexistente.",
+          "done": "El Dashboard distingue menú oculto y recepción pausada; el enlace de vista previa se incorpora en MD-H15."
+        },
+        {
+          "id": "MD-H05-T05",
+          "title": "Verificar en navegador real",
+          "action": "Recorrer publicación, pausa, cambio de sucursal y permisos en escritorio/móvil.",
+          "done": "Capturas y acciones reales muestran persistencia tras recargar."
+        }
+      ],
+      "staging": "Un administrador publica y pausa una sucursal; otro usuario sin permiso intenta editar. Verificar persistencia al recargar, catálogo consultable mediante la API pública y rechazo del cambio no autorizado.",
+      "out_of_scope": "Plazo de aceptación y reglas de programación.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H06",
+      "title": "Organizar productos y categorías del menú desde Dashboard",
+      "type": "historia",
+      "actor": "responsable del catálogo",
+      "goal": "editar visibilidad, modalidades, orden y destacados",
+      "value": "presentar el menú sin mantener un catálogo duplicado",
+      "phase": "A",
+      "plan": [
+        "P05"
+      ],
+      "depends_on": [
+        "MD-H02",
+        "MD-H04",
+        "MD-H05"
+      ],
+      "decision_blockers": [],
+      "decisions": [
+        "D07"
+      ],
+      "areas": [
+        "dashboard",
+        "catalogo",
+        "contratos"
+      ],
+      "acceptance": [
+        "La edición parte de productos y categorías existentes y permite visibilidad/modalidades digitales.",
+        "El orden y los destacados se guardan con alcance definido y se reflejan en el catálogo público.",
+        "Un producto oculto no reaparece por estar marcado como destacado.",
+        "Cambiar precios o variantes usa la edición canónica, sin formularios duplicados inconsistentes.",
+        "Las listas y formularios siguen el diseño vigente y funcionan en móvil."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H06-T01",
+          "title": "Añadir edición de reglas digitales al catálogo",
+          "action": "Conectar visibilidad/modalidades de MD-H02 en la edición existente.",
+          "done": "Un mismo producto conserva una sola fuente de precio y opciones."
+        },
+        {
+          "id": "MD-H06-T02",
+          "title": "Persistir orden y destacados",
+          "action": "Definir contrato y almacenamiento de orden/categorías/destacados necesarios para la pantalla.",
+          "done": "Orden reproducible tras recargar y por alcance aprobado."
+        },
+        {
+          "id": "MD-H06-T03",
+          "title": "Aplicar orden en la lectura pública",
+          "action": "Extender MD-H04 para devolver orden y destacados sin omitir reglas de visibilidad.",
+          "done": "Oculto nunca aparece por su marca de destacado."
+        },
+        {
+          "id": "MD-H06-T04",
+          "title": "Conectar la pantalla de contenido",
+          "action": "Permitir seleccionar y reordenar con el patrón de controles existente; enlazar a edición canónica.",
+          "done": "Operación accesible sin depender solo de arrastre."
+        },
+        {
+          "id": "MD-H06-T05",
+          "title": "Validar cambios de contenido",
+          "action": "Probar guardar/reabrir, permisos, producto eliminado u oculto y vista pública.",
+          "done": "UI y API coinciden en categorías y orden."
+        }
+      ],
+      "staging": "Reordenar una categoría, destacar un producto y luego ocultarlo; comprobar que el público refleja las tres operaciones sin duplicados.",
+      "out_of_scope": "Crear un segundo sistema de catálogo o editor de precios.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H07",
+      "title": "Registrar una recogida pendiente sin enviarla a cocina",
+      "type": "historia",
+      "actor": "cliente que recoge",
+      "goal": "enviar mi carrito y recibir un número de pedido pendiente",
+      "value": "saber que el negocio lo recibió sin darlo por aceptado",
+      "phase": "B",
+      "plan": [
+        "P06"
+      ],
+      "depends_on": [
+        "MD-H01",
+        "MD-H02",
+        "MD-H03"
+      ],
+      "decision_blockers": [
+        "MD-A02",
+        "MD-A03",
+        "MD-A12",
+        "MD-A13"
+      ],
+      "decisions": [
+        "D02",
+        "D03",
+        "D08",
+        "D11"
+      ],
+      "areas": [
+        "ordenes",
+        "table_order",
+        "contratos",
+        "inventario"
+      ],
+      "acceptance": [
+        "El servidor valida alcance, recepción, visibilidad/modalidad de cada producto, contacto y total antes de registrar un pedido pendiente.",
+        "El pendiente conserva nombre, teléfono y correo, origen digital y modalidad, sin asociar identidad por coincidencia de contacto.",
+        "Crear o reintentar un pendiente no proyecta trabajo al KDS.",
+        "La respuesta recupera el mismo pedido ante reintento y distingue resultado desconocido de rechazo definitivo.",
+        "El plazo de aceptación y los efectos de inventario siguen MD-A02 y MD-A13; las rutas nuevas permanecen desactivadas hasta completar el flujo."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H07-T01",
+          "title": "Definir recepción y transacción de pendiente",
+          "action": "Concretar contrato, estado y campos necesarios según MD-A03; incluir idempotencia y plazo aplicable.",
+          "done": "Modelo compatible con el escritor y clientes actuales."
+        },
+        {
+          "id": "MD-H07-T02",
+          "title": "Validar carrito y contacto",
+          "action": "Aplicar reglas digitales, cálculo canónico, formatos y límites; no crear identidad comercial por teléfono/correo.",
+          "done": "Error de validación no crea pedido ni reserva parcial."
+        },
+        {
+          "id": "MD-H07-T03",
+          "title": "Persistir pedido sin proyección anticipada",
+          "action": "Introducir la condición de canal/estado que impide la proyección del pendiente sin cambiar mesa/POS existentes.",
+          "done": "Pedido pendiente guardado y cero trabajo de cocina para ese pedido."
+        },
+        {
+          "id": "MD-H07-T04",
+          "title": "Aplicar inventario e idempotencia acordados",
+          "action": "Ejecutar la política aprobada dentro de la transacción y recuperar el resultado del envío repetido.",
+          "done": "Dos solicitudes equivalentes producen un pedido y un efecto de stock."
+        },
+        {
+          "id": "MD-H07-T05",
+          "title": "Probar creación y regresiones con PostgreSQL",
+          "action": "Cubrir timeout/reintento, producto oculto o excluido de recogida mediante petición directa, recepción pausada, contacto mal formado, negocio ajeno y mesa/POS actuales.",
+          "done": "Pruebas demuestran persistencia y ausencia de KDS anticipado."
+        }
+      ],
+      "staging": "Enviar dos veces el mismo carrito de recogida; verificar un pedido pendiente, total canónico, contacto aislado y ninguna comanda. Ocultar o excluir de recogida un producto y verificar rechazo por la API directa, manteniendo su venta presencial.",
+      "out_of_scope": "Pantalla pública, aceptación del personal y envío de correo.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H08",
+      "title": "Aceptar, rechazar o vencer una recogida desde el backend",
+      "type": "historia",
+      "actor": "personal autorizado",
+      "goal": "resolver los pedidos pendientes de forma consistente",
+      "value": "preparar solo lo que el negocio acepta",
+      "phase": "B",
+      "plan": [
+        "P06"
+      ],
+      "depends_on": [
+        "MD-H07"
+      ],
+      "decision_blockers": [
+        "MD-A02",
+        "MD-A03",
+        "MD-A13"
+      ],
+      "decisions": [
+        "D03",
+        "D15"
+      ],
+      "areas": [
+        "ordenes",
+        "kds",
+        "jobs",
+        "permisos"
+      ],
+      "acceptance": [
+        "Aceptar un pendiente válido cambia el estado y produce una sola proyección a KDS.",
+        "Rechazar exige un motivo y evita preparación; vencer el plazo produce cierre sin KDS.",
+        "Dos aceptaciones simultáneas y aceptación contra vencimiento producen un solo resultado válido.",
+        "Un cierre o aceptación repetidos devuelven un resultado coherente y no repiten efectos de inventario.",
+        "Una caída entre persistencia y entrega a KDS se recupera sin perder el pedido ni crear otra comanda."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H08-T01",
+          "title": "Implementar transiciones autorizadas",
+          "action": "Definir comandos de aceptar y rechazar con precondición de estado/versión y motivo.",
+          "done": "Transiciones inválidas o actores ajenos se rechazan."
+        },
+        {
+          "id": "MD-H08-T02",
+          "title": "Coordinar aceptación y proyección",
+          "action": "Usar mecanismos existentes para registrar aceptación y recuperar el envío único a cocina.",
+          "done": "No hay ventana que deje un aceptado perdido o un pendiente en cocina."
+        },
+        {
+          "id": "MD-H08-T03",
+          "title": "Implementar vencimiento recuperable",
+          "action": "Usar el plazo persistido y un trabajo recuperable que compruebe el estado antes de cerrar.",
+          "done": "Reinicio o ejecución tardía no acepta ni prepara un vencido."
+        },
+        {
+          "id": "MD-H08-T04",
+          "title": "Aplicar efectos comerciales e inventario",
+          "action": "Ejecutar las reglas aprobadas de rechazo/vencimiento/aceptación sin alterar otros canales.",
+          "done": "Efectos auditables y únicos por transición."
+        },
+        {
+          "id": "MD-H08-T05",
+          "title": "Probar carreras y recuperación",
+          "action": "Ejecutar aceptación doble, aceptar/vencer y fallo de proyección con PostgreSQL y mecanismos reales.",
+          "done": "Un único resultado comercial y proyección coherente después del reintento."
+        }
+      ],
+      "staging": "Aceptar un pendiente, rechazar otro y dejar vencer un tercero; repetir acciones y comprobar que solo el aceptado llega una vez al KDS.",
+      "out_of_scope": "Recogida programada e interfaz de atención.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H09",
+      "title": "Configurar el plazo de aceptación en Dashboard",
+      "type": "historia",
+      "actor": "administrador del negocio",
+      "goal": "establecer cuánto tiempo puede esperar una recogida",
+      "value": "evitar pedidos pendientes sin atención indefinida",
+      "phase": "B",
+      "plan": [
+        "P06D"
+      ],
+      "depends_on": [
+        "MD-H05",
+        "MD-H08"
+      ],
+      "decision_blockers": [
+        "MD-A13"
+      ],
+      "decisions": [
+        "D03",
+        "D07"
+      ],
+      "areas": [
+        "dashboard",
+        "configuracion",
+        "horarios"
+      ],
+      "acceptance": [
+        "El plazo se edita en Menú digital con su unidad y alcance visibles.",
+        "Valores fuera de los límites aprobados se rechazan en UI y servidor.",
+        "El cambio respeta la política acordada para pedidos ya pendientes.",
+        "La sucursal debe tener un valor operativo válido antes de activar recogida inmediata.",
+        "Guardar y recargar muestra el valor confirmado por la API."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H09-T01",
+          "title": "Exponer lectura y edición del plazo",
+          "action": "Consumir el contrato de MD-H08 y delimitar el ajuste respecto a horarios y recepción.",
+          "done": "Respuesta indica valor y alcance efectivo."
+        },
+        {
+          "id": "MD-H09-T02",
+          "title": "Añadir el control a Dashboard",
+          "action": "Mostrar unidad, límites y efecto sobre pendientes de acuerdo con MD-A13.",
+          "done": "Texto describe la política real sin un valor universal inventado."
+        },
+        {
+          "id": "MD-H09-T03",
+          "title": "Validar activación y permisos",
+          "action": "Impedir configuración inválida y proteger edición por negocio/sucursal.",
+          "done": "Servidor rechaza límites inválidos aunque se manipule el formulario."
+        },
+        {
+          "id": "MD-H09-T04",
+          "title": "Aplicar el cambio a pedidos según política",
+          "action": "Conservar o recalcular los plazos existentes solo como determine MD-A13.",
+          "done": "Cambio de ajuste no deja pedidos sin fecha de vencimiento."
+        },
+        {
+          "id": "MD-H09-T05",
+          "title": "Probar configuración y vencimiento",
+          "action": "Guardar un valor válido y otro inválido; crear pedidos antes/después del cambio.",
+          "done": "Fechas de vencimiento y UI coinciden con la regla aprobada."
+        }
+      ],
+      "staging": "Cambiar el plazo con un pedido pendiente y crear otro; comprobar fechas efectivas y vencimiento de ambos según la política acordada.",
+      "out_of_scope": "Reglas de programación y de horarios fuera de atención.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H10",
+      "title": "Consultar un pedido mediante su enlace privado",
+      "type": "historia",
+      "actor": "cliente",
+      "goal": "abrir el seguimiento de mi pedido",
+      "value": "conocer el estado sin registrarme ni depender del correo",
+      "phase": "B",
+      "plan": [
+        "P07"
+      ],
+      "depends_on": [
+        "MD-H07",
+        "MD-H08"
+      ],
+      "decision_blockers": [
+        "MD-A12"
+      ],
+      "decisions": [
+        "D11",
+        "D12",
+        "D13"
+      ],
+      "areas": [
+        "ordenes",
+        "contratos",
+        "permisos"
+      ],
+      "acceptance": [
+        "El enlace permite leer únicamente el pedido correspondiente y los datos necesarios para su seguimiento.",
+        "No se autoriza por número secuencial, teléfono, correo o cambio de identificador de negocio.",
+        "El seguimiento distingue pendiente, aceptado, preparación y resultados terminales según el contrato aprobado.",
+        "Recargar o perder conexión permite recuperar el estado vigente; el fallo de correo no bloquea la consulta.",
+        "Expiración, límites de acceso y caché siguen MD-A12; no se expone historial de cliente."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H10-T01",
+          "title": "Emitir credencial de seguimiento limitada",
+          "action": "Definir credencial, almacenamiento/validación y caducidad conforme MD-A12.",
+          "done": "No contiene datos privados innecesarios ni sustituye membresía del negocio."
+        },
+        {
+          "id": "MD-H10-T02",
+          "title": "Exponer la proyección pública del pedido",
+          "action": "Definir DTO con líneas, total, sucursal, modalidad, tiempos y acciones permitidas.",
+          "done": "No incluye historial, claves internas ni datos de otros clientes."
+        },
+        {
+          "id": "MD-H10-T03",
+          "title": "Resolver recuperación de estado",
+          "action": "Proveer lectura actualizable usando la infraestructura existente; definir tratamiento de desconexión.",
+          "done": "Reconsulta devuelve el estado del pedido original."
+        },
+        {
+          "id": "MD-H10-T04",
+          "title": "Aplicar límites y caché privada",
+          "action": "Evitar enumeración, acceso cruzado y almacenamiento público del resultado.",
+          "done": "Credencial errónea o expirada no entrega datos."
+        },
+        {
+          "id": "MD-H10-T05",
+          "title": "Probar autorización y continuidad",
+          "action": "Cubrir reintento, enlace alterado, número público, correo coincidente y fallo de proveedor de avisos.",
+          "done": "Solo la credencial válida accede a su pedido."
+        }
+      ],
+      "staging": "Abrir dos pedidos con sus enlaces; intercambiar IDs/credenciales y comprobar aislamiento. Recargar tras un cambio de estado y tras un fallo de correo.",
+      "out_of_scope": "Autenticación de clientes y avisos por correo.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H11",
+      "title": "Cancelar directamente una recogida pendiente",
+      "type": "historia",
+      "actor": "cliente que recoge",
+      "goal": "cancelar mientras el negocio no acepta",
+      "value": "retirar el pedido antes de que empiece la preparación",
+      "phase": "B",
+      "plan": [
+        "P08"
+      ],
+      "depends_on": [
+        "MD-H08",
+        "MD-H10"
+      ],
+      "decision_blockers": [
+        "MD-A02",
+        "MD-A04"
+      ],
+      "decisions": [
+        "D14"
+      ],
+      "areas": [
+        "ordenes",
+        "cancelacion",
+        "inventario"
+      ],
+      "acceptance": [
+        "La credencial del pedido permite cancelar una recogida pendiente, según permisos públicos limitados.",
+        "Cancelar un pendiente evita toda proyección posterior y ejecuta la política de inventario aprobada una sola vez.",
+        "Cancelar y aceptar simultáneamente deja un único resultado; si ganó la aceptación se informa la acción permitida vigente.",
+        "Repetir la cancelación devuelve el estado existente sin duplicar efectos.",
+        "No se aplican cargos automáticos ni se permite cancelar otro pedido."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H11-T01",
+          "title": "Implementar comando público acotado",
+          "action": "Usar la credencial de seguimiento y una transición condicionada al estado pendiente.",
+          "done": "No permite cambios arbitrarios de estado o pedido."
+        },
+        {
+          "id": "MD-H11-T02",
+          "title": "Serializar cancelación con aceptación/vencimiento",
+          "action": "Aplicar control transaccional con las transiciones de MD-H08.",
+          "done": "No existe pedido cancelado que se proyecte después."
+        },
+        {
+          "id": "MD-H11-T03",
+          "title": "Aplicar efectos y evento de cancelación",
+          "action": "Registrar motivo/origen y liberar lo definido por inventario sin cargo automático.",
+          "done": "Efecto único y auditable."
+        },
+        {
+          "id": "MD-H11-T04",
+          "title": "Actualizar acciones del seguimiento",
+          "action": "Devolver el estado y la acción vigente si el pedido cambió durante la solicitud.",
+          "done": "El cliente no ve una cancelación confirmada cuando ganó aceptación."
+        },
+        {
+          "id": "MD-H11-T05",
+          "title": "Probar concurrencia e idempotencia",
+          "action": "Cubrir cancelar/aceptar, cancelar/vencer, repetición y acceso cruzado con PostgreSQL.",
+          "done": "Un resultado comercial válido y cero proyecciones de un cancelado."
+        }
+      ],
+      "staging": "Lanzar cancelación y aceptación concurrentes sobre un pendiente; comprobar el resultado final desde cliente, POS y KDS.",
+      "out_of_scope": "Cancelación de programados aceptados y solicitud de cancelación tras aceptar.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H12",
+      "title": "Solicitar y resolver cancelación de un pedido aceptado",
+      "type": "historia",
+      "actor": "cliente y personal autorizado",
+      "goal": "solicitar y resolver una cancelación con el estado real del pedido",
+      "value": "evitar detener preparación sin autorización",
+      "phase": "B",
+      "plan": [
+        "P08"
+      ],
+      "depends_on": [
+        "MD-H08",
+        "MD-H10",
+        "MD-H11"
+      ],
+      "decision_blockers": [
+        "MD-A02",
+        "MD-A04"
+      ],
+      "decisions": [
+        "D14"
+      ],
+      "areas": [
+        "cancelacion",
+        "ordenes",
+        "permisos",
+        "kds"
+      ],
+      "acceptance": [
+        "Una solicitud de cancelación queda separada del estado comercial y no detiene automáticamente preparación.",
+        "El personal autorizado puede aprobar o rechazar la solicitud y dejar un motivo.",
+        "Después de iniciar preparación se exige la autorización vigente; no se amplían permisos por ser un pedido digital.",
+        "Una aprobación válida actualiza comercio, POS y estaciones; rechazo conserva el pedido activo.",
+        "Reintento, cambio de versión, día operativo y pedido ya cobrado/entregado siguen reglas aprobadas, sin una autorización reutilizable."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H12-T01",
+          "title": "Persistir la solicitud separada del pedido",
+          "action": "Definir una solicitud activa y su resolución, con identidad del pedido y trazabilidad.",
+          "done": "Pedir cancelación no cambia el estado a cancelado."
+        },
+        {
+          "id": "MD-H12-T02",
+          "title": "Implementar resolución con permisos existentes",
+          "action": "Integrar autorización ligada a operación/versión y día operativo cuando aplique MD-A04.",
+          "done": "Un cajero sin permiso no anula preparación mediante el nuevo canal."
+        },
+        {
+          "id": "MD-H12-T03",
+          "title": "Coordinar resultado con KDS e inventario",
+          "action": "Al aprobar, usar cancelación canónica y efectos aprobados; registrar preparación iniciada.",
+          "done": "Las estaciones afectadas dejan de preparar y no se restaura stock incorrectamente."
+        },
+        {
+          "id": "MD-H12-T04",
+          "title": "Exponer solicitud y respuesta al seguimiento",
+          "action": "Mostrar pendiente de respuesta, aprobación o rechazo con la acción permitida vigente.",
+          "done": "La UI no anuncia cancelación antes de confirmación."
+        },
+        {
+          "id": "MD-H12-T05",
+          "title": "Probar autorización, carreras y recuperación",
+          "action": "Cubrir resolución doble, pedido cambiado, día cerrado y caída al notificar estaciones.",
+          "done": "Resolución única, permisos intactos y estado consistente después de recuperar."
+        }
+      ],
+      "staging": "Solicitar cancelar un preparado, rechazar desde un rol sin permiso y aprobar con la autorización válida; comprobar cliente, POS y estaciones.",
+      "out_of_scope": "Reembolsos o edición silenciosa de líneas ya enviadas.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H13",
+      "title": "Atender pendientes y cancelaciones desde UmiPOS",
+      "type": "historia",
+      "actor": "personal del negocio",
+      "goal": "ver, escuchar y resolver pedidos del menú",
+      "value": "atender a tiempo sin cambiar de aplicación",
+      "phase": "B",
+      "plan": [
+        "P09"
+      ],
+      "depends_on": [
+        "MD-H08",
+        "MD-H12"
+      ],
+      "decision_blockers": [],
+      "decisions": [
+        "D03",
+        "D08",
+        "D09",
+        "D14"
+      ],
+      "areas": [
+        "pos",
+        "ordenes",
+        "cancelacion"
+      ],
+      "acceptance": [
+        "Un nuevo pendiente aparece con contador y alerta sonora conforme a la operación del POS.",
+        "El detalle muestra productos, variante/opciones, total, origen, modalidad, contacto y plazo aplicable.",
+        "Aceptar/rechazar usan la API y muestran resultado real; rechazo exige motivo.",
+        "Las solicitudes de cancelación se distinguen de pedidos cancelados y respetan autorizaciones.",
+        "Reconexión y dos dispositivos no duplican pedidos ni aceptaciones; al cargar pedidos antiguos no se reproduce una tormenta de alertas."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H13-T01",
+          "title": "Integrar bandeja con datos reales",
+          "action": "Extender la superficie nativa de entrantes y lecturas por sucursal para pendientes y solicitudes.",
+          "done": "No depende de los fixtures React del recorrido."
+        },
+        {
+          "id": "MD-H13-T02",
+          "title": "Añadir contador y aviso sonoro",
+          "action": "Usar identificador/versión de evento para avisar de nuevos pendientes sin repetir cada refresco.",
+          "done": "Un nuevo pedido genera aviso; reconectar no reproduce todos los antiguos."
+        },
+        {
+          "id": "MD-H13-T03",
+          "title": "Conectar aceptar y rechazar",
+          "action": "Bloquear doble envío en UI, usar comandos idempotentes y presentar conflictos de estado.",
+          "done": "No se muestra aceptación local antes de respuesta canónica."
+        },
+        {
+          "id": "MD-H13-T04",
+          "title": "Conectar resolución de cancelaciones",
+          "action": "Mostrar solicitud activa, motivo y autorización existente según estado.",
+          "done": "Una solicitud rechazada mantiene el pedido en su bandeja operativa."
+        },
+        {
+          "id": "MD-H13-T05",
+          "title": "Verificar en POS nativo y dos sesiones",
+          "action": "Ampliar pruebas de entrantes y recorrer aceptación, rechazo, solicitud y reconexión.",
+          "done": "Evidencia nativa con estados coherentes en ambos dispositivos."
+        }
+      ],
+      "staging": "Con dos POS de prueba, enviar un pendiente, comprobar sonido/contador, aceptarlo desde uno y verificar actualización del otro sin duplicar KDS.",
+      "out_of_scope": "Cobro y administración de programación.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H14",
+      "title": "Cobrar y entregar el pedido existente desde UmiPOS",
+      "type": "historia",
+      "actor": "cajero",
+      "goal": "cobrar y entregar la recogida que llegó del menú",
+      "value": "registrar una sola venta sobre el pedido correcto",
+      "phase": "B",
+      "plan": [
+        "P09"
+      ],
+      "depends_on": [
+        "MD-H13",
+        "MD-H29"
+      ],
+      "decision_blockers": [
+        "MD-A02",
+        "MD-A03"
+      ],
+      "decisions": [
+        "D02",
+        "D17"
+      ],
+      "areas": [
+        "pos",
+        "checkout",
+        "inventario"
+      ],
+      "acceptance": [
+        "Adoptar y cobrar el pedido conserva el identificador comercial, origen digital, modalidad, líneas, opciones y total vigentes; cobrar en POS no cambia el origen a presencial.",
+        "Cobro usa los métodos y permisos existentes; el menú no añade un pago en línea.",
+        "Entrega y pago son hechos separados según el flujo aprobado y no crean otra orden.",
+        "Reintentar cobro o recuperar la sesión no duplica pagos ni preparación.",
+        "Marcar no recogido no registra ingreso ni inventario de una venta cobrada; sigue la política operativa aprobada."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H14-T01",
+          "title": "Mapear pedido digital a cuenta existente",
+          "action": "Revisar adopción en pos-cart y checkout según MD-A03, preservando el vínculo comercial, origen y modalidad hasta la venta comprometida.",
+          "done": "No se crea un nuevo pedido al abrir la cuenta."
+        },
+        {
+          "id": "MD-H14-T02",
+          "title": "Conservar ajustes y validaciones de cobro",
+          "action": "Usar total canónico y mecanismos actuales de pago/permisos, con conflictos visibles.",
+          "done": "Cuenta modificada no se cobra con un total obsoleto."
+        },
+        {
+          "id": "MD-H14-T03",
+          "title": "Registrar entrega y no recogido",
+          "action": "Definir acciones compatibles con el ciclo aprobado y sus efectos de inventario.",
+          "done": "No recogido no genera un pago ficticio."
+        },
+        {
+          "id": "MD-H14-T04",
+          "title": "Proteger reintento y reconexión",
+          "action": "Recuperar el resultado comercial de pagos/entrega ante timeout.",
+          "done": "Un resultado desconocido no dispara un segundo cobro."
+        },
+        {
+          "id": "MD-H14-T05",
+          "title": "Probar cobro real del flujo en entorno de prueba",
+          "action": "Ejecutar adopción, pago, entrega y recuperación con POS nativo; añadir prueba de stock separada.",
+          "done": "Un pedido, pago correcto, estaciones sin reproyección y efectos de stock comprobados sin mocks que los oculten."
+        }
+      ],
+      "staging": "Completar un pedido de barra+cocina, cobrarlo en caja, reconectar POS y verificar que existe una sola orden y un solo pago.",
+      "out_of_scope": "Métodos de pago nuevos y cambios generales del checkout.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H15",
+      "title": "Consultar y armar el carrito con el diseño final",
+      "type": "historia",
+      "actor": "cliente",
+      "goal": "navegar el menú real y personalizar productos",
+      "value": "revisar mi pedido en celular o escritorio",
+      "phase": "C",
+      "plan": [
+        "P10"
+      ],
+      "depends_on": [
+        "MD-H04",
+        "MD-H06"
+      ],
+      "decision_blockers": [
+        "MD-A10"
+      ],
+      "decisions": [
+        "D01"
+      ],
+      "areas": [
+        "frontend_menu",
+        "catalogo"
+      ],
+      "acceptance": [
+        "El catálogo, detalle y carrito conservan la dirección v6 y menu-redesign.css aprobada.",
+        "Negocio, sucursal, categorías, imágenes, productos, precios y opciones vienen de la API.",
+        "Buscar y filtrar categorías funciona sin perder selección del carrito; opciones obligatorias son visibles.",
+        "Carrito muestra cantidades, extras, indicaciones y total provisional; el servidor validará el envío.",
+        "Carga, catálogo vacío, agotado, oculto y recepción pausada tienen estados claros, accesibles y adaptables."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H15-T01",
+          "title": "Integrar el frontend en la ubicación acordada",
+          "action": "Crear la superficie pública según MD-A10 y reutilizar el diseño local sin copiar el visor de marketing como producto. Preparar una URL de revisión vinculada a la API de staging para probar este PR, antes de la publicación estable de MD-H30.",
+          "done": "Ruta local conectada y configuración de API por entorno."
+        },
+        {
+          "id": "MD-H15-T02",
+          "title": "Conectar catálogo y navegación",
+          "action": "Renderizar identidad, categorías, búsqueda, destacados y disponibilidad del contrato público. Incorporar en Dashboard el enlace de vista previa de la sucursal, usando esa misma identidad.",
+          "done": "Sin datos fijos de Bruma; la vista previa abre el catálogo de la sucursal seleccionada y refleja su pausa."
+        },
+        {
+          "id": "MD-H15-T03",
+          "title": "Conectar variantes y modificadores",
+          "action": "Mostrar opciones canónicas, reglas obligatorias, extras e indicaciones con precio provisional.",
+          "done": "Selecciones inválidas se explican antes de agregar."
+        },
+        {
+          "id": "MD-H15-T04",
+          "title": "Implementar carrito y estados de red",
+          "action": "Mantener líneas/cantidades y revisión del total; distinguir vacío, agotado, error y pausa.",
+          "done": "Error de carga no se muestra como catálogo vacío ni como pedido enviado."
+        },
+        {
+          "id": "MD-H15-T05",
+          "title": "Comparar visual e interacción",
+          "action": "Probar móvil/escritorio, teclado, nombres largos y cambio de opciones usando capturas aprobadas.",
+          "done": "Catálogo, producto y carrito conservan composición y controles; recursos y licencias incluidos."
+        }
+      ],
+      "staging": "Abrir catálogo real de prueba a 390 y 1440 px, elegir variante/extras y ajustar carrito. Comparar capturas con la referencia entregada. Desde Dashboard, abrir la vista previa de la sucursal correcta y comprobar que una pausa permite consultar pero no enviar.",
+      "out_of_scope": "Envío de pedidos, correos y rediseño general.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H16",
+      "title": "Enviar el carrito de una mesa y avisar al personal",
+      "type": "historia",
+      "actor": "cliente en mesa",
+      "goal": "confirmar mi pedido desde el QR",
+      "value": "recibirlo en mi mesa y que el personal lo vea",
+      "phase": "C",
+      "plan": [
+        "P11"
+      ],
+      "depends_on": [
+        "MD-H03",
+        "MD-H15",
+        "MD-H28"
+      ],
+      "decision_blockers": [
+        "MD-A02",
+        "MD-A03",
+        "MD-A12"
+      ],
+      "decisions": [
+        "D01",
+        "D04",
+        "D08",
+        "D12"
+      ],
+      "areas": [
+        "frontend_menu",
+        "table_order",
+        "pos",
+        "kds"
+      ],
+      "acceptance": [
+        "Un QR válido fija negocio, sucursal y mesa; el cliente no puede elegir una mesa ajena en el envío.",
+        "No se exigen nombre, teléfono ni correo para pedir desde mesa.",
+        "Confirmar valida el carrito, registra una sola orden y la envía a estaciones sin aceptación previa.",
+        "El personal recibe aviso y ve origen digital junto a la modalidad de mesa, sin cambiar la insignia permanente del KDS.",
+        "Precio cambiado, mesa no operable, pausa y timeout tienen resultados recuperables y visibles."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H16-T01",
+          "title": "Resolver credencial y contexto de mesa",
+          "action": "Conectar el QR y mostrar la mesa validada por API; manejar credencial inválida o mesa no operable.",
+          "done": "No se confía en IDs editables del navegador."
+        },
+        {
+          "id": "MD-H16-T02",
+          "title": "Conectar confirmación sin contacto",
+          "action": "Enviar selección canónica con idempotencia y mostrar el total validado.",
+          "done": "No se añade formulario obligatorio de recogida."
+        },
+        {
+          "id": "MD-H16-T03",
+          "title": "Conservar preparación directa y aviso",
+          "action": "Usar la proyección existente y el mecanismo de aviso al personal para esa sucursal.",
+          "done": "Una orden genera sus estaciones y el aviso correspondiente."
+        },
+        {
+          "id": "MD-H16-T04",
+          "title": "Mostrar resultado y recuperación",
+          "action": "Distinguir recibido/en preparación de error; conservar acceso al resultado tras timeout.",
+          "done": "Reintento recupera la misma orden sin una segunda comanda."
+        },
+        {
+          "id": "MD-H16-T05",
+          "title": "Probar QR a estaciones y POS",
+          "action": "Cubrir variantes, mesa ajena, precio cambiado, pausa y reintento desde navegador real.",
+          "done": "Un QR produce pedido correcto, aviso al personal y preparación directa."
+        }
+      ],
+      "staging": "Escanear el QR de mesa de prueba, pedir alimento+bebida y comprobar aviso en POS y productos en sus estaciones, sin pantalla de aceptación.",
+      "out_of_scope": "Contacto obligatorio, recogida y pagos desde el menú.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H17",
+      "title": "Enviar y seguir una recogida inmediata desde el menú",
+      "type": "historia",
+      "actor": "cliente que recoge",
+      "goal": "confirmar mi carrito y contacto y seguir su aceptación",
+      "value": "saber cuándo pasar al negocio",
+      "phase": "C",
+      "plan": [
+        "P12"
+      ],
+      "depends_on": [
+        "MD-H09",
+        "MD-H10",
+        "MD-H11",
+        "MD-H12",
+        "MD-H13",
+        "MD-H15",
+        "MD-H28"
+      ],
+      "decision_blockers": [],
+      "decisions": [
+        "D02",
+        "D03",
+        "D11",
+        "D13",
+        "D14"
+      ],
+      "areas": [
+        "frontend_menu",
+        "ordenes"
+      ],
+      "acceptance": [
+        "El formulario pide nombre, teléfono y correo con validación y revisión, sin OTP ni registro obligatorio.",
+        "Confirmar explica pago en negocio y espera de aceptación; una respuesta pendiente no se presenta como aceptada.",
+        "El cliente puede abrir el enlace privado, recargar y recuperar el estado tras una desconexión.",
+        "Cancelar pendiente y solicitar cancelación posterior reflejan las acciones que permite la API.",
+        "Un cambio de precio/disponibilidad antes de enviar requiere revisión; reintento no duplica el pedido."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H17-T01",
+          "title": "Añadir correo y contacto al diseño aprobado",
+          "action": "Completar el formulario interactivo con nombre/teléfono/correo y revisión visible.",
+          "done": "Se conserva la composición del menú; no aparece OTP."
+        },
+        {
+          "id": "MD-H17-T02",
+          "title": "Conectar envío idempotente",
+          "action": "Usar el contrato de pendiente y tratar validación, revisión de precio y resultado desconocido.",
+          "done": "Un doble clic o reintento no genera otro pedido."
+        },
+        {
+          "id": "MD-H17-T03",
+          "title": "Conectar seguimiento privado",
+          "action": "Renderizar estados, líneas, total y acciones permitidas de la proyección pública.",
+          "done": "Recarga conserva acceso al pedido correcto aunque no llegue correo."
+        },
+        {
+          "id": "MD-H17-T04",
+          "title": "Conectar cancelación y solicitud",
+          "action": "Confirmar acción y mostrar resolución real o espera del negocio.",
+          "done": "No se anuncia cancelación por una solicitud todavía pendiente."
+        },
+        {
+          "id": "MD-H17-T05",
+          "title": "Recorrer el flujo en navegador y POS",
+          "action": "Probar correo inválido, corrección, pérdida de conexión, aceptación y cancelación en ambos formatos.",
+          "done": "Evidencia del mismo pedido desde cliente y personal."
+        }
+      ],
+      "staging": "Enviar una recogida con correo de prueba, abrir su enlace en otra pestaña y aceptar desde POS; verificar cambios y ausencia de duplicados.",
+      "out_of_scope": "Programación y verificación de identidad por contacto.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H18",
+      "title": "Enviar avisos del pedido por correo con reintentos",
+      "type": "historia",
+      "actor": "cliente que recoge",
+      "goal": "recibir avisos del negocio con mi enlace de seguimiento",
+      "value": "conocer los cambios sin depender de mantener abierta la página",
+      "phase": "C",
+      "plan": [
+        "P13"
+      ],
+      "depends_on": [
+        "MD-H08",
+        "MD-H10",
+        "MD-H11",
+        "MD-H12",
+        "MD-H29"
+      ],
+      "decision_blockers": [
+        "MD-A09",
+        "MD-A12"
+      ],
+      "decisions": [
+        "D13"
+      ],
+      "areas": [
+        "correo",
+        "jobs",
+        "ordenes"
+      ],
+      "acceptance": [
+        "Se producen avisos de pendiente, aceptación, listo, rechazo, cancelación y vencimiento por eventos confirmados.",
+        "Cada aviso identifica al negocio, sucursal y pedido y contiene el enlace privado correcto.",
+        "Un reintento del evento no crea otro pedido ni envía avisos ilimitados; la política de deduplicación y reintento es explícita.",
+        "Un fallo SMTP conserva el estado comercial y deja un resultado observable y recuperable.",
+        "El sistema distingue encolado, aceptado por proveedor, fallo y entrega si existe evidencia de proveedor; no registra lectura sin evidencia."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H18-T01",
+          "title": "Definir eventos y deduplicación de avisos",
+          "action": "Revisar rutas outbox existentes y añadir eventos de correo de pedido con clave por transición/destinatario.",
+          "done": "Correo nuevo tiene productor y consumidor identificados, sin suponer que ya existen."
+        },
+        {
+          "id": "MD-H18-T02",
+          "title": "Crear plantillas transaccionales del negocio",
+          "action": "Preparar contenido para los seis eventos con sucursal, total/horario cuando aplique y enlace privado.",
+          "done": "No incluyen promociones ni contactos de otro negocio."
+        },
+        {
+          "id": "MD-H18-T03",
+          "title": "Integrar worker con adaptador SMTP",
+          "action": "Usar los mecanismos existentes y remitente/respuesta aprobados; persistir resultado sin alterar pedido.",
+          "done": "El fallo de correo no revierte aceptación o cancelación."
+        },
+        {
+          "id": "MD-H18-T04",
+          "title": "Implementar reintentos y observación",
+          "action": "Definir límites, espera, deduplicación y manejo de fallo terminal; registrar aceptación sin llamarla entrega.",
+          "done": "Eventos repetidos y proveedor caído dejan estados verificables."
+        },
+        {
+          "id": "MD-H18-T05",
+          "title": "Probar con receptor de correo local",
+          "action": "Ejecutar eventos repetidos, destinatario incorrecto, timeout y recuperación con pedido real de prueba.",
+          "done": "Plantillas, enlaces y destinatarios correctos; pedido intacto ante fallo."
+        }
+      ],
+      "staging": "Usar un receptor de pruebas, simular caída y recuperar el envío. Verificar aviso correcto para cada transición sin duplicar el pedido.",
+      "out_of_scope": "WhatsApp, SMS, campañas y garantía de lectura del destinatario.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H19",
+      "title": "Validar remitente y entrega del correo del piloto",
+      "type": "historia",
+      "actor": "responsable de operación",
+      "goal": "comprobar el envío con la configuración real del negocio",
+      "value": "activar avisos con un remitente y respuesta utilizables",
+      "phase": "E",
+      "plan": [
+        "P13"
+      ],
+      "depends_on": [
+        "MD-H18"
+      ],
+      "decision_blockers": [
+        "MD-A09",
+        "MD-A11"
+      ],
+      "decisions": [
+        "D13"
+      ],
+      "areas": [
+        "correo",
+        "operacion"
+      ],
+      "acceptance": [
+        "Se identifica remitente, dominio y dirección de respuesta autorizados para el piloto sin poner credenciales en Git.",
+        "Se verifica envío a destinatarios de prueba autorizados y se registra qué evidencia acredita aceptación o entrega.",
+        "Una respuesta del cliente llega al responsable definido; un rebote o fallo tiene un procedimiento de atención.",
+        "Seguimiento web continúa disponible cuando el aviso falla.",
+        "La activación de avisos queda registrada por entorno; configurar Brevo no se presenta como prueba de entrega."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H19-T01",
+          "title": "Preparar configuración de remitente por entorno",
+          "action": "Usar MD-A09 para remitente, reply-to y secretos en el mecanismo del equipo.",
+          "done": "Configuración trazable sin valores secretos en issue/PR."
+        },
+        {
+          "id": "MD-H19-T02",
+          "title": "Verificar dominio y receptor autorizado",
+          "action": "Comprobar requisitos del proveedor y acordar destinatarios de prueba.",
+          "done": "Remitente válido y destinatarios autorizados registrados sin exponer secretos."
+        },
+        {
+          "id": "MD-H19-T03",
+          "title": "Ejecutar envío y respuesta controlados",
+          "action": "Enviar avisos de un pedido sintético y responder al negocio.",
+          "done": "Evidencia real distingue aceptado/entregado y confirma recepción de la respuesta."
+        },
+        {
+          "id": "MD-H19-T04",
+          "title": "Ensayar fallo y atención",
+          "action": "Probar el fallo que permita el entorno y documentar rebotes, reintento y escalación.",
+          "done": "El responsable puede identificar el problema y el pedido sigue consultable."
+        },
+        {
+          "id": "MD-H19-T05",
+          "title": "Registrar habilitación del piloto",
+          "action": "Adjuntar resultados, entorno y responsable; preparar desactivación de avisos preservando pedidos.",
+          "done": "Criterios de MD-A09 satisfechos antes de activar mensajes al público."
+        }
+      ],
+      "staging": "Completar el ensayo con remitente y receptores autorizados, usando pedidos sintéticos de staging; registrar evidencia de envío, respuesta y fallo.",
+      "out_of_scope": "Un nuevo proveedor de mensajería o un PR solo para activar un ajuste no versionado.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H20",
+      "title": "Calcular horarios compatibles para el carrito",
+      "type": "historia",
+      "actor": "cliente que programa",
+      "goal": "ver solo horas en las que todos mis productos se pueden recoger",
+      "value": "hacer un pedido que el negocio pueda cumplir",
+      "phase": "D",
+      "plan": [
+        "P14"
+      ],
+      "depends_on": [
+        "MD-H02",
+        "MD-H04"
+      ],
+      "decision_blockers": [
+        "MD-A05",
+        "MD-A06",
+        "MD-A07"
+      ],
+      "decisions": [
+        "D05",
+        "D06"
+      ],
+      "areas": [
+        "horarios",
+        "catalogo",
+        "contratos"
+      ],
+      "acceptance": [
+        "El servidor calcula horas válidas según sucursal, zona horaria, aperturas, cierres y excepciones.",
+        "Aplica la anticipación más exigente y el horizonte más corto del carrito, según las reglas aprobadas.",
+        "La duración considera cantidades y mezcla de productos conforme MD-A05, sin tomar 20 minutos como regla fija.",
+        "Un carrito no compatible recibe una explicación; no se cambia silenciosamente a recogida inmediata.",
+        "La opción fuera de horario y capacidad de slots solo opera como determinen MD-A06 y MD-A07."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H20-T01",
+          "title": "Definir reglas de programación canónicas",
+          "action": "Representar anticipación, horizonte, elegibilidad y límite de cancelación por producto/sucursal.",
+          "done": "Contrato y persistencia necesarios revisados según las decisiones aprobadas."
+        },
+        {
+          "id": "MD-H20-T02",
+          "title": "Reutilizar calendario y zona horaria",
+          "action": "Aplicar horario regular, excepciones y cruces de medianoche de la sucursal.",
+          "done": "No se usa la zona del navegador como autoridad."
+        },
+        {
+          "id": "MD-H20-T03",
+          "title": "Calcular compatibilidad del carrito",
+          "action": "Aplicar cantidades, preparación, horizontes y capacidad definida por MD-A05/07.",
+          "done": "Una hora ofrecida satisface todos los productos."
+        },
+        {
+          "id": "MD-H20-T04",
+          "title": "Exponer consulta de horarios y motivos",
+          "action": "Devolver horas elegibles y razones cuando no existan; volver a validar al reservar.",
+          "done": "No se promete disponibilidad permanente por una consulta anterior."
+        },
+        {
+          "id": "MD-H20-T05",
+          "title": "Probar calendario y carritos mixtos",
+          "action": "Usar reloj controlado, cierres, medianoche, cantidades y mezcla elegible/no elegible.",
+          "done": "Resultados esperados documentados para cada regla aprobada."
+        }
+      ],
+      "staging": "Consultar horas para productos con distintas anticipaciones y un cierre excepcional; comprobar las horas y razones en zona horaria de la sucursal.",
+      "out_of_scope": "Reserva, liberación a KDS y UI de selección.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H21",
+      "title": "Registrar y aceptar una recogida programada sin prepararla antes",
+      "type": "historia",
+      "actor": "personal del negocio",
+      "goal": "aceptar una recogida futura como reserva",
+      "value": "organizar la preparación para la hora prometida",
+      "phase": "D",
+      "plan": [
+        "P14"
+      ],
+      "depends_on": [
+        "MD-H07",
+        "MD-H08",
+        "MD-H18",
+        "MD-H20"
+      ],
+      "decision_blockers": [
+        "MD-A02",
+        "MD-A03",
+        "MD-A06",
+        "MD-A13"
+      ],
+      "decisions": [
+        "D05",
+        "D15"
+      ],
+      "areas": [
+        "ordenes",
+        "horarios",
+        "inventario"
+      ],
+      "acceptance": [
+        "Enviar un programado valida nuevamente la hora, el carrito y la capacidad acordada.",
+        "El pedido guarda fecha de recogida, zona horaria y tiempos derivados necesarios para operar.",
+        "Aceptar deja el pedido reservado sin proyección a KDS; rechazar/vencer aplica reglas de inventario aprobadas.",
+        "Si se permiten envíos fuera de horario, el plazo de aceptación sigue MD-A06; si no, el servidor rechaza el caso.",
+        "Reintentos y aceptación doble conservan una reserva; la recepción pública sigue desactivada hasta completar liberación y atención."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H21-T01",
+          "title": "Extender el contrato de pedido con horario",
+          "action": "Representar recogida y tiempos operativos sin confundir reserva con preparación comercial.",
+          "done": "Versiones de POS/Dashboard leen de forma compatible."
+        },
+        {
+          "id": "MD-H21-T02",
+          "title": "Validar y reservar la hora transaccionalmente",
+          "action": "Revalidar calendario, reglas/capacidad e inventario al confirmar.",
+          "done": "Dos envíos concurrentes no exceden la política aprobada ni duplican reserva."
+        },
+        {
+          "id": "MD-H21-T03",
+          "title": "Resolver aceptación de programados",
+          "action": "Separar la transición aceptado/reservado de la aceptación inmediata de MD-H08.",
+          "done": "Aceptación futura genera cero trabajo KDS temprano."
+        },
+        {
+          "id": "MD-H21-T04",
+          "title": "Aplicar vencimiento y cierre de reserva",
+          "action": "Usar reglas dentro/fuera de horario y registrar el resultado terminal.",
+          "done": "Un reservado rechazado o vencido no podrá liberarse."
+        },
+        {
+          "id": "MD-H21-T05",
+          "title": "Adaptar avisos a la reserva programada",
+          "action": "Emitir los eventos del pedido usando MD-H18 y mostrar fecha de recogida, límite y espera de aceptación cuando aplique.",
+          "done": "El correo de aceptación confirma la reserva y no afirma que cocina ya prepara."
+        },
+        {
+          "id": "MD-H21-T06",
+          "title": "Probar persistencia y transiciones",
+          "action": "Cubrir horario cambiado, petición repetida, aceptación doble y aceptación fuera de atención.",
+          "done": "Reserva única con fechas coherentes y sin proyección anticipada."
+        }
+      ],
+      "staging": "Crear y aceptar un pedido futuro; reiniciar el worker/API y confirmar que permanece reservado con su hora y sin comanda.",
+      "out_of_scope": "Worker de liberación y cambio de hora posterior a la reserva.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H22",
+      "title": "Liberar un programado a preparación a la hora correcta",
+      "type": "historia",
+      "actor": "personal de cocina y barra",
+      "goal": "recibir el pedido aceptado cuando corresponde prepararlo",
+      "value": "cumplir la recogida sin preparar demasiado pronto",
+      "phase": "D",
+      "plan": [
+        "P14"
+      ],
+      "depends_on": [
+        "MD-H21"
+      ],
+      "decision_blockers": [
+        "MD-A05",
+        "MD-A07"
+      ],
+      "decisions": [
+        "D15"
+      ],
+      "areas": [
+        "jobs",
+        "ordenes",
+        "kds"
+      ],
+      "acceptance": [
+        "Un programado aceptado llega a las estaciones cuando se alcanza la hora de liberación válida.",
+        "Pendiente, cancelado, rechazado y vencido nunca se liberan por un trabajo atrasado.",
+        "Reejecutar el trabajo o tener dos workers produce una sola proyección.",
+        "Una caída antes/después de proyectar se recupera con una política explícita para trabajo atrasado.",
+        "La liberación registra sus tiempos reales y permite detectar retrasos sin adelantar pedidos."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H22-T01",
+          "title": "Elegir mecanismo durable existente",
+          "action": "Revisar jobs/BullMQ/schedulers y seleccionar el dueño del trabajo de liberación, sin crear infraestructura innecesaria.",
+          "done": "Diseño especifica reejecución, reloj y recuperación de trabajo atrasado."
+        },
+        {
+          "id": "MD-H22-T02",
+          "title": "Programar trabajos desde reserva aceptada",
+          "action": "Crear trabajo identificable por pedido/versión y hora calculada.",
+          "done": "El job no se crea como sustituto de una reserva persistida."
+        },
+        {
+          "id": "MD-H22-T03",
+          "title": "Validar estado y liberar una vez",
+          "action": "Comprobar hora/estado dentro de la coordinación transaccional y usar proyector existente.",
+          "done": "Una carrera con cierre no deja una comanda inválida."
+        },
+        {
+          "id": "MD-H22-T04",
+          "title": "Recuperar fallos y observar retrasos",
+          "action": "Registrar ejecución, proyección y retraso; recuperar sin repetición comercial.",
+          "done": "El responsable distingue pendiente de trabajo y fallo terminal."
+        },
+        {
+          "id": "MD-H22-T05",
+          "title": "Probar workers concurrentes y reloj",
+          "action": "Ejecutar antes/en/después de la hora, con duplicados y caídas alrededor de la proyección.",
+          "done": "Una sola preparación y ningún pedido terminal liberado."
+        }
+      ],
+      "staging": "Aceptar un programado sintético, adelantar el reloj de prueba y ejecutar/repetir el worker; comprobar una proyección en las estaciones correctas.",
+      "out_of_scope": "Rediseño de colas generales o promesas de preparación sin calendario aprobado.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H23",
+      "title": "Cancelar un programado aceptado dentro de su límite",
+      "type": "historia",
+      "actor": "cliente que programa",
+      "goal": "cancelar directamente antes del corte y de la liberación",
+      "value": "retirar mi reserva cuando todavía está permitido",
+      "phase": "D",
+      "plan": [
+        "P08",
+        "P14"
+      ],
+      "depends_on": [
+        "MD-H11",
+        "MD-H12",
+        "MD-H21",
+        "MD-H22"
+      ],
+      "decision_blockers": [
+        "MD-A02",
+        "MD-A04",
+        "MD-A07"
+      ],
+      "decisions": [
+        "D14",
+        "D15"
+      ],
+      "areas": [
+        "cancelacion",
+        "ordenes",
+        "jobs"
+      ],
+      "acceptance": [
+        "La cancelación directa exige simultáneamente hora anterior al corte y ausencia de liberación a preparación.",
+        "Después del corte o de liberar, la acción es solicitar cancelación al personal.",
+        "El seguimiento expone una fecha/hora concreta en la zona horaria correcta.",
+        "Cancelación y liberación concurrentes producen un solo resultado válido, sin reaparición del cancelado en KDS.",
+        "Reintentos y jobs antiguos no repiten efectos de inventario ni reviven la reserva."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H23-T01",
+          "title": "Definir predicado y límite persistido",
+          "action": "Aplicar estado y tiempo del servidor; fijar el límite según reglas del carrito.",
+          "done": "El corte nunca es posterior a la liberación habilitada."
+        },
+        {
+          "id": "MD-H23-T02",
+          "title": "Integrar cancelación directa de reserva",
+          "action": "Extender la transición canónica con efectos de inventario y vencimiento de trabajos asociados.",
+          "done": "El trabajo residual verifica el estado y no libera el cancelado."
+        },
+        {
+          "id": "MD-H23-T03",
+          "title": "Aplicar solicitud después del límite",
+          "action": "Reutilizar MD-H12 cuando la cancelación directa ya no procede.",
+          "done": "La solicitud conserva activo el pedido hasta resolución."
+        },
+        {
+          "id": "MD-H23-T04",
+          "title": "Exponer límite y acciones al cliente",
+          "action": "Devolver fecha concreta y acción permitida en seguimiento y confirmación.",
+          "done": "El navegador no calcula una autorización distinta del servidor."
+        },
+        {
+          "id": "MD-H23-T05",
+          "title": "Probar fronteras y carreras",
+          "action": "Cubrir justo antes/en/después del corte, cancelación/liberación y job atrasado.",
+          "done": "Resultados de borde aprobados y cero pedidos cancelados que reaparecen."
+        }
+      ],
+      "staging": "Cancelar una reserva antes del corte y ejecutar después su job antiguo; repetir el caso al liberar y comprobar la acción que ganó.",
+      "out_of_scope": "Penalizaciones automáticas y cancelación pública de una venta cobrada.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H24",
+      "title": "Configurar programación por sucursal y producto",
+      "type": "historia",
+      "actor": "administrador del negocio",
+      "goal": "definir qué productos y fechas se pueden programar",
+      "value": "adaptar el canal a la operación de cada sucursal",
+      "phase": "D",
+      "plan": [
+        "P15"
+      ],
+      "depends_on": [
+        "MD-H05",
+        "MD-H06",
+        "MD-H20",
+        "MD-H21"
+      ],
+      "decision_blockers": [
+        "MD-A05",
+        "MD-A06",
+        "MD-A07"
+      ],
+      "decisions": [
+        "D05",
+        "D06",
+        "D07"
+      ],
+      "areas": [
+        "dashboard",
+        "horarios",
+        "catalogo"
+      ],
+      "acceptance": [
+        "La sucursal puede configurar programación y los productos sus límites aprobados.",
+        "Los campos distinguen anticipación mínima, preparación, horizonte y cancelación.",
+        "La UI impide combinaciones inválidas y muestra el alcance efectivo sin copiar ajustes a otros negocios.",
+        "Cambiar reglas no altera silenciosamente reservas existentes; se aplica la política aprobada.",
+        "La vista previa de horarios refleja el mismo cálculo que usa el servidor."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H24-T01",
+          "title": "Conectar ajustes de sucursal",
+          "action": "Añadir calendario y programación a Menú digital, enlazando al horario canónico.",
+          "done": "Sin segundo calendario contradictorio."
+        },
+        {
+          "id": "MD-H24-T02",
+          "title": "Conectar elegibilidad y reglas por producto",
+          "action": "Extender la edición existente para programable, fechas posteriores, anticipación/horizonte/corte.",
+          "done": "Producto conserva su identidad y alcance."
+        },
+        {
+          "id": "MD-H24-T03",
+          "title": "Validar combinaciones y mensajes",
+          "action": "Mostrar unidades, zona horaria y explicación de errores que devuelve la API.",
+          "done": "No se confunden preparación y anticipación para pedir."
+        },
+        {
+          "id": "MD-H24-T04",
+          "title": "Conservar reservas vigentes",
+          "action": "Presentar y aplicar el efecto aprobado de cambios de reglas sobre reservas.",
+          "done": "No cambia silenciosamente la hora prometida de un pedido."
+        },
+        {
+          "id": "MD-H24-T05",
+          "title": "Verificar edición y horarios en navegador",
+          "action": "Guardar reglas de dos productos y consultar un carrito mixto y un cierre excepcional.",
+          "done": "Configuración, API y vista previa ofrecen las mismas horas."
+        }
+      ],
+      "staging": "Habilitar programación solo para panadería, cambiar horizonte y probar un carrito mixto; comprobar que otra sucursal conserva su configuración. Crear y aceptar una reserva antes de editar las reglas; comprobar hora de recogida, liberación y límite de cancelación persistidos según MD-A07, sin cambios silenciosos.",
+      "out_of_scope": "Programación de productos sin reglas y cambios automáticos de reservas.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H25",
+      "title": "Atender reservas programadas desde UmiPOS",
+      "type": "historia",
+      "actor": "personal del negocio",
+      "goal": "ver y aceptar reservas futuras con su hora",
+      "value": "organizar su atención sin enviarlas antes a cocina",
+      "phase": "D",
+      "plan": [
+        "P16"
+      ],
+      "depends_on": [
+        "MD-H13",
+        "MD-H21",
+        "MD-H22",
+        "MD-H23"
+      ],
+      "decision_blockers": [],
+      "decisions": [
+        "D05",
+        "D15"
+      ],
+      "areas": [
+        "pos",
+        "ordenes",
+        "horarios"
+      ],
+      "acceptance": [
+        "La bandeja distingue pendientes programados, reservas aceptadas y pedidos ya en preparación.",
+        "Cada reserva muestra fecha/hora de recogida y la información necesaria para evaluar capacidad.",
+        "Aceptar reserva no muestra preparación ni crea comanda temprana.",
+        "Cancelaciones y liberaciones actualizan la bandeja tras reconectar sin duplicados.",
+        "Los controles conservan el diseño vigente y usan permisos/contratos canónicos."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H25-T01",
+          "title": "Añadir lectura de reservas a la bandeja",
+          "action": "Consumir fechas/estado del backend y distinguir día/modalidad operativa.",
+          "done": "Programados no se mezclan con pendientes inmediatos sin identificación."
+        },
+        {
+          "id": "MD-H25-T02",
+          "title": "Mostrar detalle de tiempo y preparación",
+          "action": "Presentar hora prometida, productos, opciones y advertencias reales de capacidad.",
+          "done": "El personal puede revisar el compromiso antes de aceptar."
+        },
+        {
+          "id": "MD-H25-T03",
+          "title": "Conectar aceptación y rechazo de reserva",
+          "action": "Usar comandos de MD-H21 y explicar el estado reservado.",
+          "done": "Aceptar no ofrece falso estado de cocina."
+        },
+        {
+          "id": "MD-H25-T04",
+          "title": "Actualizar cancelación y liberación",
+          "action": "Recuperar eventos/lecturas tras desconexión y mantener un único pedido.",
+          "done": "Transiciones de MD-H22/H23 aparecen en el lugar correcto."
+        },
+        {
+          "id": "MD-H25-T05",
+          "title": "Validar POS nativo con reloj de prueba",
+          "action": "Recorrer reserva, aceptación, corte y liberación con dos sesiones.",
+          "done": "Misma hora y estado en POS y KDS sin envío anticipado."
+        }
+      ],
+      "staging": "Aceptar una reserva desde POS, reiniciar la sesión y llegar a la hora de liberar; comprobar el cambio de bandeja y una sola comanda.",
+      "out_of_scope": "Reprogramar reservas sin política aprobada.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H26",
+      "title": "Elegir una fecha de recogida y seguir el pedido programado",
+      "type": "historia",
+      "actor": "cliente que programa",
+      "goal": "elegir una hora compatible y conocer mi límite de cancelación",
+      "value": "planear mi recogida con información clara",
+      "phase": "D",
+      "plan": [
+        "P17"
+      ],
+      "depends_on": [
+        "MD-H17",
+        "MD-H20",
+        "MD-H21",
+        "MD-H22",
+        "MD-H23",
+        "MD-H24",
+        "MD-H25"
+      ],
+      "decision_blockers": [],
+      "decisions": [
+        "D02",
+        "D05",
+        "D06",
+        "D11",
+        "D14"
+      ],
+      "areas": [
+        "frontend_menu",
+        "horarios",
+        "ordenes"
+      ],
+      "acceptance": [
+        "El cliente puede elegir inmediato o programado cuando la sucursal y el carrito lo permiten.",
+        "Las fechas/horas provienen del servidor y se revalidan al confirmar.",
+        "Confirmación y seguimiento muestran recogida, zona horaria comprensible, pago en negocio y corte de cancelación.",
+        "El estado recibido sigue pendiente; aceptado se presenta como reserva hasta liberación.",
+        "Un carrito incompatible, horario ya no válido o límite vencido ofrece una respuesta concreta sin cambiar silenciosamente la modalidad."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H26-T01",
+          "title": "Integrar elección de modalidad y horarios",
+          "action": "Consumir elegibilidad y slots del carrito conservando el diseño aprobado.",
+          "done": "No se hardcodean siete días ni horarios de Bruma."
+        },
+        {
+          "id": "MD-H26-T02",
+          "title": "Mostrar confirmación de compromiso",
+          "action": "Presentar contacto, fecha/hora, total y corte antes del envío.",
+          "done": "El cliente puede corregir datos y horario."
+        },
+        {
+          "id": "MD-H26-T03",
+          "title": "Conectar reserva idempotente",
+          "action": "Enviar la selección y tratar conflicto de horario/stock/precio con revisión visible.",
+          "done": "Reintento recupera la misma reserva."
+        },
+        {
+          "id": "MD-H26-T04",
+          "title": "Mostrar seguimiento y cancelación temporal",
+          "action": "Usar acciones/fechas del servidor para reservar, preparar y cancelar/solicitar.",
+          "done": "No cambia autorización por el reloj local del cliente."
+        },
+        {
+          "id": "MD-H26-T05",
+          "title": "Recorrer casos completos en móvil/escritorio",
+          "action": "Probar otro día, carrito mixto, cierre, cambio de hora disponible y cancelación de borde.",
+          "done": "Cliente, POS y KDS muestran fecha y estado coherentes."
+        }
+      ],
+      "staging": "Programar para otro día con producto elegible; aceptar, cancelar dentro del corte y repetir con una reserva que llega a preparación.",
+      "out_of_scope": "Modificar hora de una reserva ya aceptada sin nueva decisión de producto.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H27",
+      "title": "Obtener enlaces y QR desde Dashboard",
+      "type": "historia",
+      "actor": "administrador del negocio",
+      "goal": "obtener el enlace público y los QR correctos",
+      "value": "compartir el menú y colocarlo en las mesas",
+      "phase": "E",
+      "plan": [
+        "P18"
+      ],
+      "depends_on": [
+        "MD-H05",
+        "MD-H16"
+      ],
+      "decision_blockers": [
+        "MD-A10",
+        "MD-A12"
+      ],
+      "decisions": [
+        "D01",
+        "D07"
+      ],
+      "areas": [
+        "dashboard",
+        "table_order",
+        "configuracion"
+      ],
+      "acceptance": [
+        "Dashboard muestra enlace y QR general de la sucursal y QR de sus mesas existentes.",
+        "Cada QR resuelve el alcance correcto; no crea mesas paralelas ni credenciales sin control.",
+        "Copiar/descargar y abrir la vista previa conservan rutas estables del entorno.",
+        "La regeneración o revocación sigue la política aprobada y advierte su efecto sobre QR impresos.",
+        "Un usuario sin permiso no obtiene controles administrativos de otra sucursal."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H27-T01",
+          "title": "Reutilizar identidad y credenciales de mesa",
+          "action": "Conectar el inventario real de mesas con sus mecanismos actuales de token.",
+          "done": "Sin nueva autoridad de mesas o secretos públicos de administración."
+        },
+        {
+          "id": "MD-H27-T02",
+          "title": "Construir enlaces por entorno",
+          "action": "Aplicar dominio/ruta de MD-A10 y distinguir general de mesa.",
+          "done": "Un QR de staging no apunta accidentalmente a main/producción."
+        },
+        {
+          "id": "MD-H27-T03",
+          "title": "Añadir copiar, descargar y vista previa",
+          "action": "Presentar enlaces y QR en Dashboard con negocio/sucursal visibles.",
+          "done": "Se puede obtener y verificar el QR sin herramientas externas."
+        },
+        {
+          "id": "MD-H27-T04",
+          "title": "Aplicar revocación/regeneración aprobada",
+          "action": "Usar MD-A12 y documentar impacto sobre impresos y enlaces previos.",
+          "done": "La operación es explícita y respeta permisos."
+        },
+        {
+          "id": "MD-H27-T05",
+          "title": "Verificar con lectura real de QR",
+          "action": "Abrir QR general y de dos mesas desde dispositivo de prueba.",
+          "done": "Cada uno carga sucursal/mesa correctas; los revocados se rechazan según política."
+        }
+      ],
+      "staging": "Descargar e inspeccionar QR general y dos mesas; escanearlos y comprobar negocio/sucursal/mesa y entorno.",
+      "out_of_scope": "Inventar un plano nuevo o permitir edición del ID de mesa por el cliente.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H28",
+      "title": "Controlar admisión cuando no hay atención disponible",
+      "type": "historia",
+      "actor": "responsable de operación",
+      "goal": "pausar nuevas solicitudes cuando la sucursal no pueda atenderlas",
+      "value": "evitar pedidos que quedan abandonados",
+      "phase": "B",
+      "plan": [
+        "P06",
+        "P11",
+        "P12"
+      ],
+      "depends_on": [
+        "MD-H01",
+        "MD-H07"
+      ],
+      "decision_blockers": [
+        "MD-A08"
+      ],
+      "decisions": [
+        "D03",
+        "D04",
+        "D07"
+      ],
+      "areas": [
+        "dispositivos",
+        "horarios",
+        "ordenes"
+      ],
+      "acceptance": [
+        "La política distingue cierre previsto, pausa manual y falta de atención durante horario de servicio.",
+        "La señal de disponibilidad es la aprobada en MD-A08; last_seen_at no se interpreta por sí solo como personal disponible.",
+        "La admisión inmediata se aplica en servidor y afecta solo al canal/sucursal definidos.",
+        "Menú y seguimiento siguen disponibles; pedidos aceptados no se cancelan por la pausa.",
+        "Recuperar disponibilidad usa una regla explícita y observable, sin oscilación o reanudación accidental."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H28-T01",
+          "title": "Implementar la señal acordada",
+          "action": "Revisar sesiones/dispositivos y construir solo la condición definida por MD-A08.",
+          "done": "Se puede distinguir el caso operativo con evidencia."
+        },
+        {
+          "id": "MD-H28-T02",
+          "title": "Resolver disponibilidad efectiva",
+          "action": "Combinar horario, pausa manual y señal operativa con precedencia aprobada.",
+          "done": "Estado efectivo y motivo son legibles por los consumidores."
+        },
+        {
+          "id": "MD-H28-T03",
+          "title": "Aplicar admisión a entradas públicas",
+          "action": "Integrar el guard de canal/sucursal en mesa y recogida sin cerrar consulta o seguimiento.",
+          "done": "La solicitud directa tampoco evade una pausa aplicable."
+        },
+        {
+          "id": "MD-H28-T04",
+          "title": "Añadir recuperación y observación",
+          "action": "Definir reactivación conforme a política y registrar incidentes operativos sin borrar pedidos.",
+          "done": "El responsable conoce motivo y momento de pausa/reactivación."
+        },
+        {
+          "id": "MD-H28-T05",
+          "title": "Probar caída y recuperación",
+          "action": "Simular condición de indisponibilidad, cierre y reconexión usando fuentes reales de prueba.",
+          "done": "Sin nuevos pedidos indebidos; pedidos aceptados intactos."
+        }
+      ],
+      "staging": "Durante horario abierto, simular la condición aprobada de falta de atención; comprobar pausa solo del canal, consulta disponible y recuperación definida. Enviar solicitudes directas de mesa y recogida para comprobar la aplicación de la política sin depender de la UI.",
+      "out_of_scope": "Asumir presencia humana a partir de un dispositivo autenticado o añadir biometría.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H29",
+      "title": "Marcar listo solo cuando terminan todas las estaciones",
+      "type": "historia",
+      "actor": "cliente y personal",
+      "goal": "ver el estado global correcto del pedido",
+      "value": "entregar o recoger cuando cocina y barra han terminado",
+      "phase": "B",
+      "plan": [
+        "P06",
+        "P09",
+        "P13"
+      ],
+      "depends_on": [
+        "MD-H08"
+      ],
+      "decision_blockers": [],
+      "decisions": [
+        "D10",
+        "D16"
+      ],
+      "areas": [
+        "kds",
+        "ordenes",
+        "pos"
+      ],
+      "acceptance": [
+        "Cada estación recibe solo sus productos según el enrutamiento existente.",
+        "Terminar barra sin terminar cocina mantiene el pedido agregado en preparación.",
+        "La última estación pendiente completa el estado global una sola vez.",
+        "Cancelaciones autorizadas ajustan el agregado según la verdad comercial; eventos atrasados no reviven líneas canceladas.",
+        "Se conservan modalidad y detalle, sin nueva insignia permanente de origen en KDS."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H29-T01",
+          "title": "Contrastar y reutilizar agregado existente",
+          "action": "Verificar cómo KDS deriva estado comercial y resolver solo las brechas del canal nuevo.",
+          "done": "No se crea una segunda autoridad de listo."
+        },
+        {
+          "id": "MD-H29-T02",
+          "title": "Conservar proyección por estación",
+          "action": "Comprobar variantes, modificadores y rutas del pedido aceptado.",
+          "done": "Barra y cocina ven sus productos correctos."
+        },
+        {
+          "id": "MD-H29-T03",
+          "title": "Coordinar actualización global única",
+          "action": "Actualizar orden/evento al terminar todos los elementos requeridos según estados vigentes.",
+          "done": "No se emite listo por completar una sola estación."
+        },
+        {
+          "id": "MD-H29-T04",
+          "title": "Integrar cancelación y eventos tardíos",
+          "action": "Usar estados/versiones canónicos para no contar ni reactivar trabajo cancelado.",
+          "done": "Un evento retrasado no contradice una cancelación."
+        },
+        {
+          "id": "MD-H29-T05",
+          "title": "Probar varias estaciones y dispositivos",
+          "action": "Ejecutar finalización parcial, final simultáneo, duplicado y línea cancelada.",
+          "done": "Una transición global válida y lectura consistente en POS/seguimiento."
+        }
+      ],
+      "staging": "Enviar alimento y bebida, terminar barra primero y comprobar que sigue en preparación; terminar cocina y verificar un único listo.",
+      "out_of_scope": "Nueva cola de KDS o indicadores permanentes adicionales de origen.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H30",
+      "title": "Publicar una versión del menú para validación en staging",
+      "type": "historia",
+      "actor": "equipo de desarrollo",
+      "goal": "tener una URL de staging con el menú conectado a su entorno",
+      "value": "probar la integración antes de main",
+      "phase": "E",
+      "plan": [
+        "P19"
+      ],
+      "depends_on": [
+        "MD-H15",
+        "MD-H16",
+        "MD-H17"
+      ],
+      "decision_blockers": [
+        "MD-A10"
+      ],
+      "decisions": [
+        "D18",
+        "D19"
+      ],
+      "areas": [
+        "despliegue",
+        "frontend_menu",
+        "operacion"
+      ],
+      "acceptance": [
+        "El build usa configuración explícita de staging y no apunta a datos o API de producción.",
+        "Las rutas de negocio/mesa y seguimiento se resuelven en carga directa y recarga.",
+        "Credenciales servidor no aparecen en el bundle; CORS/proxy y caché respetan rutas públicas y privadas.",
+        "Las funciones incompletas quedan desactivadas por modalidad; una vista desplegada no implica piloto activo.",
+        "Se documenta cómo volver a una versión compatible y pausar entradas preservando pedidos."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H30-T01",
+          "title": "Definir configuración por entorno",
+          "action": "Aplicar MD-A10 a rutas, host, API y mecanismo Cloudflare del producto.",
+          "done": "Staging y producción no se confunden con el proyecto de demo umi-stageshow."
+        },
+        {
+          "id": "MD-H30-T02",
+          "title": "Integrar build y validación de recursos",
+          "action": "Añadir configuración versionada necesaria y comprobar carga de fotos/fuentes con licencias.",
+          "done": "Build reproducible y rutas internas correctas."
+        },
+        {
+          "id": "MD-H30-T03",
+          "title": "Aplicar fronteras HTTP y de caché",
+          "action": "Configurar acceso a API y evitar cachear seguimiento privado como catálogo público.",
+          "done": "Recarga de ruta funciona y no revela datos de otro pedido."
+        },
+        {
+          "id": "MD-H30-T04",
+          "title": "Preparar despliegue y reversión de staging",
+          "action": "Usar el pipeline existente o extensión acotada, con revisión identificable y funciones incompletas desactivadas.",
+          "done": "Se puede identificar qué revisión se prueba y cómo detener admisión."
+        },
+        {
+          "id": "MD-H30-T05",
+          "title": "Verificar URL de staging",
+          "action": "Probar navegador, rutas directas, configuración y recursos sobre el despliegue de prueba.",
+          "done": "Evidencia de staging y ausencia de conexiones accidentales a producción."
+        }
+      ],
+      "staging": "Abrir URL de staging, recargar rutas de negocio/mesa/pedido y comprobar destinos de red, flags por modalidad y revisión desplegada.",
+      "out_of_scope": "Activar el piloto público o desplegar desarrollo directamente en main.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H31",
+      "title": "Certificar los flujos completos en staging",
+      "type": "historia",
+      "actor": "responsable de validación",
+      "goal": "probar mesa, recogida y programación en staging",
+      "value": "tener evidencia antes de promover a main",
+      "phase": "E",
+      "plan": [
+        "P19"
+      ],
+      "depends_on": [
+        "MD-H14",
+        "MD-H16",
+        "MD-H17",
+        "MD-H18",
+        "MD-H19",
+        "MD-H23",
+        "MD-H24",
+        "MD-H25",
+        "MD-H26",
+        "MD-H27",
+        "MD-H28",
+        "MD-H29",
+        "MD-H30",
+        "MD-H33"
+      ],
+      "decision_blockers": [
+        "MD-A11"
+      ],
+      "decisions": [
+        "D18",
+        "D19"
+      ],
+      "areas": [
+        "operacion",
+        "pos",
+        "kds",
+        "frontend_menu"
+      ],
+      "acceptance": [
+        "La revisión desplegada y las versiones de clientes y esquema quedan identificadas.",
+        "Los tres flujos completos funcionan con datos sintéticos: creación, preparación, seguimiento, cobro y entrega.",
+        "Se prueban rechazo, vencimiento, cancelaciones, varias estaciones, reintento, caída y fallo de correo.",
+        "La evidencia usa navegador y POS/KDS nativos, no la maqueta React como sustituto.",
+        "Los defectos bloqueantes se resuelven mediante PRs atómicos a staging y se repiten los casos afectados antes de recomendar promoción."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H31-T01",
+          "title": "Preparar datos y matriz de staging",
+          "action": "Identificar negocio/sucursal sintéticos, roles, productos, calendario y revisiones de API/POS/esquema.",
+          "done": "Matriz ejecutable ligada a los criterios del backlog."
+        },
+        {
+          "id": "MD-H31-T02",
+          "title": "Ejecutar recorridos de mesa e inmediato",
+          "action": "Crear pedidos y comprobar aviso, aceptación según modalidad, estaciones, seguimiento, pago y entrega.",
+          "done": "Un pedido comercial por envío y cobro correcto."
+        },
+        {
+          "id": "MD-H31-T03",
+          "title": "Ejecutar programación y cancelaciones",
+          "action": "Probar calendario, reserva, corte, liberación y carreras con reloj controlado donde sea posible.",
+          "done": "Ninguna preparación anticipada ni reaparición de cancelados."
+        },
+        {
+          "id": "MD-H31-T04",
+          "title": "Ensayar fallos y recuperación",
+          "action": "Probar indisponibilidad, reintento, correo fallido, reconexión y reversión compatible.",
+          "done": "Pedidos existentes preservados y fallos observables."
+        },
+        {
+          "id": "MD-H31-T05",
+          "title": "Registrar resultados y cerrar defectos",
+          "action": "Adjuntar resultados por criterio, abrir referencias de defectos que correspondan y repetir el caso tras el PR a staging.",
+          "done": "Recomendación de promoción basada en evidencia completa; faltantes figuran como no validados."
+        }
+      ],
+      "staging": "Este issue es la validación integral en staging. No se cierra con pruebas locales ni con screenshots del prototipo. Contrastar pedidos digitales y presenciales en historial y reportes, comprobando que solo las ventas cobradas aportan ingreso.",
+      "out_of_scope": "Un PR documental P00 o una promoción automática a main.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H32",
+      "title": "Promover lo validado a main y activar el piloto controlado",
+      "type": "historia",
+      "actor": "responsable de lanzamiento",
+      "goal": "promover la versión probada y activar una sucursal",
+      "value": "publicar el menú con una operación preparada",
+      "phase": "E",
+      "plan": [
+        "P19"
+      ],
+      "depends_on": [
+        "MD-H31"
+      ],
+      "decision_blockers": [
+        "MD-A09",
+        "MD-A10",
+        "MD-A11"
+      ],
+      "decisions": [
+        "D18",
+        "D19"
+      ],
+      "areas": [
+        "despliegue",
+        "operacion"
+      ],
+      "acceptance": [
+        "La promoción identifica la revisión validada en staging y no incluye cambios de desarrollo sin esa validación.",
+        "La ruta de promoción/release respeta el procedimiento vigente y no sustituye PRs de desarrollo a staging.",
+        "Negocio, sucursal, catálogo, horarios, contacto y reglas reales del piloto sustituyen los ejemplos de Bruma.",
+        "Se verifica la revisión desplegada, los enlaces/QR y la operación de atención tras activar.",
+        "Existe responsable, observación y procedimiento de pausa o reversión que preserva pedidos; la activación no ocurre solo por cerrar otro issue."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H32-T01",
+          "title": "Preparar la promoción identificada",
+          "action": "Relacionar revisiones, PRs atómicos y evidencia de MD-H31 con el cambio de release a main.",
+          "done": "No se incluyen commits ajenos sin revisar y validar."
+        },
+        {
+          "id": "MD-H32-T02",
+          "title": "Confirmar configuración operativa del piloto",
+          "action": "Cargar valores autorizados de negocio/sucursal, productos, horarios y remitente con los accesos del equipo.",
+          "done": "No se usan tiempos, precios o contactos ficticios."
+        },
+        {
+          "id": "MD-H32-T03",
+          "title": "Promover mediante el flujo de release vigente",
+          "action": "Ejecutar la promoción cuando esté autorizada e inspeccionar CI/despliegue de la revisión resultante.",
+          "done": "El runtime corresponde a la revisión aprobada, no solo al PR."
+        },
+        {
+          "id": "MD-H32-T04",
+          "title": "Activar y comprobar el recorrido del piloto",
+          "action": "Habilitar únicamente las modalidades listas y realizar la comprobación controlada acordada.",
+          "done": "El responsable puede recibir, preparar, cobrar y resolver incidencias."
+        },
+        {
+          "id": "MD-H32-T05",
+          "title": "Registrar observación y reversión",
+          "action": "Comprobar alertas, seguimiento y pausa; documentar resultados posteriores al despliegue.",
+          "done": "Pilotaje trazable y recuperación que conserva órdenes y pagos."
+        }
+      ],
+      "staging": "Usar la evidencia aprobada de MD-H31 como condición de entrada. Tras main, comprobar la revisión del runtime y el piloto con su responsable.",
+      "out_of_scope": "Autorizar ahora la publicación o convertir cada tarea de desarrollo en PR directo a main.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    },
+    {
+      "id": "MD-H33",
+      "title": "Distinguir pedidos digitales en historial y reportes",
+      "type": "historia",
+      "actor": "administrador del negocio",
+      "goal": "consultar el origen de los pedidos y ventas del menú",
+      "value": "distinguirlos de los pedidos presenciales sin confundir la modalidad",
+      "phase": "E",
+      "plan": [
+        "P09",
+        "P19"
+      ],
+      "depends_on": [
+        "MD-H14",
+        "MD-H16"
+      ],
+      "decision_blockers": [
+        "MD-A03"
+      ],
+      "decisions": [
+        "D08",
+        "D09",
+        "D10",
+        "D17"
+      ],
+      "areas": [
+        "ordenes",
+        "checkout",
+        "dashboard",
+        "reportes"
+      ],
+      "acceptance": [
+        "El historial y detalle distinguen origen digital/presencial y modalidad mesa/recogida como campos separados.",
+        "Una venta cobrada en POS conserva el origen del pedido digital; los pedidos presenciales mantienen su atribución.",
+        "El reporte por canal usa la fuente canónica de ventas cobradas; un pendiente, rechazo o pedido no recogido sin cobro no se suma como ingreso.",
+        "Los filtros y totales respetan negocio, sucursal y periodo. El total por origen reconcilia con el reporte de ventas existente, incluidas sus devoluciones y ajustes.",
+        "La interfaz conserva el diseño vigente y no añade una insignia permanente de origen en KDS."
+      ],
+      "tasks": [
+        {
+          "id": "MD-H33-T01",
+          "title": "Contrastar atribución y consultas actuales",
+          "action": "Revisar source, fulfillment_type, vínculo de checkout y proyección de ventas en orders y dashboard-operations; contrastar el ADR histórico con el código vigente.",
+          "done": "Se identifica la fuente canónica sin equiparar pedido recibido con venta cobrada."
+        },
+        {
+          "id": "MD-H33-T02",
+          "title": "Preservar origen en lecturas de historial",
+          "action": "Extender solo las lecturas y contratos necesarios para exponer y filtrar el origen digital, manteniendo los permisos y la modalidad separada.",
+          "done": "La UI y una solicitud directa devuelven únicamente pedidos del alcance permitido."
+        },
+        {
+          "id": "MD-H33-T03",
+          "title": "Conectar origen al reporte de ventas",
+          "action": "Usar la atribución conservada por MD-H14 en el agregado existente; cubrir ajustes y devoluciones con su semántica actual.",
+          "done": "Los importes por canal reconcilian con ventas cobradas y no cuentan pendientes como ingresos."
+        },
+        {
+          "id": "MD-H33-T04",
+          "title": "Mostrar origen y filtros en Dashboard",
+          "action": "Actualizar Pedidos y Reportes con sus componentes vigentes; corregir textos antiguos que limitan la atribución a WhatsApp si ya no describen el comportamiento.",
+          "done": "Origen y modalidad son legibles en detalle y filtros sin rediseñar las pantallas."
+        },
+        {
+          "id": "MD-H33-T05",
+          "title": "Probar historial y conciliación por canal",
+          "action": "Añadir casos digital/presencial, pendiente/cobrado, devolución y sucursal ajena; recorrer Dashboard con la API real de staging.",
+          "done": "Resultados sin duplicación y evidencia de aislamiento y conciliación."
+        }
+      ],
+      "staging": "Crear un pedido presencial y pedidos de mesa/recogida digitales, cobrar los casos previstos y dejar uno sin cobro. Verificar origen en detalle e historial y reconciliar ingresos por canal con ventas; repetir con una devolución y otra sucursal.",
+      "out_of_scope": "Un sistema nuevo de analítica, campañas, atribución de marketing o una nueva insignia permanente en KDS.",
+      "status": "Propuesta para revisión",
+      "github_issue": null
+    }
+  ],
+  "decisions": [
+    {
+      "id": "MD-A01",
+      "title": "Alcance, precedencia y permisos de configuración",
+      "type": "decision",
+      "question": "Definir qué se configura por negocio y qué por sucursal; elegir precedencia, valores iniciales y roles de lectura/escritura.",
+      "output": "Matriz de campos, alcance, precedencia, valores iniciales y permisos aprobada.",
+      "acceptance": [
+        "Incluye publicación, recepción y modalidades sin reutilizar implícitamente pausa WhatsApp.",
+        "Describe sucursal nueva, ajuste heredado, ajuste propio y actor sin permiso.",
+        "La recepción permanece desactivada donde el flujo todavía no está completo."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A01-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A01-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Definir qué se configura por negocio y qué por sucursal; elegir precedencia, valores iniciales y roles de lectura/escritura.",
+          "done": "Matriz de campos, alcance, precedencia, valores iniciales y permisos aprobada."
+        },
+        {
+          "id": "MD-A01-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    },
+    {
+      "id": "MD-A02",
+      "title": "Inventario y efectos de cierre del pedido",
+      "type": "decision",
+      "question": "Determinar reserva/descuento y liberación por crear, aceptar, rechazar, vencer, cancelar, preparar y no recoger.",
+      "output": "Tabla de efectos por transición, integración con inventario existente y ejemplo de concurrencia aprobados.",
+      "acceptance": [
+        "Distingue preparado de no preparado y no restaura automáticamente producto consumido.",
+        "Explica qué ocurre con programados y falta de stock antes/después de aceptar.",
+        "Incluye un ejemplo de reintento que no duplica reserva ni descuento."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A02-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A02-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Determinar reserva/descuento y liberación por crear, aceptar, rechazar, vencer, cancelar, preparar y no recoger.",
+          "done": "Tabla de efectos por transición, integración con inventario existente y ejemplo de concurrencia aprobados."
+        },
+        {
+          "id": "MD-A02-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    },
+    {
+      "id": "MD-A03",
+      "title": "Correspondencia entre pedido, preparación, cuenta y cobro",
+      "type": "decision",
+      "question": "Elegir cómo representar aceptación/reserva sin romper estados, contratos y adopción de cuenta existentes.",
+      "output": "Mapa de estados/contratos y de identificadores comerciales aprobado con compatibilidad de clientes.",
+      "acceptance": [
+        "Distingue estado comercial, solicitud de cancelación, preparación y pago.",
+        "Mesa/POS actuales conservan su comportamiento y un pedido digital se cobra sin duplicar orden.",
+        "Incluye un ejemplo de aceptación inmediata y otro de reserva programada."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A03-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A03-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Elegir cómo representar aceptación/reserva sin romper estados, contratos y adopción de cuenta existentes.",
+          "done": "Mapa de estados/contratos y de identificadores comerciales aprobado con compatibilidad de clientes."
+        },
+        {
+          "id": "MD-A03-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    },
+    {
+      "id": "MD-A04",
+      "title": "Permisos y día operativo al cancelar",
+      "type": "decision",
+      "question": "Resolver quién puede cancelar en cada estado y cómo se aplican autorización específica, versión y día operativo del producto vigente.",
+      "output": "Matriz de actor, estado, acción, autorización y efectos de cancelación aprobada.",
+      "acceptance": [
+        "Respeta order.void_after_preparation.approve y no amplía permisos por etiqueta digital.",
+        "Distingue pedido no cobrado de venta cobrada o entregada.",
+        "Incluye versión cambiada mientras se autoriza y pedido de día operativo anterior."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A04-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A04-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Resolver quién puede cancelar en cada estado y cómo se aplican autorización específica, versión y día operativo del producto vigente.",
+          "done": "Matriz de actor, estado, acción, autorización y efectos de cancelación aprobada."
+        },
+        {
+          "id": "MD-A04-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    },
+    {
+      "id": "MD-A05",
+      "title": "Duración de preparación para cantidades y carritos mixtos",
+      "type": "decision",
+      "question": "Definir cómo calcular preparación por producto, cantidad y estaciones y cómo la revisa el personal.",
+      "output": "Regla calculable con ejemplos numéricos reales de cantidades y mezcla de productos aprobada.",
+      "acceptance": [
+        "No adopta los 20 minutos ficticios como valor global.",
+        "Incluye dos estaciones, varias unidades y un producto de preparación larga.",
+        "Aclara cómo se obtiene la hora de liberación desde la hora de recogida."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A05-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A05-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Definir cómo calcular preparación por producto, cantidad y estaciones y cómo la revisa el personal.",
+          "done": "Regla calculable con ejemplos numéricos reales de cantidades y mezcla de productos aprobada."
+        },
+        {
+          "id": "MD-A05-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    },
+    {
+      "id": "MD-A06",
+      "title": "Programados fuera de horario",
+      "type": "decision",
+      "question": "Decidir si cada negocio puede permitir envíos programados cuando está cerrado y desde cuándo corre su aceptación.",
+      "output": "Política dentro/fuera de horario y campo configurable, si aplica, aprobados.",
+      "acceptance": [
+        "Si se prohíbe, describe rechazo y próxima opción visible.",
+        "Si se permite, define próxima apertura, plazo de aceptación y tiempo mínimo para preparar.",
+        "Incluye cierre excepcional y pedido recibido justo antes del cierre."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A06-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A06-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Decidir si cada negocio puede permitir envíos programados cuando está cerrado y desde cuándo corre su aceptación.",
+          "done": "Política dentro/fuera de horario y campo configurable, si aplica, aprobados."
+        },
+        {
+          "id": "MD-A06-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    },
+    {
+      "id": "MD-A07",
+      "title": "Límites de programación, capacidad y cambios de reglas",
+      "type": "decision",
+      "question": "Definir anticipación, horizonte, corte de cancelación, capacidad si aplica y efecto de cambiar reglas con reservas vigentes.",
+      "output": "Matriz de reglas configurables y valores del piloto, con políticas de frontera y cambios aprobadas.",
+      "acceptance": [
+        "El corte de cancelación directa nunca queda después de liberar a preparación.",
+        "Aclara si existe capacidad por hora y qué ocurre con dos reservas simultáneas.",
+        "Cambiar calendario o reglas no mueve silenciosamente una hora prometida."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A07-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A07-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Definir anticipación, horizonte, corte de cancelación, capacidad si aplica y efecto de cambiar reglas con reservas vigentes.",
+          "done": "Matriz de reglas configurables y valores del piloto, con políticas de frontera y cambios aprobadas."
+        },
+        {
+          "id": "MD-A07-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    },
+    {
+      "id": "MD-A08",
+      "title": "Señal de atención disponible y pausa",
+      "type": "decision",
+      "question": "Determinar qué señal demuestra que el negocio puede atender; definir umbrales, alcance por modalidad y recuperación de pausa.",
+      "output": "Política de detección y recuperación con fuentes observables y casos de prueba aprobada.",
+      "acceptance": [
+        "last_seen_at o autenticación aislada no se toman como presencia humana.",
+        "Distingue cierre, pausa manual y caída; especifica mesa e inmediato.",
+        "La pausa preserva consultas, seguimiento y pedidos aceptados."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A08-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A08-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Determinar qué señal demuestra que el negocio puede atender; definir umbrales, alcance por modalidad y recuperación de pausa.",
+          "done": "Política de detección y recuperación con fuentes observables y casos de prueba aprobada."
+        },
+        {
+          "id": "MD-A08-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    },
+    {
+      "id": "MD-A09",
+      "title": "Remitente, respuestas y fallos de correo",
+      "type": "decision",
+      "question": "Definir identidad del remitente por negocio, dominio autorizado, reply-to, responsable de respuestas y tratamiento de rebotes/reintentos.",
+      "output": "Configuración operativa sin secretos, política de envío y destinatarios autorizados de prueba aprobados.",
+      "acceptance": [
+        "Distingue SMTP configurado, aceptación del proveedor y entrega.",
+        "Define cómo se identifica el negocio y cómo responde el cliente.",
+        "Incluye tratamiento de fallo sin cancelar el pedido ni usar WhatsApp como dependencia."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A09-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A09-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Definir identidad del remitente por negocio, dominio autorizado, reply-to, responsable de respuestas y tratamiento de rebotes/reintentos.",
+          "done": "Configuración operativa sin secretos, política de envío y destinatarios autorizados de prueba aprobados."
+        },
+        {
+          "id": "MD-A09-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    },
+    {
+      "id": "MD-A10",
+      "title": "Ubicación, dominio y rutas del frontend",
+      "type": "decision",
+      "question": "Elegir ubicación del frontend en el monorepo, rutas estables por sucursal/mesa y estrategia de entornos/API/Cloudflare.",
+      "output": "Mapa de rutas, propietario del frontend y configuración por entorno aprobados.",
+      "acceptance": [
+        "Se distingue umi-stageshow de la publicación comercial.",
+        "Staging no apunta a datos o API de producción.",
+        "Explica enlaces/QR estables y la carga directa de una ruta de seguimiento."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A10-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A10-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Elegir ubicación del frontend en el monorepo, rutas estables por sucursal/mesa y estrategia de entornos/API/Cloudflare.",
+          "done": "Mapa de rutas, propietario del frontend y configuración por entorno aprobados."
+        },
+        {
+          "id": "MD-A10-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    },
+    {
+      "id": "MD-A11",
+      "title": "Negocio y sucursal del piloto",
+      "type": "decision",
+      "question": "Seleccionar negocio/sucursal y responsables de operación, validación y lanzamiento; definir catálogo, horario y modalidades iniciales.",
+      "output": "Ficha de piloto con responsables, alcance y datos reales autorizados.",
+      "acceptance": [
+        "Identifica quién atiende pendientes e incidencias y cómo se pausa el canal.",
+        "Los datos reales sustituyen los ejemplos de Bruma.",
+        "Define destinatarios de prueba y fecha solo cuando exista compromiso del equipo."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A11-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A11-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Seleccionar negocio/sucursal y responsables de operación, validación y lanzamiento; definir catálogo, horario y modalidades iniciales.",
+          "done": "Ficha de piloto con responsables, alcance y datos reales autorizados."
+        },
+        {
+          "id": "MD-A11-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    },
+    {
+      "id": "MD-A12",
+      "title": "Protección de acceso público y datos de contacto",
+      "type": "decision",
+      "question": "Definir límites de abuso, credenciales y caducidad/rotación, cacheado privado y retención de contacto.",
+      "output": "Política mínima de acceso, límites y retención con escenarios de prueba aprobada.",
+      "acceptance": [
+        "Número, teléfono o correo no autorizan a consultar pedidos ni historial.",
+        "Define efecto de revocar QR y de expirar un enlace sin inventar identidad verificada.",
+        "No requiere OTP ni usa credenciales de administración en el cliente público."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A12-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A12-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Definir límites de abuso, credenciales y caducidad/rotación, cacheado privado y retención de contacto.",
+          "done": "Política mínima de acceso, límites y retención con escenarios de prueba aprobada."
+        },
+        {
+          "id": "MD-A12-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    },
+    {
+      "id": "MD-A13",
+      "title": "Plazo de aceptación y cambios con pendientes",
+      "type": "decision",
+      "question": "Definir alcance, unidad, límites, valor inicial y efecto de cambiar el plazo mientras existen pedidos pendientes.",
+      "output": "Regla y valores operativos aprobados para inicio/vencimiento y cambios del plazo.",
+      "acceptance": [
+        "Incluye pedidos antes/después del cambio y aceptación concurrente con vencimiento.",
+        "No adopta los cinco minutos de DiDi como decisión de Umi.",
+        "Se relaciona con MD-A06 cuando se permiten programados fuera de horario."
+      ],
+      "tasks": [
+        {
+          "id": "MD-A13-T01",
+          "title": "Contrastar el comportamiento vigente",
+          "action": "Revisar fuentes, operación y consumidores relacionados con esta decisión; registrar hechos y restricciones.",
+          "done": "Evidencia fechada que diferencia hechos de propuestas."
+        },
+        {
+          "id": "MD-A13-T02",
+          "title": "Resolver la decisión con los responsables",
+          "action": "Definir alcance, unidad, límites, valor inicial y efecto de cambiar el plazo mientras existen pedidos pendientes.",
+          "done": "Regla y valores operativos aprobados para inicio/vencimiento y cambios del plazo."
+        },
+        {
+          "id": "MD-A13-T03",
+          "title": "Convertir el resultado en ejemplos verificables",
+          "action": "Registrar los escenarios de aceptación indicados y actualizar las historias afectadas; conservar el resultado junto al primer PR funcional que lo use.",
+          "done": "No quedan valores implícitos; las historias afectadas enlazan la decisión resuelta."
+        }
+      ],
+      "status": "Pendiente de decisión",
+      "github_issue": null,
+      "depends_on": []
+    }
+  ]
+}

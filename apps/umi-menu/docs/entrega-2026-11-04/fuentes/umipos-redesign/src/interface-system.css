@@ -1,0 +1,32 @@
+/* Shared action and field rules for the POS and owner dashboard. */
+.u-app {
+  --ui-action-height: 48px;
+  --ui-control-height: 44px;
+  --ui-radius: 8px;
+  --ui-field-border: color-mix(in srgb, var(--ink) 50%, var(--surface));
+  font-variant-numeric: tabular-nums;
+}
+.u-app :is(.u-primary,.u-secondary) { border-radius: var(--ui-radius); font-size: 14px; font-weight: 500; line-height: 20px; }
+.u-app .u-primary { min-height: var(--ui-action-height); }
+.u-app .u-secondary { min-height: var(--ui-control-height); }
+.u-app .button-press-motion { min-height: var(--ui-control-height); border-radius: var(--ui-radius); box-shadow: none; }
+.u-app .button-press-motion.bg-button-primary { min-height: var(--ui-action-height); background: var(--blue); color: var(--color-text-white); }
+.u-app :is(.u-primary,.u-secondary,.button-press-motion):disabled { opacity: .45; cursor: not-allowed; }
+.u-app button:focus-visible, .u-app a:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+.u-app .u-overline { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 400; }
+.u-app .u-page-title { font-family: 'Bricolage Grotesque',sans-serif; font-weight: 600; }
+.u-app .u-confirm { min-height: var(--ui-action-height); }
+.u-app .u-pin-keypad button, .u-app .u-pin-keypad button > span,
+.u-app .u-keypad button { font-size: 22px; font-weight: 500; line-height: 28px; }
+.u-app .u-pin-keypad button[data-target=pin-clear] > span { font-size: 13px; line-height: 20px; }
+.u-app .u-received > div { border-color: var(--ui-field-border); border-radius: var(--ui-radius); }
+.u-app .u-charge-amount { align-items: flex-start; text-align: start; }
+.u-app .u-cash-scroll-wrap::after { content: ''; position: absolute; inset-inline: 0; bottom: 0; height: 20px; background: linear-gradient(transparent,var(--bg)); pointer-events: none; }
+.u-app [data-ui-field=select] { min-height: 48px; border-color: var(--ui-field-border); border-radius: var(--ui-radius); box-shadow: none; }
+.u-app[data-theme=dark] .bg-button-primary,
+.u-app[data-theme=dark] .u-boardui .bg-button-primary { color: var(--bg); }
+.u-app[data-theme=dark] input[type=time] { color-scheme: dark; }
+.study-app-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 auto 16px; max-width: 1280px; }
+.study-app-picker > button { border-radius: 8px; min-height: 44px; padding: 8px 16px; }
+.study-app-picker [aria-pressed=true] { background: var(--color-background-secondary-default); border-color: var(--color-border-button-default); }
+.study-app-picker > button:nth-child(4) { margin-inline-start: auto; }
