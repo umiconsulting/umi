@@ -43,6 +43,7 @@ on:
     paths:
       - 'apps/umi-pos/**'
       - 'packages/contract/generated/dart/**'
+      - 'packages/contract/src/catalog.ts'
       - '.github/workflows/umi-pos-ios.yml'
   workflow_dispatch:
 
@@ -78,10 +79,15 @@ jobs:
         --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled
         --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=true
         --dart-define=UMIPOS_RELEASE_VERSION=0.1.0
-        --dart-define=UMIPOS_CONTRACT_VERSION=2.23.0
         --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Read the contract version
+        run: |
+          CONTRACT_VERSION=$(sed -n "s/^export const CONTRACT_VERSION = '\(.*\)';$/\1/p" packages/contract/src/catalog.ts)
+          test -n "$CONTRACT_VERSION"
+          printf 'CONTRACT_VERSION=%s\n' "$CONTRACT_VERSION" >> "$GITHUB_ENV"
 
       # The version RUNNING_UMIPOS.md documents. A different Flutter here would
       # make this job disagree with every local run.
@@ -120,11 +126,15 @@ jobs:
         working-directory: apps/umi-pos
         run: flutter gen-l10n
 
+      - name: Native POS client tests
+        working-directory: apps/umi-pos
+        run: flutter test --no-pub
+
       # The point of the job. `--no-codesign` skips signing entirely, so this needs
       # no certificate, no profile and no Apple account.
       - name: Build for iOS without signing
         working-directory: apps/umi-pos
-        run: flutter build ios --no-codesign --release $UMIPOS_DEFINES
+        run: flutter build ios --no-codesign --release $UMIPOS_DEFINES --dart-define=UMIPOS_CONTRACT_VERSION="$CONTRACT_VERSION"
 
       # A simulator build needs NO signing at all, so it is the one artifact
       # anybody can produce today. It runs in a cloud iOS simulator — LambdaTest
@@ -136,7 +146,7 @@ jobs:
       # app with the Dart VM in it; the benefit is that it exists at all.
       - name: Build for the simulator
         working-directory: apps/umi-pos
-        run: flutter build ios --simulator --debug $UMIPOS_DEFINES
+        run: flutter build ios --simulator --debug $UMIPOS_DEFINES --dart-define=UMIPOS_CONTRACT_VERSION="$CONTRACT_VERSION"
 
       # Zipped on purpose. `upload-artifact` stores files relative to the least
       # common ancestor of the paths it is given, so handing it `Runner.app` puts

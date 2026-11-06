@@ -78,12 +78,42 @@ jobs:
           corepack enable
           corepack prepare pnpm@10.29.3 --activate
 
-      # Only the dashboard subtree — avoids installing sibling apps (e.g. umi-cash
-      # runs `prisma generate` on install, which this build does not need).
+      # Include the root Playwright dependency and the dashboard subtree.
+      # Umi Cash keeps its separate npm install.
       - name: Install
-        run: pnpm install --frozen-lockfile --filter @umi/dashboard...
+        run: pnpm install --frozen-lockfile --filter @umi/dashboard... --filter umi-workspace
+
+      - name: Dashboard unit tests
+        run: pnpm --filter @umi/dashboard test
+
+      - name: Install Chromium for the browser checks
+        run: pnpm --filter @umi/dashboard exec playwright install --with-deps chromium
+
+      - name: Self-contained dashboard browser checks
+        run: |
+          pnpm --filter @umi/dashboard exec playwright test --config playwright.config.js \
+            e2e/floor-plan.pw.js \
+            e2e/inventory-quantities.pw.js \
+            e2e/recipe-sales-recovery.pw.js \
+            e2e/redesign-parity.pw.js \
+            --reporter=line
+
+      - name: Identify separate live-fixture checks
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ### Dashboard client checks
+          The unit suite and the self-contained browser suite passed.
+          The following 10 live-fixture cases were NOT RUN by this workflow. They are not passes.
+          - inventory-import.pw.js: 4 cases; requires UMI_IMPORT_FIXTURE and, for the API/database case, UMI_IMPORT_DATABASE_URL.
+          - inventory-initial-cost.pw.js: 2 cases; requires UMI_INITIAL_COST_FIXTURE.
+          - inventory-mobile.pw.js: 1 case; requires UMI_MOBILE_FIXTURE.
+          - inventory-preparation.pw.js: 3 cases; requires UMI_PREPARATION_FIXTURE.
+          EOF
 
       - name: Write build env
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          RELEASE_VERSION: ${{ github.ref_name }}
         run: |
           # The deploy target branch selects the environment. Production (main)
           # calls the API directly — it is already same-site with the dashboard.
@@ -93,7 +123,6 @@ jobs:
           # (…pages.dev and …umiconsulting.co are different sites). The preview
           # backend is chosen at runtime by the Pages "Preview" env var
           # API_ORIGIN. All values here are public build-time config.
-          BRANCH="${{ github.head_ref || github.ref_name }}"
           CONTRACT_VERSION="$(sed -n "s/^export const CONTRACT_VERSION = '\(.*\)';$/\1/p" packages/contract/src/catalog.ts)"
           test -n "$CONTRACT_VERSION" || { echo "CONTRACT_VERSION not found in packages/contract/src/catalog.ts"; exit 1; }
           if [ "$BRANCH" = "main" ]; then
@@ -124,7 +153,7 @@ jobs:
           VITE_SUPABASE_URL=https://xbudknbimkgjjgohnjgp.supabase.co
           VITE_SUPABASE_ANON_KEY=${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_CONFIG_SCHEMA_VERSION=1
-          VITE_RELEASE_VERSION=${{ github.ref_name }}
+          VITE_RELEASE_VERSION=$RELEASE_VERSION
           VITE_RELEASE_GIT_COMMIT=${{ github.sha }}
           VITE_RELEASE_BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           EOF
@@ -134,11 +163,11 @@ jobs:
 
       - name: Deploy to Cloudflare Pages
         env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 8aef562d6d0c51b70f1b83fa1d2912a4
         run: |
           # main -> production branch "main"; PR -> preview branch = head ref.
-          BRANCH="${{ github.head_ref || github.ref_name }}"
           echo "Deploying to Cloudflare Pages (branch: $BRANCH)"
           OUT=$(pnpm dlx wrangler@4.129.0 pages deploy apps/umi-dashboard/dist \
             --project-name=umi-dashboard --branch="$BRANCH" --commit-dirty=true 2>&1)

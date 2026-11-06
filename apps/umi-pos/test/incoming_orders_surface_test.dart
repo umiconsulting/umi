@@ -131,6 +131,69 @@ const _telemetry = SafeTelemetry(
 );
 
 void main() {
+  for (final contentWidth in [684.0, 868.0]) {
+    testWidgets(
+      'incoming retains header through loading, empty and detail at content width $contentWidth',
+      (tester) async {
+        tester.view.physicalSize = const Size(900, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final repo = _Repo()..pending = Completer<PosIncomingOrders>();
+        final incoming = IncomingOrdersController(
+          repository: repo,
+          telemetry: _telemetry,
+        );
+        final cart = CartController(repository: repo, telemetry: _telemetry)
+          ..restore(_cart());
+        await tester.pumpWidget(
+          PosApp(
+            locale: const Locale('es'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            home: Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: contentWidth,
+                child: IncomingOrdersSurface(
+                  incoming: incoming,
+                  cart: cart,
+                  merchantId: 'merchant',
+                  locationId: 'location',
+                  operatorSessionId: 'operator',
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.byTooltip('Actualizar'), findsOneWidget);
+        expect(find.byTooltip('Cerrar'), findsOneWidget);
+        repo.pending!.complete(const PosIncomingOrders(orders: []));
+        await tester.pumpAndSettle();
+        expect(find.byTooltip('Actualizar').hitTestable(), findsOneWidget);
+        repo.pending = null;
+        await tester.tap(find.byTooltip('Actualizar'));
+        await tester.pumpAndSettle();
+        expect(find.byTooltip('Actualizar').hitTestable(), findsOneWidget);
+        if (contentWidth < 752) {
+          await tester.tap(
+            find.byKey(
+              const ValueKey('incoming-00000000-0000-4000-8000-0000000000a1'),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(find.byTooltip('Actualizar').hitTestable(), findsOneWidget);
+          expect(find.byTooltip('Cerrar').hitTestable(), findsOneWidget);
+        }
+        expect(repo.lastBind, isNull);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        incoming.dispose();
+        cart.dispose();
+      },
+    );
+  }
+
   testWidgets('lists an incoming order and picks it up into the cart', (
     tester,
   ) async {
@@ -172,7 +235,12 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Ana'), findsOneWidget);
+    expect(find.textContaining('Ana'), findsWidgets);
+    expect(find.text('wa-1'), findsNWidgets(2));
+    expect(find.textContaining('Recibido'), findsWidgets);
+    expect(find.textContaining('Al atender se vincula'), findsOneWidget);
+    expect(find.text('Total del pedido de origen'), findsOneWidget);
+    expect(find.textContaining('líneas de productos'), findsOneWidget);
     expect(find.text('Atender'), findsOneWidget);
 
     await tester.tap(find.text('Atender'));
@@ -241,9 +309,15 @@ void main() {
         await tester.ensureVisible(find.text('Reintentar'));
         await tester.tap(find.text('Reintentar'));
         await tester.pumpAndSettle();
-        expect(find.text('Ana'), findsOneWidget);
+        expect(find.textContaining('Ana'), findsWidgets);
         expect(cart.state.cart, same(original));
         expect(repo.lastBind, isNull);
+        await tester.tap(find.text('wa-1'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('incoming-list')), findsNothing);
+        expect(find.textContaining('Al atender se vincula'), findsOneWidget);
+        expect(find.text('Total del pedido de origen'), findsOneWidget);
+        expect(find.textContaining('líneas de productos'), findsOneWidget);
         await tester.ensureVisible(find.text('Atender'));
         final rect = tester.getRect(find.text('Atender'));
         expect(rect.right, lessThanOrEqualTo(375));

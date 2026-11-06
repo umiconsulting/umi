@@ -7,8 +7,10 @@ import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/network/api_client.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/storage/local_working_copy.dart';
+import 'package:umi_pos/core/theme/display_preferences.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/core/theme/umi_theme.dart';
+import 'package:umi_pos/features/cart/course_control.dart';
 import 'package:umi_pos/features/catalog/catalog_controller.dart';
 import 'package:umi_pos/features/catalog/catalog_repository.dart';
 import 'package:umi_pos/features/catalog/catalog_surface.dart';
@@ -24,6 +26,7 @@ CatalogProductSummary product(
   String availability = 'enabled',
   bool hasVariants = false,
   bool hasModifiers = false,
+  Map<String, Object?>? media,
 }) => CatalogProductSummary(
   id: id,
   name: name,
@@ -36,7 +39,7 @@ CatalogProductSummary product(
   saleAction: 'merchandise',
   availability: availability,
   availableFrom: null,
-  primaryMedia: null,
+  primaryMedia: media,
   hasVariants: hasVariants,
   hasModifiers: hasModifiers,
   updatedAt: '2026-07-28T00:00:00Z',
@@ -50,11 +53,15 @@ final class FakeCatalogRepository implements CatalogRepository {
     this.categoryItems = const [],
     this.productHasVariants = false,
     this.productHasModifiers = false,
+    this.productMedia,
+    this.mediumDelta = 0,
   });
 
   /// What the one seeded product is called, and the category it carries. A test that
   /// cares about the tile's colour and letters sets both; the rest keep the defaults.
   final String productName;
+  final int mediumDelta;
+  final Map<String, Object?>? productMedia;
   final Map<String, Object?>? productCategory;
 
   /// What the branch's menu says about that product: `enabled`, or one of the four
@@ -93,6 +100,7 @@ final class FakeCatalogRepository implements CatalogRepository {
               '$calls',
               name: productName,
               category: productCategory,
+              media: productMedia,
               availability: productAvailability,
               hasVariants: productHasVariants,
               hasModifiers: productHasModifiers,
@@ -128,23 +136,50 @@ final class FakeCatalogRepository implements CatalogRepository {
     updatedAt: '2026-07-28T00:00:00Z',
     barcode: '7501000000002',
     media: const [],
-    variants: const [
-      {'id': 'small', 'name': 'Chico'},
-      {'id': 'medium', 'name': 'Mediano'},
-      {'id': 'large', 'name': 'Grande'},
+    variants: [
+      {
+        'id': 'small',
+        'name': 'Chico',
+        'attributes': <String, Object?>{},
+        'priceDelta': {'minorUnits': 0, 'currency': 'MXN'},
+        'availability': 'enabled',
+      },
+      {
+        'id': 'medium',
+        'name': 'Mediano',
+        'attributes': <String, Object?>{},
+        'priceDelta': {'minorUnits': mediumDelta, 'currency': 'MXN'},
+        'availability': 'enabled',
+      },
+      {
+        'id': 'large',
+        'name': 'Grande',
+        'attributes': <String, Object?>{},
+        'priceDelta': {'minorUnits': 0, 'currency': 'MXN'},
+        'availability': 'enabled',
+      },
     ],
     optionGroups: const [
       {
         'id': 'milk',
         'name': 'Tipo de leche',
+        'required': false,
+        'minSelections': 0,
+        'maxSelections': null,
         'modifiers': [
-          {'id': 'oat', 'name': 'Leche de avena'},
+          {
+            'id': 'oat',
+            'name': 'Leche de avena',
+            'priceDelta': {'minorUnits': 0, 'currency': 'MXN'},
+            'available': true,
+          },
           // One modifier carries a surcharge and the other does not, on purpose:
           // the surcharge adds a second line to its tile, and that is the case
           // that used to leave two tiles in one row at different heights.
           {
             'id': 'whole',
             'name': 'Leche entera',
+            'available': true,
             'priceDelta': {'minorUnits': 1000, 'currency': 'MXN'},
           },
         ],
@@ -243,6 +278,87 @@ CatalogController controller(FakeCatalogRepository repository) {
 }
 
 void main() {
+  for (final dark in [false, true]) {
+    testWidgets(
+      'photo-free keys retain readable names and category contrast in dark=$dark',
+      (tester) async {
+        const name = 'Una bebida con nombre largo para comprobar el contraste';
+        final repo = FakeCatalogRepository(
+          productName: name,
+          productMedia: const {'url': 'https://example.invalid/product.png'},
+          categoryItems: const [
+            {
+              'id': 'sage',
+              'name': 'Sage',
+              'displayOrder': 0,
+              'enabled': true,
+              'color': '#34d399',
+            },
+            {
+              'id': 'cyan',
+              'name': 'Cyan',
+              'displayOrder': 1,
+              'enabled': true,
+              'color': '#67e8f9',
+            },
+            {
+              'id': 'lavender',
+              'name': 'Lavender',
+              'displayOrder': 2,
+              'enabled': true,
+              'color': '#a78bfa',
+            },
+          ],
+        );
+        final catalog = controller(repo);
+        await catalog.open(partition);
+        final root = testRoot();
+        await tester.pumpWidget(
+          PosApp(
+            theme: dark ? UmiTheme.dark() : UmiTheme.light(),
+            locale: const Locale('es'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
+            home: CatalogSurface(
+              entry: root.entry,
+              catalog: catalog,
+              cart: root.cart,
+              cash: root.cash,
+              checkout: root.checkout,
+              sales: root.sales,
+              exceptions: root.exceptions,
+              connectivity: root.connectivity,
+              telemetry: root.telemetry,
+            ),
+          ),
+        );
+        await tester.pump();
+        final label = tester.widget<Text>(find.text(name));
+        expect(label.style!.backgroundColor, isNull);
+        expect(find.byType(Image), findsNothing);
+        expect(label.style!.fontSize, 18);
+        expect(label.style!.fontWeight, FontWeight.w600);
+        final fills = <Color>[];
+        for (final name in ['Sage', 'Cyan', 'Lavender']) {
+          final box = tester.widget<Container>(
+            find
+                .ancestor(of: find.text(name), matching: find.byType(Container))
+                .first,
+          );
+          fills.add((box.decoration! as BoxDecoration).color!);
+        }
+        expect(fills.toSet(), hasLength(3));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        catalog.dispose();
+        root.dispose();
+      },
+    );
+  }
+
   test(
     'catalog cache is bounded and partitioned by tenant, branch and language',
     () {
@@ -384,93 +500,147 @@ void main() {
     root.dispose();
   });
 
-  testWidgets('the category index stacks its ears and opens the one chosen', (
-    tester,
-  ) async {
-    final repository = FakeCatalogRepository(
-      categoryItems: const [
-        {
-          'id': 'drinks',
-          'name': 'Bebidas',
-          'displayOrder': 0,
-          'enabled': true,
-          'color': '#1E6F8C',
-        },
-        {
-          'id': 'desserts',
-          'name': 'Postres',
-          'displayOrder': 1,
-          'enabled': true,
-          'color': null,
-        },
-      ],
-    );
-    final value = controller(repository);
-    await value.open(partition);
-    final root = testRoot();
-    await tester.pumpWidget(
-      PosApp(
-        locale: const Locale('es'),
-        supportedLocales: AppLocalizations.supportedLocales,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
+  for (final size in const [
+    Size(402, 874),
+    Size(412, 915),
+    Size(820, 1180),
+    Size(800, 1340),
+    Size(1340, 800),
+    Size(1440, 1000),
+  ]) {
+    testWidgets('category selection stays readable beside products at $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repository = FakeCatalogRepository(
+        categoryItems: const [
+          {
+            'id': 'drinks',
+            'name': 'Bebidas',
+            'displayOrder': 0,
+            'enabled': true,
+            'color': '#67e8f9',
+          },
+          {
+            'id': 'desserts',
+            'name': 'Postres',
+            'displayOrder': 1,
+            'enabled': true,
+            'color': null,
+          },
         ],
-        home: CatalogSurface(
-          entry: root.entry,
-          catalog: value,
-          cart: root.cart,
-          cash: root.cash,
-          checkout: root.checkout,
-          sales: root.sales,
-          exceptions: root.exceptions,
-          connectivity: root.connectivity,
-          telemetry: root.telemetry,
+      );
+      final value = controller(repository);
+      await value.open(partition);
+      final root = testRoot();
+      await tester.pumpWidget(
+        PosApp(
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          home: CatalogSurface(
+            entry: root.entry,
+            catalog: value,
+            cart: root.cart,
+            cash: root.cash,
+            checkout: root.checkout,
+            sales: root.sales,
+            exceptions: root.exceptions,
+            connectivity: root.connectivity,
+            telemetry: root.telemetry,
+          ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    Rect ear(String label) => tester.getRect(
-      find.ancestor(of: find.text(label), matching: find.byType(PosTapRegion)),
-    );
-    bool chosen(String label) =>
-        tester
-            .widget<PosTapRegion>(
-              find.ancestor(
-                of: find.text(label),
-                matching: find.byType(PosTapRegion),
-              ),
+      expect(find.text('La carta'), findsOneWidget);
+      expect(find.text('umi'), findsOneWidget);
+      Rect ear(String label) => tester.getRect(
+        find.ancestor(
+          of: find.text(label),
+          matching: find.byType(PosTapRegion),
+        ),
+      );
+      bool chosen(String label) =>
+          tester
+              .widget<PosTapRegion>(
+                find.ancestor(
+                  of: find.text(label),
+                  matching: find.byType(PosTapRegion),
+                ),
+              )
+              .selected ??
+          false;
+      final first = ear('Todo');
+      final drinks = ear('Bebidas');
+      final desserts = ear('Postres');
+      expect(drinks.left, greaterThanOrEqualTo(first.right));
+      expect(desserts.left, greaterThanOrEqualTo(drinks.right));
+      final products = tester.getRect(
+        find.byKey(const PageStorageKey('catalog-grid')),
+      );
+      expect(drinks.bottom, lessThanOrEqualTo(products.top));
+      if (size.width >= 700) {
+        final account = tester.getRect(
+          find.byKey(const ValueKey('catalog-account')),
+        );
+        expect(products.right, lessThanOrEqualTo(account.left));
+      }
+      final categoryText = tester.widget<Text>(find.text('Bebidas'));
+      final categoryContainer = tester.widget<Container>(
+        find
+            .ancestor(
+              of: find.text('Bebidas'),
+              matching: find.byType(Container),
             )
-            .selected ??
-        false;
-    // The dividers wear their labels in capitals: the raised text is what the
-    // operator reads on the ear, and the test taps and measures that text.
-    final first = ear('TODO');
-    final drinks = ear('BEBIDAS');
-    final desserts = ear('POSTRES');
-    // The ears tuck under each other, so a row of separate buttons would start
-    // each one after the last instead of over it.
-    expect(drinks.left, lessThan(first.right));
-    expect(desserts.left, lessThan(drinks.right));
-    // One divider is open at a time. The ear inside the box is what changes
-    // height with the choice; the box stays on the till's touch floor.
-    expect(chosen('TODO'), isTrue);
-    expect(chosen('BEBIDAS'), isFalse);
-    expect(chosen('POSTRES'), isFalse);
-    expect(drinks.height, greaterThanOrEqualTo(UmiTouchTarget.minimum));
-    expect(drinks.height, desserts.height);
+            .first,
+      );
+      final softened = HSLColor.fromColor(
+        (categoryContainer.decoration! as BoxDecoration).color!,
+      );
+      expect(softened.saturation, lessThan(.36));
+      expect(softened.lightness, greaterThan(.70));
+      expect(
+        softened.hue,
+        closeTo(HSLColor.fromColor(const Color(0xFF67E8F9)).hue, 3),
+      );
+      final allContainer = tester.widget<Container>(
+        find
+            .ancestor(of: find.text('Todo'), matching: find.byType(Container))
+            .first,
+      );
+      expect(
+        (allContainer.decoration! as BoxDecoration).color,
+        const Color(0xFFCDD2DF),
+      );
+      final foreground = categoryText.style!.color!.computeLuminance();
+      final background = (categoryContainer.decoration! as BoxDecoration).color!
+          .computeLuminance();
+      final contrast =
+          ((foreground > background ? foreground : background) + .05) /
+          ((foreground < background ? foreground : background) + .05);
+      expect(contrast, greaterThanOrEqualTo(4.5));
+      expect(chosen('Todo'), isTrue);
+      expect(chosen('Bebidas'), isFalse);
+      expect(drinks.height, greaterThanOrEqualTo(UmiTouchTarget.minimum - .01));
+      await tester.ensureVisible(find.text('Postres'));
+      await tester.tap(find.text('Postres'));
+      await tester.pump();
+      expect(value.state.selectedCategoryId, 'desserts');
+      expect(chosen('Postres'), isTrue);
+      expect(chosen('Bebidas'), isFalse);
+      expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('POSTRES'));
-    await tester.pump();
-    expect(value.state.selectedCategoryId, 'desserts');
-    expect(chosen('POSTRES'), isTrue);
-    expect(chosen('BEBIDAS'), isFalse);
-
-    await tester.pumpWidget(const SizedBox());
-    value.dispose();
-    root.dispose();
-  });
+      await tester.pumpWidget(const SizedBox());
+      value.dispose();
+      root.dispose();
+    });
+  }
 
   testWidgets(
     'an unavailable product is dimmed, says "No disponible", and its tap never reaches the cart',
@@ -534,7 +704,7 @@ void main() {
   );
 
   testWidgets(
-    'a product with no photo is a block of its category colour with its initials',
+    'a product key shows its full name without a decorative photo or initials',
     (tester) async {
       // The tile carries the owner's colour and the product's own letters, and nothing
       // else. The owner removed the line drawing that used to sit behind the letters on
@@ -579,61 +749,55 @@ void main() {
       );
       await tester.pump();
 
-      // The initials are the product's, not the category's: "Croissant" reads CR.
-      expect(find.text('CR'), findsOneWidget);
-      // The card and the page are ColoredBoxes too; the innermost ancestor of the letters is
-      // the block itself.
-      final block = find
-          .ancestor(of: find.text('CR'), matching: find.byType(ColoredBox))
-          .first;
-      expect(tester.widget<ColoredBox>(block).color, const Color(0xFFF58231));
-      // A light owner colour would wash white letters out, so the ink follows luminance.
-      final letters = tester.widget<Text>(find.text('CR'));
-      expect(letters.style?.color, const Color(0xFFFFFFFF));
-      // No drawing and no corner badge: the block and the letters are the whole tile. Scoped to
-      // the tile because the icons elsewhere on the card are painted, on purpose.
-      expect(
-        find.descendant(of: block, matching: find.byType(CustomPaint)),
-        findsNothing,
-      );
-
+      expect(find.text('CR'), findsNothing);
+      expect(find.byType(Image), findsNothing);
+      final name = tester.widget<Text>(find.text('Croissant'));
+      expect(name.style!.fontSize, 18);
+      expect(name.style!.fontWeight, FontWeight.w600);
       await tester.pumpWidget(const SizedBox());
       value.dispose();
       root.dispose();
     },
   );
 
-  testWidgets('product detail keeps variant choices horizontal inside its scroll surface', (
+  testWidgets('product detail presents variant and modifier inspectors with stacked keys', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final repository = FakeCatalogRepository(
       productHasVariants: true,
+      mediumDelta: 1000,
       productHasModifiers: true,
     );
     final value = controller(repository);
     await value.open(partition);
     final root = testRoot();
+    final prefs = DisplayPreferences(TestPreferences());
+    await prefs.load();
+    addTearDown(prefs.dispose);
     await tester.pumpWidget(
-      PosApp(
-        locale: const Locale('es'),
-        supportedLocales: AppLocalizations.supportedLocales,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
+      DisplayPreferencesScope(
+        preferences: prefs,
+        child: PosApp(
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
 
-          GlobalWidgetsLocalizations.delegate,
-        ],
-        home: CatalogSurface(
-          entry: root.entry,
-          catalog: value,
-          cart: root.cart,
-          cash: root.cash,
-          checkout: root.checkout,
-          sales: root.sales,
-          exceptions: root.exceptions,
-          connectivity: root.connectivity,
-          telemetry: root.telemetry,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          home: CatalogSurface(
+            entry: root.entry,
+            catalog: value,
+            cart: root.cart,
+            cash: root.cash,
+            checkout: root.checkout,
+            sales: root.sales,
+            exceptions: root.exceptions,
+            connectivity: root.connectivity,
+            telemetry: root.telemetry,
+          ),
         ),
       ),
     );
@@ -641,12 +805,26 @@ void main() {
     await tester.tap(find.text('Café'));
     await tester.pumpAndSettle();
 
+    final variant = find
+        .ancestor(of: find.text('Mediano'), matching: find.byType(PosTapRegion))
+        .first;
+    expect(
+      find.descendant(of: variant, matching: find.text('+MXN 10.00')),
+      findsOneWidget,
+    );
+    expect(find.text('Incluido'), findsNWidgets(2));
+    expect(find.byKey(const ValueKey('product-detail-photo')), findsOneWidget);
+    await prefs.setShowProductPhotos(false);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('product-detail-photo')), findsNothing);
     expect(find.byType(RawScrollbar), findsWidgets);
-    final small = tester.getCenter(find.text('Chico'));
-    final medium = tester.getCenter(find.text('Mediano'));
-    final large = tester.getCenter(find.text('Grande'));
-    expect(small.dy, medium.dy);
-    expect(medium.dy, large.dy);
+    final small = tester.getTopLeft(find.text('Chico'));
+    final medium = tester.getTopLeft(find.text('Mediano'));
+    final large = tester.getTopLeft(find.text('Grande'));
+    expect(small.dx, medium.dx);
+    expect(medium.dx, large.dx);
+    expect(small.dy, lessThan(medium.dy));
+    expect(medium.dy, lessThan(large.dy));
 
     // Every option tile in a row is the same size, whether or not it carries a
     // surcharge. The tile with a price used to be one line taller than the one
@@ -669,7 +847,7 @@ void main() {
           .first,
     );
     expect(plain, withPrice);
-    expect(plain.width, 200);
+    expect(plain.width, greaterThanOrEqualTo(160));
 
     // AND THE NAME SITS IN THE MIDDLE OF ITS TILE.
     //
@@ -689,10 +867,7 @@ void main() {
     final labelRect = tester.getRect(find.text('Leche de avena'));
     expect((labelRect.center.dy - tileRect.center.dy).abs(), lessThan(1.5));
 
-    // And it stays level when one of them is SELECTED: a selected tile draws a
-    // 2 px border where an unselected one draws 1 px, which used to be absorbed
-    // by a pinned tile height and painted a "BOTTOM OVERFLOWED" stripe in a
-    // debug build. Now the row grows by those 2 px and both tiles grow with it.
+    // Selecting a choice changes its surface and border color without changing row geometry.
     await tester.tap(find.text('Leche entera'));
     await tester.pumpAndSettle();
     final selectedPlain = tester.getSize(
@@ -712,7 +887,7 @@ void main() {
           .first,
     );
     expect(selectedPlain, selectedWithPrice);
-    expect(selectedWithPrice.height, plain.height + 2);
+    expect(selectedWithPrice.height, plain.height);
 
     await tester.tap(find.text('Catálogo'));
     await tester.pumpAndSettle();
@@ -890,6 +1065,23 @@ void main() {
             find.widgetWithText(PosButton, 'Agregar a la comanda'),
             findsOneWidget,
           );
+          if (size.width < 700) {
+            final l = AppLocalizations.of(
+              tester.element(find.byType(CatalogSurface)),
+            );
+            expect(
+              tester.getTopLeft(find.text(l.cartQuantityLabel)).dy,
+              tester.getTopLeft(find.text(l.cartCourseLabel)).dy,
+            );
+            expect(
+              tester.getTopLeft(find.byTooltip(l.increaseQuantity)).dy,
+              closeTo(
+                tester.getTopLeft(find.byKey(CourseControl.increaseKey)).dy,
+                2,
+              ),
+            );
+            expect(find.text(l.cartCourseHint), findsOneWidget);
+          }
           expect(tester.takeException(), isNull);
         }
         await tester.pumpWidget(const SizedBox());

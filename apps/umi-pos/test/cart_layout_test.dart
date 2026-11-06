@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
@@ -12,9 +16,12 @@ import 'package:umi_pos/core/theme/umi_theme.dart';
 import 'package:umi_pos/features/cart/account_details_surface.dart';
 import 'package:umi_pos/features/cart/cart_controller.dart';
 import 'package:umi_pos/features/cart/cart_repository.dart';
+import 'package:umi_pos/features/cart/incoming_orders_controller.dart';
 import 'package:umi_pos/features/catalog/catalog_controller.dart';
 import 'package:umi_pos/features/catalog/catalog_repository.dart';
 import 'package:umi_pos/features/catalog/catalog_surface.dart';
+import 'package:umi_pos/features/checkout/checkout_controller.dart';
+import 'package:umi_pos/features/checkout/checkout_repository.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
 import 'package:umi_pos/features/entry/entry_gateway.dart';
 import 'package:umi_pos/features/offline/connectivity_controller.dart';
@@ -30,8 +37,150 @@ import 'support/fakes.dart';
 /// debug stripe over the sale. The reproduction is a phone-sized surface with the
 /// keyboard inset — the panel and the messages must scroll, not overflow.
 
+final class _IncomingRepo implements CartRepository {
+  int reads = 0;
+  @override
+  Future<PosIncomingOrders> incomingOrders(
+    String merchantId,
+    CartQuery query,
+  ) async {
+    reads++;
+    return const PosIncomingOrders(
+      orders: [
+        {
+          'orderId': 'order',
+          'reference': 'Web 12',
+          'customerName': 'Ana',
+          'channel': 'web',
+          'status': 'placed',
+          'placedAt': null,
+          'itemCount': 2,
+          'totalMinorUnits': 5000,
+        },
+      ],
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+final class _LedgerRepo
+    implements CheckoutRepository, PartialPaymentRepository {
+  int reads = 0;
+  bool fail = false;
+  int paid = 4500;
+  int collections = 0;
+  Completer<CheckoutPartialPaymentResult>? deferredRead;
+  Map<String, Object?> snapshot(String cartId) => {
+    'cartId': cartId,
+    'cartVersion': 1,
+    'amountDue': {'minorUnits': 13500, 'currency': 'MXN'},
+    'appliedAmount': {'minorUnits': paid, 'currency': 'MXN'},
+    'remainingBalance': {'minorUnits': 13500 - paid, 'currency': 'MXN'},
+    'tipAmount': {'minorUnits': 0, 'currency': 'MXN'},
+    'tenderDrafts': [
+      {
+        'id': 'prior-payment',
+        'type': 'manual_terminal',
+        'amount': {'minorUnits': paid, 'currency': 'MXN'},
+        'status': 'confirmed_success',
+      },
+    ],
+    'blockedByUnknown': false,
+    'canFinalize': false,
+    'confirmationReferences': <String, String>{},
+  };
+  @override
+  Future<CheckoutRecoverySnapshot> recovery(
+    String merchantId,
+    String cartId,
+    CheckoutRecoveryQuery query,
+  ) async => CheckoutRecoverySnapshot(
+    checkoutId: 'checkout',
+    cartId: cartId,
+    checkoutVersion: 1,
+    state: 'draft',
+    tenderDrafts: const [],
+    tipDraft: null,
+    discountDrafts: const [],
+    receiptDelivery: const {},
+    paymentSummary: null,
+    paymentOutcome: null,
+    result: null,
+    recoveryState: 'none',
+    checkoutFingerprint: null,
+    updatedAt: '2026-11-04T00:00:00Z',
+  );
+
+  @override
+  Future<CheckoutPartialPaymentResult> collectPartialPayment(
+    String merchantId,
+    String cartId,
+    CheckoutPartialPaymentRequest request,
+  ) async {
+    collections++;
+    final tender = request.toJson()['tender']! as Map;
+    paid += ((tender['amount'] as Map)['minorUnits']! as num).toInt();
+    return CheckoutPartialPaymentResult(ok: true, data: snapshot(cartId));
+  }
+
+  @override
+  Future<CheckoutPolicy> policy(
+    String merchantId,
+    PosCheckoutPolicyQuery query,
+  ) async => CheckoutPolicy.fromJson({
+    'version': 'test',
+    'manualTerminalEnabled': true,
+    'bankTransferEnabled': false,
+    'bankTransferDetails': null,
+    'merchantLogoUrl': null,
+    'mixedTenderEnabled': false,
+    'maximumTenderLines': 8,
+    'manualTerminalApprovalThreshold': {'minorUnits': 50000, 'currency': 'MXN'},
+    'manualTerminalApprovalPermission': 'checkout.terminal.approve',
+    'tip': {
+      'enabled': false,
+      'presetBasisPoints': <int>[],
+      'customPercentageEnabled': false,
+      'customFixedEnabled': false,
+      'maximumTip': {'minorUnits': 0, 'currency': 'MXN'},
+      'requiredPermission': null,
+      'version': 'test',
+    },
+    'discount': {
+      'enabled': false,
+      'maximumBasisPoints': 0,
+      'maximumAmount': {'minorUnits': 0, 'currency': 'MXN'},
+      'cashierThreshold': {'minorUnits': 0, 'currency': 'MXN'},
+      'customRequiresApproval': false,
+      'requiredPermission': 'checkout.discount.apply',
+      'approvalPermission': 'checkout.discount.approve',
+      'version': 'test',
+    },
+  });
+  @override
+  Future<CheckoutPartialPaymentResult> partialPayments(
+    String merchantId,
+    String cartId,
+    CheckoutPartialPaymentQuery query,
+  ) async {
+    reads++;
+    if (fail) throw StateError('unavailable');
+    if (deferredRead != null) return deferredRead!.future;
+    return CheckoutPartialPaymentResult(ok: true, data: snapshot(cartId));
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
 final class _Gateway implements EntryGateway {
-  _Gateway({this.permissions = const ['cart.write', 'order.fire']});
+  _Gateway({
+    this.permissions = const ['cart.write', 'order.fire'],
+    this.entitlements = const [],
+  });
+  final List<Map<String, Object?>> entitlements;
   final List<String> permissions;
   @override
   Future<OperatorSessionView> startOperator(
@@ -46,7 +195,7 @@ final class _Gateway implements EntryGateway {
     deviceId: 'device',
     state: 'active',
     permissions: permissions,
-    entitlements: const [],
+    entitlements: entitlements,
     startedAt: '2026-10-07T00:00:00Z',
     lastActivityAt: '2026-10-07T00:00:00Z',
     expiresAt: '2026-10-08T00:00:00Z',
@@ -105,6 +254,13 @@ class _AccountCartRepo extends _CartRepo implements OpenAccountCartRepository {
   /// 2026-10-13 — "solo se acumulan si spamean el botón" — was this counter
   /// climbing once per tap on a cart that held nothing.
   int suspends = 0;
+
+  @override
+  Future<Cart> account(
+    String merchantId,
+    String cartId,
+    CartQuery query,
+  ) async => cart;
 
   @override
   Future<Cart> suspendAccount(
@@ -332,14 +488,26 @@ _fixture({
   bool waiterMode = false,
   int lines = 6,
   String? accountFolio,
+  _LedgerRepo? ledger,
+  IncomingOrdersController? incoming,
+  bool incomingEntitled = false,
 }) async {
   final root = testRoot();
+  final checkout = ledger == null
+      ? root.checkout
+      : CheckoutController(repository: ledger, telemetry: root.telemetry);
   final entry = EntryController(
     gateway: _Gateway(
+      entitlements: incomingEntitled
+          ? [
+              {'featureKey': 'pos.incoming_orders', 'enabled': true},
+            ]
+          : [],
       permissions: [
         'cart.write',
         'order.fire',
         if (!waiterMode) 'checkout.commit',
+        if (ledger != null && !waiterMode) 'checkout.terminal.confirm',
         if (!waiterMode) 'sale.lifecycle',
       ],
     ),
@@ -415,7 +583,8 @@ _fixture({
       catalog: catalog,
       cart: cart,
       cash: root.cash,
-      checkout: root.checkout,
+      checkout: checkout,
+      incomingOrders: incoming,
       sales: sales,
       exceptions: root.exceptions,
       connectivity: root.connectivity,
@@ -427,6 +596,7 @@ _fixture({
     connectivity: root.connectivity,
     persistedCart: () => repository.cart,
     dispose: () {
+      if (checkout != root.checkout) checkout.dispose();
       if (sales != root.sales) sales.dispose();
       catalog.dispose();
       cart.dispose();
@@ -468,10 +638,317 @@ void _completeText(WidgetTester tester, String label) {
 }
 
 void main() {
+  testWidgets(
+    'large account line amount preserves product text at doubled scale',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final fixture = await _fixture(lines: 1);
+      final cart = fixture.cart.state.cart!;
+      fixture.cart.restore(
+        Cart.fromJson({
+          ...cart.toJson(),
+          'items': [
+            {
+              ...cart.items.single,
+              'productName': 'Café de especialidad para compartir',
+              'price': {
+                ...cart.items.single['price']! as Map<String, Object?>,
+                'lineTotal': {'minorUnits': 99999999, 'currency': 'MXN'},
+              },
+            },
+          ],
+        }),
+      );
+      await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 2));
+      await tester.pumpAndSettle();
+      final name = find.text('Café de especialidad para compartir');
+      expect(name, findsOneWidget);
+      final title = tester.renderObject<RenderParagraph>(name);
+      expect(title.size.width, greaterThan(70));
+      expect(title.didExceedMaxLines, isFalse);
+      expect(find.text('MXN 999,999.99'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      fixture.dispose();
+    },
+  );
+
+  testWidgets('local frequency emphasis stays fixed during adds and search', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    SharedPreferences.setMockInitialValues({
+      'umi.pos.frequent.merchant.location': jsonEncode([
+        for (var index = 0; index < 2; index++)
+          {
+            'id': 'product-$index',
+            'name': 'Producto $index',
+            'price': {'minorUnits': 4500, 'currency': 'MXN'},
+            'count': index == 0 ? 2 : 1,
+          },
+      ]),
+    });
+    final fixture = await _fixture(lines: 0);
+    await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+    await tester.pumpAndSettle();
+    final first = find.byKey(const ValueKey('product-key-product-0'));
+    final second = find.byKey(const ValueKey('product-key-product-1'));
+    expect(tester.getSize(first).height, 232);
+    expect(tester.getSize(second).height, 112);
+    expect(find.text('Frecuente'), findsOneWidget);
+    await tester.tap(second);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(first).height, 232);
+    expect(tester.getSize(second).height, 112);
+    await tester.enterText(find.byType(EditableText), 'Producto');
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(first).height, 232);
+    expect(tester.getSize(second).height, 112);
+    expect(find.text('Frecuente'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    fixture.dispose();
+  });
+
+  testWidgets(
+    'return from partial payment clears stale balance until deferred ledger resolves',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final ledger = _LedgerRepo();
+      final fixture = await _fixture(lines: 1, ledger: ledger);
+      await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+      await tester.pumpAndSettle();
+      final account = find.byKey(const ValueKey('account-workspace'));
+      Finder amount(String value) =>
+          find.descendant(of: account, matching: find.text(value));
+      expect(amount('MXN 90.00'), findsOneWidget);
+      final version = fixture.cart.state.cart!.version;
+      await tester.tap(find.byKey(const ValueKey('account-split-check')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('partial-principal')),
+        '45.00',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('partial-charge')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sí, se cobró'));
+      await tester.pumpAndSettle();
+      expect(ledger.collections, 1);
+      expect(ledger.paid, 9000);
+      expect(fixture.cart.state.cart!.version, version);
+      ledger.deferredRead = Completer<CheckoutPartialPaymentResult>();
+      await tester.tap(find.text('Volver a la cuenta'));
+      await tester.pumpAndSettle();
+      expect(amount('MXN 90.00'), findsNothing);
+      expect(amount('MXN 45.00'), findsNothing);
+      expect(find.text('Consultando saldo…'), findsOneWidget);
+      ledger.deferredRead!.complete(
+        CheckoutPartialPaymentResult(
+          ok: true,
+          data: ledger.snapshot(fixture.cart.state.cart!.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(amount('MXN 90.00'), findsOneWidget);
+      expect(amount('MXN 45.00'), findsOneWidget);
+      expect(find.text('Consultando saldo…'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      fixture.dispose();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final entitled in [false, true]) {
+    testWidgets(
+      'incoming header and polling obey entitlement $entitled and stop after disposal',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final root = testRoot();
+        final repo = _IncomingRepo();
+        final incoming = IncomingOrdersController(
+          repository: repo,
+          telemetry: root.telemetry,
+        );
+        final fixture = await _fixture(
+          lines: 1,
+          incoming: incoming,
+          incomingEntitled: entitled,
+        );
+        await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+        await tester.pumpAndSettle();
+        expect(repo.reads, entitled ? 1 : 0);
+        final shortcut = find.byKey(const ValueKey('incoming-header-shortcut'));
+        expect(shortcut, entitled ? findsOneWidget : findsNothing);
+        if (entitled) {
+          expect(
+            find.descendant(of: shortcut, matching: find.text('1')),
+            findsOneWidget,
+          );
+          await tester.pump(const Duration(seconds: 30));
+          await tester.pumpAndSettle();
+          expect(repo.reads, 2);
+          await tester.tap(shortcut);
+          await tester.pumpAndSettle();
+          expect(find.text('Web 12'), findsNWidgets(2));
+        }
+        await tester.pumpWidget(const SizedBox());
+        final reads = repo.reads;
+        await tester.pump(const Duration(seconds: 60));
+        expect(repo.reads, reads);
+        fixture.dispose();
+        incoming.dispose();
+        root.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'account shows authoritative paid and remaining, clears stale balance on failure',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final ledger = _LedgerRepo();
+      final fixture = await _fixture(lines: 1, ledger: ledger);
+      await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+      await tester.pumpAndSettle();
+      expect(find.text('Pagado'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('account-workspace')),
+          matching: find.text('MXN 45.00'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('MXN 90.00'), findsOneWidget);
+      expect(ledger.reads, 1);
+      ledger.fail = true;
+      fixture.cart.restore(
+        Cart.fromJson({...fixture.cart.state.cart!.toJson(), 'version': 2}),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('MXN 90.00'), findsNothing);
+      expect(find.textContaining('Saldo no disponible'), findsOneWidget);
+      expect(ledger.reads, 2);
+      await tester.pumpWidget(const SizedBox());
+      fixture.dispose();
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets('waiter account does not read payment ledger', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final ledger = _LedgerRepo();
+    final fixture = await _fixture(lines: 1, ledger: ledger, waiterMode: true);
+    await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+    await tester.pumpAndSettle();
+    expect(ledger.reads, 0);
+    await tester.pumpWidget(const SizedBox());
+    fixture.dispose();
+  });
+
+  testWidgets('finished checkout returns from the phone account to the menu', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final fixture = await _fixture(
+      lines: 1,
+      ledger: _LedgerRepo(),
+      accountName: 'Counter',
+    );
+    await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(PosOrderButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('account-split-check')));
+    await tester.pumpAndSettle();
+    fixture.sales.finishCheckoutPresentation(force: true);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Volver a la cuenta'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('account-workspace')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('catalog-category-index')),
+      findsOneWidget,
+    );
+    expect(find.text('Iniciar pedido'), findsNothing);
+    expect(fixture.cart.state.cart, isNull);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    fixture.dispose();
+  });
+
+  testWidgets(
+    'catalog phone account passes its permitted locked navigation to split and full checkout',
+    (tester) async {
+      tester.view.physicalSize = const Size(412, 915);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final fixture = await _fixture(
+        lines: 1,
+        ledger: _LedgerRepo(),
+        accountName: 'Counter',
+      );
+      await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+      await tester.pumpAndSettle();
+      final original = tester.widget<PosNavigation>(find.byType(PosNavigation));
+      final destinations = original.destinations;
+      expect(original.onDestinationSelected, isNotNull);
+      await tester.tap(find.byType(PosOrderButton));
+      await tester.pumpAndSettle();
+      void expectNavigation() {
+        final navigation = tester.widget<PosNavigation>(
+          find.byType(PosNavigation),
+        );
+        expect(navigation.destinations, destinations);
+        expect(navigation.onDestinationSelected, isNull);
+        expect(
+          tester.getRect(find.byType(PosNavigation)).bottom,
+          lessThanOrEqualTo(915),
+        );
+      }
+
+      expectNavigation();
+      await tester.tap(find.byKey(const ValueKey('account-split-check')));
+      await tester.pumpAndSettle();
+      expectNavigation();
+      expect(
+        tester.getRect(find.byType(PosHeader).last).height,
+        closeTo(56, 1.01),
+      );
+      await tester.tap(find.text('Volver a la cuenta'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(PosButton, 'Cobrar'));
+      await tester.pumpAndSettle();
+      expectNavigation();
+      expect(
+        tester.getRect(find.byType(PosHeader).last).height,
+        closeTo(56, 1.01),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      fixture.dispose();
+    },
+  );
+
   testWidgets('the open mobile cart sheet follows authoritative cart changes', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(800, 1340);
+    tester.view.physicalSize = const Size(412, 915);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await fonts();
@@ -541,9 +1018,9 @@ void main() {
         await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
         await tester.pumpAndSettle();
         expect(find.text('Cuenta 024'), findsOneWidget);
-        expect(find.text('Mesa 2'), findsOneWidget);
+        expect(find.text('Mesa 2'), findsNWidgets(2));
         expect(find.text('Ana terraza'), findsOneWidget);
-        expect(find.byTooltip('Cuenta 024 · Ana López'), findsOneWidget);
+        expect(find.textContaining('Ana López'), findsOneWidget);
         expect(find.text('Asignar mesa'), findsNothing);
         expect(find.text('Agregar mesa'), findsNothing);
         expect(tester.takeException(), isNull);
@@ -781,7 +1258,7 @@ void main() {
             if (checkout.hitTestable().evaluate().isEmpty) {
               final scroll = find
                   .descendant(
-                    of: find.byType(PosCard),
+                    of: find.byKey(const ValueKey('account-workspace')),
                     matching: find.byType(Scrollable),
                   )
                   .first;
@@ -794,7 +1271,26 @@ void main() {
             }
             expect(checkout.hitTestable(), findsOneWidget);
             _completeText(tester, locale == 'es' ? 'Cobrar' : 'Checkout');
-            expect(find.text('MXN 390.00').hitTestable(), findsWidgets);
+            if (find.text('MXN 390.00').evaluate().isEmpty) {
+              await tester.scrollUntilVisible(
+                find.text('MXN 390.00'),
+                -100,
+                scrollable: find
+                    .descendant(
+                      of: find.byKey(const ValueKey('account-workspace')),
+                      matching: find.byType(Scrollable),
+                    )
+                    .first,
+              );
+              await tester.pumpAndSettle();
+            }
+            expect(find.text('MXN 390.00'), findsWidgets);
+            expect(
+              find.textContaining(
+                locale == 'es' ? 'Saldo no disponible' : 'Balance unavailable',
+              ),
+              findsOneWidget,
+            );
             final close = find.byTooltip(
               locale == 'es' ? 'Cerrar comanda' : 'Close order',
             );
@@ -815,7 +1311,7 @@ void main() {
   testWidgets('the cart opens on a short viewport without overflowing', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(800, 600);
+    tester.view.physicalSize = const Size(412, 600);
     tester.view.devicePixelRatio = 1.0;
     // The keyboard is up: 300 logical pixels of the bottom are gone.
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
@@ -886,19 +1382,33 @@ void main() {
     await tester.pump();
 
     // The cart is behind the FAB on a narrow till.
-    await tester.tap(find.text('Comanda'));
+    await tester.tap(find.byType(PosOrderButton));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
     // An overflow is reported as a test exception; separately, nothing else blew
     // up while the cart laid out.
     expect(tester.takeException(), isNull);
-    expect(find.text('Latte 0'), findsOneWidget);
+    final sheetScroll = find
+        .descendant(
+          of: find.byKey(const ValueKey('account-workspace')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('Latte 0'),
+      80,
+      scrollable: sheetScroll,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Latte 0').hitTestable(), findsOneWidget);
     // And the actions are pinned below the panel's scroll, inside the space the
     // keyboard leaves — the point of the scroll is that they are not pushed off
     // with a debug stripe, and the point of pinning them is that they are there
     // without hunting for them.
     final fire = find.byTooltip('Enviar a cocina');
+    await tester.scrollUntilVisible(fire, 100, scrollable: sheetScroll);
+    await tester.pumpAndSettle();
     expect(fire, findsOneWidget);
     expect(
       tester.getRect(fire).bottom,
@@ -1014,11 +1524,11 @@ void main() {
 
       await tester.tap(find.widgetWithText(PosButton, 'Iniciar pedido'));
       await tester.pumpAndSettle();
-      expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
-      expect(fixture.cart.state.phase, CartPhase.idle);
-      expect(fixture.cart.state.errorCode, isNull);
+      expect(find.text('Servicio del nuevo pedido'), findsOneWidget);
+      expect(fixture.cart.state.phase, CartPhase.validationFailure);
+      expect(fixture.cart.state.errorCode, 'CART_VALIDATION_FAILED');
 
-      await tester.tap(find.text('Cancelar'));
+      await tester.tap(find.text('Volver'));
       await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
@@ -1121,38 +1631,47 @@ void main() {
     fixture.dispose();
   });
 
-  testWidgets('Nueva cuenta parks the account locally while the API is down', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(1920, 1014);
-    tester.view.devicePixelRatio = 1.375;
-    addTearDown(tester.view.reset);
-    await fonts();
-    final fixture = await _fixture(
-      openAccounts: true,
-      lines: 2,
-      accountFolio: 'Cuenta 078',
-    );
-    await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
-    await tester.pump();
+  testWidgets(
+    'inline new-order cancellation preserves the account while the API is down',
+    (tester) async {
+      tester.view.physicalSize = const Size(1920, 1014);
+      tester.view.devicePixelRatio = 1.375;
+      addTearDown(tester.view.reset);
+      await fonts();
+      final fixture = await _fixture(
+        openAccounts: true,
+        lines: 2,
+        accountFolio: 'Cuenta 078',
+      );
+      await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+      await tester.pump();
 
-    fixture.connectivity.networkDown();
-    await tester.tap(find.text('Iniciar pedido').first);
-    await tester.pumpAndSettle();
+      fixture.connectivity.networkDown();
+      await tester.tap(find.text('Nuevo pedido').first);
+      await tester.pumpAndSettle();
 
-    expect((fixture.repository as _AccountCartRepo).suspends, 0);
-    expect(fixture.cart.state.cart, isNull);
-    expect(
-      find.textContaining('No se completó la operación'),
-      findsNothing,
-      reason: 'a local-first new account does not report a failed remote save',
-    );
-    expect(tester.takeException(), isNull);
+      expect(
+        find.byKey(const ValueKey('catalog-service-choice')),
+        findsOneWidget,
+      );
+      expect(fixture.cart.state.cart!.items, hasLength(2));
+      await tester.tap(find.text('Volver'));
+      await tester.pumpAndSettle();
+      expect((fixture.repository as _AccountCartRepo).suspends, 0);
+      expect(fixture.cart.state.cart!.items, hasLength(2));
+      expect(
+        find.textContaining('No se completó la operación'),
+        findsNothing,
+        reason:
+            'a local-first new account does not report a failed remote save',
+      );
+      expect(tester.takeException(), isNull);
 
-    await tester.pumpWidget(const SizedBox());
-    await tester.pump();
-    fixture.dispose();
-  });
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+      fixture.dispose();
+    },
+  );
 
   test('an account is bare only when nothing identifies it', () {
     // The four facts the API asks before it lists an account as open

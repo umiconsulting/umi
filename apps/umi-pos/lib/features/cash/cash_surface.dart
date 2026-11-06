@@ -122,7 +122,18 @@ final class _CashCenterState extends State<CashCenter> {
       child: PosPage(
         appBar: PosHeader(
           automaticallyImplyLeading: !widget.embedded,
-          title: StationHeading(title: l.cashCenterTitle),
+          title: StationHeading(
+            title:
+                snapshot?.currentShift != null &&
+                    MediaQuery.sizeOf(context).width < 1000
+                ? _registerName(snapshot!)
+                : l.cashCenterTitle,
+            subtitle:
+                snapshot?.currentShift != null &&
+                    MediaQuery.sizeOf(context).width < 1000
+                ? _statusHeadline(l, snapshot!)
+                : null,
+          ),
           leading: !widget.embedded && (ModalRoute.of(context)?.canPop ?? false)
               ? PosIconButton(
                   tooltip: l.closeAction,
@@ -148,7 +159,7 @@ final class _CashCenterState extends State<CashCenter> {
         ),
         body: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(UmiSpacing.lg),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -208,17 +219,57 @@ final class _CashCenterState extends State<CashCenter> {
           ),
           const SizedBox(height: UmiSpacing.md),
         ],
-        _StatusCard(
-          title: _statusHeadline(l, snapshot),
-          register: _registerName(snapshot),
-          businessDate: snapshot.businessDate,
-          openedAt:
-              (snapshot.currentShift ?? snapshot.adoptableShift)?['openedAt']
-                  as String?,
-          closedAt: snapshot.currentShift?['closedAt'] as String?,
-          lastReadAt: widget.controller.lastReadAt,
-          policy: snapshot.policy,
-        ),
+        if (constraints.maxWidth >= 1000 ||
+            snapshot.currentShift == null ||
+            expired)
+          if (snapshot.currentShift != null &&
+              constraints.maxWidth >= 1000 &&
+              !expired)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _StatusCard(
+                    title: _statusHeadline(l, snapshot),
+                    register: _registerName(snapshot),
+                    businessDate: snapshot.businessDate,
+                    openedAt:
+                        (snapshot.currentShift ??
+                                snapshot.adoptableShift)?['openedAt']
+                            as String?,
+                    closedAt: snapshot.currentShift?['closedAt'] as String?,
+                    lastReadAt: widget.controller.lastReadAt,
+                    policy: snapshot.policy,
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  flex: 2,
+                  child: CashEquation(
+                    account: CashDrawerAccount.fromLedger(
+                      snapshot.ledger,
+                      currency:
+                          snapshot.currentShift?['currency'] as String? ??
+                          'MXN',
+                    ),
+                    expectedCash: snapshot.expectedCash,
+                  ),
+                ),
+              ],
+            )
+          else
+            _StatusCard(
+              title: _statusHeadline(l, snapshot),
+              register: _registerName(snapshot),
+              businessDate: snapshot.businessDate,
+              openedAt:
+                  (snapshot.currentShift ??
+                          snapshot.adoptableShift)?['openedAt']
+                      as String?,
+              closedAt: snapshot.currentShift?['closedAt'] as String?,
+              lastReadAt: widget.controller.lastReadAt,
+              policy: snapshot.policy,
+            ),
         if (snapshot.summary != null) ...[
           const SizedBox(height: UmiSpacing.md),
           if (snapshot.currentShift?['status'] == 'closed')
@@ -1456,7 +1507,7 @@ final class _OpenShiftSectionState extends State<_OpenShiftSection> {
   }
 }
 
-final class _ActiveShiftSection extends StatelessWidget {
+final class _ActiveShiftSection extends StatefulWidget {
   const _ActiveShiftSection({
     required this.controller,
     required this.permissions,
@@ -1466,6 +1517,15 @@ final class _ActiveShiftSection extends StatelessWidget {
   final CashController controller;
   final OperatorPermissions permissions;
   final Future<void> Function()? onHandoffCompleted;
+  @override
+  State<_ActiveShiftSection> createState() => _ActiveShiftSectionState();
+}
+
+final class _ActiveShiftSectionState extends State<_ActiveShiftSection> {
+  int _tab = 0;
+  CashController get controller => widget.controller;
+  OperatorPermissions get permissions => widget.permissions;
+  Future<void> Function()? get onHandoffCompleted => widget.onHandoffCompleted;
 
   @override
   Widget build(BuildContext context) {
@@ -1485,6 +1545,8 @@ final class _ActiveShiftSection extends StatelessWidget {
         _Action(
           icon: PosGlyphs.addCircleOutline,
           label: l.paidInAction,
+          tone: 'in',
+          subtitle: spanish ? 'Suma al efectivo' : 'Adds to cash',
           onPressed: () => _movement(context, controller, 'paid_in'),
         ),
       if (actions.contains('movement') &&
@@ -1492,19 +1554,23 @@ final class _ActiveShiftSection extends StatelessWidget {
         _Action(
           icon: PosGlyphs.removeCircleOutline,
           label: l.paidOutAction,
+          tone: 'out',
+          subtitle: spanish ? 'Resta del efectivo' : 'Subtracts from cash',
           onPressed: () => _movement(context, controller, 'paid_out'),
         ),
       if (actions.contains('movement') &&
           permissions.allows('cash.movement.safe_drop'))
         _Action(
-          icon: PosGlyphs.savingsOutlined,
+          icon: PosGlyphs.lockOutline,
           label: l.safeDropAction,
+          tone: 'safe',
+          subtitle: spanish ? 'Resguardo de efectivo' : 'Secure cash storage',
           onPressed: () => _movement(context, controller, 'safe_drop'),
         ),
       if (actions.contains('no_sale') &&
           permissions.allows('cash.drawer.no_sale'))
         _Action(
-          icon: PosGlyphs.pointOfSaleOutlined,
+          icon: PosGlyphs.cashDrawer,
           label: l.noSaleDrawerAction,
           onPressed: () => _noSale(context, controller),
         ),
@@ -1815,21 +1881,123 @@ final class _ActiveShiftSection extends StatelessWidget {
             operations.isEmpty && lifecycle.isEmpty && !showCloseFlow;
         final showShiftRail = showCloseFlow || lifecycle.isNotEmpty;
         if (!roomForTwoColumns) {
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                buildDrawer(expanded: false),
-                if (readOnly) ...[
-                  const SizedBox(height: UmiSpacing.lg),
-                  buildReadOnlyRail(),
+          final labels = spanish
+              ? ['Movimientos', 'Turno', 'Cierre']
+              : ['Movements', 'Shift', 'Close'];
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  for (var index = 0; index < labels.length; index++)
+                    Expanded(
+                      child: PosTapRegion(
+                        selected: _tab == index,
+                        semanticLabel: labels[index],
+                        onTap: () => setState(() => _tab = index),
+                        child: Container(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: _tab == index
+                                    ? PosTheme.of(context).colorScheme.primary
+                                    : PosTheme.of(
+                                        context,
+                                      ).colorScheme.outlineVariant,
+                                width: _tab == index ? 2 : 1,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            labels[index],
+                            style: PosTheme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(fontSize: 14),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
-                if (showShiftRail) ...[
-                  const SizedBox(height: UmiSpacing.lg),
-                  buildClose(),
-                ],
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_tab == 0) ...[
+                        Text(
+                          l.expectedCashLabel,
+                          style: PosTheme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          snapshot.expectedCash == null
+                              ? (spanish
+                                    ? 'Disponible al enviar el conteo'
+                                    : 'Available after submitting the count')
+                              : _money(snapshot.expectedCash!),
+                          style: PosTheme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        const PosDivider(),
+                        const SizedBox(height: 16),
+                        _ActionGrid(actions: operations),
+                        if (readOnly) buildReadOnlyRail(),
+                      ],
+                      if (_tab == 1) ...[
+                        _StatusCard(
+                          title: l.cashCenterTitle,
+                          register:
+                              (snapshot.currentShift?['registerName']
+                                  as String?) ??
+                              '',
+                          businessDate: snapshot.businessDate,
+                          openedAt:
+                              snapshot.currentShift?['openedAt'] as String?,
+                          closedAt:
+                              snapshot.currentShift?['closedAt'] as String?,
+                          lastReadAt: controller.lastReadAt,
+                          policy: snapshot.policy,
+                        ),
+                        const SizedBox(height: 16),
+                        CashEquation(
+                          account: CashDrawerAccount.fromLedger(
+                            snapshot.ledger,
+                            currency:
+                                (snapshot.currentShift?['currency']
+                                    as String?) ??
+                                'MXN',
+                          ),
+                          expectedCash: snapshot.expectedCash,
+                        ),
+                        const SizedBox(height: 16),
+                        CashJournal(lines: snapshot.ledger, expand: false),
+                        if (lifecycle.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          _ActionGrid(actions: lifecycle),
+                        ],
+                        const SizedBox(height: 16),
+                        _SectionCard(
+                          title: l.cashPolicyLabel,
+                          child: CashPolicyTable(policy: snapshot.policy),
+                        ),
+                      ],
+                      if (_tab == 2) ...[
+                        if (count != null && snapshot.summary == null)
+                          _VarianceCard(
+                            variance: variance!,
+                            count: count.count,
+                          ),
+                        if (showCloseFlow) closeCard() else buildReadOnlyRail(),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
           );
         }
         // A tall rail lets the journal take the slack and stay put. On a short
@@ -1857,17 +2025,48 @@ final class _ActiveShiftSection extends StatelessWidget {
             ),
           );
         }
-        return Row(
+        return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(flex: 3, child: drawerColumn),
-            const SizedBox(width: UmiSpacing.lg),
+            const SizedBox(height: 24),
             Expanded(
-              flex: 2,
-              // The rail holds more cards than a 720 px terminal has rows.
-              // Scrolling it keeps every card at its own height instead of
-              // stretching one until the others fit.
-              child: SingleChildScrollView(child: buildClose()),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (count != null && snapshot.summary == null) ...[
+                            _VarianceCard(
+                              variance: variance!,
+                              count: count.count,
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (operations.isNotEmpty) ...[
+                            _SectionCard(
+                              title: spanish
+                                  ? 'Movimientos de caja'
+                                  : 'Cash movements',
+                              child: _ActionGrid(actions: operations),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                          buildClose(),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    flex: 6,
+                    child: CashJournal(lines: snapshot.ledger, expand: true),
+                  ),
+                ],
+              ),
             ),
           ],
         );
@@ -2074,19 +2273,43 @@ final class _ActionGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
+      final financial = actions
+          .whereType<_Action>()
+          .where((action) => action.tone != null)
+          .toList();
+      if (financial.isNotEmpty && financial.length < actions.length) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _ActionGrid(actions: financial),
+            const SizedBox(height: 8),
+            for (final action in actions)
+              if (!financial.contains(action)) action,
+          ],
+        );
+      }
       const gap = UmiSpacing.sm;
-      final width = (constraints.maxWidth - gap) / 2;
+      final columns =
+          constraints.maxWidth >=
+              520 * MediaQuery.textScalerOf(context).scale(1)
+          ? 3
+          : 2;
+      final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
       // An odd number of actions leaves a ragged last row. The last tile takes
       // the full width instead, so the set reads as a grid rather than as a
       // mistake.
-      final odd = actions.length.isOdd;
+      final odd = actions.length % columns == 1;
       return Wrap(
         spacing: gap,
         runSpacing: gap,
         children: [
           for (final (index, action) in actions.indexed)
             SizedBox(
-              width: odd && index == actions.length - 1
+              width:
+                  (columns == 2 &&
+                          action is _Action &&
+                          action.tone == 'safe') ||
+                      (odd && index == actions.length - 1)
                   ? constraints.maxWidth
                   : width,
               child: action,
@@ -2102,16 +2325,74 @@ final class _Action extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.tone,
+    this.subtitle,
   });
 
   final PosGlyph icon;
   final String label;
+  final String? tone, subtitle;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final theme = PosTheme.of(context);
     final scheme = theme.colorScheme;
+    if (tone != null) {
+      final accent = switch (tone) {
+        'in' => const Color(0xff286653),
+        'out' => const Color(0xff95682c),
+        _ => scheme.primary,
+      };
+      final fill = scheme.dark
+          ? Color.alphaBlend(accent.withValues(alpha: .22), scheme.surface)
+          : switch (tone) {
+              'in' => const Color(0xffe7f2eb),
+              'out' => const Color(0xfff8edda),
+              _ => scheme.primaryContainer,
+            };
+      final ink = scheme.dark ? scheme.onSurface : accent;
+      return PosTapRegion(
+        onTap: onPressed,
+        semanticLabel: label,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 104),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: fill,
+            border: Border.all(color: ink),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              PosIcon(icon, size: 20, color: ink),
+              const SizedBox(height: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: ink,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle!,
+                      style: theme.textTheme.bodySmall?.copyWith(color: ink),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     // A till is read in a hurry and in low light. A bare outline on a near-black
     // surface is a shape the eye files as a panel, not as a control — the tiles
     // that move the drawer were the least button-like thing on the screen. A
@@ -2126,8 +2407,8 @@ final class _Action extends StatelessWidget {
         style:
             PosOutlineButton.styleFrom(
               foregroundColor: scheme.onSurface,
-              backgroundColor: scheme.surfaceContainerHighest,
-              iconColor: scheme.primary,
+              backgroundColor: scheme.surface,
+              iconColor: scheme.onSurfaceVariant,
               textStyle: theme.textTheme.labelLarge,
               minimumSize: const Size(0, UmiTouchTarget.minimum),
             ).copyWith(
@@ -2725,39 +3006,109 @@ Future<void> _count(BuildContext context, CashController controller) async {
   var tally = const DenominationTally(0, <Map<String, Object?>>[]);
   final total = TextEditingController();
   int? totalMinorUnits;
-  final accepted = await showPosDialog<bool>(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setState) => PosAlertDialog(
-        title: Text(blind ? l.blindCountAction : l.countDrawerAction),
-        // A teller counting on a small window gets the whole drawer. PosSurface's
-        // default 40 px inset on each side left the quantity rows 10 px wider
-        // than the content box, and the dialog reported it as an overflow stripe
-        // across the steppers.
-        insetPadding: const EdgeInsets.symmetric(
-          horizontal: UmiSpacing.md,
-          vertical: UmiSpacing.lg,
-        ),
-        // Wide enough for the counter's two columns, so the whole drawer and its
-        // total are on one screen with nothing to scroll. It used to be a
-        // 420-wide box with a scroll view, which cut the small coins and the
-        // running total off the bottom of the count.
-        content: SizedBox(
-          width: 660,
-          // A short window scrolls the count instead of clipping it: eleven
-          // denominations are taller than a laptop in landscape. The dialog's own
-          // `scrollable: true` is not the tool here — it wraps the actions in an
-          // intrinsic-width bar that overflows at phone width — so the count
-          // scrolls inside the content box the dialog already bounds.
-          child: SingleChildScrollView(
+  PosNavigation? navigation;
+  context.visitAncestorElements((element) {
+    if (element.widget case PosPage(
+      bottomNavigationBar: final PosNavigation value,
+    )) {
+      navigation = value;
+      return false;
+    }
+    return true;
+  });
+  final registerId = snapshot?.currentShift?['registerId'];
+  final register =
+      snapshot?.registers
+              .where((value) => value['id'] == registerId)
+              .firstOrNull?['displayName']
+          as String?;
+  final accepted = await Navigator.of(context).push<bool>(
+    PosPageRoute<bool>(
+      builder: (countContext) => StatefulBuilder(
+        builder: (context, setState) {
+          final es = Localizations.localeOf(context).languageCode == 'es';
+          final valid = totalOnly
+              ? (totalMinorUnits ?? 0) > 0
+              : tally.totalMinorUnits > 0;
+          Widget controls(bool rail) {
+            final amount = Text(
+              formatMinorUnits(
+                totalOnly ? totalMinorUnits ?? 0 : tally.totalMinorUnits,
+                currency,
+              ),
+              key: const ValueKey('count-workspace-total'),
+              style: rail
+                  ? PosTheme.of(context).textTheme.displaySmall
+                  : PosTheme.of(context).textTheme.titleLarge,
+            );
+            final totalLabel = Text(
+              es ? 'Total contado' : 'Counted total',
+              style: PosTheme.of(context).textTheme.bodySmall,
+            );
+            final submit = PosButton(
+              compact: true,
+              style: PosButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+              onPressed: valid ? () => Navigator.pop(countContext, true) : null,
+              child: Text(
+                blind ? l.submitBlindCountAction : l.submitCountAction,
+              ),
+            );
+            final cancel = PosTextButton(
+              compact: true,
+              onPressed: () => Navigator.pop(countContext, false),
+              child: Text(l.closeAction),
+            );
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (rail) ...[
+                    totalLabel,
+                    const SizedBox(height: 8),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: amount,
+                    ),
+                  ] else
+                    Row(
+                      children: [
+                        Expanded(child: totalLabel),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: amount,
+                          ),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 8),
+                  if (rail) ...[
+                    submit,
+                    cancel,
+                  ] else
+                    Row(
+                      children: [
+                        cancel,
+                        const SizedBox(width: 8),
+                        Expanded(child: submit),
+                      ],
+                    ),
+                ],
+              ),
+            );
+          }
+
+          final content = SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // What the count is, before the counting starts: blind means the
-                // expected amount is not on this screen, and a recount means this
-                // one replaces the last. Both are facts the operator has to know
-                // *before* they add up the drawer, not after they submit it.
                 _Note(
                   icon: blind
                       ? PosGlyphs.visibilityOffOutlined
@@ -2768,7 +3119,7 @@ Future<void> _count(BuildContext context, CashController controller) async {
                             : l.countDialogVisibleHint)
                       : l.countDialogRecountHint(attempt),
                 ),
-                const SizedBox(height: UmiSpacing.md),
+                const SizedBox(height: 16),
                 if (totalOnly)
                   PosField(
                     controller: total,
@@ -2788,27 +3139,128 @@ Future<void> _count(BuildContext context, CashController controller) async {
                   DenominationCounter(
                     currency: currency,
                     denominations: denominationsFromPolicy(snapshot?.policy),
+                    grouped: true,
+                    showTotal: false,
                     onChanged: (value) => setState(() => tally = value),
                   ),
               ],
             ),
-          ),
-        ),
-        actions: [
-          PosTextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(l.closeAction),
-          ),
-          PosButton(
-            onPressed:
-                (totalOnly
-                    ? (totalMinorUnits ?? 0) <= 0
-                    : tally.totalMinorUnits <= 0)
+          );
+          return PosPage(
+            appBar: PosHeader(
+              automaticallyImplyLeading: false,
+              actionsInline: true,
+              title: Row(
+                children: [
+                  if (navigation == null ||
+                      MediaQuery.sizeOf(context).width < 700 ||
+                      MediaQuery.sizeOf(context).height -
+                              MediaQuery.viewInsetsOf(context).bottom <
+                          600) ...[
+                    Text(
+                      'umi',
+                      style: PosTheme.of(
+                        context,
+                      ).textTheme.headlineSmall?.copyWith(fontSize: 22),
+                    ),
+                    const SizedBox(width: 16),
+                  ],
+                  Expanded(
+                    child: Text(
+                      l.cashCenterTitle,
+                      style: PosTheme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            bottomNavigationBar: navigation == null
                 ? null
-                : () => Navigator.pop(dialogContext, true),
-            child: Text(blind ? l.submitBlindCountAction : l.submitCountAction),
-          ),
-        ],
+                : PosNavigation(
+                    destinations: navigation!.destinations,
+                    selectedIndex: navigation!.selectedIndex,
+                  ),
+            body: SafeArea(
+              key: const ValueKey('cash-count-workspace'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          [
+                            if (register != null && register.isNotEmpty)
+                              register,
+                            if (snapshot?.businessDate != null)
+                              snapshot!.businessDate,
+                          ].join(' · '),
+                          style: PosTheme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          blind ? l.blindCountAction : l.countDrawerAction,
+                          style: PosTheme.of(
+                            context,
+                          ).textTheme.titleLarge?.copyWith(fontSize: 18),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, box) {
+                        final wide =
+                            box.maxWidth >=
+                                680 *
+                                    (MediaQuery.textScalerOf(
+                                          context,
+                                        ).scale(16) /
+                                        16) &&
+                            MediaQuery.textScalerOf(context).scale(16) < 24;
+                        final submit = DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: PosTheme.of(context).colorScheme.surface,
+                            border: Border(
+                              top: BorderSide(
+                                color: PosTheme.of(
+                                  context,
+                                ).colorScheme.outlineVariant,
+                              ),
+                            ),
+                          ),
+                          child: controls(wide),
+                        );
+                        return wide
+                            ? Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(child: content),
+                                  SizedBox(
+                                    width: 256,
+                                    child: Align(
+                                      alignment: Alignment.bottomCenter,
+                                      child: submit,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                children: [
+                                  Expanded(child: content),
+                                  submit,
+                                ],
+                              );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     ),
   );

@@ -32,7 +32,9 @@ Future<String?> showOrderTypePicker(BuildContext context) {
                       children: [
                         Text(es ? 'Comer aquí' : 'Dine in'),
                         Text(
-                          es ? 'Elegir una mesa' : 'Choose a table',
+                          es
+                              ? 'Servicio en el local'
+                              : 'Service at this location',
                           style: PosTheme.of(dialog).textTheme.bodySmall,
                         ),
                       ],
@@ -74,4 +76,69 @@ Future<String?> showOrderTypePicker(BuildContext context) {
       ],
     ),
   );
+}
+
+class OrderServiceChoice extends StatelessWidget {
+  const OrderServiceChoice({
+    required this.onSelect,
+    required this.onCancel,
+    this.chooseTable = false,
+    super.key,
+  });
+  final ValueChanged<String> onSelect;
+  final VoidCallback onCancel;
+  final bool chooseTable;
+
+  @override
+  Widget build(BuildContext context) {
+    final es = Localizations.localeOf(context).languageCode == 'es';
+    final theme = PosTheme.of(context);
+    return Container(
+      key: const ValueKey('catalog-service-choice'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            es ? 'Servicio del nuevo pedido' : 'Service for the new order',
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              PosOutlineButton(
+                autofocus: true,
+                onPressed: () => onSelect('dine_in'),
+                child: Text(
+                  chooseTable
+                      ? (es
+                            ? 'Comer aquí · Elegir mesa'
+                            : 'Dine in · Choose table')
+                      : (es ? 'Comer aquí' : 'Dine in'),
+                ),
+              ),
+              PosOutlineButton(
+                onPressed: () => onSelect('takeout'),
+                child: Text(es ? 'Para llevar' : 'Takeaway'),
+              ),
+              PosTextButton(
+                onPressed: onCancel,
+                child: Text(es ? 'Volver' : 'Back'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

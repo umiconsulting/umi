@@ -8,6 +8,7 @@ import '../../core/localization/app_localizations.dart';
 import '../../core/security/operator_permissions.dart';
 import '../../core/theme/umi_theme.dart';
 import '../../shared/widgets/station_document.dart';
+import '../cart/account_preview.dart';
 import '../entry/entry_controller.dart';
 import 'floor_plan_controller.dart';
 import 'table_state_controller.dart';
@@ -46,6 +47,8 @@ class FloorPlanSurface extends StatefulWidget {
     this.onShowAccounts,
     this.directAccounts = false,
     this.onSetUpTables,
+    this.readAccount,
+    this.readBalance,
   });
   final FloorPlanController controller;
   final EntryController entry;
@@ -61,6 +64,8 @@ class FloorPlanSurface extends StatefulWidget {
   final VoidCallback? onShowAccounts;
   final bool directAccounts;
   final VoidCallback? onSetUpTables;
+  final Future<Cart?> Function(FloorPlanElement)? readAccount;
+  final Future<Map<String, Object?>?> Function(Cart)? readBalance;
 
   /// The live room (plan section 8D steps 3 to 5). Null when this build has no
   /// client, and the surface then stays the read-only map it used to be.
@@ -71,6 +76,7 @@ class FloorPlanSurface extends StatefulWidget {
 
 class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     with WidgetsBindingObserver {
+  int _accountRefreshGeneration = 0;
   Timer? _timer;
   Timer? _ticker;
   String? _areaId;
@@ -94,7 +100,13 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   /// side by side. Narrower surfaces keep the modal sheet.
   static const double _panelBreakpoint = 720;
 
-  bool get _panelShown => MediaQuery.sizeOf(context).width >= _panelBreakpoint;
+  bool get _panelShown =>
+      MediaQuery.sizeOf(context).width >= _panelBreakpoint ||
+      MediaQuery.textScalerOf(context).scale(16) < 24;
+  bool get _portraitPanel {
+    final size = MediaQuery.sizeOf(context);
+    return _panelShown && size.height > size.width;
+  }
 
   // El plano reduce las etiquetas al espacio de cada mesa. El texto al 200 %
   // necesita una lista legible en pantallas angostas.
@@ -195,6 +207,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       }
       return;
     }
+    _accountRefreshGeneration++;
     final scope = '$merchant:$location:$operator';
     if (_context != scope) {
       _context = scope;
@@ -267,141 +280,198 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         .toList(growable: false);
     _elementsById = {for (final table in tables) table.id: table};
     final visuals = room == null ? null : _visuals(room, tables);
-    return PosPage(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _topBar(tables, visuals, l10n, es),
-            if (widget.onShowAccounts != null)
-              Align(
-                alignment: Alignment.centerRight,
-                child: PosTextButton.icon(
-                  onPressed: widget.onShowAccounts,
-                  icon: const PosIcon(PosGlyphs.receiptLong),
-                  label: Text(es ? 'Cuentas abiertas' : 'Open accounts'),
-                ),
+    final dock =
+        MediaQuery.sizeOf(context).width >= 900 &&
+        MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height &&
+        MediaQuery.textScalerOf(context).scale(16) < 24;
+    final controls = <Widget>[
+      _topBar(tables, visuals, l10n, es),
+      if (widget.onShowAccounts != null)
+        Align(
+          alignment: Alignment.centerRight,
+          child: PosTextButton.icon(
+            onPressed: widget.onShowAccounts,
+            icon: const PosIcon(PosGlyphs.receiptLong),
+            label: Text(es ? 'Cuentas abiertas' : 'Open accounts'),
+          ),
+        ),
+      if (controller.loading) const PosProgress(),
+      if (controller.failed)
+        PosNoticeBanner(
+          content: Text(
+            es
+                ? 'No se pudo actualizar el plano. La información puede estar desactualizada.'
+                : 'Could not refresh the floor plan. The information may be out of date.',
+          ),
+          actions: [
+            PosTextButton(
+              onPressed: _load,
+              child: Text(es ? 'Reintentar' : 'Retry'),
+            ),
+          ],
+        ),
+      if (room != null && room.stale)
+        PosNoticeBanner(
+          content: Text(
+            es
+                ? 'No se pudo actualizar el estado de las mesas. Lo que ves puede estar desactualizado.'
+                : 'Could not refresh table state. What you see may be out of date.',
+          ),
+          actions: [
+            PosTextButton(
+              onPressed: _load,
+              child: Text(es ? 'Reintentar' : 'Retry'),
+            ),
+          ],
+        ),
+      if (room?.errorCode != null) _failureBanner(room!, l10n),
+      if (_notice != null)
+        PosNoticeBanner(
+          content: Text(_notice!),
+          actions: [
+            PosTextButton(
+              onPressed: () => setState(() => _notice = null),
+              child: Text(l10n.closeAction),
+            ),
+          ],
+        ),
+      if (_result != null)
+        Semantics(
+          liveRegion: true,
+          child: PosNoticeBanner(
+            content: Text(_result!),
+            actions: [
+              PosTextButton(
+                onPressed: () => setState(() => _result = null),
+                child: Text(l10n.closeAction),
               ),
-            if (controller.loading) const PosProgress(),
-            if (controller.failed)
-              PosNoticeBanner(
-                content: Text(
-                  es
-                      ? 'No se pudo actualizar el plano. La información puede estar desactualizada.'
-                      : 'Could not refresh the floor plan. The information may be out of date.',
-                ),
-                actions: [
-                  PosTextButton(
-                    onPressed: _load,
-                    child: Text(es ? 'Reintentar' : 'Retry'),
-                  ),
-                ],
-              ),
-            if (room != null && room.stale)
-              PosNoticeBanner(
-                content: Text(
-                  es
-                      ? 'No se pudo actualizar el estado de las mesas. Lo que ves puede estar desactualizado.'
-                      : 'Could not refresh table state. What you see may be out of date.',
-                ),
-                actions: [
-                  PosTextButton(
-                    onPressed: _load,
-                    child: Text(es ? 'Reintentar' : 'Retry'),
-                  ),
-                ],
-              ),
-            if (room?.errorCode != null) _failureBanner(room!, l10n),
-            if (_notice != null)
-              PosNoticeBanner(
-                content: Text(_notice!),
-                actions: [
-                  PosTextButton(
-                    onPressed: () => setState(() => _notice = null),
-                    child: Text(l10n.closeAction),
-                  ),
-                ],
-              ),
-            if (_result != null)
-              Semantics(
-                liveRegion: true,
-                child: PosNoticeBanner(
-                  content: Text(_result!),
-                  actions: [
-                    PosTextButton(
-                      onPressed: () => setState(() => _result = null),
-                      child: Text(l10n.closeAction),
-                    ),
-                  ],
-                ),
-              ),
-            if (_mergeMode || _moveFrom != null) _gestureBar(room, l10n, es),
-            if (!widget.directAccounts && controller.refreshedAt != null)
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  '${es ? 'Plano actualizado' : 'Map refreshed'}: ${PosLocalLabels.of(context).formatTimeOfDay(PosTime.fromDateTime(controller.refreshedAt!))}',
-                ),
-              ),
-            if (areas.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  UmiSpacing.md,
-                  0,
-                  UmiSpacing.md,
-                  UmiSpacing.sm,
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) => Row(
-                    children: [
-                      Expanded(
-                        child: FloorPlanAreaSelector(
+            ],
+          ),
+        ),
+      if (_mergeMode || _moveFrom != null) _gestureBar(room, l10n, es),
+      if (!widget.directAccounts && controller.refreshedAt != null)
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: Text(
+            '${es ? 'Plano actualizado' : 'Map refreshed'}: ${PosLocalLabels.of(context).formatTimeOfDay(PosTime.fromDateTime(controller.refreshedAt!))}',
+          ),
+        ),
+      if (areas.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            UmiSpacing.md,
+            0,
+            UmiSpacing.md,
+            UmiSpacing.sm,
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) => Row(
+              children: [
+                Expanded(
+                  child: widget.directAccounts && areas.length == 1
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            areas.single.name,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        )
+                      : FloorPlanAreaSelector(
                           areas: areas,
                           selectedAreaId: area?.id,
                           onSelect: (value) => setState(() => _areaId = value),
                         ),
+                ),
+                // The hint is a nicety, so it yields to the chips: the
+                // operator needs every area on a narrow surface.
+                //
+                // It ALSO YIELDS TO AN ARMED MODE. It says what a tap on a table does — open
+                // its detail — and with a move or a merge armed a tap does something else.
+                // Two instructions on one screen, one of them false, is how a table gets
+                // moved by accident; the gesture bar above already says what the next tap
+                // will do. Measured on the iMin D3-504 on 2026-10-11: with `Moviendo Mesa 3…`
+                // in the bar, this hint still read `Toca una mesa para ver el detalle`.
+                if (constraints.maxWidth >= 560 &&
+                    _moveFrom == null &&
+                    !_mergeMode) ...[
+                  const SizedBox(width: UmiSpacing.md),
+                  Flexible(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 280),
+                      child: Text(
+                        es
+                            ? 'Toca una mesa para ver el detalle'
+                            : 'Tap a table to see its detail',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                      // The hint is a nicety, so it yields to the chips: the
-                      // operator needs every area on a narrow surface.
-                      //
-                      // It ALSO YIELDS TO AN ARMED MODE. It says what a tap on a table does — open
-                      // its detail — and with a move or a merge armed a tap does something else.
-                      // Two instructions on one screen, one of them false, is how a table gets
-                      // moved by accident; the gesture bar above already says what the next tap
-                      // will do. Measured on the iMin D3-504 on 2026-10-11: with `Moviendo Mesa 3…`
-                      // in the bar, this hint still read `Toca una mesa para ver el detalle`.
-                      if (constraints.maxWidth >= 560 &&
-                          _moveFrom == null &&
-                          !_mergeMode) ...[
-                        const SizedBox(width: UmiSpacing.md),
-                        Flexible(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 280),
-                            child: Text(
-                              es
-                                  ? 'Toca una mesa para ver el detalle'
-                                  : 'Tap a table to see its detail',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.right,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+    ];
+    return PosPage(
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (!dock) ...controls,
+            Expanded(
+              child: _portraitPanel
+                  ? ListView(
+                      children: [
+                        SizedBox(
+                          height: (MediaQuery.sizeOf(context).width * .62)
+                              .clamp(320.0, 450.0),
+                          child: _roomView(area, visuals, l10n, es),
+                        ),
+                        _detailPanel(area, l10n, es, stacked: true),
+                      ],
+                    )
+                  : dock
+                  ? Column(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizedBox(
+                                width: 232,
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: controls,
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 24),
+                              Expanded(
+                                child: _roomView(area, visuals, l10n, es),
+                              ),
+                            ],
                           ),
                         ),
+                        Expanded(
+                          flex: 2,
+                          child: _detailPanel(area, l10n, es, docked: true),
+                        ),
                       ],
-                    ],
-                  ),
-                ),
-              ),
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: _roomView(area, visuals, l10n, es)),
-                  if (_panelShown) _detailPanel(area, l10n, es),
-                ],
-              ),
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: _roomView(area, visuals, l10n, es)),
+                        if (_panelShown) _detailPanel(area, l10n, es),
+                      ],
+                    ),
             ),
             if (!_panelShown) _selectedSummary(area, l10n, es),
           ],
@@ -426,8 +496,41 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
             .where((visual) => visual.state == tableStateDirty)
             .length ??
         0;
+    if (widget.directAccounts && widget.embedded) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                [
+                  floorPlanTableCountLabel(tables.length, spanish: es),
+                  if (dirty > 0) es ? '$dirty por limpiar' : '$dirty to clear',
+                  if (_roomOffline) es ? 'Sin conexión' : 'Offline',
+                ].join(' · '),
+                style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+                  color: PosTheme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            if (widget.onOpenTemporaryAccount != null)
+              PosIconButton(
+                key: const ValueKey('open-temporary-table-account'),
+                tooltip: es ? 'Mesa temporal' : 'Temporary table',
+                onPressed: () => unawaited(widget.onOpenTemporaryAccount!()),
+                icon: const PosIcon(PosGlyphs.addCircleOutline, size: 20),
+              ),
+            PosIconButton(
+              tooltip: es ? 'Actualizar' : 'Refresh',
+              onPressed: widget.controller.loading ? null : _load,
+              icon: const PosIcon(PosGlyphs.refresh, size: 20),
+            ),
+          ],
+        ),
+      );
+    }
     return PosHeader(
-      toolbarHeight: widget.directAccounts ? 56 : 72,
+      toolbarHeight: 56,
       actionsInline:
           widget.directAccounts && MediaQuery.sizeOf(context).width >= 560,
       automaticallyImplyLeading: !widget.embedded,
@@ -687,19 +790,34 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          Expanded(
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
-          Text(value, style: theme.textTheme.bodySmall),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _detailPanel(FloorPlanArea? area, AppLocalizations l10n, bool es) {
+  Widget _detailPanel(
+    FloorPlanArea? area,
+    AppLocalizations l10n,
+    bool es, {
+    bool stacked = false,
+    bool docked = false,
+  }) {
     final theme = PosTheme.of(context);
     final palette = _FloorPlanPalette.of(context);
     final room = widget.tableState;
@@ -710,146 +828,160 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         area.elements
             .map(FloorPlanElement.fromJson)
             .any((candidate) => candidate.id == selected.id);
-
-    final children = <Widget>[];
+    Widget content;
     if (selected == null || !inArea) {
-      children.add(
-        Text(
-          l10n.tableStatePanelEmpty,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+      content = Text(
+        l10n.tableStatePanelEmpty,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
         ),
       );
     } else {
       final entry = room?.stateOf(selected.id);
-      final state = room?.isPaidAndOccupied(selected.id) == true
+      final state = room != null && room.map == null
+          ? tableVisualUnknown
+          : room?.isPaidAndOccupied(selected.id) == true
           ? tableVisualPaid
           : entry?.state ?? tableStateOpen;
       final elapsed = room?.elapsedOf(selected.id);
       final groupId = entry?.groupId;
-      final groupSize = (room != null && groupId != null)
+      final groupSize = room != null && groupId != null
           ? room.group(groupId).length
           : 0;
       final partySize = entry?.partySize;
-      children.addAll([
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                l10n.tableStatePanelTitle(selected.label),
-                style: theme.textTheme.titleLarge,
-              ),
-            ),
-            Text(
-              '${selected.capacity} ${es ? 'lugares' : 'seats'}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: UmiSpacing.xs),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: UmiSpacing.sm,
-              vertical: UmiSpacing.xs,
-            ),
-            decoration: BoxDecoration(
-              color: palette.stateAccent(state).withValues(alpha: .16),
-              borderRadius: BorderRadius.circular(UmiRadius.surface),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: palette.stateAccent(state),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: UmiSpacing.xs),
-                Text(
-                  _stateLabel(state, es),
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: palette.stateAccent(state),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (entry?.openAccountFolio != null)
-          _panelRow(es ? 'Cuenta' : 'Account', entry!.openAccountFolio!),
-        if (partySize != null)
-          _panelRow(l10n.tableStatePartySizeField, '$partySize'),
-        if (elapsed != null)
-          _panelRow(l10n.tableStateElapsedField, formatTableTurn(elapsed)),
-        if (groupSize > 1) _panelRow(l10n.tableStateGroupField, '$groupSize'),
-        const PosDivider(),
-        Text(
-          l10n.tableStatePanelActions,
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: UmiSpacing.sm),
-      ]);
-      if (room != null) {
-        final actions = _tableActions(selected, room, l10n, es);
-        children.add(
-          Wrap(
-            spacing: UmiSpacing.sm,
-            runSpacing: UmiSpacing.sm,
+      final facts = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              for (var index = 0; index < actions.length; index++)
-                if (index == 0 && widget.onOpenAccount != null)
-                  PosButton.icon(
-                    onPressed: actions[index].onTap,
-                    icon: PosIcon(actions[index].icon, size: 18),
-                    label: Text(actions[index].label),
-                  )
-                else
-                  PosOutlineButton.icon(
-                    onPressed: actions[index].onTap,
-                    icon: PosIcon(actions[index].icon, size: 18),
-                    label: Text(actions[index].label),
-                  ),
+              Expanded(
+                child: Text(
+                  l10n.tableStatePanelTitle(selected.label),
+                  style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
+                ),
+              ),
+              PosIconButton(
+                tooltip: es ? 'Quitar selección' : 'Clear selection',
+                onPressed: () => setState(() => _selectedId = null),
+                icon: const PosIcon(PosGlyphs.close, size: 18),
+              ),
             ],
           ),
-        );
-      } else if (widget.onOpenAccount != null) {
-        children.add(
-          PosButton.icon(
-            onPressed: () => unawaited(widget.onOpenAccount!(selected)),
-            icon: const PosIcon(PosGlyphs.receiptLong),
-            label: Text(es ? 'Abrir cuenta' : 'Open account'),
+          const SizedBox(height: 8),
+          Text(
+            '${selected.capacity} ${es ? 'lugares' : 'seats'}',
+            style: theme.textTheme.bodySmall,
           ),
-        );
-      }
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: palette.stateAccent(state).withValues(alpha: .16),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              _stateLabel(state, es),
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: palette.stateAccent(state),
+              ),
+            ),
+          ),
+          if (entry?.openAccountFolio != null)
+            _panelRow(es ? 'Cuenta' : 'Account', entry!.openAccountFolio!),
+          if (partySize != null)
+            _panelRow(l10n.tableStatePartySizeField, '$partySize'),
+          if (elapsed != null)
+            _panelRow(l10n.tableStateElapsedField, formatTableTurn(elapsed)),
+          if (groupSize > 1) _panelRow(l10n.tableStateGroupField, '$groupSize'),
+        ],
+      );
+      final preview = entry?.openAccountId != null && widget.readAccount != null
+          ? AccountPreview(
+              key: ValueKey('table-account-${entry!.openAccountId}'),
+              refreshGeneration: _accountRefreshGeneration,
+              load: () => widget.readAccount!(selected),
+              balance: widget.readBalance,
+            )
+          : null;
+      final actions = room == null
+          ? null
+          : _tableActions(selected, room, l10n, es);
+      final operations = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            l10n.tableStatePanelActions,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (actions != null)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (var index = 0; index < actions.length; index++)
+                  if (index == 0 && widget.onOpenAccount != null)
+                    PosButton.icon(
+                      onPressed: actions[index].onTap,
+                      icon: PosIcon(actions[index].icon, size: 18),
+                      label: Text(actions[index].label),
+                    )
+                  else
+                    PosOutlineButton.icon(
+                      onPressed: actions[index].onTap,
+                      icon: PosIcon(actions[index].icon, size: 18),
+                      label: Text(actions[index].label),
+                    ),
+              ],
+            )
+          else if (room == null && widget.onOpenAccount != null)
+            PosButton.icon(
+              onPressed: () => unawaited(widget.onOpenAccount!(selected)),
+              icon: const PosIcon(PosGlyphs.receiptLong),
+              label: Text(es ? 'Abrir cuenta' : 'Open account'),
+            ),
+        ],
+      );
+      content = docked
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 184, child: facts),
+                const SizedBox(width: 24),
+                if (preview != null) ...[
+                  Expanded(child: preview),
+                  const SizedBox(width: 24),
+                ],
+                Expanded(child: operations),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                facts,
+                if (preview != null) ...[const SizedBox(height: 12), preview],
+                const PosDivider(),
+                operations,
+              ],
+            );
     }
-
     return Container(
       key: const ValueKey('table-detail-panel'),
-      width: 320,
-      margin: const EdgeInsets.fromLTRB(0, 0, UmiSpacing.md, UmiSpacing.md),
-      padding: const EdgeInsets.all(UmiSpacing.md),
+      width: stacked || docked ? double.infinity : 320,
+      margin: docked
+          ? EdgeInsets.zero
+          : EdgeInsets.fromLTRB(stacked ? 16 : 0, 0, 16, 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(UmiRadius.surface),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: docked ? BorderRadius.zero : BorderRadius.circular(8),
+        border: docked
+            ? Border(top: BorderSide(color: theme.colorScheme.outlineVariant))
+            : Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: children,
-        ),
-      ),
+      child: SingleChildScrollView(child: content),
     );
   }
 
@@ -865,7 +997,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     final room = widget.tableState;
     final facts = <String>[
       _stateLabel(
-        room?.isPaidAndOccupied(selected.id) == true
+        room != null && room.map == null
+            ? tableVisualUnknown
+            : room?.isPaidAndOccupied(selected.id) == true
             ? tableVisualPaid
             : room?.stateOf(selected.id).state ?? tableStateOpen,
         es,
@@ -923,6 +1057,16 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     TableStateController room,
     List<FloorPlanElement> tables,
   ) {
+    if (room.map == null) {
+      return {
+        for (final table in tables)
+          table.id: FloorPlanTableVisual(
+            state: tableStateOpen,
+            known: false,
+            selected: _selectedId == table.id,
+          ),
+      };
+    }
     final groupSize = <String, int>{};
     for (final table in tables) {
       final groupId = room.stateOf(table.id).groupId;
@@ -975,6 +1119,8 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   String _stateLabel(String state, bool es) {
     final l10n = AppLocalizations.of(context);
     return switch (state) {
+      tableVisualUnknown =>
+        es ? 'Estado por consultar' : 'Status not yet available',
       tableStateSeated => l10n.tableStateSeatedLabel,
       tableStateOrdered => l10n.tableStateOrderedLabel,
       tableStateServed => l10n.tableStateServedLabel,
@@ -1318,6 +1464,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     AppLocalizations l10n,
     bool es,
   ) {
+    if (room.map == null) return const [];
     final entry = room.stateOf(element.id);
     final present = tablePartyStates.contains(entry.state);
     final paid = room.isPaidAndOccupied(element.id);
@@ -1492,7 +1639,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
             children: [
               Text(
                 _stateLabel(
-                  room.isPaidAndOccupied(element.id)
+                  room.map == null
+                      ? tableVisualUnknown
+                      : room.isPaidAndOccupied(element.id)
                       ? tableVisualPaid
                       : entry.state,
                   es,
@@ -1519,6 +1668,15 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                   l10n.tableStateGroupLabel(groupSize),
                   style: PosTheme.of(dialog).textTheme.bodySmall,
                 ),
+              if (entry.openAccountId != null &&
+                  widget.readAccount != null) ...[
+                const PosDivider(),
+                AccountPreview(
+                  key: ValueKey('table-account-${entry.openAccountId}'),
+                  load: () => widget.readAccount!(element),
+                  balance: widget.readBalance,
+                ),
+              ],
               const PosDivider(),
               ...actions.map(
                 (action) =>
@@ -1560,6 +1718,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
 
 /// Estado visual del pago. Los seis estados físicos del contrato se conservan.
 const tableVisualPaid = 'paid_occupied';
+const tableVisualUnknown = 'room_unknown';
 
 /// What one table looks like beyond its published geometry. [state] is always
 /// one of the contract's six names.
@@ -1574,6 +1733,7 @@ final class FloorPlanTableVisual {
     this.partySize,
     this.accountFolio,
     this.paid = false,
+    this.known = true,
   });
 
   final String state;
@@ -1585,8 +1745,13 @@ final class FloorPlanTableVisual {
   final bool selected;
   final bool moving;
   final bool paid;
+  final bool known;
 
-  String get displayState => paid ? tableVisualPaid : state;
+  String get displayState => !known
+      ? tableVisualUnknown
+      : paid
+      ? tableVisualPaid
+      : state;
 
   bool get partyPresent => tablePartyStates.contains(state);
 }
@@ -1989,7 +2154,7 @@ class _FloorPlanElement extends StatelessWidget {
   Widget build(BuildContext context) {
     final isTable = element.kind == 'table';
     final visual = state;
-    final accent = visual == null || visual.state == tableStateOpen
+    final accent = visual == null || visual.displayState == tableStateOpen
         ? null
         : palette.stateAccent(visual.displayState);
     final selected = visual?.selected == true || visual?.moving == true;
@@ -2043,6 +2208,8 @@ class _FloorPlanElement extends StatelessWidget {
   }
 
   String _stateName(String state, bool spanish) => switch (state) {
+    tableVisualUnknown =>
+      spanish ? 'Estado por consultar' : 'Status not yet available',
     tableStateSeated => spanish ? 'Ocupada' : 'Seated',
     tableStateOrdered => spanish ? 'Pedido tomado' : 'Order taken',
     tableStateServed => spanish ? 'Servido' : 'Served',
@@ -2060,7 +2227,7 @@ class _FloorPlanElement extends StatelessWidget {
     final band = detailed ? height / 2 : height;
     final style = TextStyle(
       color: palette.labelFor(element.kind),
-      fontWeight: FontWeight.w700,
+      fontWeight: FontWeight.w500,
       fontSize: math.min(band * 0.55, width * 0.4).clamp(7.0, 26.0),
       height: 1.1,
     );
@@ -2119,11 +2286,7 @@ class _FloorPlanElement extends StatelessWidget {
     return Column(
       children: [
         Expanded(child: Center(child: label)),
-        Container(
-          key: ValueKey('floor-plan-divider-${element.id}'),
-          height: 1,
-          color: palette.divider,
-        ),
+        const SizedBox(height: 2),
         Expanded(
           child: visual != null && visual.state != tableStateOpen
               ? Padding(
@@ -2148,6 +2311,7 @@ class _FloorPlanElement extends StatelessWidget {
 
 /// The glyph that carries a state, so the state is never colour alone.
 PosGlyph tableStateGlyph(String state) => switch (state) {
+  tableVisualUnknown => PosGlyphs.helpOutline,
   tableStateSeated => PosGlyphs.eventSeat,
   tableStateOrdered => PosGlyphs.receiptLong,
   tableStateServed => PosGlyphs.restaurant,
@@ -2216,9 +2380,11 @@ class _FloorPlanSeatDotPainter extends CustomPainter {
       remaining -= inRow;
       var left = (size.width - (inRow * diameter + (inRow - 1) * gap)) / 2;
       for (var dot = 0; dot < inRow; dot++) {
-        canvas.drawCircle(
-          Offset(left + diameter / 2, top + diameter / 2),
-          diameter / 2,
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(left, top + diameter * .25, diameter, diameter * .5),
+            const Radius.circular(2),
+          ),
           paint,
         );
         left += pitch;
@@ -2296,18 +2462,21 @@ class _FloorPlanPalette {
     return _FloorPlanPalette(
       dark: dark,
       scheme: theme.colorScheme,
-      canvas: dark ? const Color(0xff15161a) : const Color(0xffededf2),
-      tableFill: dark ? const Color(0xff25272e) : PosColors.white,
-      tableBorder: dark ? const Color(0xff3b3e47) : const Color(0xffdfdfe7),
+      canvas: theme.colorScheme.background,
+      tableFill: dark ? const Color(0xff17382d) : const Color(0xffe7f2eb),
+      tableBorder: dark ? const Color(0xff7fd0a6) : const Color(0xff93b4a2),
       divider: dark ? const Color(0xff3b3e47) : const Color(0xffe6e6ec),
       seat: dark ? const Color(0xffa7adb8) : const Color(0xff9ba1ab),
       label: theme.colorScheme.onSurface,
-      tableElevation: dark ? 0 : 1.5,
+      tableElevation: 0,
       shadow: const Color(0x1a101828),
       groupFill: dark ? const Color(0x332f6f4f) : const Color(0x141b7f4b),
       groupBorder: dark ? const Color(0xff7fd0a6) : const Color(0xff1b7f4b),
       stateTint: dark ? const Color(0x221f9e63) : const Color(0x0f1b7f4b),
       stateAccents: {
+        tableStateOpen: dark
+            ? const Color(0xff7fd0a6)
+            : const Color(0xff286653),
         tableStateSeated: dark
             ? const Color(0xff7fd0a6)
             : const Color(0xff1b7f4b),
@@ -2345,9 +2514,14 @@ class _FloorPlanPalette {
   final Color stateTint;
   final Map<String, Color> stateAccents;
 
-  Color stateAccent(String state) => stateAccents[state] ?? scheme.primary;
+  Color stateAccent(String state) => state == tableVisualUnknown
+      ? scheme.onSurfaceVariant
+      : stateAccents[state] ?? scheme.primary;
 
   Color fillFor(String kind, [String? state]) {
+    if (kind == 'table' && state == tableVisualUnknown) {
+      return scheme.surfaceContainerHigh;
+    }
     if (kind != 'table' || state == null || state == tableStateOpen) {
       return switch (kind) {
         'table' => tableFill,
@@ -2358,7 +2532,10 @@ class _FloorPlanPalette {
         _ => scheme.surfaceContainerHighest,
       };
     }
-    return Color.alphaBlend(stateTint, tableFill);
+    return Color.alphaBlend(
+      stateAccent(state).withValues(alpha: dark ? .18 : .10),
+      scheme.surface,
+    );
   }
 
   Color borderFor(String kind) => switch (kind) {

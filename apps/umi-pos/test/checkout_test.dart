@@ -17,6 +17,7 @@ import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
 import 'package:umi_pos/features/checkout/checkout_surface.dart';
 import 'package:umi_pos/features/checkout/partial_checkout_surface.dart';
+import 'package:umi_pos/features/checkout/payment_method_tile.dart';
 import 'package:umi_pos/features/customer_value/customer_value_controller.dart';
 import 'package:umi_pos/features/customer_value/customer_value_repository.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
@@ -674,13 +675,15 @@ Future<_TenderSheet> _openTenderSheet(
   _CheckoutRepository repository, {
   required CheckoutPolicy policy,
   _CartRepository? cartRepository,
+  Size viewport = const Size(1280, 3200),
+  bool shell = false,
   Future<String?> Function()? onOpenCashShift,
   Future<String?> Function()? onEnsureCashShift,
 }) async {
   tester.view.devicePixelRatio = 1;
   // Tall enough that the whole tender surface lays out at once, so every
   // asserted part is on screen without scrolling.
-  tester.view.physicalSize = const Size(1280, 3200);
+  tester.view.physicalSize = viewport;
   addTearDown(tester.view.reset);
   repository.policyValue = policy;
   final cart = CartController(
@@ -719,18 +722,35 @@ Future<_TenderSheet> _openTenderSheet(
       ],
       home: Builder(
         builder: (context) => PosPage(
-          body: PosButton(
-            onPressed: () => showCheckoutSheet(
-              context,
-              checkout: checkout,
-              cashShiftId: null,
-              cart: cart,
-              entry: root.entry,
-              sales: root.sales,
-              onOpenCashShift: onOpenCashShift,
-              onEnsureCashShift: onEnsureCashShift,
+          bottomNavigationBar: shell
+              ? PosNavigation(
+                  onDestinationSelected: (_) {},
+                  destinations: const [
+                    PosDestination(
+                      icon: PosIcon(PosGlyphs.receiptLong),
+                      label: 'Sale',
+                    ),
+                    PosDestination(
+                      icon: PosIcon(PosGlyphs.paymentsOutlined),
+                      label: 'Cash desk',
+                    ),
+                  ],
+                )
+              : null,
+          body: Builder(
+            builder: (context) => PosButton(
+              onPressed: () => showCheckoutSheet(
+                context,
+                checkout: checkout,
+                cashShiftId: null,
+                cart: cart,
+                entry: root.entry,
+                sales: root.sales,
+                onOpenCashShift: onOpenCashShift,
+                onEnsureCashShift: onEnsureCashShift,
+              ),
+              child: const Text('open'),
             ),
-            child: const Text('open'),
           ),
         ),
       ),
@@ -1068,6 +1088,40 @@ Future<_ValueSheet> _openValueSheet(
 }
 
 void main() {
+  for (final size in const [
+    Size(402, 874),
+    Size(412, 915),
+    Size(820, 1180),
+    Size(800, 1340),
+    Size(1340, 800),
+    Size(1440, 1000),
+  ]) {
+    testWidgets(
+      'checkout keeps charge reachable while fields scroll at $size',
+      (tester) async {
+        final sheet = await _openTenderSheet(
+          tester,
+          _CheckoutRepository(),
+          policy: CheckoutPolicy.fromJson(_policy),
+        );
+        tester.view.physicalSize = size;
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final charge = find.byKey(const ValueKey('checkout-charge'));
+        expect(charge.hitTestable(), findsOneWidget);
+        final before = tester.getRect(charge);
+        await tester.drag(
+          find.byType(SingleChildScrollView).first,
+          const Offset(0, -250),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getRect(charge), before);
+        expect(charge.hitTestable(), findsOneWidget);
+        await sheet.dispose();
+      },
+    );
+  }
+
   test('known checkout refusals keep their actionable message', () {
     final l = AppLocalizationsEs();
     expect(
@@ -1628,11 +1682,11 @@ void main() {
       await controller.confirm();
 
       expect(controller.state.phase, CheckoutPhase.failure);
+      expect(controller.state.errorCode, 'EXTERNAL_PAYMENT_NOT_COMMITTED');
       expect(
-        controller.state.errorCode,
-        'EXTERNAL_PAYMENT_NOT_COMMITTED',
+        controller.state.failureDetails?['causeCode'],
+        'CHECKOUT_CART_CHANGED',
       );
-      expect(controller.state.failureDetails?['causeCode'], 'CHECKOUT_CART_CHANGED');
       expect(repository.captures, hasLength(1));
       expect(repository.settlements, hasLength(1));
     },
@@ -1769,9 +1823,12 @@ void main() {
 
     expect(find.byType(PartialCheckoutSurface), findsOneWidget);
     expect(find.text('MXN 116.00'), findsWidgets);
-    expect(find.text('This portion'), findsOneWidget);
-    expect(find.text('Tip'), findsOneWidget);
-    expect(find.text('Charge now'), findsOneWidget);
+    expect(find.byKey(const ValueKey('partial-principal')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('partial-tip-disclosure')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('partial-exact-charge')), findsOneWidget);
     expect(find.text('Remaining'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
@@ -1856,8 +1913,14 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byKey(const ValueKey('partial-tip-disclosure')));
+    await tester.pumpAndSettle();
     expect(find.text('Tip for the account owner'), findsOneWidget);
     expect(find.text('Suggested base · MXN 100.00 before tax'), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('partial-tip-bp-1000')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('partial-tip-bp-1000')));
     await tester.pumpAndSettle();
 
@@ -1876,10 +1939,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(tipField().controller?.text, '5.00');
 
+    await tester.ensureVisible(find.byKey(const ValueKey('partial-tip-zero')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('partial-tip-zero')));
     await tester.pumpAndSettle();
     expect(tipField().controller?.text, '0.00');
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('partial-tip-bp-1500')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('partial-tip-bp-1500')));
     await tester.pumpAndSettle();
     expect(tipField().controller?.text, '7.50');
@@ -1993,7 +2062,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(PartialCheckoutSurface), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Close'));
+    await tester.tap(find.text('Back to account'));
     await tester.pumpAndSettle();
 
     expect(find.byType(PartialCheckoutSurface), findsNothing);
@@ -2166,6 +2235,8 @@ void main() {
     final firstBasis = value.requests.first.checkoutFingerprint;
 
     // The correction: the cash the customer handed over, after the preview.
+    await tester.ensureVisible(find.text('MXN 500.00'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('MXN 500.00'));
     await tester.pumpAndSettle();
     // The sheet is showing the repriced total, and the edit turns the confirm back into a charge.
@@ -2256,6 +2327,13 @@ void main() {
       repository,
       policy: CheckoutPolicy.fromJson(_policy),
     );
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('checkout-tip-disclosure')),
+        matching: find.text('Tip'),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('10%'));
     await tester.pumpAndSettle();
     // 10 % of 116.00 is 11.60, so the cash the till applies and receives is 127.60.
@@ -2308,6 +2386,13 @@ void main() {
     }
     await tester.pumpAndSettle();
 
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('checkout-tip-disclosure')),
+        matching: find.text('Tip'),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('10%'));
     await tester.pumpAndSettle();
 
@@ -2322,6 +2407,67 @@ void main() {
     expect(find.text('MXN 372.40'), findsOneWidget);
     await sheet.dispose();
   });
+
+  for (final width in [800.0, 820.0]) {
+    testWidgets(
+      'portrait checkout keeps method bank, work and account beside one another at $width',
+      (tester) async {
+        final sheet = await _openTenderSheet(
+          tester,
+          _CheckoutRepository(),
+          policy: CheckoutPolicy.fromJson(_policy),
+          viewport: Size(width, 1280),
+          shell: true,
+        );
+        final first = tester.getRect(find.byType(PaymentMethodTile).first);
+        final second = tester.getRect(find.byType(PaymentMethodTile).at(1));
+        final work = tester.getRect(
+          find.byKey(const ValueKey('checkout-keypad')),
+        );
+        final account = find.byKey(const ValueKey('checkout-account'));
+        expect(first.right, lessThanOrEqualTo(work.left));
+        expect(second.top, greaterThanOrEqualTo(first.bottom));
+        expect(tester.getRect(account).left, greaterThanOrEqualTo(work.right));
+        final pane = find
+            .ancestor(of: account, matching: find.byType(SizedBox))
+            .first;
+        expect(tester.getRect(pane).width, 304);
+        expect(tester.takeException(), isNull);
+        await sheet.dispose();
+      },
+    );
+  }
+
+  testWidgets(
+    'phone checkout keeps method row, full cash keypad and charge reachable with the locked shell',
+    (tester) async {
+      final sheet = await _openTenderSheet(
+        tester,
+        _CheckoutRepository(),
+        policy: CheckoutPolicy.fromJson(_policy),
+        viewport: const Size(402, 874),
+        shell: true,
+      );
+      final charge = find.byKey(const ValueKey('checkout-charge'));
+      expect(charge.hitTestable(), findsOneWidget);
+      final keypad = find.byKey(const ValueKey('checkout-keypad'));
+      expect(keypad, findsOneWidget);
+      expect(tester.getRect(keypad).height, 188);
+      expect(
+        tester.getRect(keypad).bottom,
+        lessThan(tester.getRect(charge).top),
+      );
+      expect(find.text('0').hitTestable(), findsOneWidget);
+      expect(find.text('9').hitTestable(), findsOneWidget);
+      final navigation = tester
+          .widgetList<PosNavigation>(find.byType(PosNavigation))
+          .last;
+      expect(navigation.destinations, hasLength(2));
+      expect(navigation.onDestinationSelected, isNull);
+      expect(tester.takeException(), isNull);
+      await sheet.dispose();
+    },
+  );
 
   testWidgets('checkout sheet renders authoritative totals and payment methods', (
     tester,
@@ -2384,8 +2530,8 @@ void main() {
     // The redesigned SOTA tender screen: a hero total, the payment-method tile,
     // the cash-received flow with quick-cash notes and an on-screen keypad, the
     // colour-coded change block. Receipt delivery uses the default display path.
-    expect(find.text('TOTAL'), findsOneWidget);
-    expect(find.text('Payment selection'), findsOneWidget);
+    expect(find.text('Remaining balance'), findsWidgets);
+    expect(find.byKey(const ValueKey('checkout-account')), findsOneWidget);
     expect(find.text('Cash'), findsWidgets);
     expect(find.text('Cash received'), findsOneWidget);
     expect(find.text('Exact amount'), findsOneWidget);
@@ -2396,6 +2542,8 @@ void main() {
     expect(find.text('MXN 116.00'), findsWidgets);
     // Changing the received cash must not add another confirmation. The
     // operator has already reviewed the visible total and tender.
+    await tester.ensureVisible(find.text('MXN 500.00'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('MXN 500.00'));
     await tester.pumpAndSettle();
     // One-tap checkout: the charge button reviews the total server-side and, when
@@ -3186,6 +3334,13 @@ void main() {
     final charge = tester.widget<PosButton>(find.byType(PosButton).last);
     expect(charge.onPressed, isNotNull);
 
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('checkout-tip-disclosure')),
+        matching: find.text('Tip'),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('10%'));
     await tester.pumpAndSettle();
     expect(
@@ -3227,6 +3382,13 @@ void main() {
     expect(find.byKey(const ValueKey('tender-tip-keypad')), findsNothing);
     expect(find.text('Receipt destination'), findsNothing);
 
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('checkout-tip-disclosure')),
+        matching: find.text('Tip'),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('custom-tip-percentage')));
     await tester.pumpAndSettle();
     final keypad = find.byKey(const ValueKey('tender-tip-keypad'));
@@ -3234,7 +3396,12 @@ void main() {
     tester.view.physicalSize = const Size(1920, 1080);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(tester.getRect(keypad).bottom, lessThan(820));
+    await tester.ensureVisible(keypad);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(keypad).bottom,
+      lessThanOrEqualTo(tester.view.physicalSize.height),
+    );
     for (final digit in ['1', '2', '.', '5']) {
       await tester.tap(find.descendant(of: keypad, matching: find.text(digit)));
       await tester.pump();
@@ -3269,6 +3436,13 @@ void main() {
       policy: CheckoutPolicy.fromJson(_policy),
     );
     await tester.tap(find.text('Manual terminal'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('checkout-tip-disclosure')),
+        matching: find.text('Tip'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('custom-tip-fixed')));
     await tester.pumpAndSettle();
@@ -3482,6 +3656,46 @@ void main() {
           reason:
               '$finder sits at $rect, outside the $canvas the till draws on',
         );
+      }
+      await sheet.dispose();
+    },
+  );
+  testWidgets(
+    'payment work stays together beside the actual account at tablet sizes',
+    (tester) async {
+      final sheet = await _openTenderSheet(
+        tester,
+        _CheckoutRepository(),
+        policy: CheckoutPolicy.fromJson(_policy),
+      );
+      for (final size in [
+        const Size(800, 1340),
+        const Size(1340, 800),
+        const Size(412, 915),
+      ]) {
+        tester.view.physicalSize = size;
+        await tester.pumpAndSettle();
+        final received = tester.getRect(find.text('Cash received'));
+        final keypad = tester.getRect(
+          find.byKey(const ValueKey('tender-cash')),
+        );
+        expect(keypad.top, greaterThan(received.bottom));
+        expect(keypad.left, lessThanOrEqualTo(received.left));
+        if (size.width >= 700) {
+          final account = tester.getRect(
+            find.byKey(const ValueKey('checkout-account')),
+          );
+          expect(keypad.right, lessThan(account.left));
+        }
+        expect(
+          find.byKey(const ValueKey('checkout-charge')).hitTestable(),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('custom-tip-percentage')),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
       }
       await sheet.dispose();
     },

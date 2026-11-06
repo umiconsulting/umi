@@ -485,6 +485,158 @@ Future<void> _seedOpenShift(_FakeCashRepository repository) => repository.open(
 );
 
 void main() {
+  testWidgets(
+    'phone separates full-width safe drop and drawer access from the movement pair',
+    (tester) async {
+      tester.view.physicalSize = const Size(402, 874);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repository = _FakeCashRepository();
+      await _seedOpenShift(repository);
+      repository.snapshot = CashCenterSnapshot.fromJson({
+        ...repository.snapshot.toJson(),
+        'allowedActions': ['movement', 'no_sale', 'suspend', 'count'],
+      });
+      final controller = CashController(repository: repository);
+      controller.setContext(
+        merchantId: 'merchant',
+        locationId: 'location',
+        operatorSessionId: 'operator',
+      );
+      await controller.load();
+      await tester.pumpWidget(
+        PosApp(
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: CashCenter(
+            controller: controller,
+            permissions: OperatorPermissions(const [
+              'cash.shift.read',
+              'cash.movement.paid_in',
+              'cash.movement.paid_out',
+              'cash.movement.safe_drop',
+              'cash.drawer.no_sale',
+              'cash.count.submit',
+            ]),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final l = AppLocalizations.of(tester.element(find.byType(CashCenter)));
+      Finder keyFor(String label) => find
+          .ancestor(of: find.text(label), matching: find.byType(PosTapRegion))
+          .first;
+      final entry = tester.getRect(keyFor(l.paidInAction));
+      final exit = tester.getRect(keyFor(l.paidOutAction));
+      final safe = tester.getRect(keyFor(l.safeDropAction));
+      expect(entry.top, exit.top);
+      expect(safe.width, greaterThan(entry.width * 1.9));
+      expect(safe.top, greaterThanOrEqualTo(entry.bottom));
+      expect(repository.movedWith, isNull);
+      expect(repository.noSaleRequest, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      controller.dispose();
+    },
+  );
+
+  for (final width in [800.0, 820.0]) {
+    testWidgets(
+      'portrait count retains bill and coin columns beside its submit region at $width',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 1280);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final repository = _FakeCashRepository();
+        await _seedOpenShift(repository);
+        repository.snapshot = CashCenterSnapshot.fromJson({
+          ...repository.snapshot.toJson(),
+          'policy': {
+            ...repository.snapshot.policy,
+            'blindCountRequired': false,
+          },
+          'currentShift': {
+            ...repository.snapshot.currentShift!,
+            'registerId': repository.snapshot.registers.first['id'],
+          },
+        });
+        final controller = CashController(repository: repository);
+        controller.setContext(
+          merchantId: 'merchant',
+          locationId: 'location',
+          operatorSessionId: 'operator',
+        );
+        await controller.load();
+        await tester.pumpWidget(
+          PosApp(
+            locale: const Locale('es'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            home: PosPage(
+              bottomNavigationBar: PosNavigation(
+                destinations: const [
+                  PosDestination(
+                    icon: PosIcon(PosGlyphs.receiptLong),
+                    label: 'Venta',
+                  ),
+                  PosDestination(
+                    icon: PosIcon(PosGlyphs.paymentsOutlined),
+                    label: 'Caja',
+                  ),
+                ],
+              ),
+              body: CashCenter(
+                embedded: true,
+                controller: controller,
+                permissions: OperatorPermissions(const [
+                  'cash.shift.read',
+                  'cash.count.submit',
+                ]),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cierre'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Contar el cajón'));
+        await tester.tap(find.text('Contar el cajón'));
+        await tester.pumpAndSettle();
+        expect(find.text('umi'), findsOneWidget);
+        final bills = tester.getRect(find.text('Billetes'));
+        final coins = tester.getRect(find.text('Monedas'));
+        final total = tester.getRect(
+          find.byKey(const ValueKey('count-workspace-total')),
+        );
+        expect(bills.top, coins.top);
+        expect(bills.right, lessThanOrEqualTo(coins.left));
+        expect(coins.right, lessThanOrEqualTo(total.left));
+        expect(
+          find.descendant(
+            of: find.byType(PosHeader).last,
+            matching: find.text('umi'),
+          ),
+          findsNothing,
+        );
+        tester.view.physicalSize = const Size(402, 874);
+        await tester.pumpAndSettle();
+        expect(find.text('umi'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(PosHeader).last,
+            matching: find.text('umi'),
+          ),
+          findsOneWidget,
+        );
+        expect(repository.countedWith, isNull);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        controller.dispose();
+      },
+    );
+  }
+
   for (final cancel in [false, true]) {
     testWidgets(
       'total-only count keeps the principal policy and closes safely cancel=$cancel',
@@ -496,6 +648,10 @@ void main() {
         await _seedOpenShift(repository);
         repository.snapshot = CashCenterSnapshot.fromJson({
           ...repository.snapshot.toJson(),
+          'currentShift': {
+            ...repository.snapshot.currentShift!,
+            'registerId': repository.snapshot.registers.first['id'],
+          },
           'policy': {
             ...repository.snapshot.policy,
             'countMethod': 'total_only',
@@ -525,19 +681,23 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        await tester.tap(find.text('Cierre'));
+        await tester.pumpAndSettle();
         await tester.ensureVisible(find.text('Contar el cajón'));
         await tester.tap(find.text('Contar el cajón'));
         await tester.pumpAndSettle();
+        expect(find.text('umi'), findsOneWidget);
+        expect(find.textContaining('Caja principal'), findsOneWidget);
         expect(find.byType(DenominationCounter), findsNothing);
         final field = find.descendant(
-          of: find.byType(PosAlertDialog),
+          of: find.byKey(const ValueKey('cash-count-workspace')),
           matching: find.byType(PosField),
         );
         expect(field, findsOneWidget);
         await tester.enterText(field, '1234.56');
         await tester.pump();
         final action = find.descendant(
-          of: find.byType(PosAlertDialog),
+          of: find.byKey(const ValueKey('cash-count-workspace')),
           matching: find.text(cancel ? 'Cerrar' : 'Enviar conteo'),
         );
         await tester.ensureVisible(action);
@@ -1127,6 +1287,8 @@ void main() {
 
     // The operator reads the drawer's account and the line that produced it, on
     // the same surface, without asking the owner's dashboard.
+    await tester.tap(find.text('Turno'));
+    await tester.pumpAndSettle();
     expect(find.text('La cuenta del cajón'), findsOneWidget);
     expect(find.text('Libro del turno'), findsOneWidget);
     expect(find.text('Fondo inicial'), findsWidgets);
@@ -1296,6 +1458,8 @@ void main() {
     await tester.pump();
     // The figures on this screen wear the same micro-label as the equation's
     // terms, so the two cards read as one ledger.
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
     expect(find.textContaining('EXPECTED CASH'), findsWidgets);
     expect(find.textContaining('COUNTED CASH'), findsWidgets);
     expect(find.text('Start recount'), findsOneWidget);
@@ -1646,6 +1810,8 @@ void main() {
     // about when somebody looked.
     final hh = readAt!.hour.toString().padLeft(2, '0');
     final mm = readAt.minute.toString().padLeft(2, '0');
+    await tester.tap(find.text('Turno'));
+    await tester.pump();
     expect(find.text('Actualizado $hh:$mm'), findsOneWidget);
   });
 
@@ -1959,6 +2125,8 @@ void main() {
 
     // The next step sits at the foot of the close card, which is below the fold
     // on this test's 800 x 600 surface: bring it into view before pressing it.
+    await tester.tap(find.text('Cierre'));
+    await tester.pumpAndSettle();
     final reasonAction = find.widgetWithText(
       PosButton,
       'Motivo de la diferencia',

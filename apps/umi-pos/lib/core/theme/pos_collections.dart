@@ -150,29 +150,31 @@ class PosBadge extends StatelessWidget {
   final bool isLabelVisible;
   final Color? backgroundColor;
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      ?child,
-      if (isLabelVisible)
-        Container(
-          margin: const EdgeInsets.only(left: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color:
-                backgroundColor ??
-                PosTheme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: DefaultTextStyle(
-            style: PosTheme.of(context).textTheme.labelSmall!.copyWith(
-              color: PosTheme.of(context).colorScheme.primary,
-            ),
-            child: label ?? const SizedBox(width: 4, height: 4),
-          ),
+  Widget build(BuildContext context) {
+    final palette = PosTheme.of(context).colorScheme;
+    final badge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: backgroundColor ?? palette.primary,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DefaultTextStyle(
+        style: PosTheme.of(context).textTheme.labelSmall!.copyWith(
+          color: palette.onPrimary,
+          fontSize: 10,
         ),
-    ],
-  );
+        child: label ?? const SizedBox(width: 4, height: 4),
+      ),
+    );
+    if (child == null) return isLabelVisible ? badge : const SizedBox.shrink();
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child!,
+        if (isLabelVisible) Positioned(right: -8, top: -7, child: badge),
+      ],
+    );
+  }
 }
 
 class PosSegment<T> {
@@ -280,7 +282,9 @@ class PosListRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = PosTheme.of(context);
     final body = ConstrainedBox(
-      constraints: BoxConstraints(minHeight: math.max(48, minTileHeight)),
+      constraints: BoxConstraints(
+        minHeight: math.max(dense ? 44 : 48, minTileHeight),
+      ),
       child: Container(
         color:
             tileColor ?? (selected ? theme.colorScheme.primaryContainer : null),
@@ -1227,6 +1231,7 @@ class PosDisclosure extends StatefulWidget {
     this.leading,
     this.trailing,
     this.initiallyExpanded = false,
+    this.compact = false,
     this.onExpansionChanged,
     this.childrenPadding,
     this.tilePadding,
@@ -1235,7 +1240,7 @@ class PosDisclosure extends StatefulWidget {
   final Widget title;
   final Widget? subtitle, leading, trailing;
   final List<Widget> children;
-  final bool initiallyExpanded;
+  final bool initiallyExpanded, compact;
   final ValueChanged<bool>? onExpansionChanged;
   final EdgeInsetsGeometry? childrenPadding, tilePadding;
   @override
@@ -1249,12 +1254,16 @@ class _PosDisclosureState extends State<PosDisclosure> {
     mainAxisSize: MainAxisSize.min,
     children: [
       PosListRow(
+        dense: widget.compact,
+        minTileHeight: widget.compact ? 44 : 56,
         title: widget.title,
         subtitle: widget.subtitle,
         leading: widget.leading,
         trailing:
             widget.trailing ?? PosIcon(open ? PosGlyphs.remove : PosGlyphs.add),
-        contentPadding: widget.tilePadding,
+        contentPadding:
+            widget.tilePadding ??
+            (widget.compact ? const EdgeInsets.symmetric(vertical: 4) : null),
         onTap: () {
           setState(() => open = !open);
           widget.onExpansionChanged?.call(open);
@@ -1278,12 +1287,15 @@ class PosDestination extends StatelessWidget {
     required this.label,
     this.selectedIcon,
     this.tooltip,
+    this.railSecondary = false,
+    this.railBottom = false,
     super.key,
   });
   final Widget icon;
   final Widget? selectedIcon;
   final String label;
   final String? tooltip;
+  final bool railSecondary, railBottom;
   @override
   Widget build(BuildContext context) => icon;
 }
@@ -1329,6 +1341,19 @@ class _PosNavigationState extends State<PosNavigation> {
   Set<Object> _visible = {};
   Object? _moreMeaning, _menuFocus, _collapsedFocus;
   bool _menuOpen = false;
+  bool _localRailExpanded = false;
+  bool get _railExpanded =>
+      DisplayPreferencesScope.maybeOf(context)?.menuLabels ??
+      _localRailExpanded;
+  void _setRailExpanded(bool value) {
+    final prefs = DisplayPreferencesScope.maybeOf(context);
+    if (prefs != null) {
+      unawaited(prefs.setMenuLabels(value));
+    } else {
+      setState(() => _localRailExpanded = value);
+    }
+  }
+
   (bool, bool, int)? _layout;
   List<Object>? _identities;
 
@@ -1394,6 +1419,8 @@ class _PosNavigationState extends State<PosNavigation> {
         : widget.selectedIndex.clamp(0, destinations.length - 1);
     final onDestinationSelected = widget.onDestinationSelected;
     final rail = widget.rail;
+    final expanded =
+        _railExpanded || MediaQuery.textScalerOf(context).scale(16) >= 24;
     if (destinations.isEmpty) return const SizedBox.shrink();
     final identities = destinations
         .cast<PosDestination>()
@@ -1410,7 +1437,8 @@ class _PosNavigationState extends State<PosNavigation> {
     final p = PosTheme.of(context).colorScheme;
     final theme = PosTheme.of(context);
     final style = theme.textTheme.labelMedium!.copyWith(
-      fontWeight: FontWeight.w700,
+      fontSize: rail ? 13 : 11,
+      fontWeight: FontWeight.w500,
     );
     double labelWidth(String label, TextStyle textStyle) {
       final painter = TextPainter(
@@ -1433,28 +1461,28 @@ class _PosNavigationState extends State<PosNavigation> {
     );
     final fullWidth = destinations.cast<PosDestination>().fold<double>(
       48,
-      (needed, destination) =>
-          math.max(needed, labelWidth(destination.label, style) + 16),
+      (needed, destination) => math.max(
+        needed,
+        labelWidth(destination.label, style) + (rail ? 16 : 8),
+      ),
     );
     final compact =
         !rail &&
-        destinations.length > 4 &&
-        fullWidth * destinations.length > available;
+        (destinations.length > 5 ||
+            (destinations.length > 4 &&
+                fullWidth * destinations.length > available));
     final controls = List.generate(destinations.length, (index) {
       final d = destinations[index] as PosDestination;
       final chosen = selectedIndex == index;
-      final foreground = rail
-          ? p.onRail
-          : (chosen ? p.primary : p.onSurfaceVariant);
+      final foreground = chosen
+          ? PosColors.white
+          : p.onRail.withValues(alpha: .84);
       final label = Text(
         d.label,
         textAlign: rail ? TextAlign.start : TextAlign.center,
         maxLines: 1,
         softWrap: false,
-        style: PosTheme.of(context).textTheme.labelMedium!.copyWith(
-          color: foreground,
-          fontWeight: chosen ? FontWeight.w700 : FontWeight.w500,
-        ),
+        style: style.copyWith(color: foreground),
       );
       final icon = IconTheme(
         data: IconThemeData(color: foreground, size: 22),
@@ -1465,9 +1493,9 @@ class _PosNavigationState extends State<PosNavigation> {
         focusNode: _node(identities[index]),
         selected: chosen,
         semanticLabel: d.label,
-        focusColor: rail ? p.signal : p.primary,
-        hoverColor: rail ? p.onRail.withValues(alpha: .08) : null,
-        borderRadius: BorderRadius.circular(4),
+        focusColor: p.signal,
+        hoverColor: p.onRail.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(8),
         onTap: onDestinationSelected == null
             ? null
             : () {
@@ -1475,30 +1503,18 @@ class _PosNavigationState extends State<PosNavigation> {
                 _restore(identities[index]);
               },
         child: Container(
-          constraints: BoxConstraints(minHeight: rail ? 56 : 64, minWidth: 48),
+          constraints: BoxConstraints(minHeight: rail ? 52 : 48, minWidth: 48),
           padding: EdgeInsets.symmetric(
-            horizontal: rail ? 16 : 8,
-            vertical: 10,
+            horizontal: rail ? (expanded ? 16 : 8) : 4,
+            vertical: 8,
           ),
           decoration: BoxDecoration(
-            color: chosen
-                ? (rail ? p.signal.withValues(alpha: .16) : p.primaryContainer)
-                : null,
-            border: rail
-                ? Border(
-                    left: BorderSide(
-                      color: chosen ? p.signal : const Color(0x00000000),
-                      width: 3,
-                    ),
-                  )
-                : Border(
-                    top: BorderSide(
-                      color: chosen ? p.primary : const Color(0x00000000),
-                      width: 3,
-                    ),
-                  ),
+            color: chosen ? p.onRail.withValues(alpha: .16) : null,
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: rail
+          child: rail && !expanded
+              ? Center(child: icon)
+              : rail
               ? Row(
                   children: [
                     icon,
@@ -1514,8 +1530,8 @@ class _PosNavigationState extends State<PosNavigation> {
       );
       return rail
           ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: item,
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+              child: PosTooltip(message: d.label, child: item),
             )
           : item;
     });
@@ -1564,9 +1580,12 @@ class _PosNavigationState extends State<PosNavigation> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            selectedIndex >= 3
-                ? (destinations[selectedIndex] as PosDestination).icon
-                : const PosIcon(PosGlyphs.moreVert, size: 22),
+            IconTheme(
+              data: IconThemeData(color: p.onRail),
+              child: selectedIndex >= 3
+                  ? (destinations[selectedIndex] as PosDestination).icon
+                  : const PosIcon(PosGlyphs.moreVert, size: 22),
+            ),
             const SizedBox(height: 5),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -1578,11 +1597,13 @@ class _PosNavigationState extends State<PosNavigation> {
                         : (spanish ? 'Más' : 'More'),
                     maxLines: 1,
                     softWrap: false,
-                    style: theme.textTheme.labelSmall,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: p.onRail,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 4),
-                const PosIcon(PosGlyphs.expandMore, size: 14),
+                PosIcon(PosGlyphs.expandMore, size: 14, color: p.onRail),
               ],
             ),
           ],
@@ -1597,8 +1618,10 @@ class _PosNavigationState extends State<PosNavigation> {
           .cast<PosDestination>()
           .fold<double>(
             48,
-            (needed, destination) =>
-                math.max(needed, labelWidth(destination.label, style) + 16),
+            (needed, destination) => math.max(
+              needed,
+              labelWidth(destination.label, style) + (rail ? 16 : 8),
+            ),
           );
       // Reserve the widest secondary label so selection keeps the same rows.
       final moreStyle = theme.textTheme.labelSmall!.copyWith(
@@ -1627,7 +1650,7 @@ class _PosNavigationState extends State<PosNavigation> {
       _restore(previousFocus);
     }
     var railWidth = 184.0;
-    if (rail) {
+    if (rail && MediaQuery.textScalerOf(context).scale(1) > 1.3) {
       for (final destination in destinations.cast<PosDestination>()) {
         final painter = TextPainter(
           text: TextSpan(
@@ -1639,16 +1662,26 @@ class _PosNavigationState extends State<PosNavigation> {
           textDirection: Directionality.of(context),
           textScaler: MediaQuery.textScalerOf(context),
         )..layout();
-        final needed = painter.width.ceilToDouble() + 71;
+        final needed = painter.width.ceilToDouble() + 88;
         if (needed > railWidth) railWidth = needed;
         painter.dispose();
       }
+      railWidth = math.max(
+        railWidth,
+        labelWidth(
+              spanish ? 'Contraer menú' : 'Collapse menu',
+              theme.textTheme.labelMedium!,
+            ) +
+            88,
+      );
     }
     return Container(
-      width: rail ? railWidth : null,
+      width: rail ? (expanded ? railWidth : 72) : null,
       decoration: BoxDecoration(
-        color: rail ? p.rail : p.surface,
-        border: rail ? null : Border(top: BorderSide(color: p.outlineVariant)),
+        color: p.rail,
+        border: rail
+            ? Border(right: BorderSide(color: p.outlineVariant))
+            : Border(top: BorderSide(color: p.outlineVariant)),
       ),
       padding: EdgeInsets.symmetric(horizontal: rail ? 0 : 8, vertical: 8),
       child: SafeArea(
@@ -1657,28 +1690,105 @@ class _PosNavigationState extends State<PosNavigation> {
             ? Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-                    child: Column(
-                      children: [
-                        Text(
-                          'umi',
-                          style: PosTheme.of(context).textTheme.headlineSmall!
-                              .copyWith(color: p.onRail, fontSize: 30),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        width: 64 * MediaQuery.textScalerOf(context).scale(1),
+                        child: Center(
+                          child: Text(
+                            'umi',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: p.onRail,
+                              fontSize: 29,
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          spanish ? 'ESTACIÓN' : 'STATION',
-                          style: PosTheme.of(context).textTheme.labelSmall!
-                              .copyWith(
-                                color: p.onRail.withValues(alpha: .7),
-                                fontSize: 9,
-                                letterSpacing: 1.3,
+                      ),
+                    ),
+                  ),
+                  const PosDivider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                    child: PosSurface(
+                      color: p.onRail.withValues(alpha: .08),
+                      borderRadius: BorderRadius.circular(6),
+                      child: expanded
+                          ? SizedBox(
+                              width: double.infinity,
+                              child: PosTextButton.icon(
+                                onPressed: () => _setRailExpanded(false),
+                                icon: const PosIcon(
+                                  PosGlyph('nav_panel-left-close'),
+                                  size: 20,
+                                ),
+                                label: Text(
+                                  spanish ? 'Contraer menú' : 'Collapse menu',
+                                ),
+                                style: PosTextButton.styleFrom(
+                                  alignment: Alignment.centerLeft,
+                                  foregroundColor: p.onRail,
+                                  textStyle: theme.textTheme.labelMedium,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  minimumSize: const Size(48, 44),
+                                ),
                               ),
-                        ),
+                            )
+                          : PosIconButton(
+                              tooltip: spanish
+                                  ? (expanded
+                                        ? 'Contraer menú'
+                                        : 'Expandir menú')
+                                  : (expanded
+                                        ? 'Collapse menu'
+                                        : 'Expand menu'),
+                              onPressed: () => _setRailExpanded(!_railExpanded),
+                              style: PosIconButton.styleFrom(
+                                foregroundColor: p.onRail,
+                              ),
+                              icon: PosIcon(
+                                PosGlyph(
+                                  expanded
+                                      ? 'nav_panel-left-close'
+                                      : 'nav_panel-left-open',
+                                ),
+                                size: 20,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        for (var i = 0; i < controls.length; i++)
+                          if (!(destinations[i] as PosDestination)
+                                  .railSecondary &&
+                              !(destinations[i] as PosDestination).railBottom)
+                            controls[i],
+                        if (destinations.cast<PosDestination>().any(
+                          (d) => d.railSecondary,
+                        ))
+                          const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: PosDivider(height: 1),
+                          ),
+                        for (var i = 0; i < controls.length; i++)
+                          if ((destinations[i] as PosDestination)
+                                  .railSecondary &&
+                              !(destinations[i] as PosDestination).railBottom)
+                            controls[i],
                       ],
                     ),
                   ),
-                  Expanded(child: ListView(children: controls)),
+                  for (var i = 0; i < controls.length; i++)
+                    if ((destinations[i] as PosDestination).railBottom)
+                      controls[i],
                 ],
               )
             : Column(

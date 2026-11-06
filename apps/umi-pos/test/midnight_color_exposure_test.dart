@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
@@ -13,9 +11,7 @@ import 'package:umi_pos/features/catalog/catalog_surface.dart';
 
 import 'support/fakes.dart';
 
-const _orange = Color(0xFFF28C28);
 const _neutral = Color(0xFF0D0D0D);
-const _ink = Color(0xFFF2F2F2);
 const _category = <String, Object?>{
   'id': 'bread',
   'name': 'Pan',
@@ -97,7 +93,7 @@ ShapeDecoration _buttonDecoration(WidgetTester tester) =>
 
 void main() {
   testWidgets(
-    'Midnight limits category color and retains accessible selection',
+    'Midnight photo-free keys retain readable category color and accessible selection',
     (tester) async {
       tester.view.physicalSize = const Size(1400, 900);
       tester.view.devicePixelRatio = 1;
@@ -140,86 +136,56 @@ void main() {
         );
         await tester.pump();
 
-        final initials = find.text('PI');
-        final background = tester
-            .widget<ColoredBox>(
-              find
-                  .ancestor(of: initials, matching: find.byType(ColoredBox))
-                  .first,
-            )
-            .color;
-        final foreground = tester.widget<Text>(initials).style!.color!;
-        expect(background, _neutral);
-        expect(foreground, _ink);
+        final product = find.byKey(const ValueKey('product-key-roll'));
+        final surface = tester.widget<Container>(
+          find
+              .descendant(
+                of: product,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Container && widget.decoration is BoxDecoration,
+                ),
+              )
+              .first,
+        );
+        final background = (surface.decoration! as BoxDecoration).color!;
+        final foreground = tester
+            .widget<Text>(find.text('Pan integral'))
+            .style!
+            .color!;
+        expect(background.computeLuminance(), lessThan(.1));
         expect(_contrast(foreground, background), greaterThanOrEqualTo(4.5));
+        expect(find.text('PI'), findsNothing);
+        expect(find.byType(Image), findsNothing);
 
-        final product = find
-            .ancestor(of: initials, matching: find.byType(PosTapRegion))
-            .first;
-        final band = find.descendant(
-          of: product,
-          matching: find.byWidgetPredicate(
-            (widget) => widget is ColoredBox && widget.color == _orange,
-          ),
+        final tab = find.descendant(
+          of: find.byKey(const ValueKey('catalog-category-index')),
+          matching: find.text('Pan'),
         );
-        expect(band, findsOneWidget);
-        expect(tester.getSize(band).height, 8);
-        expect(
-          tester.getSize(band).height,
-          lessThan(tester.getSize(product).height / 5),
+        final tabRegion = find.ancestor(
+          of: tab,
+          matching: find.byType(PosTapRegion),
         );
-
-        // The divider wears its label in capitals; the category above keeps the
-        // name it was seeded with.
-        final tab = find.text('PAN');
-        expect(tester.widget<Text>(tab).style!.color, _ink);
-        expect(
-          tester.getSemantics(tab),
-          isSemantics(isButton: true, isSelected: false),
+        final tabSurface = tester.widget<Container>(
+          find
+              .descendant(
+                of: tabRegion,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Container && widget.decoration is BoxDecoration,
+                ),
+              )
+              .first,
         );
-        final paintedTab = find
-            .ancestor(of: tab, matching: find.byType(CustomPaint))
-            .first;
-        final size = tester.getSize(paintedTab);
-        final painter = tester.widget<CustomPaint>(paintedTab).painter!;
-        final recorder = ui.PictureRecorder();
-        painter.paint(ui.Canvas(recorder), size);
-        final picture = recorder.endRecording();
-        final pixels = await tester.runAsync(() async {
-          final image = await picture.toImage(
-            size.width.ceil(),
-            size.height.ceil(),
-          );
-          final bytes = await image.toByteData(
-            format: ui.ImageByteFormat.rawRgba,
-          );
-          image.dispose();
-          return bytes!;
-        });
-        picture.dispose();
-        var orangePixels = 0;
-        var neutralPixels = 0;
-        for (var i = 0; i < pixels!.lengthInBytes; i += 4) {
-          final color = Color.fromARGB(
-            pixels.getUint8(i + 3),
-            pixels.getUint8(i),
-            pixels.getUint8(i + 1),
-            pixels.getUint8(i + 2),
-          );
-          if (color == _orange) orangePixels++;
-          if (color == _neutral) neutralPixels++;
-        }
-        final pixelCount = pixels.lengthInBytes / 4;
-        expect(orangePixels, greaterThan(0));
-        expect(orangePixels / pixelCount, lessThan(.3));
-        expect(neutralPixels / pixelCount, greaterThan(.3));
+        final fill = (tabSurface.decoration! as BoxDecoration).color!;
+        final ink = tester.widget<Text>(tab).style!.color!;
+        expect(fill.computeLuminance(), lessThan(.1));
+        expect(_contrast(ink, fill), greaterThanOrEqualTo(4.5));
+        expect(tester.widget<PosTapRegion>(tabRegion).selected, isFalse);
         await tester.tap(tab);
         await tester.pump();
         expect(catalog.state.selectedCategoryId, 'bread');
-        expect(
-          tester.getSemantics(tab),
-          isSemantics(isButton: true, isSelected: true),
-        );
+        expect(tester.widget<PosTapRegion>(tabRegion).selected, isTrue);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       } finally {

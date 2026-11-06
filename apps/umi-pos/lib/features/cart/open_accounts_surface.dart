@@ -60,6 +60,7 @@ class OpenAccountsList extends StatefulWidget {
     required this.load,
     required this.onSelected,
     this.operatorSessionId,
+    this.additionalRows,
     this.tablelessOnly = false,
     this.showFulfillmentFilter = false,
     this.showDateFilter = false,
@@ -75,6 +76,7 @@ class OpenAccountsList extends StatefulWidget {
   final Future<List<Cart>> Function() load;
   final ValueChanged<Cart> onSelected;
   final String? operatorSessionId;
+  final Widget? additionalRows;
   final bool tablelessOnly;
   final bool showFulfillmentFilter;
   final bool showDateFilter;
@@ -408,7 +410,7 @@ class _OpenAccountsListState extends State<OpenAccountsList> {
               ? const Center(child: PosSpinner())
               : _error != null
               ? Center(child: Text(operatorErrorMessage(context, _error!)))
-              : visible.isEmpty
+              : visible.isEmpty && widget.additionalRows == null
               ? Center(
                   child: Text(
                     _accounts?.any(
@@ -523,6 +525,10 @@ class _OpenAccountsListState extends State<OpenAccountsList> {
         ],
         for (final cart in today)
           _row(context, cart, es, carried: false, now: now),
+        if (!_previousDaysOnly &&
+            _fulfillmentType != 'takeout' &&
+            _search.text.isEmpty)
+          ?widget.additionalRows,
       ],
     );
   }

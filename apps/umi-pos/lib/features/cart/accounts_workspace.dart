@@ -2,7 +2,6 @@ import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/theme/pos_ui.dart';
 import '../../shared/widgets/inline_notice.dart';
-import '../../shared/widgets/station_document.dart';
 import 'open_accounts_surface.dart';
 
 /// The account entry point shares one location for tables and named accounts.
@@ -14,6 +13,7 @@ class AccountsWorkspace extends StatelessWidget {
     required this.onSelected,
     required this.onNewAccount,
     this.tables,
+    this.freeTables,
     this.busy = false,
     this.currentBusinessDate,
     this.notice,
@@ -31,6 +31,7 @@ class AccountsWorkspace extends StatelessWidget {
   final ValueChanged<Cart> onSelected;
   final VoidCallback? onNewAccount;
   final Widget? tables;
+  final Widget? freeTables;
   final bool busy;
   final String? notice;
   final Cart? watchedAccount;
@@ -54,38 +55,61 @@ class AccountsWorkspace extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Wrap(
-                  spacing: 16,
-                  runSpacing: 12,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    StationHeading(title: es ? 'Cuentas' : 'Accounts'),
-                    if (tables != null)
-                      PosSegmented<bool>(
-                        showSelectedIcon: false,
-                        segments: [
-                          PosSegment(
-                            value: true,
-                            label: Text(es ? 'Lista' : 'List'),
-                          ),
-                          PosSegment(
-                            value: false,
-                            label: Text(es ? 'Mapa' : 'Map'),
-                          ),
-                        ],
-                        selected: {list},
-                        onSelectionChanged: (value) =>
-                            onViewChanged(value.first),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          es ? 'Servicio en salón' : 'Dining service',
+                          style: PosTheme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: PosTheme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          es ? 'Cuentas y mesas' : 'Accounts and tables',
+                          style: PosTheme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (onNewAccount != null)
+                    PosIconButton(
+                      onPressed: busy ? null : onNewAccount,
+                      tooltip: es ? 'Iniciar pedido' : 'Start order',
+                      icon: const PosIcon(PosGlyphs.add, size: 20),
+                    ),
+                  if (tables != null) ...[
+                    PosIconButton(
+                      tooltip: es ? 'Mapa' : 'Map',
+                      onPressed: () => onViewChanged(false),
+                      icon: PosIcon(
+                        PosGlyphs.mapOutlined,
+                        size: 20,
+                        color: !list
+                            ? PosTheme.of(context).colorScheme.primary
+                            : PosTheme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                    if (onNewAccount != null)
-                      PosButton(
-                        onPressed: busy ? null : onNewAccount,
-                        child: Text(es ? 'Iniciar pedido' : 'Start order'),
+                    ),
+                    PosIconButton(
+                      tooltip: es ? 'Lista' : 'List',
+                      onPressed: () => onViewChanged(true),
+                      icon: PosIcon(
+                        PosGlyphs.list,
+                        size: 20,
+                        color: list
+                            ? PosTheme.of(context).colorScheme.primary
+                            : PosTheme.of(context).colorScheme.onSurfaceVariant,
                       ),
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
             if (notice != null)
@@ -96,6 +120,7 @@ class AccountsWorkspace extends StatelessWidget {
             Expanded(
               child: list
                   ? OpenAccountsList(
+                      additionalRows: freeTables,
                       watchedAccount: watchedAccount,
                       readAccount: readAccount,
                       onAccountReleased: onAccountReleased,

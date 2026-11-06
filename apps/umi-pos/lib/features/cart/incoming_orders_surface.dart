@@ -56,15 +56,14 @@ final class IncomingOrdersSurface extends StatefulWidget {
 }
 
 final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
+  String? _selectedId;
   @override
   void initState() {
     super.initState();
     widget.incoming.addListener(_changed);
-    widget.incoming.load(
-      widget.merchantId,
-      widget.locationId,
-      widget.operatorSessionId,
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reload();
+    });
   }
 
   @override
@@ -101,38 +100,71 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final state = widget.incoming.state;
-    return PosPage(
-      appBar: PosHeader(
-        automaticallyImplyLeading: false,
-        title: StationHeading(title: l.incomingOrdersTitle),
-        leading: widget.embedded
-            ? null
-            : PosIconButton(
-                tooltip: l.closeAction,
-                onPressed: () => Navigator.pop(context),
-                icon: const PosIcon(PosGlyphs.arrowBack),
-              ),
-        actions: [
-          PosIconButton(
-            tooltip: l.refreshAction,
-            onPressed:
-                state.phase == IncomingOrdersPhase.loading || state.binding
-                ? null
-                : _reload,
-            icon: const PosIcon(PosGlyphs.refresh),
-          ),
-        ],
+    final queueHeader = PosHeader(
+      automaticallyImplyLeading: false,
+      title: StationHeading(
+        title: l.incomingOrdersTitle,
+        subtitle: Localizations.localeOf(context).languageCode == 'es'
+            ? 'Menú digital'
+            : 'Digital menu',
       ),
+      leading: widget.embedded
+          ? null
+          : PosIconButton(
+              tooltip: l.closeAction,
+              onPressed: () => Navigator.pop(context),
+              icon: const PosIcon(PosGlyphs.arrowBack),
+            ),
+      actions: [
+        if (state.phase == IncomingOrdersPhase.ready)
+          PosTag(
+            label: Text(
+              Localizations.localeOf(context).languageCode == 'es'
+                  ? '${state.orders.length} por revisar'
+                  : '${state.orders.length} to review',
+            ),
+          ),
+        PosIconButton(
+          tooltip: l.refreshAction,
+          onPressed: state.phase == IncomingOrdersPhase.loading || state.binding
+              ? null
+              : _reload,
+          icon: const PosIcon(PosGlyphs.refresh),
+        ),
+      ],
+    );
+    return PosPage(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(UmiSpacing.lg),
-          child: _body(l, state),
+          padding: const EdgeInsets.all(16),
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final queueVisible =
+                  box.maxWidth >= 720 &&
+                  state.phase == IncomingOrdersPhase.ready &&
+                  state.orders.isNotEmpty;
+              if (queueVisible) {
+                return _body(l, state, queueHeader: queueHeader);
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  queueHeader,
+                  Expanded(child: _body(l, state)),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 
-  Widget _body(AppLocalizations l, IncomingOrdersState state) {
+  Widget _body(
+    AppLocalizations l,
+    IncomingOrdersState state, {
+    Widget? queueHeader,
+  }) {
     switch (state.phase) {
       case IncomingOrdersPhase.idle:
       case IncomingOrdersPhase.loading:
@@ -176,17 +208,125 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
             ),
           );
         }
-        return ListView.separated(
-          itemCount: state.orders.length,
-          separatorBuilder: (_, _) => const SizedBox(height: UmiSpacing.sm),
-          itemBuilder: (_, index) => _OrderCard(
-            order: state.orders[index],
-            binding: state.binding,
-            onTake: () => _take(state.orders[index]),
-          ),
+        return LayoutBuilder(
+          builder: (context, box) {
+            final wide = box.maxWidth >= 720;
+            final selected = state.orders
+                .where((order) => order.orderId == _selectedId)
+                .firstOrNull;
+            final effective = selected ?? (wide ? state.orders.first : null);
+            Widget detail(PosIncomingOrder order) => SingleChildScrollView(
+              key: const ValueKey('incoming-detail'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!wide)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: PosTextButton.icon(
+                        onPressed: () => setState(() => _selectedId = null),
+                        icon: const PosIcon(PosGlyphs.arrowBack),
+                        label: Text(
+                          Localizations.localeOf(context).languageCode == 'es'
+                              ? 'Todos los pedidos'
+                              : 'All orders',
+                        ),
+                      ),
+                    ),
+                  _OrderCard(
+                    minHeight: wide ? box.maxHeight : 0,
+                    order: order,
+                    binding: state.binding,
+                    onTake: () => _take(order),
+                  ),
+                ],
+              ),
+            );
+            final list = ListView.separated(
+              key: const ValueKey('incoming-list'),
+              padding: const EdgeInsets.all(12),
+              itemCount: state.orders.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              itemBuilder: (_, index) {
+                final order = state.orders[index];
+                return PosListRow(
+                  key: ValueKey('incoming-${order.orderId}'),
+                  contentPadding: const EdgeInsets.all(16),
+                  selected: effective?.orderId == order.orderId,
+                  title: Text(order.reference ?? order.orderId),
+                  subtitle: Text(
+                    [
+                      if (order.customerName != null) order.customerName!,
+                      _incomingStatus(order, context),
+                    ].join(' · '),
+                  ),
+                  onTap: () => setState(() => _selectedId = order.orderId),
+                  trailing: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 100),
+                    child: Text(
+                      formatMinorUnits(order.totalMinorUnits, 'MXN'),
+                      style: PosTheme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                );
+              },
+            );
+            if (!wide) return effective == null ? list : detail(effective);
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  width: 304,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: PosTheme.of(context).colorScheme.background,
+                      border: Border(
+                        right: BorderSide(
+                          color: PosTheme.of(
+                            context,
+                          ).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ?queueHeader,
+                        Expanded(child: list),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(child: detail(effective!)),
+              ],
+            );
+          },
         );
     }
   }
+}
+
+String _incomingStatus(PosIncomingOrder order, BuildContext context) {
+  final es = Localizations.localeOf(context).languageCode == 'es';
+  final status = switch (order.status) {
+    'placed' => es ? 'Recibido' : 'Received',
+    'confirmed' => es ? 'Confirmado' : 'Confirmed',
+    'preparing' => es ? 'En preparación' : 'Preparing',
+    'ready' => es ? 'Listo' : 'Ready',
+    'completed' => es ? 'Completado' : 'Completed',
+    'cancelled' => es ? 'Cancelado' : 'Cancelled',
+    _ => order.status,
+  };
+  final placed = DateTime.tryParse(order.placedAt ?? '');
+  final minutes = placed == null
+      ? null
+      : DateTime.now().difference(placed).inMinutes;
+  return [
+    status,
+    if (minutes != null && minutes >= 0)
+      es ? 'Hace $minutes min' : '$minutes min ago',
+  ].join(' · ');
 }
 
 final class _OrderCard extends StatelessWidget {
@@ -194,77 +334,89 @@ final class _OrderCard extends StatelessWidget {
     required this.order,
     required this.binding,
     required this.onTake,
+    this.minHeight = 0,
   });
   final PosIncomingOrder order;
   final bool binding;
   final VoidCallback onTake;
+  final double minHeight;
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return PosCard(
-      child: Padding(
-        padding: const EdgeInsets.all(UmiSpacing.md),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final details = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final theme = PosTheme.of(context);
+    final es = Localizations.localeOf(context).languageCode == 'es';
+    return Container(
+      constraints: BoxConstraints(minHeight: minHeight),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(color: theme.colorScheme.surface),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(switch (order.channel) {
+                'whatsapp' => 'WhatsApp',
+                'web' => 'Web',
+                'aggregator' => 'Delivery',
+                _ => order.channel,
+              }, style: theme.textTheme.bodySmall),
+              const SizedBox(height: 8),
+              Text(
+                order.reference ?? order.orderId,
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                order.customerName ??
+                    (es ? 'Cliente no indicado' : 'Customer not provided'),
+                style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _incomingStatus(order, context),
+                style: theme.textTheme.bodyMedium,
+              ),
+              const PosDivider(),
+              Text(
+                es
+                    ? '${order.itemCount} líneas de productos'
+                    : '${order.itemCount} product lines',
+              ),
+              const SizedBox(height: 16),
+              Text(
+                es
+                    ? 'El detalle de productos, notas y horario de entrega no está disponible en esta terminal. Al atender se vincula la referencia; captura y verifica los productos antes de cobrar.'
+                    : 'Product details, notes and pickup time are unavailable on this terminal. Taking the order links its reference; enter and verify the items before charging.',
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const PosDivider(),
                 Text(
-                  order.customerName ?? order.reference ?? order.orderId,
-                  style: PosTheme.of(context).textTheme.titleMedium,
+                  es ? 'Total del pedido de origen' : 'Source order total',
+                  style: theme.textTheme.bodySmall,
                 ),
-                const SizedBox(height: UmiSpacing.xs),
                 Text(
-                  // The one money formatter: this row used to price the order in
-                  // dollars (`$330.00`) on a till that says `MXN` everywhere
-                  // else. The projection carries no currency of its own —
-                  // `merchant.order_total` has none — so the till names the one
-                  // it trades in, the same constant the gift-card dialog uses.
-                  '${_channelLabel(order.channel)} · ${order.itemCount} · '
-                  '${formatMinorUnits(order.totalMinorUnits, 'MXN')}',
-                  style: PosTheme.of(context).textTheme.bodySmall,
+                  formatMinorUnits(order.totalMinorUnits, 'MXN'),
+                  style: theme.textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 24),
+                PosButton(
+                  onPressed: binding ? null : onTake,
+                  child: Text(l.incomingOrdersTake),
                 ),
               ],
-            );
-            final action = PosButton(
-              onPressed: binding ? null : onTake,
-              child: Text(l.incomingOrdersTake),
-            );
-            if (constraints.maxWidth <
-                400 * MediaQuery.textScalerOf(context).scale(1)) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  details,
-                  const SizedBox(height: UmiSpacing.md),
-                  action,
-                ],
-              );
-            }
-            return Row(
-              children: [
-                Expanded(child: details),
-                const SizedBox(width: UmiSpacing.md),
-                action,
-              ],
-            );
-          },
-        ),
+            ),
+          ),
+        ],
       ),
     );
-  }
-
-  String _channelLabel(String channel) {
-    switch (channel) {
-      case 'whatsapp':
-        return 'WhatsApp';
-      case 'web':
-        return 'Web';
-      case 'aggregator':
-        return 'Delivery';
-      default:
-        return channel;
-    }
   }
 }

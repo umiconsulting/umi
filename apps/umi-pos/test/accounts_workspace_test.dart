@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
+import 'package:umi_pos/features/cart/account_preview.dart';
 import 'package:umi_pos/features/cart/accounts_workspace.dart';
+import 'package:umi_pos/features/cart/free_tables_list.dart';
 
 Cart _account(String id, {String? table}) => Cart.fromJson({
   'id': id,
@@ -34,6 +38,86 @@ Cart _account(String id, {String? table}) => Cart.fromJson({
 });
 
 void main() {
+  testWidgets('list retains free physical tables with no commercial accounts', (
+    tester,
+  ) async {
+    final table = FloorPlanElement.fromJson({
+      'id': 'free',
+      'kind': 'table',
+      'shape': 'round',
+      'label': 'Mesa 9',
+      'capacity': 4,
+      'x': 0,
+      'y': 0,
+      'width': 100,
+      'height': 100,
+      'rotation': 0,
+    });
+    FloorPlanElement? selected;
+    await tester.pumpWidget(
+      PosApp(
+        locale: const Locale('es'),
+        supportedLocales: const [Locale('es')],
+        home: AccountsWorkspace(
+          withoutTable: true,
+          onViewChanged: (_) {},
+          load: () async => [],
+          onSelected: (_) {},
+          onNewAccount: null,
+          freeTables: FreeTablesList(
+            load: () async => [table],
+            onSelected: (value) => selected = value,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Mesas libres'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('free-table-free')));
+    expect(selected, same(table));
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+    'account preview loads real lines and ledger without claiming the account',
+    (tester) async {
+      final pending = Completer<Cart?>();
+      final balance = Completer<Map<String, Object?>?>();
+      await tester.pumpWidget(
+        PosApp(
+          locale: const Locale('es'),
+          supportedLocales: const [Locale('es')],
+          home: PosPage(
+            body: AccountPreview(
+              load: () => pending.future,
+              balance: (_) => balance.future,
+            ),
+          ),
+        ),
+      );
+      expect(find.text('Consultando cuenta…'), findsOneWidget);
+      pending.complete(
+        Cart.fromJson({
+          ..._account('one').toJson(),
+          'items': [
+            {'productName': 'Latte', 'quantity': 2, 'note': 'Sin azúcar'},
+          ],
+        }),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('2 × Latte'), findsOneWidget);
+      expect(find.text('Total · MXN 45.00'), findsOneWidget);
+      expect(find.text('Saldo por consultar en cobro'), findsOneWidget);
+      balance.complete({
+        'appliedAmount': {'minorUnits': 1500, 'currency': 'MXN'},
+        'remainingBalance': {'minorUnits': 3000, 'currency': 'MXN'},
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('Pagado · MXN 15.00'), findsOneWidget);
+      expect(find.text('Por cobrar · MXN 30.00'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('a refused account stays in the list with its owner notice', (
     tester,
   ) async {
@@ -122,9 +206,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Plano de mesas'), findsOneWidget);
-      await tester.tap(find.text('Iniciar pedido'));
+      await tester.tap(find.byTooltip('Iniciar pedido'));
       expect(newAccounts, 1);
-      await tester.tap(find.text('Lista'));
+      await tester.tap(find.byTooltip('Lista'));
       await tester.pumpAndSettle();
       expect(withoutTable, isTrue);
       expect(find.text('Plano de mesas'), findsNothing);
@@ -134,9 +218,9 @@ void main() {
       expect(find.byKey(const ValueKey('open-account-table')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('open-account-counter')));
       expect(selected, same(account));
-      await tester.tap(find.text('Iniciar pedido'));
+      await tester.tap(find.byTooltip('Iniciar pedido'));
       expect(newAccounts, 2);
-      await tester.tap(find.text('Mapa'));
+      await tester.tap(find.byTooltip('Mapa'));
       await tester.pumpAndSettle();
       expect(withoutTable, isFalse);
       expect(find.text('Plano de mesas'), findsOneWidget);
@@ -178,11 +262,11 @@ void main() {
       expect(find.text('Mesas'), findsNothing);
       await tester.tap(find.text('Cuenta 024 · 2026-10-12'));
       expect(selected, same(account));
-      await tester.tap(find.text('Iniciar pedido'));
+      await tester.tap(find.byTooltip('Iniciar pedido'));
       expect(newAccounts, 1);
       update(() => busy = true);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Iniciar pedido'));
+      await tester.tap(find.byTooltip('Iniciar pedido'));
       expect(newAccounts, 1);
       expect(viewChanges, 0);
       expect(tester.takeException(), isNull);

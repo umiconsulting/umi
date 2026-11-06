@@ -14,6 +14,38 @@ KitchenOrderProjection ticket(String? type, {String station = 'Barra'}) =>
     });
 
 void main() {
+  for (final size in const [
+    Size(402, 874),
+    Size(412, 915),
+    Size(820, 1180),
+    Size(800, 1340),
+    Size(1340, 800),
+    Size(1440, 1000),
+  ]) {
+    testWidgets(
+      'service labels remain visible without payment actions at $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final harness = await pumpBoard(
+          tester,
+          locale: const Locale('es'),
+          orders: [ticket('dine_in')],
+        );
+        final badge = find.byType(KitchenFulfillmentBadge);
+        final rect = tester.getRect(badge);
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(size.width));
+        expect(rect.bottom, lessThanOrEqualTo(size.height));
+        expect(find.text('Para comer aquí'), findsOneWidget);
+        expect(find.textContaining('Cobrar'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await harness.dispose(tester);
+      },
+    );
+  }
+
   for (final station in ['Barra', 'Cocina']) {
     for (final mode in [
       (
@@ -117,7 +149,7 @@ void main() {
     (name: 'midnight', theme: UmiTheme.midnight()),
   ]) {
     testWidgets(
-      '${appearance.name} labels have distinct colors and readable text',
+      '${appearance.name} neutral service labels retain readable text',
       (tester) async {
         await tester.pumpWidget(
           PosApp(
@@ -154,7 +186,7 @@ void main() {
               : backgroundLuminance;
           expect((lighter + .05) / (darker + .05), greaterThanOrEqualTo(4.5));
         }
-        expect(colors.toSet(), hasLength(2));
+        expect(colors.toSet(), hasLength(1));
         expect(tester.takeException(), isNull);
       },
     );

@@ -214,7 +214,7 @@ final class _PinLoginState extends State<_PinLogin> {
     // The largest text the product offers doubles every line, so the space BETWEEN blocks is what
     // gives way; the title, the hint, the dots, the keys and the action all stay.
     final largeText = MediaQuery.textScalerOf(context).scale(16) >= 24;
-    final block = largeText ? UmiSpacing.md : UmiSpacing.lg;
+    final block = UmiSpacing.md;
     final tight = largeText ? UmiSpacing.xs : UmiSpacing.sm;
     final error = _tooShort
         ? l.operatorPinLength
@@ -222,8 +222,8 @@ final class _PinLoginState extends State<_PinLogin> {
     // Touch-first PIN entry: a numeric keypad with large targets, not a text
     // field that would summon the OS keyboard on a counter tablet. The physical
     // keyboard still works through the KeyboardListener (dev, accessibility).
-    return _EntryFrame(
-      showSignature: false,
+    return _PinFrame(
+      controller: widget.controller,
       child: KeyboardListener(
         focusNode: focus,
         autofocus: true,
@@ -231,23 +231,32 @@ final class _PinLoginState extends State<_PinLogin> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Semantics(
-              container: true,
-              header: true,
+            Align(
+              alignment: Alignment.centerLeft,
               child: Text(
-                l.operatorPinTitle,
-                style: PosTheme.of(context).textTheme.headlineSmall,
-                textAlign: TextAlign.center,
+                'PIN',
+                style: PosTheme.of(context).textTheme.labelMedium,
               ),
             ),
-            SizedBox(height: block),
+            const SizedBox(height: 12),
             Semantics(
               container: true,
               liveRegion: true,
               label: es ? 'PIN de operador' : 'Operator PIN',
               value: es ? '$length dígitos' : '$length digits',
               excludeSemantics: true,
-              child: PinDots(length: length, minLength: 4),
+              child: Container(
+                height: 56,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: PosTheme.of(context).colorScheme.surface,
+                  border: Border.all(
+                    color: PosTheme.of(context).colorScheme.outline,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: PinDots(length: length, minLength: 4),
+              ),
             ),
             SizedBox(height: tight),
             Text(
@@ -275,7 +284,7 @@ final class _PinLoginState extends State<_PinLogin> {
               // 60 px is still a long way above the till's 48 px floor, and it is the room that
               // keeps the action on the screen at 200 % text. The keys are the biggest thing on
               // this screen after the type itself, so they are the honest place to take it from.
-              keyHeight: largeText ? 60 : 68,
+              keyHeight: largeText ? 60 : 56,
               rowGap: largeText ? UmiSpacing.xs : UmiSpacing.sm,
             ),
             SizedBox(height: block),
@@ -601,6 +610,165 @@ final class _Recovery extends StatelessWidget {
   }
 }
 
+/// The login workspace uses only the terminal and operator identity already held
+/// by entry. Shift totals and a staff picker require data this contract does not expose.
+final class _PinFrame extends StatelessWidget {
+  const _PinFrame({required this.controller, required this.child});
+  final EntryController controller;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    final theme = PosTheme.of(context);
+    final es = Localizations.localeOf(context).languageCode == 'es';
+    final state = controller.state;
+    final location = [
+      state.selectedTenant?.name,
+      state.selectedBranch?.name,
+      state.device?.displayName,
+    ].whereType<String>().join(' · ');
+    final identity = Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            es ? 'Iniciar sesión' : 'Sign in',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        if (controller.operatorName != null) ...[
+          Text(es ? 'Usuario' : 'User', style: theme.textTheme.bodySmall),
+          const SizedBox(height: 8),
+          Text(controller.operatorName!, style: theme.textTheme.titleMedium),
+        ],
+      ],
+    );
+    return PosPage(
+      backgroundColor: theme.colorScheme.surface,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final largeText = MediaQuery.textScalerOf(context).scale(16) >= 24;
+            final wide =
+                box.maxWidth >= 1000 ||
+                (box.maxWidth >= 700 && box.maxHeight < 700);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    wide ? 48 : 16,
+                    largeText ? 8 : 24,
+                    wide ? 48 : 16,
+                    largeText ? 8 : 20,
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        'umi',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontSize: wide && !largeText ? 40 : 30,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          location,
+                          textAlign: TextAlign.right,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const PosDivider(height: 1),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, console) => SingleChildScrollView(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: wide ? 48 : 16,
+                        vertical: wide && box.maxHeight > 800 ? 48 : 8,
+                      ),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight:
+                              (console.maxHeight -
+                                      (wide && box.maxHeight > 800 ? 96 : 16))
+                                  .clamp(0, double.infinity),
+                        ),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: largeText ? 480 : 400,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                identity,
+                                const SizedBox(height: 24),
+                                Center(
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 320,
+                                    ),
+                                    child: child,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (!largeText && box.maxHeight > 700)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      wide ? 48 : 16,
+                      12,
+                      wide ? 48 : 16,
+                      20,
+                    ),
+                    child: Column(
+                      children: [
+                        const PosDivider(),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                state.selectedBranch?.name ?? '',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ),
+                            if (state.device != null)
+                              Flexible(
+                                child: Text(
+                                  state.device!.displayName,
+                                  style: theme.textTheme.bodySmall,
+                                  textAlign: TextAlign.right,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
 final class _EntryFrame extends StatelessWidget {
   const _EntryFrame({
     required this.child,
@@ -677,12 +845,6 @@ final class _EntryFrame extends StatelessWidget {
   );
 }
 
-/// True while a loading screen belongs to the operator's PIN: the screen that
-/// verifies it and the screen that starts the session it opens.
-bool _pinLoading(EntryPhase phase) =>
-    phase == EntryPhase.pinAuthenticating ||
-    phase == EntryPhase.startingOperator;
-
 final class _EntryLoading extends StatelessWidget {
   const _EntryLoading({required this.phase});
   final EntryPhase phase;
@@ -702,7 +864,7 @@ final class _EntryLoading extends StatelessWidget {
       // owner asked on 2026-10-11 for the terminal's own mark to stay off that
       // whole path: the mark, the word and the promise all read as one thing,
       // and they came back on the screen that follows the PIN.
-      showSignature: !_pinLoading(phase),
+      showSignature: true,
       wordmarkOnly: true,
       child: Column(
         mainAxisSize: MainAxisSize.min,

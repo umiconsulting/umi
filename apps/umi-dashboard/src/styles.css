@@ -4231,6 +4231,11 @@ time,
   }
 }
 @media (max-width: 840px) {
+  /* Safari zooms focused fields below 16px. Keep auth fields at that size. */
+  .login-wrap .input.tall,
+  .login-pw .input.tall {
+    font-size: 16px;
+  }
   .login-wrap {
     grid-template-columns: 1fr;
   }

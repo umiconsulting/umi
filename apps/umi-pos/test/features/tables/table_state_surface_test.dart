@@ -133,6 +133,7 @@ final class RoomRepository implements TableStateRepository {
       );
 
   TableStateMap map;
+  Completer<TableStateMap>? pendingRead;
   Object? commandFailure;
   SeatTableRequest? seated;
   MovePartyRequest? moved;
@@ -147,7 +148,7 @@ final class RoomRepository implements TableStateRepository {
   Future<TableStateMap> read(
     String merchantId,
     PosTableStateQuery query,
-  ) async => map;
+  ) async => pendingRead == null ? map : pendingRead!.future;
 
   @override
   Future<TableStateChangeResult> seat(
@@ -380,6 +381,8 @@ Future<SurfaceHarness> pumpSurface(
   onOpenAccount,
   Future<bool> Function()? onOpenTemporaryAccount,
   bool directAccounts = false,
+  Future<Cart?> Function(FloorPlanElement)? readAccount,
+  Future<Map<String, Object?>?> Function(Cart)? readBalance,
 }) async {
   final entry = await readyEntryController(permissions: permissions);
   final room = repository ?? RoomRepository();
@@ -411,6 +414,8 @@ Future<SurfaceHarness> pumpSurface(
           onOpenAccount: onOpenAccount,
           onOpenTemporaryAccount: onOpenTemporaryAccount,
           directAccounts: directAccounts,
+          readAccount: readAccount,
+          readBalance: readBalance,
         ),
       ),
     ),
@@ -425,6 +430,221 @@ Future<SurfaceHarness> pumpSurface(
 }
 
 void main() {
+  for (final firstFails in [false, true]) {
+    testWidgets(
+      'first room read remains unknown and retains the last valid state, initial failure=$firstFails',
+      (tester) async {
+        final gate = Completer<TableStateMap>();
+        final repository = RoomRepository(
+          states: [entryJson(t1, tableStateSeated, partySize: 2)],
+        )..pendingRead = gate;
+        var opens = 0;
+        final harness = await pumpSurface(
+          tester,
+          repository: repository,
+          onOpenAccount: (_, {partySize}) async {
+            opens++;
+            return true;
+          },
+        );
+        final map = find.byType(FloorPlanMap);
+        expect(map, findsOneWidget);
+        expect(
+          tester.widget<FloorPlanMap>(map).tableStates![t1]!.displayState,
+          isNot(tableStateOpen),
+        );
+        await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
+        await tester.pumpAndSettle();
+        expect(find.text('Open account'), findsNothing);
+        expect(find.text('Seat'), findsNothing);
+        expect(opens, 0);
+        if (firstFails) {
+          gate.completeError(StateError('Initial room unavailable'));
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<FloorPlanMap>(map).tableStates![t1]!.displayState,
+            tableVisualUnknown,
+          );
+          expect(find.text('Open account'), findsNothing);
+          final success = Completer<TableStateMap>();
+          repository.pendingRead = success;
+          await tester.tap(find.byTooltip('Refresh'));
+          await tester.pump();
+          success.complete(repository.map);
+        } else {
+          gate.complete(repository.map);
+        }
+        repository.pendingRead = null;
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<FloorPlanMap>(map).tableStates![t1]!.state,
+          tableStateSeated,
+        );
+        final failedRefresh = Completer<TableStateMap>();
+        repository.pendingRead = failedRefresh;
+        await tester.tap(find.byTooltip('Refresh'));
+        await tester.pump();
+        expect(
+          tester.widget<FloorPlanMap>(map).tableStates![t1]!.state,
+          tableStateSeated,
+        );
+        failedRefresh.completeError(StateError('No room reply'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<FloorPlanMap>(map).tableStates![t1]!.state,
+          tableStateSeated,
+        );
+        expect(harness.tableState.stale, isTrue);
+        expect(opens, 0);
+        expect(tester.takeException(), isNull);
+        await harness.dispose(tester);
+      },
+    );
+  }
+
+  testWidgets(
+    'same selected account refreshes through the room without accepting stale replies',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      Cart account(int version) => Cart.fromJson({
+        'id': 'same-account',
+        'merchantId': merchantId,
+        'locationId': locationId,
+        'operatorSessionId': operatorSessionId,
+        'status': 'draft',
+        'version': version,
+        'fulfillmentType': 'dine_in',
+        'tableId': t1,
+        'accountFolio': 'Account 024',
+        'items': [
+          {'productName': 'Product $version', 'quantity': 1},
+        ],
+        'totals': {
+          'subtotal': {'minorUnits': version * 4500, 'currency': 'MXN'},
+          'tax': {'minorUnits': 0, 'currency': 'MXN'},
+          'discounts': {
+            'total': {'minorUnits': 0, 'currency': 'MXN'},
+            'entries': [],
+          },
+          'grandTotal': {'minorUnits': version * 4500, 'currency': 'MXN'},
+          'businessDate': '2026-09-16',
+        },
+        'checkoutEnabled': true,
+        'checkoutMessageCode': 'ready',
+        'updatedAt': serverClock,
+      });
+      Map<String, Object?> ledger(int paid, int due) => {
+        'appliedAmount': {'minorUnits': paid, 'currency': 'MXN'},
+        'remainingBalance': {'minorUnits': due, 'currency': 'MXN'},
+      };
+      var reads = 0;
+      final balanceVersions = <int>[];
+      final oldCart = Completer<Cart?>();
+      final oldBalance = Completer<Map<String, Object?>?>();
+      final harness = await pumpSurface(
+        tester,
+        repository: RoomRepository(
+          states: [
+            entryJson(
+              t1,
+              tableStateSeated,
+              partySize: 2,
+              seatedAt: '2026-09-16T17:58:00.000Z',
+              openAccountId: 'same-account',
+            ),
+          ],
+        ),
+        readAccount: (_) {
+          reads++;
+          return reads == 2 ? oldCart.future : Future.value(account(reads));
+        },
+        readBalance: (cart) {
+          balanceVersions.add(cart.version);
+          return cart.version == 3
+              ? oldBalance.future
+              : Future.value(ledger(cart.version * 1000, cart.version * 3500));
+        },
+      );
+      await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
+      await tester.pumpAndSettle();
+      expect(find.text('1 × Product 1'), findsOneWidget);
+      expect(find.text('Paid · MXN 10.00'), findsOneWidget);
+      await tester.tap(find.byTooltip('Refresh'));
+      await tester.pump();
+      expect(reads, 2);
+      expect(find.text('Loading account…'), findsOneWidget);
+      expect(find.text('Paid · MXN 10.00'), findsNothing);
+      await tester.tap(find.byTooltip('Refresh'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 × Product 3'), findsOneWidget);
+      expect(find.text('Total · MXN 135.00'), findsOneWidget);
+      expect(find.text('Review balance at checkout'), findsOneWidget);
+      oldCart.complete(account(2));
+      await tester.pumpAndSettle();
+      expect(find.text('1 × Product 2'), findsNothing);
+      expect(balanceVersions, [1, 3]);
+      await tester.tap(find.byTooltip('Refresh'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 × Product 4'), findsOneWidget);
+      expect(find.text('Paid · MXN 40.00'), findsOneWidget);
+      expect(find.text('Remaining · MXN 140.00'), findsOneWidget);
+      oldBalance.complete(ledger(1, 1));
+      await tester.pumpAndSettle();
+      expect(find.text('Paid · MXN 0.01'), findsNothing);
+      await tester.pump(const Duration(seconds: 1));
+      expect(reads, 4, reason: 'The table timer must not cause account reads');
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pumpAndSettle();
+      expect(reads, 5);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(reads, 6);
+      expect(harness.room.seated, isNull);
+      expect(harness.room.moved, isNull);
+      expect(tester.takeException(), isNull);
+      await harness.dispose(tester);
+    },
+  );
+
+  testWidgets('wide table detail docks below the complete published floor', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = await pumpSurface(tester);
+    final map = find.byType(FloorPlanMap);
+    final panel = find.byKey(const ValueKey('table-detail-panel'));
+    expect(
+      tester.getRect(panel).top,
+      greaterThanOrEqualTo(tester.getRect(map).bottom),
+    );
+    final area = tester.widget<FloorPlanMap>(map).area;
+    expect(area.width, 1200);
+    expect(area.height, 800);
+    expect(
+      area.elements
+          .map(FloorPlanElement.fromJson)
+          .map(
+            (table) => (table.id, table.x, table.y, table.width, table.height),
+          ),
+      [(t1, 300, 300, 200, 200), (t2, 800, 300, 180, 180)],
+    );
+    expect(
+      find.byKey(const ValueKey('floor-plan-element-$t1')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('floor-plan-element-$t2')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await harness.dispose(tester);
+  });
+
   testWidgets('a paid party stays seated until staff confirms departure', (
     tester,
   ) async {
@@ -655,24 +875,37 @@ void main() {
       await tester.tap(find.text('T1'));
       await tester.pumpAndSettle();
       expect(opened, isEmpty);
-      expect(find.byKey(const ValueKey('table-detail-panel')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('selected-table-summary')),
-        findsOneWidget,
-      );
-      expect(find.text('Open account'), findsOneWidget);
-      expect(find.text('Seat'), findsOneWidget);
-      await tester.tap(find.text('Close'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Details'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Open account'));
-      await tester.pumpAndSettle();
-      expect(opened, [t1]);
-      expect(
-        find.byKey(const ValueKey('selected-table-summary')),
-        findsOneWidget,
-      );
+      if (textScale == 1) {
+        expect(
+          find.byKey(const ValueKey('table-detail-panel')),
+          findsOneWidget,
+        );
+        expect(find.byType(PosAlertDialog), findsNothing);
+        expect(find.byType(FloorPlanMap), findsOneWidget);
+        await tester.ensureVisible(find.text('Open account'));
+        await tester.tap(find.text('Open account'));
+        await tester.pumpAndSettle();
+        expect(opened, [t1]);
+      } else {
+        expect(find.byKey(const ValueKey('table-detail-panel')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('selected-table-summary')),
+          findsOneWidget,
+        );
+        expect(find.text('Open account'), findsOneWidget);
+        expect(find.text('Seat'), findsOneWidget);
+        await tester.tap(find.text('Close'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Details'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Open account'));
+        await tester.pumpAndSettle();
+        expect(opened, [t1]);
+        expect(
+          find.byKey(const ValueKey('selected-table-summary')),
+          findsOneWidget,
+        );
+      }
       expect(harness.room.seated, isNull);
       expect(tester.takeException(), isNull);
       await harness.dispose(tester);
@@ -1004,6 +1237,7 @@ void main() {
     expect(find.text('Mark served'), findsOneWidget);
     expect(find.text('Bill requested'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Order sent'));
     await tester.tap(find.text('Order sent'));
     await tester.pumpAndSettle();
     expect(harness.room.ordered!.tableId, t1);
@@ -1016,6 +1250,7 @@ void main() {
     // apart from the state heading, so a tap cannot hit the wrong one.
     await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Mark served'));
     await tester.tap(find.text('Mark served'));
     await tester.pumpAndSettle();
     expect(harness.room.served!.tableId, t1);
@@ -1023,6 +1258,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Bill requested'));
     await tester.tap(find.text('Bill requested'));
     await tester.pumpAndSettle();
     expect(harness.room.awaitingPayment!.tableId, t1);
@@ -1112,24 +1348,15 @@ void main() {
     tester.view.physicalSize = const Size(375, 812);
     await tester.pumpAndSettle();
     expect(find.byType(FloorPlanMap), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('selected-table-summary')),
-      findsOneWidget,
-    );
-    expect(find.text('Seated · 2 guests'), findsOneWidget);
-    await tester.tap(find.text('Details'));
-    await tester.pumpAndSettle();
-    expect(find.text('2 min at table'), findsOneWidget);
+    expect(find.byKey(const ValueKey('table-detail-panel')), findsOneWidget);
+    expect(find.byType(PosAlertDialog), findsNothing);
+    expect(find.text('Seated'), findsWidgets);
     expect(find.text('Move'), findsOneWidget);
-    await tester.tap(find.text('Close'));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('selected-table-summary')),
-      findsOneWidget,
-    );
+    await tester.ensureVisible(find.byTooltip('Clear selection'));
     await tester.tap(find.byTooltip('Clear selection'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('selected-table-summary')), findsNothing);
+    expect(find.text('Move'), findsNothing);
+    expect(find.byType(FloorPlanMap), findsOneWidget);
     expect(harness.room.moved, isNull);
     expect(harness.room.seated, isNull);
     expect(tester.takeException(), isNull);

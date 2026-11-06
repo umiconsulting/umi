@@ -12,6 +12,9 @@ import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
 import 'package:umi_pos/features/checkout/checkout_surface.dart';
 import 'package:umi_pos/features/checkout/partial_checkout_surface.dart';
+import 'package:umi_pos/features/checkout/payment_method_tile.dart';
+
+import 'receipt_document_test.dart' show fonts;
 
 const _merchant = '00000000-0000-4000-8000-000000000001';
 const _location = '00000000-0000-4000-8000-000000000002';
@@ -237,11 +240,15 @@ Future<(CartController, CheckoutController)> _pump(
   WidgetTester tester,
   _Repo repository, {
   bool canConfirmManualTerminal = false,
+  String? merchantLabel,
+  Size viewport = const Size(1280, 1800),
+  bool shell = false,
+  bool viaRoute = false,
   Future<bool?> Function(int amountMinor, bool selected)?
   onShowBankTransferDetails,
 }) async {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(1280, 1800);
+  tester.view.physicalSize = viewport;
   addTearDown(tester.view.reset);
   const telemetry = SafeTelemetry(
     enabled: false,
@@ -264,6 +271,30 @@ Future<(CartController, CheckoutController)> _pump(
     operatorSessionId: _operator,
     currency: 'MXN',
   );
+  final surface = PartialCheckoutSurface(
+    checkout: checkout,
+    cart: cart,
+    operatorSessionId: _operator,
+    merchantLabel: merchantLabel,
+    navigation: shell
+        ? PosNavigation(
+            destinations: const [
+              PosDestination(
+                icon: PosIcon(PosGlyphs.receiptLong),
+                label: 'Sale',
+              ),
+              PosDestination(
+                icon: PosIcon(PosGlyphs.paymentsOutlined),
+                label: 'Cash',
+              ),
+            ],
+          )
+        : null,
+    canConfirmManualTerminal: canConfirmManualTerminal,
+    cashShiftId: _shift,
+    onShowBankTransferDetails:
+        onShowBankTransferDetails ?? (_, _) async => false,
+  );
   await tester.pumpWidget(
     PosApp(
       locale: const Locale('en'),
@@ -272,22 +303,277 @@ Future<(CartController, CheckoutController)> _pump(
         AppLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
       ],
-      home: PartialCheckoutSurface(
-        checkout: checkout,
-        cart: cart,
-        operatorSessionId: _operator,
-        canConfirmManualTerminal: canConfirmManualTerminal,
-        cashShiftId: _shift,
-        onShowBankTransferDetails:
-            onShowBankTransferDetails ?? (_, _) async => false,
-      ),
+      home: viaRoute
+          ? Builder(
+              builder: (context) => PosButton(
+                onPressed: () => Navigator.of(
+                  context,
+                ).push(PosPageRoute<void>(builder: (_) => surface)),
+                child: const Text('Open partial'),
+              ),
+            )
+          : surface,
     ),
   );
   await tester.pumpAndSettle();
+  if (viaRoute) {
+    await tester.tap(find.text('Open partial'));
+    await tester.pumpAndSettle();
+  }
   return (cart, checkout);
 }
 
 void main() {
+  testWidgets(
+    'phone partial route puts methods before the form and keeps cash visible',
+    (tester) async {
+      await fonts();
+      final repository = _Repo()
+        ..enableManualTerminal = true
+        ..enableBankTransfer = true;
+      final (cart, checkout) = await _pump(
+        tester,
+        repository,
+        viewport: const Size(402, 874),
+        shell: true,
+        viaRoute: true,
+        canConfirmManualTerminal: true,
+        merchantLabel: 'Café · Local',
+      );
+      final principal = find.byKey(const ValueKey('partial-principal'));
+      final cash = find.byKey(const ValueKey('partial-cash-received'));
+      final methods = find.byType(PaymentMethodTile);
+      for (final method in methods.evaluate()) {
+        final rect = tester.getRect(find.byWidget(method.widget));
+        expect(rect.bottom, lessThan(tester.getRect(principal).top));
+        expect(rect.height, greaterThanOrEqualTo(48));
+        expect(find.byWidget(method.widget).hitTestable(), findsOneWidget);
+      }
+      expect(
+        tester
+            .getSize(find.widgetWithText(PosTextButton, 'Back to account'))
+            .height,
+        44,
+      );
+      expect(
+        tester.getSize(find.widgetWithText(PosTextButton, 'Refresh')).height,
+        44,
+      );
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('partial-account-disclosure')))
+            .height,
+        44,
+      );
+      expect(cash.hitTestable(), findsOneWidget);
+      expect(
+        tester.getRect(cash).bottom,
+        lessThanOrEqualTo(
+          tester
+              .getRect(find.byKey(const ValueKey('partial-payment-editor')))
+              .bottom,
+        ),
+      );
+      expect(find.text('Amount due'), findsOneWidget);
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('partial-cash-change')))
+            .height,
+        36,
+      );
+      expect(
+        find.byKey(const ValueKey('partial-exact-charge')).hitTestable(),
+        findsOneWidget,
+      );
+      final charge = find.byKey(const ValueKey('partial-charge'));
+      expect(charge.hitTestable(), findsOneWidget);
+      expect(tester.getSize(charge).height, 48);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(cash);
+      await tester.pumpAndSettle();
+      expect(cash.hitTestable(), findsOneWidget);
+      expect(charge.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      checkout.dispose();
+      cart.dispose();
+    },
+  );
+
+  for (final width in [800.0, 820.0]) {
+    testWidgets(
+      'portrait partial checkout retains vertical methods and account at $width',
+      (tester) async {
+        final repository = _Repo()..enableManualTerminal = true;
+        final (cart, checkout) = await _pump(
+          tester,
+          repository,
+          viewport: Size(width, 1280),
+          shell: true,
+          canConfirmManualTerminal: true,
+          merchantLabel: 'Cafe · Local',
+        );
+        final first = tester.getRect(find.byType(PaymentMethodTile).first);
+        final second = tester.getRect(find.byType(PaymentMethodTile).at(1));
+        final principal = tester.getRect(
+          find.byKey(const ValueKey('partial-principal')),
+        );
+        final account = tester.getRect(
+          find.byKey(const ValueKey('partial-account-summary')),
+        );
+        expect(first.right, lessThanOrEqualTo(principal.left));
+        expect(second.top, greaterThanOrEqualTo(first.bottom));
+        expect(account.left, greaterThanOrEqualTo(principal.right));
+        expect(tester.takeException(), isNull);
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('partial-account-summary')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('partial-account-disclosure')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        checkout.dispose();
+        cart.dispose();
+      },
+    );
+  }
+
+  testWidgets('phone partial checkout retains UMI beside the real merchant', (
+    tester,
+  ) async {
+    final (cart, checkout) = await _pump(
+      tester,
+      _Repo(),
+      merchantLabel: 'Café Norte · Centro',
+    );
+    tester.view.physicalSize = const Size(402, 874);
+    await tester.pumpAndSettle();
+    final header = find.byType(PosHeader);
+    expect(
+      find.descendant(of: header, matching: find.text('umi')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: header, matching: find.text('Café Norte · Centro')),
+      findsOneWidget,
+    );
+    expect(find.byType(PosNavigation), findsNothing);
+    expect(
+      find.byKey(const ValueKey('partial-charge')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    cart.dispose();
+    checkout.dispose();
+  });
+
+  testWidgets(
+    'payment shell finds permitted navigation past an inner header page',
+    (tester) async {
+      PosNavigation? found;
+      await tester.pumpWidget(
+        PosApp(
+          home: PosPage(
+            bottomNavigationBar: PosNavigation(
+              destinations: const [
+                PosDestination(
+                  icon: PosIcon(PosGlyphs.receiptOutlined),
+                  label: 'Sale',
+                ),
+              ],
+            ),
+            body: PosPage(
+              body: Builder(
+                builder: (context) {
+                  found = checkoutNavigationOf(context);
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(found, isNotNull);
+      expect((found!.destinations.single as PosDestination).label, 'Sale');
+    },
+  );
+
+  testWidgets(
+    'cash keypad changes only received amount and preserves exact principal',
+    (tester) async {
+      final repository = _Repo();
+      final (cart, checkout) = await _pump(tester, repository);
+      await tester.tap(find.byKey(const ValueKey('partial-cash-clear')));
+      await tester.pump();
+      for (final digit in ['2', '0', '0']) {
+        await tester.tap(find.byKey(ValueKey('partial-cash-key-$digit')));
+        await tester.pump();
+      }
+      final field = tester.widget<PosField>(
+        find.byKey(const ValueKey('partial-cash-received')),
+      );
+      expect(field.controller!.text, '200');
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('partial-cash-change')),
+          matching: find.text('MXN 84.00'),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('partial-charge')));
+      await tester.pumpAndSettle();
+      final tender = repository.commands.single['tender'] as Map;
+      expect((tender['amount'] as Map)['minorUnits'], 11600);
+      expect((tender['amountReceived'] as Map)['minorUnits'], 20000);
+      await tester.pumpWidget(const SizedBox());
+      cart.dispose();
+      checkout.dispose();
+    },
+  );
+
+  for (final size in const [
+    Size(402, 874),
+    Size(412, 915),
+    Size(820, 1180),
+    Size(800, 1340),
+    Size(1340, 800),
+    Size(1440, 1000),
+  ]) {
+    testWidgets('partial checkout keeps cash and charge reachable at $size', (
+      tester,
+    ) async {
+      final (cart, checkout) = await _pump(tester, _Repo());
+      tester.view.physicalSize = size;
+      await tester.pumpAndSettle();
+      final received = find.byKey(const ValueKey('partial-cash-received'));
+      final change = find.byKey(const ValueKey('partial-cash-change'));
+      final charge = find.byKey(const ValueKey('partial-charge'));
+      expect(charge.hitTestable(), findsOneWidget);
+      await tester.ensureVisible(received);
+      await tester.pumpAndSettle();
+      expect(received.hitTestable(), findsOneWidget);
+      expect(tester.getRect(change).bottom, lessThan(size.height));
+      expect(charge.hitTestable(), findsOneWidget);
+      expect(
+        tester.getRect(received).bottom,
+        lessThan(tester.getRect(change).top),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      cart.dispose();
+      checkout.dispose();
+    });
+  }
+
   testWidgets(
     'a split terminal leg confirms without asking the operator to type a receipt folio',
     (tester) async {
@@ -368,6 +654,8 @@ void main() {
       find.byKey(const ValueKey('partial-principal')),
       '40.00',
     );
+    await tester.tap(find.byKey(const ValueKey('partial-tip-disclosure')));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('partial-tip')), '5.00');
     await tester.pumpAndSettle();
 
@@ -605,7 +893,7 @@ void main() {
     (tester) async {
       final repository = _Repo();
       final (cart, checkout) = await _pump(tester, repository);
-      expect(find.text('Cuenta 104'), findsOneWidget);
+      expect(find.text('Cuenta 104'), findsNWidgets(2));
       expect(find.text('Remaining'), findsOneWidget);
       expect(find.text('MXN 116.00'), findsWidgets);
       expect(
@@ -629,6 +917,8 @@ void main() {
       expect(find.text('MXN 76.00'), findsWidgets);
       expect(find.byKey(const ValueKey('partial-payment-0')), findsOneWidget);
 
+      await tester.tap(find.byKey(const ValueKey('partial-tip-disclosure')));
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('partial-tip')),
         '10.00',

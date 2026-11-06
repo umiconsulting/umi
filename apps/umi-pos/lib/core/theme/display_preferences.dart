@@ -18,6 +18,8 @@ final class DisplayPreferences extends ChangeNotifier {
   PosThemeMode themeMode = PosThemeMode.system;
   String? language;
   bool reduceMotion = false;
+  bool showProductPhotos = true;
+  bool menuLabels = false;
   bool kitchenSoundsMuted = false;
   PosTextSize textSize = PosTextSize.system;
 
@@ -61,6 +63,8 @@ final class DisplayPreferences extends ChangeNotifier {
           language = value['language'] as String?;
           reduceMotion = value['reduceMotion'] as bool;
           kitchenSoundsMuted = value['kitchenSoundsMuted'] == true;
+          showProductPhotos = value['showProductPhotos'] != false;
+          menuLabels = value['menuLabels'] == true;
           kitchenStationId = value['kitchenStationId'] as String?;
           kitchenStationName = value['kitchenStationName'] as String?;
           textSize = value.containsKey('textSize')
@@ -140,6 +144,26 @@ final class DisplayPreferences extends ChangeNotifier {
     soundsMuted: value,
   );
 
+  Future<void> setShowProductPhotos(bool value) => _save(
+    theme: themeMode,
+    locale: language,
+    motion: reduceMotion,
+    size: textSize,
+    stationId: kitchenStationId,
+    stationName: kitchenStationName,
+    photos: value,
+  );
+
+  Future<void> setMenuLabels(bool value) => _save(
+    theme: themeMode,
+    locale: language,
+    motion: reduceMotion,
+    size: textSize,
+    stationId: kitchenStationId,
+    stationName: kitchenStationName,
+    labels: value,
+  );
+
   Future<void> _save({
     required PosThemeMode theme,
     required String? locale,
@@ -148,6 +172,8 @@ final class DisplayPreferences extends ChangeNotifier {
     String? stationId,
     String? stationName,
     bool? soundsMuted,
+    bool? photos,
+    bool? labels,
   }) async {
     if (busy || !_alive) return;
     if (![null, 'es', 'en'].contains(locale)) {
@@ -168,6 +194,8 @@ final class DisplayPreferences extends ChangeNotifier {
           'kitchenStationId': stationId,
           'kitchenStationName': stationName,
           'kitchenSoundsMuted': soundsMuted ?? kitchenSoundsMuted,
+          'showProductPhotos': photos ?? showProductPhotos,
+          'menuLabels': labels ?? menuLabels,
         }),
       );
       if (_alive) {
@@ -178,6 +206,8 @@ final class DisplayPreferences extends ChangeNotifier {
         kitchenStationId = stationId;
         kitchenStationName = stationName;
         kitchenSoundsMuted = soundsMuted ?? kitchenSoundsMuted;
+        showProductPhotos = photos ?? showProductPhotos;
+        menuLabels = labels ?? menuLabels;
       }
     } catch (_) {
       if (_alive) error = DisplayPreferenceError.write;
