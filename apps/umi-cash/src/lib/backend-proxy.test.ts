@@ -4,6 +4,22 @@ import { proxyRequest } from './backend-proxy';
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe('Cash API transport', () => {
+  it('forwards conditional Wallet downloads and preserves an empty 304 response', async () => {
+    vi.stubEnv('CASH_API_ORIGIN', 'https://api-staging.example.test');
+    const modified = 'Thu, 05 Nov 2026 23:44:51 GMT';
+    const fetch = vi.fn(async (_url: URL, init: RequestInit) => {
+      expect(new Headers(init.headers).get('if-modified-since')).toBe(modified);
+      return new Response(null, { status: 304, headers: { 'last-modified': modified } });
+    });
+    vi.stubGlobal('fetch', fetch);
+    const response = await proxyRequest(new Request('https://cash.example.test/api/cafe/passes/apple/v1/passes/type/serial', {
+      headers: { authorization: 'ApplePass test-token', 'if-modified-since': modified },
+    }));
+    expect(response.status).toBe(304);
+    expect(await response.text()).toBe('');
+    expect(response.headers.get('last-modified')).toBe(modified);
+  });
+
   it('preserves a signed pass as binary data', async () => {
     vi.stubEnv('CASH_API_ORIGIN', 'https://api-staging.example.test');
     const bytes = new Uint8Array([0x50, 0x4b, 0, 255, 37]);

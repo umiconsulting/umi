@@ -24,7 +24,7 @@ export async function proxyRequest(request: Request): Promise<Response> {
   if (path === '/api/umi/mfa/verify') path = '/api/auth/local/mfa/verify';
   const headers = new Headers();
   headers.set('accept-encoding', 'identity');
-  for (const key of ['accept', 'content-type', 'authorization', 'cookie', 'user-agent', 'origin', 'x-umi-csrf']) {
+  for (const key of ['accept', 'content-type', 'authorization', 'cookie', 'user-agent', 'origin', 'x-umi-csrf', 'if-modified-since']) {
     const value = request.headers.get(key);
     if (value) headers.set(key, value);
   }
