@@ -192,3 +192,9 @@ New cafés without stamp artwork receive basic empty and earned stamp images ins
 
 The backend suite passes 2,164 tests. Type checks, lint, and focused wallet checks pass.
 See [protocol research](../research/2026-11-05-staging-wallet-updates.md) for delivery and notification limits.
+
+The first delivery deployment failed because the VPS registry pull returned `denied`.
+The reusable deployment now authenticates that pull with the current job token through SSH stdin.
+A temporary Docker configuration keeps shared VPS credentials unchanged and is removed after deployment.
+The VPS has no automatic Docker credential helper installed.
+Bash syntax checks and ShellCheck 0.11.0 verify the deployment shell.
