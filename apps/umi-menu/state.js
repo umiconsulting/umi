@@ -38,7 +38,11 @@
     o.updatedAt = now;
     return o;
   }
-  const api = { advance, settings, terminal };
+  function hasOpenAccount(orders, table) {
+    return orders.some(o => o.mode === 'table' && String(o.table) === String(table)
+      && !o.paid && !terminal.includes(o.status));
+  }
+  const api = { advance, settings, terminal, hasOpenAccount };
   root.MenuDemo = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(globalThis);

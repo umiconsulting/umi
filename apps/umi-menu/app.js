@@ -21,6 +21,10 @@ function transact(id, action, payload = {}) {
     const i = state.orders.findIndex(o => o.id === id);
     if (i < 0) throw new Error('No se encontró el pedido.');
     state.orders[i] = MenuDemo.advance(state.orders[i], action, now(), payload);
+    const updated = state.orders[i];
+    if (updated.mode === 'table' && !MenuDemo.hasOpenAccount(state.orders, updated.table)) {
+      state.bills.filter(b => b.table === updated.table && b.status === 'pending').forEach(b => { b.status = 'closed'; });
+    }
     save(); refresh();
   } catch(e) { notify(e.message); }
 }
@@ -30,11 +34,13 @@ const baseSetMode = setMode;
 setMode = function(next) { if (tableLocked && next !== 'table') return; baseSetMode(next); renderContext(); };
 renderContext = function () {
   const table = mode === 'table';
+  const hasAccount = MenuDemo.hasOpenAccount(state.orders, tableNumber);
   const bill = state.bills.find(b => b.table === tableNumber && b.status === 'pending');
-  const content = `<div class="row"><span class="context-icon">${icon(table?'table':'bag')}</span><div><div class="context-title">${table?'Mesa '+tableNumber:'Para recoger'}</div><div class="context-sub">Bruma · Sucursal Centro · Ejemplo</div></div></div><div class="fulfillment-caption">${state.settings.paused?'Pedidos pausados. Puedes consultar el menú.':table?'El personal recibe el número de tu mesa.':'Pago en el negocio · Sujeto a aceptación'}</div>${table?`<button class="secondary" data-bill ${bill?'disabled':''}>${bill?'Cuenta solicitada':'Pedir la cuenta'}</button>`:''}`;
+  const content = `<div class="row"><span class="context-icon">${icon(table?'table':'bag')}</span><div><div class="context-title">${table?'Mesa '+tableNumber:'Para recoger'}</div><div class="context-sub">Bruma · Sucursal Centro · Ejemplo</div></div></div><div class="fulfillment-caption">${state.settings.paused?'Pedidos pausados. Puedes consultar el menú.':table?'El personal recibe el número de tu mesa.':'Pago en el negocio · Sujeto a aceptación'}</div>${table?`<button class="secondary" data-bill ${!hasAccount || bill?'disabled':''}>${bill?'Cuenta solicitada':'Pedir la cuenta'}</button>`:''}`;
   $('#fulfillment').innerHTML = content;
-  $('#mobile-context').innerHTML = `<div><strong>${table?'Mesa '+tableNumber:'Para recoger'}</strong><div>${state.settings.paused?'Pedidos pausados':'Bruma · Centro'}</div></div>${table?`<button class="text-btn" data-bill ${bill?'disabled':''}>${bill?'Cuenta solicitada':'Pedir la cuenta'}</button>`:''}`;
+  $('#mobile-context').innerHTML = `<div><strong>${table?'Mesa '+tableNumber:'Para recoger'}</strong><div>${state.settings.paused?'Pedidos pausados':'Bruma · Centro'}</div></div>${table?`<button class="text-btn" data-bill ${!hasAccount || bill?'disabled':''}>${bill?'Cuenta solicitada':'Pedir la cuenta'}</button>`:''}`;
   document.querySelectorAll('[data-bill]').forEach(b => b.onclick = () => {
+    if (mode !== 'table' || !MenuDemo.hasOpenAccount(state.orders, tableNumber)) return;
     if (!state.bills.some(b => b.table === tableNumber && b.status === 'pending')) {
       state.bills.unshift({id: demoId(), table: tableNumber, status: 'pending', at: now()});
       save(); refresh(); notify('El personal de la demo recibió tu solicitud de cuenta.');

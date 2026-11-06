@@ -14,3 +14,5 @@ Validación local, 2026-11-05, rama hc_umi_digital_menu:
 Playwright con Chromium instalado, 430 × 932: título Promociones, filtro Desayunos sin etiquetas repetidas y agregar al carrito aprobados. Sin errores JavaScript.
 Servidor HTTP activo en http://127.0.0.1:56456/index.html.
 Validación funcional del usuario y push pendientes. Sin validación de staging ni integración comercial.
+
+Ajuste posterior: Pedir la cuenta requiere al menos un pedido de esa mesa activo y sin cobrar. Un carrito sin enviar no habilita la acción. Cerrar todos los pedidos cierra las solicitudes pendientes. Diez pruebas aprobadas y recorrido móvil verificado: deshabilitado sin pedido y con carrito; habilitado después de confirmar.
