@@ -1,7 +1,0 @@
-interface:
-  display_name: "Using Superpowers"
-  short_description: "Apply the complete Superpowers workflow"
-  default_prompt: "Use $using-superpowers to apply the Superpowers workflow to this task."
-
-policy:
-  allow_implicit_invocation: true
