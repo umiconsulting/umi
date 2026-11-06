@@ -104,7 +104,7 @@ Local database checks also verify location ownership, merchant isolation, split 
 upper reward tiers, broadcast dry runs, SQL parsing, and application startup.
 The production dependency audit reports zero known vulnerabilities.
 The adapter development toolchain retains audit findings that need a separate upgrade review.
-Actual Apple and Google Wallet delivery remains a device check before production cutover.
+Google installation and visible phone notifications remain device checks before production cutover.
 
 ## Isolated wallet setup
 
@@ -171,7 +171,7 @@ The temporary platform administrator grant was revoked, and its account was susp
 The permanent platform administrator remains active.
 The synthetic café and its business login remain available for review.
 The disposable local PostgreSQL and Redis containers were stopped.
-Actual installation in Apple Wallet or Google Wallet remains a physical-device check.
+The user confirmed Apple installation. Google installation remains a physical-device check.
 
 ## Test delivery, 2026-11-05
 
@@ -190,7 +190,7 @@ The certificate includes its WWDR chain. Existing token authentication keeps its
 Staging still receives no APN token key.
 New cafés without stamp artwork receive basic empty and earned stamp images instead of HTTP 500.
 
-The backend suite passes 2,164 tests. Type checks, lint, and focused wallet checks pass.
+The backend suite passes 2,167 tests. Cash passes 59 tests. Type checks, lint, and Worker build checks pass.
 See [protocol research](../research/2026-11-05-staging-wallet-updates.md) for delivery and notification limits.
 
 The first delivery deployment failed because the VPS registry pull returned `denied`.
@@ -198,3 +198,15 @@ The reusable deployment now authenticates that pull with the current job token t
 A temporary Docker configuration keeps shared VPS credentials unchanged and is removed after deployment.
 The VPS has no automatic Docker credential helper installed.
 Bash syntax checks and ShellCheck 0.11.0 verify the deployment shell.
+
+The [delivery deployment](https://github.com/umiconsulting/umi/actions/runs/42133876705) passed.
+Runtime checks confirm test mode in the API and isolated mode in the worker.
+The test café has three Apple cards and two registered passes on the test iPhone.
+The authenticated Apple resync returned `cards: 3, sent: 2`.
+The phone then polled and downloaded both passes with HTTP 200.
+The signed pass for the scanned card contains `1/9` and the first-stamp message.
+The two stamp image states also return HTTP 200 and have different image content.
+
+The phone reported redundant full downloads when it sent `If-Modified-Since`.
+Cash now forwards that header. The authenticated API returns HTTP 304 when the pass is unchanged.
+Changed passes retain HTTP 200. Invalid tokens retain HTTP 401, even when the date matches.
