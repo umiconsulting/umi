@@ -6,6 +6,8 @@ settings:
 
 importers:
 
+  apps/umi-menu: {}
+
   .:
     devDependencies:
       '@axe-core/playwright':

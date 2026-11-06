@@ -1,0 +1,46 @@
+.u-settings { width: 100%; min-width: 0; display: flex; flex-direction: column; padding: 28px 32px; overflow: hidden; }
+.u-settings-head { display: flex; align-items: center; gap: 24px; margin-bottom: 28px; }
+.u-settings-head h1 { margin: 0; }
+.u-settings-head > span { margin-inline-start: auto; color: var(--muted); font-size: 12px; }
+.u-settings-layout { display: flex; gap: 32px; flex: 1; min-height: 0; }
+.u-settings-tabs { width: 160px; flex: none; display: flex; flex-direction: column; gap: 8px; }
+.u-settings-scroll-wrap { flex: 1; position: relative; min-width: 0; min-height: 0; }
+.u-settings-content { height: 100%; overflow: auto; padding-inline-end: 8px; }
+.u-config-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.u-config-heading h2, .u-config-section h2 { font-size: 20px; line-height: 1.4; font-weight: 500; margin: 0; }
+.u-config-heading p, .u-config-section p { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 8px 0 0; }
+.u-config-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.u-device-list { margin-top: 24px; }
+.u-device { border-top: 1px solid var(--line); padding: 20px 0; }
+.u-device-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.u-device h3, .u-config-section h3, .u-device-form h3 { font-size: 16px; font-weight: 500; margin: 0; }
+.u-device-title p { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+.u-device-state { font-size: 12px; color: var(--muted); padding: 4px 8px; border-radius: 5px; background: var(--pale); white-space: nowrap; }
+.u-device-state[data-ready=true] { color: var(--green); background: var(--green-soft); }
+.u-device dl, .u-session-facts { display: grid; gap: 8px; margin: 16px 0; }
+.u-device dl > div, .u-session-facts > div { display: flex; align-items: center; gap: 24px; font-size: 13px; }
+.u-device dt, .u-session-facts dt { width: 90px; margin: 0; color: var(--muted); }
+.u-device dd, .u-session-facts dd { margin: 0; }
+.u-config-section { padding-top: 24px; margin-top: 24px; border-top: 1px solid var(--line); }
+.u-config-section > button { margin-top: 16px; }
+.u-config-job { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; font-size: 13px; border-bottom: 1px solid var(--line); }
+.u-config-job b { font-weight: 500; color: var(--green); }
+.u-config-select { max-width: 260px; margin-top: 24px; }
+.u-config-preferences { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.u-config-checks { display: flex; flex-direction: column; gap: 20px; }
+.u-config-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.u-device-form { display: flex; flex-direction: column; gap: 24px; max-width: 580px; }
+.u-session-facts { gap: 20px; margin-bottom: 32px; }
+.compact .u-settings { padding: 20px 16px; }
+.compact .u-settings-head { gap: 12px; margin-bottom: 20px; }
+.compact .u-settings-head h1 { font-size: 24px; }
+.compact .u-settings-head > span { display: none; }
+.compact .u-settings-layout { flex-direction: column; gap: 20px; }
+.compact .u-settings-tabs { flex-direction: row; width: 100%; gap: 0; }
+.compact .u-settings-tabs button { padding-inline: 4px; font-size: 12px; flex: 1; }
+.compact .u-settings-content { padding-inline-end: 0; }
+.compact .u-config-heading h2, .compact .u-config-section h2 { font-size: 18px; }
+.compact .u-config-actions button { flex-grow: 1; font-size: 12px; }
+.compact .u-config-preferences { grid-template-columns: 1fr; gap: 20px; }
+.compact .u-config-fields { grid-template-columns: 1fr; }
+.compact .u-setting-menu { display: none; }

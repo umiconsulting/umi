@@ -1,0 +1,206 @@
+@reference './boardui.css';
+
+/* Both alternatives organize categories across the counter, before products. */
+.u-app:is([data-design="2"],[data-design="3"]) .u-catalog {
+  grid-template-rows: 44px 56px 44px minmax(0,1fr) 24px;
+  gap: 8px 12px;
+}
+.u-app:is([data-design="2"],[data-design="3"]) .u-catalog > .u-categories {
+  grid-area: 2 / 1 / 3 / -1; margin: 0; gap: 8px;
+}
+.u-app:is([data-design="2"],[data-design="3"]) .u-categories button {
+  min-height: 56px; padding: 12px; flex-direction: row; align-items: center; gap: 8px;
+  background: color-mix(in srgb,var(--category-surface) 84%,var(--category-tone,var(--blue)) 16%);
+}
+.u-app:is([data-design="2"],[data-design="3"]) .u-categories button b { @apply text-body-medium; }
+.u-app:is([data-design="2"],[data-design="3"]) .u-categories button[data-active="true"] {
+  border-color: var(--blue); box-shadow: inset 0 -3px var(--blue);
+}
+.u-app:is([data-design="2"],[data-design="3"]) .u-new { grid-area: 3 / 1; }
+.u-app:is([data-design="2"],[data-design="3"]) .u-grid-heading { grid-area: 3 / 2; }
+.u-app:is([data-design="2"],[data-design="3"]) .u-products-scroll { grid-area: 4 / 1 / 5 / -1; }
+.u-app:is([data-design="2"],[data-design="3"]) .u-catalog-foot { grid-area: 5 / 1 / 6 / -1; }
+.u-app:is([data-design="2"],[data-design="3"]) .u-new-order-choice { grid-area: 3 / 1 / 5 / -1; }
+
+/* 2: operational keys. Category colour, full name and price identify each key. */
+.u-app[data-design="2"] .u-products {
+  grid-template-columns: repeat(4,minmax(0,1fr)); grid-auto-rows: 112px;
+  grid-auto-flow: row; gap: 8px;
+}
+.u-app[data-design="2"] .u-product {
+  padding: 8px 12px; border-radius: 8px; gap: 4px;
+  background: color-mix(in srgb,var(--category-surface) 84%,var(--category-tone,var(--blue)) 16%);
+}
+.u-app[data-design="2"] .u-product:nth-child(6n + 1) { grid-row: auto; }
+.u-app[data-design="2"] .u-product[data-popular="true"] { grid-row: span 2; }
+.u-app[data-design="2"] .u-product-popularity { margin-top: 4px; padding: 2px 8px; border: 1px solid color-mix(in srgb,var(--ink) 32%,transparent); background: transparent; color: var(--ink); @apply text-caption-1-medium; }
+.u-app[data-design="2"] .u-new-action { grid-area: 3 / 1; justify-self: start; height: 44px; min-height: 44px; padding: 8px 12px; gap: 4px; @apply text-body-2-medium; }
+.u-app[data-design="2"]:is(.compact,[data-tablet-portrait="true"]) .u-new-action { grid-area: 1 / 1; justify-self: end; }
+.u-app[data-design="2"] .u-product strong { @apply text-title-3-semibold; color: var(--ink); padding-inline-end: 0; }
+.u-app[data-design="2"] .u-product-category { @apply text-caption-1-regular; }
+.u-app[data-design="2"] .u-product-price { @apply text-body-2-medium; padding-inline-end: 0; }
+.u-app[data-design="2"] .u-product > .u-product-count { inset: 8px 8px auto auto; }
+.u-app[data-design="2"] .u-product[data-in-order="true"] .u-product-category { padding-inline-end: 24px; }
+.u-app[data-design="2"] .u-ticket { background: var(--bg); }
+.u-app[data-design="2"] .u-ticket-context,.u-app[data-design="2"] .u-ticket-foot { background: transparent; }
+
+/* 3: original UMI product buttons: name first, category edge and aligned price. */
+.u-app[data-design="3"] .u-header { height: 64px; }
+.u-app[data-design="3"] .u-catalog { padding: 20px; grid-template-columns: minmax(112px,.7fr) minmax(180px,1.3fr); }
+.u-app[data-design="3"] .u-catalog-top .u-page-title { @apply text-title-2-semibold; }
+.u-app[data-design="3"] .u-categories { border-bottom: 1px solid var(--line); }
+.u-app[data-design="3"] .u-categories button { border-radius: 12px 12px 0 0; }
+.u-app[data-design="3"] .u-categories button[data-active="true"] { box-shadow: inset 0 4px var(--blue); border-color: transparent; }
+.u-app[data-design="3"] .u-products {
+  grid-template-columns: repeat(2,minmax(0,1fr)); grid-auto-rows: 104px; gap: 8px 12px;
+}
+.u-app[data-design="3"] .u-product {
+  display: grid; grid-template-columns: minmax(0,1fr) auto;
+  grid-template-rows: 20px minmax(26px,auto); align-content: center;
+  column-gap: 12px; row-gap: 4px; padding: 12px;
+  border: 0; border-inline-start: 4px solid var(--category-tone,var(--blue)); border-radius: 8px;
+  background: color-mix(in srgb,var(--surface) 94%,var(--category-tone,var(--blue)) 6%);
+}
+.u-app[data-design="3"] .u-product:nth-child(6n + 1) { grid-row: auto; }
+.u-app[data-design="3"] .u-product[data-in-order="true"] {
+  background: color-mix(in srgb,var(--surface) 90%,var(--category-tone,var(--blue)) 10%);
+}
+.u-app[data-design="3"] .u-product-category {
+  grid-area: 1 / 1; @apply text-caption-1-medium; opacity: 1;
+}
+.u-app[data-design="3"] .u-product strong { grid-area: 2 / 1; @apply text-title-3-medium; align-self: start; }
+.u-app[data-design="3"] .u-product-price { grid-area: 2 / 2; @apply text-body-2-medium; padding: 0; margin: 0; align-self: end; text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.u-app[data-design="3"] .u-product > .u-product-count { position: static; grid-area: 1 / 2; justify-self: end; min-width: 24px; height: 20px; background: var(--blue-soft); color: var(--blue); }
+.u-app[data-design="3"] .u-ticket { width: 344px; }
+.u-app[data-design="3"] .u-ticket-context { padding: 20px 20px 0; border-top: 4px solid var(--blue); }
+.u-app[data-design="3"] .u-ticket-body { padding: 16px 20px; }
+.u-app[data-design="3"] .u-ticket-foot { padding: 8px 20px 16px; }
+.u-app[data-design="3"] .u-line { padding-bottom: 16px; margin-bottom: 16px; }
+.u-app[data-design="3"] .u-rail-head .u-logo { height: 48px; }
+.u-app[data-design="3"]:not(.compact)[data-rail-expanded="true"] .u-rail-head .u-logo { width: 100%; height: 64px; @apply text-title-1-semibold; }
+.u-app[data-design="3"] :is(.u-incoming-card,.u-kitchen-card,.u-pos-callout) { border-radius: 12px; border-top: 4px solid var(--blue); }
+.u-app[data-design="3"] .u-editor-heading { border-top: 4px solid var(--blue); padding-top: 16px; }
+.u-app[data-design="3"] .u-login-intro { border-inline-start: 0; border-top: 4px solid var(--blue); padding: 20px 0 0; }
+
+/* Portrait tablets and phones have independent catalog geometry. */
+.u-app:is([data-design="2"],[data-design="3"]):is(.compact,[data-tablet-portrait="true"]) .u-catalog {
+  grid-template-columns: 1fr; grid-template-rows: 44px 44px 48px 44px minmax(0,1fr) 24px; padding: 12px; gap: 8px;
+}
+.u-app:is([data-design="2"],[data-design="3"]):is(.compact,[data-tablet-portrait="true"]) .u-new { grid-area: 1 / 1; justify-self: end; }
+.u-app:is([data-design="2"],[data-design="3"]):is(.compact,[data-tablet-portrait="true"]) .u-search-slot { grid-area: 2 / 1; }
+.u-app:is([data-design="2"],[data-design="3"]):is(.compact,[data-tablet-portrait="true"]) .u-catalog > .u-categories { grid-area: 3 / 1; gap: 4px; }
+.u-app:is([data-design="2"],[data-design="3"]):is(.compact,[data-tablet-portrait="true"]) .u-categories button { padding: 8px; min-height: 48px; gap: 4px; }
+.u-app:is([data-design="2"],[data-design="3"]):is(.compact,[data-tablet-portrait="true"]) .u-categories button b { @apply text-body-2-medium; }
+.u-app:is([data-design="2"],[data-design="3"]):is(.compact,[data-tablet-portrait="true"]) .u-grid-heading { grid-area: 4 / 1; justify-content: flex-end; }
+.u-app:is([data-design="2"],[data-design="3"]):is(.compact,[data-tablet-portrait="true"]) .u-products-scroll { grid-area: 5 / 1; }
+.u-app:is([data-design="2"],[data-design="3"]):is(.compact,[data-tablet-portrait="true"]) .u-catalog-foot { grid-area: 6 / 1; }
+.u-app[data-design="2"]:is(.compact,[data-tablet-portrait="true"]) .u-products { grid-template-columns: repeat(2,minmax(0,1fr)); grid-auto-rows: 112px; }
+.u-app[data-design="2"]:is(.compact,[data-tablet-portrait="true"]) .u-product { padding: 8px 12px; }
+.u-app[data-design="3"]:is(.compact,[data-tablet-portrait="true"]) .u-products { grid-template-columns: 1fr; grid-auto-rows: 104px; }
+.u-app[data-design="3"][data-tablet-portrait="true"] .u-ticket { width: 304px; }
+.u-app:is([data-design="2"],[data-design="3"]).compact .u-catalog { grid-template-rows: 44px 44px 48px 44px minmax(0,1fr); padding: 12px 16px 72px; }
+.u-app[data-design="3"].compact .u-ticket { width: 100%; }
+.u-app[data-design="3"].compact .u-product { padding: 12px; }
+.u-app[data-design="3"].compact .u-ticket-context { padding: 8px 16px 0; }
+.u-app[data-design="3"].compact .u-ticket-body { padding: 12px 16px; }
+.u-app[data-design="3"].compact .u-ticket-foot { padding: 8px 16px 12px; }
+
+/* Category colours retain their established meaning in every composition. */
+.u-app:is([data-design="2"],[data-design="3"]) [data-category="Pan"] { --category-tone: var(--amber); }
+.u-app:is([data-design="2"],[data-design="3"]) [data-category="Pizzas"] { --category-tone: var(--color-text-error-primary); }
+/* Audit fixes: real interactive bounds, including the editable input itself. */
+.u-app:is([data-design="2"],[data-design="3"]) button { min-width: 44px; min-height: 44px; }
+.u-app:is([data-design="2"],[data-design="3"]) summary { min-height: 44px; display: flex; align-items: center; }
+.u-app:is([data-design="2"],[data-design="3"]) .u-boardui [role="group"]:has(> div input) { padding-block: 0; min-height: 46px; height: auto; }
+.u-app:is([data-design="2"],[data-design="3"]) .u-boardui input { min-height: 44px; }
+/* Fit all desktop keypad rows after expanding real input and tip targets. */
+.u-app:is([data-design="2"],[data-design="3"]):not(.compact) .u-payment-right { padding-block: 16px; }
+.u-app:is([data-design="2"],[data-design="3"]):not(.compact) .u-payment-form .u-methods { margin-block: 8px; }
+
+/* 3 restores the compact frequent-product strip of the original counter. */
+.u-app[data-design="3"] .u-catalog { grid-template-rows: 44px 56px 44px 48px minmax(0,1fr) 24px; }
+.u-app[data-design="3"] .u-frequent-products { grid-area: 4 / 1 / 5 / -1; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.u-app[data-design="3"] .u-frequent-products > span { color: var(--muted); }
+.u-app[data-design="3"] .u-frequent-scroll { display: flex; gap: 8px; min-width: 0; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.u-app[data-design="3"] .u-frequent-scroll button { flex: none; min-height: 44px; gap: 8px; }
+.u-app[data-design="3"] .u-products-scroll { grid-area: 5 / 1 / 6 / -1; }
+.u-app[data-design="3"] .u-catalog-foot { grid-area: 6 / 1 / 7 / -1; }
+.u-app[data-design="3"]:is(.compact,[data-tablet-portrait="true"]) .u-catalog { grid-template-rows: 44px 44px 48px 44px 48px minmax(0,1fr) 24px; }
+.u-app[data-design="3"]:is(.compact,[data-tablet-portrait="true"]) .u-frequent-products { grid-area: 5 / 1; gap: 8px; }
+.u-app[data-design="3"]:is(.compact,[data-tablet-portrait="true"]) .u-products-scroll { grid-area: 6 / 1; }
+.u-app[data-design="3"]:is(.compact,[data-tablet-portrait="true"]) .u-catalog-foot { grid-area: 7 / 1; }
+.u-app[data-design="3"].compact .u-catalog { grid-template-rows: 44px 44px 48px 44px 48px minmax(0,1fr); }
+
+/* Access shares handlers and keypad, while each direction has its own structure. */
+.u-app:is([data-design="2"],[data-design="3"]) .u-login-intro { width: auto; border: 0; padding: 0; }
+.u-app:is([data-design="2"],[data-design="3"]) .u-login-intro h1 { margin: 8px 0; @apply text-title-1-medium; }
+.u-app:is([data-design="2"],[data-design="3"]) .u-login-intro p { margin-bottom: 20px; @apply text-body-medium; }
+.u-app:is([data-design="2"],[data-design="3"]) .u-login-access { min-width: 0; }
+.u-app:is([data-design="2"],[data-design="3"]) .u-login-form { width: 100%; }
+.u-app:is([data-design="2"],[data-design="3"]) .u-pin-message [role="alert"] { color: var(--color-text-error-primary); }
+.u-app[data-design="2"] .u-login-content { flex-direction: column; gap: 24px; }
+.u-app[data-design="2"] .u-login-access { width: 512px; max-width: 100%; }
+.u-app[data-design="2"] .u-login-intro { text-align: center; }
+.u-app[data-design="2"] .u-login-operators { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 24px; }
+.u-app[data-design="2"] .u-login-operator { justify-content: space-between; min-height: 64px; padding: 12px; text-align: start; }
+.u-app[data-design="2"] .u-login-operator > span { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+.u-app[data-design="2"] .u-login-operator-copy { display: flex; flex-direction: column; gap: 4px; }
+.u-app[data-design="2"] .u-login-operator[aria-pressed="true"] { border-color: var(--blue); background: var(--blue-soft); }
+.u-app[data-design="2"] .u-login-form { max-width: 320px; margin-inline: auto; }
+.u-app[data-design="2"] .u-login-business { width: 640px; max-width: 100%; display: grid; grid-template-columns: 1fr 2fr; gap: 24px; padding: 16px 0; margin: 0; }
+.u-app[data-design="2"] .u-login-shift { flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; margin: 0; }
+.u-app[data-design="2"] .u-login-business dd { @apply text-title-2-medium; }
+.u-app[data-design="2"] .u-login-business dd > span { display: inline; margin-inline-start: 4px; }
+.u-app[data-design="3"] .u-login { display: grid; grid-template-columns: 184px minmax(0,1fr); grid-template-rows: 1fr auto; padding: 0; }
+.u-app[data-design="3"] .u-login-header { grid-area: 1 / 1 / 3 / 2; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 32px; padding: 48px 24px; background: var(--ss-accent); color: var(--color-text-white); border: 0; }
+.u-app[data-design="3"] .u-login-logo { @apply text-display-3-medium; }
+.u-app[data-design="3"] .u-login-header > span > span { display: block; margin-top: 8px; color: inherit; }
+.u-app[data-design="3"] .u-login-content { grid-area: 1 / 2; display: grid; grid-template-columns: minmax(0,320px) minmax(0,280px); justify-content: center; align-items: center; gap: 64px; padding: 32px; }
+.u-app[data-design="3"] .u-login-access > [data-slot],.u-app[data-design="3"] .u-login-access > div:has(> label) { margin-bottom: 16px; }
+.u-app[data-design="3"] .u-login-business { margin: 0; padding: 24px 0; align-self: center; }
+.u-app[data-design="3"] .u-login-business dl { grid-template-columns: 1fr; gap: 32px; }
+.u-app[data-design="3"] .u-login-business dd { @apply text-title-1-medium; }
+.u-app[data-design="3"] .u-login-shift { align-items: flex-start; flex-direction: column; gap: 8px; margin-bottom: 32px; }
+.u-app[data-design="3"] .u-login-footer { grid-area: 2 / 2; margin: 0 32px; padding-bottom: 24px; }
+.u-app[data-design="3"][data-tablet-portrait="true"] .u-login { grid-template-columns: 144px minmax(0,1fr); }
+.u-app[data-design="3"][data-tablet-portrait="true"] .u-login-content { grid-template-columns: minmax(0,320px); gap: 32px; }
+.u-app[data-design="3"][data-tablet-portrait="true"] .u-login-business dl { grid-template-columns: 1fr 1fr; }
+.u-app:is([data-design="2"],[data-design="3"]).compact .u-login-intro h1 { @apply text-title-2-medium; }
+.u-app[data-design="2"].compact .u-login { padding: 16px; }
+.u-app[data-design="2"].compact .u-login-content { padding-top: 16px; gap: 20px; }
+.u-app[data-design="2"].compact .u-login-operators { margin-block: 16px; }
+.u-app[data-design="2"].compact .u-login-operator { padding: 8px; min-height: 56px; }
+.u-app[data-design="2"].compact .u-login-business { gap: 12px; padding: 12px 0; }
+.u-app[data-design="2"].compact .u-login-business dl { gap: 12px; }
+.u-app[data-design="2"].compact .u-login-business dd > span { display: block; margin: 0; }
+.u-app[data-design="3"].compact .u-login { display: flex; padding: 0; }
+.u-app[data-design="3"].compact .u-login-header { flex-direction: row; align-items: center; justify-content: space-between; padding: 16px 24px; gap: 16px; }
+.u-app[data-design="3"].compact .u-login-logo { @apply text-title-1-medium; }
+.u-app[data-design="3"].compact .u-login-header > span > span { display: inline; margin: 0; margin-inline-start: 8px; }
+.u-app[data-design="3"].compact .u-login-content { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 16px 24px; gap: 20px; }
+.u-app[data-design="3"].compact .u-login-business { padding: 12px 0; margin: 0; width: 100%; }
+.u-app[data-design="3"].compact .u-login-shift { flex-direction: row; margin-bottom: 12px; }
+.u-app[data-design="3"].compact .u-login-business dl { grid-template-columns: 1fr 1.3fr; gap: 16px; }
+.u-app[data-design="3"].compact .u-login-business dd { @apply text-title-2-medium; }
+.u-app[data-design="3"].compact .u-login-footer { margin: auto 24px 0; padding: 12px 0; }
+
+/* Fit the working console and its live summary within the desktop viewport. */
+.u-app[data-design="2"]:not(.compact) .u-login { padding: 24px 32px; }
+.u-app[data-design="2"]:not(.compact) .u-login-header { padding-bottom: 16px; }
+.u-app[data-design="2"]:not(.compact) .u-login-content { gap: 16px; }
+.u-app[data-design="2"]:not(.compact) .u-login-intro .u-overline { display: none; }
+.u-app[data-design="2"]:not(.compact) .u-login-intro h1 { @apply text-title-2-medium; }
+.u-app[data-design="2"]:not(.compact) .u-login-intro p { margin-bottom: 16px; }
+.u-app[data-design="2"]:not(.compact) .u-login-operators { margin-bottom: 16px; }
+.u-app[data-design="2"]:not(.compact) .u-login-operator { min-height: 56px; padding: 8px 12px; }
+.u-app[data-design="2"]:not(.compact) .u-pin-keypad button { height: 48px; }
+.u-app[data-design="2"]:not(.compact) .u-login-footer { padding-top: 12px; }
+.u-app[data-design="3"] .u-login-access > .u-login-form { margin-top: 16px; }
+.u-app[data-design="3"] .u-frequent-scroll button { border: 1px solid var(--line); background: var(--surface); }
+.u-app[data-design="3"] .u-frequent-scroll button > span { display: flex; align-items: center; gap: 8px; }
+
+/* Landscape tablet safe areas leave less height than desktop windows. */
+.u-device-safe:is([data-device="ipad"],[data-device="galaxy"]) .u-app[data-design="2"][data-tablet-portrait="false"] .u-login { padding-block: 8px; }
+.u-device-safe:is([data-device="ipad"],[data-device="galaxy"]) .u-app[data-design="2"][data-tablet-portrait="false"] .u-pin-keypad button { height: 44px; }
+.u-device-safe:is([data-device="ipad"],[data-device="galaxy"]) .u-app[data-design="3"][data-tablet-portrait="false"] .u-login-content { padding-block: 16px; }
+.u-device-safe:is([data-device="ipad"],[data-device="galaxy"]) .u-app[data-design="3"][data-tablet-portrait="false"] .u-login-footer { padding-block: 12px; }

@@ -1,0 +1,47 @@
+﻿ID local,Tipo,Título,Fase,Plan,Depende de,Decisiones pendientes,Estado,GitHub issue,Archivo
+MD-H01,historia,Persistir la configuración del menú por negocio y sucursal,A,P01,,MD-A01,Propuesta para revisión,,historias/MD-H01.md
+MD-H02,historia,Definir productos y modalidades visibles en el menú,A,P02,MD-H01,,Propuesta para revisión,,historias/MD-H02.md
+MD-H03,historia,Pedir variantes válidas desde el QR de mesa,A,P03,,,Propuesta para revisión,,historias/MD-H03.md
+MD-H04,historia,Consultar el catálogo público de una sucursal,A,P04,MD-H01; MD-H02; MD-H03,MD-A10,Propuesta para revisión,,historias/MD-H04.md
+MD-H05,historia,Publicar y pausar el menú desde Dashboard,A,P05,MD-H01; MD-H04,,Propuesta para revisión,,historias/MD-H05.md
+MD-H06,historia,Organizar productos y categorías del menú desde Dashboard,A,P05,MD-H02; MD-H04; MD-H05,,Propuesta para revisión,,historias/MD-H06.md
+MD-H07,historia,Registrar una recogida pendiente sin enviarla a cocina,B,P06,MD-H01; MD-H02; MD-H03,MD-A02; MD-A03; MD-A12; MD-A13,Propuesta para revisión,,historias/MD-H07.md
+MD-H08,historia,"Aceptar, rechazar o vencer una recogida desde el backend",B,P06,MD-H07,MD-A02; MD-A03; MD-A13,Propuesta para revisión,,historias/MD-H08.md
+MD-H09,historia,Configurar el plazo de aceptación en Dashboard,B,P06D,MD-H05; MD-H08,MD-A13,Propuesta para revisión,,historias/MD-H09.md
+MD-H10,historia,Consultar un pedido mediante su enlace privado,B,P07,MD-H07; MD-H08,MD-A12,Propuesta para revisión,,historias/MD-H10.md
+MD-H11,historia,Cancelar directamente una recogida pendiente,B,P08,MD-H08; MD-H10,MD-A02; MD-A04,Propuesta para revisión,,historias/MD-H11.md
+MD-H12,historia,Solicitar y resolver cancelación de un pedido aceptado,B,P08,MD-H08; MD-H10; MD-H11,MD-A02; MD-A04,Propuesta para revisión,,historias/MD-H12.md
+MD-H13,historia,Atender pendientes y cancelaciones desde UmiPOS,B,P09,MD-H08; MD-H12,,Propuesta para revisión,,historias/MD-H13.md
+MD-H14,historia,Cobrar y entregar el pedido existente desde UmiPOS,B,P09,MD-H13; MD-H29,MD-A02; MD-A03,Propuesta para revisión,,historias/MD-H14.md
+MD-H15,historia,Consultar y armar el carrito con el diseño final,C,P10,MD-H04; MD-H06,MD-A10,Propuesta para revisión,,historias/MD-H15.md
+MD-H16,historia,Enviar el carrito de una mesa y avisar al personal,C,P11,MD-H03; MD-H15; MD-H28,MD-A02; MD-A03; MD-A12,Propuesta para revisión,,historias/MD-H16.md
+MD-H17,historia,Enviar y seguir una recogida inmediata desde el menú,C,P12,MD-H09; MD-H10; MD-H11; MD-H12; MD-H13; MD-H15; MD-H28,,Propuesta para revisión,,historias/MD-H17.md
+MD-H18,historia,Enviar avisos del pedido por correo con reintentos,C,P13,MD-H08; MD-H10; MD-H11; MD-H12; MD-H29,MD-A09; MD-A12,Propuesta para revisión,,historias/MD-H18.md
+MD-H19,historia,Validar remitente y entrega del correo del piloto,E,P13,MD-H18,MD-A09; MD-A11,Propuesta para revisión,,historias/MD-H19.md
+MD-H20,historia,Calcular horarios compatibles para el carrito,D,P14,MD-H02; MD-H04,MD-A05; MD-A06; MD-A07,Propuesta para revisión,,historias/MD-H20.md
+MD-H21,historia,Registrar y aceptar una recogida programada sin prepararla antes,D,P14,MD-H07; MD-H08; MD-H18; MD-H20,MD-A02; MD-A03; MD-A06; MD-A13,Propuesta para revisión,,historias/MD-H21.md
+MD-H22,historia,Liberar un programado a preparación a la hora correcta,D,P14,MD-H21,MD-A05; MD-A07,Propuesta para revisión,,historias/MD-H22.md
+MD-H23,historia,Cancelar un programado aceptado dentro de su límite,D,P08; P14,MD-H11; MD-H12; MD-H21; MD-H22,MD-A02; MD-A04; MD-A07,Propuesta para revisión,,historias/MD-H23.md
+MD-H24,historia,Configurar programación por sucursal y producto,D,P15,MD-H05; MD-H06; MD-H20; MD-H21,MD-A05; MD-A06; MD-A07,Propuesta para revisión,,historias/MD-H24.md
+MD-H25,historia,Atender reservas programadas desde UmiPOS,D,P16,MD-H13; MD-H21; MD-H22; MD-H23,,Propuesta para revisión,,historias/MD-H25.md
+MD-H26,historia,Elegir una fecha de recogida y seguir el pedido programado,D,P17,MD-H17; MD-H20; MD-H21; MD-H22; MD-H23; MD-H24; MD-H25,,Propuesta para revisión,,historias/MD-H26.md
+MD-H27,historia,Obtener enlaces y QR desde Dashboard,E,P18,MD-H05; MD-H16,MD-A10; MD-A12,Propuesta para revisión,,historias/MD-H27.md
+MD-H28,historia,Controlar admisión cuando no hay atención disponible,B,P06; P11; P12,MD-H01; MD-H07,MD-A08,Propuesta para revisión,,historias/MD-H28.md
+MD-H29,historia,Marcar listo solo cuando terminan todas las estaciones,B,P06; P09; P13,MD-H08,,Propuesta para revisión,,historias/MD-H29.md
+MD-H30,historia,Publicar una versión del menú para validación en staging,E,P19,MD-H15; MD-H16; MD-H17,MD-A10,Propuesta para revisión,,historias/MD-H30.md
+MD-H31,historia,Certificar los flujos completos en staging,E,P19,MD-H14; MD-H16; MD-H17; MD-H18; MD-H19; MD-H23; MD-H24; MD-H25; MD-H26; MD-H27; MD-H28; MD-H29; MD-H30; MD-H33,MD-A11,Propuesta para revisión,,historias/MD-H31.md
+MD-H32,historia,Promover lo validado a main y activar el piloto controlado,E,P19,MD-H31,MD-A09; MD-A10; MD-A11,Propuesta para revisión,,historias/MD-H32.md
+MD-H33,historia,Distinguir pedidos digitales en historial y reportes,E,P09; P19,MD-H14; MD-H16,MD-A03,Propuesta para revisión,,historias/MD-H33.md
+MD-A01,decision,"Alcance, precedencia y permisos de configuración",,,,,Pendiente de decisión,,decisiones/MD-A01.md
+MD-A02,decision,Inventario y efectos de cierre del pedido,,,,,Pendiente de decisión,,decisiones/MD-A02.md
+MD-A03,decision,"Correspondencia entre pedido, preparación, cuenta y cobro",,,,,Pendiente de decisión,,decisiones/MD-A03.md
+MD-A04,decision,Permisos y día operativo al cancelar,,,,,Pendiente de decisión,,decisiones/MD-A04.md
+MD-A05,decision,Duración de preparación para cantidades y carritos mixtos,,,,,Pendiente de decisión,,decisiones/MD-A05.md
+MD-A06,decision,Programados fuera de horario,,,,,Pendiente de decisión,,decisiones/MD-A06.md
+MD-A07,decision,"Límites de programación, capacidad y cambios de reglas",,,,,Pendiente de decisión,,decisiones/MD-A07.md
+MD-A08,decision,Señal de atención disponible y pausa,,,,,Pendiente de decisión,,decisiones/MD-A08.md
+MD-A09,decision,"Remitente, respuestas y fallos de correo",,,,,Pendiente de decisión,,decisiones/MD-A09.md
+MD-A10,decision,"Ubicación, dominio y rutas del frontend",,,,,Pendiente de decisión,,decisiones/MD-A10.md
+MD-A11,decision,Negocio y sucursal del piloto,,,,,Pendiente de decisión,,decisiones/MD-A11.md
+MD-A12,decision,Protección de acceso público y datos de contacto,,,,,Pendiente de decisión,,decisiones/MD-A12.md
+MD-A13,decision,Plazo de aceptación y cambios con pendientes,,,,,Pendiente de decisión,,decisiones/MD-A13.md

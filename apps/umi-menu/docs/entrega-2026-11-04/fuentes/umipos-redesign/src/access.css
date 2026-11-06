@@ -1,0 +1,46 @@
+.u-login { width: 100%; display: flex; flex-direction: column; padding: 32px 48px; background: var(--surface); }
+.u-login-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
+.u-login-logo { font: 600 42px/1 'Bricolage Grotesque'; letter-spacing: -1.5px; }
+.u-login-header > span > span { color: var(--muted); }
+.u-login-content { flex: 1; display: flex; align-items: center; justify-content: center; gap: 110px; }
+.u-login-intro { width: 300px; }
+.u-login-intro .u-overline { font-size: 12px; font-weight: 400; }
+.u-login-intro h1 { font: 600 42px/1.2 'Bricolage Grotesque'; letter-spacing: -1px; margin: 14px 0; }
+.u-login-intro p { font-size: 14px; line-height: 1.6; color: var(--muted); margin: 0 0 24px; }
+.u-login label { display: block; font-size: 13px; margin-bottom: 10px; }
+.u-login-intro select { color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; width: 100%; padding: 14px; font: inherit; }
+.u-login-form { width: 304px; }
+.u-pin-message { min-height: 36px; padding: 8px 0; font-size: 12px; color: var(--muted); }
+.u-pin-message [role=alert] { color: #b34d40; }
+.u-pin-keypad { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 8px 0 16px; }
+
+
+.u-login-footer { display: flex; justify-content: space-between; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.study-access { margin: 0 auto 12px; max-width: 1280px; font-size: 12px; color: #637189; }
+.u-header-actions .u-station-setting { width: 40px; height: 40px; border-radius: 8px; background: var(--pale); }
+.compact .u-login { padding: 24px; }
+.compact .u-login-logo { font-size: 32px; }
+.compact .u-login-header { font-size: 12px; }
+.compact .u-login-content { flex-direction: column; justify-content: flex-start; gap: 16px; padding-top: 16px; }
+.compact .u-login-intro, .compact .u-login-form { width: 100%; }
+.compact .u-login-intro h1 { font-size: 30px; margin: 8px 0; }
+.compact .u-login-intro p { display: none; }
+.compact .u-login-intro .u-overline { display: none; }
+.compact .u-login-intro select { padding: 12px; }
+
+.compact .u-pin-keypad button { height: 44px; min-height: 44px; }
+.compact .u-pin-keypad { margin-top: 0; }
+.compact .u-login-footer { margin-top: auto; }
+.u-login-business { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 20px 0; margin: 0 0 28px; }
+.u-login-shift { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; font-size: 12px; }
+.u-login-shift b { font-weight: 500; color: var(--green); }
+.u-login-shift > span { color: var(--muted); }
+.u-login-business dl { display: grid; grid-template-columns: 1fr 1.3fr; gap: 24px; margin: 0; }
+.u-login-business dt { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+.u-login-business dd { font: 600 28px/1.2 'Bricolage Grotesque'; margin: 0; }
+.u-login-business dd > span { display: block; font: 400 11px/1.4 'IBM Plex Sans'; color: var(--muted); margin-top: 4px; }
+.compact .u-login-business { padding: 12px 0; margin: 16px 0; }
+.compact .u-login-shift { margin-bottom: 12px; }
+.compact .u-login-business dd { font-size: 22px; }
+.compact .u-login-business dd > span { display: inline; margin-inline-start: 4px; }
+.compact .u-login-business dt { margin-bottom: 4px; }
