@@ -1,4 +1,0 @@
-monthly_conversations,monthly_inbound_messages,monthly_outbound_messages,ai_usd,embeddings_usd,twilio_usd,meta_usd,variable_usd,infrastructure_budget_usd,estimated_total_usd,budget_with_20_percent_contingency_usd,cost_per_conversation_usd
-1000,8000,8000,85.0,0.04,80.000,59.5000,224.5400,40.0,264.5400,317.44800,0.26454
-10000,80000,80000,850.0,0.40,800.000,671.5000,2321.9000,75.0,2396.9000,2876.28000,0.23969
-100000,800000,800000,8500.0,4.00,8000.000,6791.5000,23295.5000,150.0,23445.5000,28134.60000,0.234455

@@ -1,21 +1,20 @@
-// Empaqueta el prototipo estático sin transformar sus scripts clásicos.
-const { mkdirSync, copyFileSync, cpSync } = require('node:fs');
+// Copia el sitio estático. La documentación nunca entra en la salida pública.
+const { mkdirSync, copyFileSync, cpSync, rmSync } = require('node:fs');
 const { resolve } = require('node:path');
 const root = resolve(__dirname, '..');
-for (const folder of ['dist', 'public']) {
-  const out = resolve(root, folder);
-  mkdirSync(out, { recursive: true });
-  for (const file of [
-    'index.html',
-    'base.js',
-    'state.js',
-    'app.js',
-    'visual.js',
-    'navigation.js',
-    'mvp.css',
-  ])
-    copyFileSync(resolve(root, file), resolve(out, file));
-  for (const dir of ['files', 'qr'])
-    cpSync(resolve(root, dir), resolve(out, dir), { recursive: true });
+const out = resolve(root, 'dist');
+rmSync(out, { recursive: true, force: true });
+mkdirSync(out, { recursive: true });
+for (const file of [
+  'index.html',
+  'base.js',
+  'state.js',
+  'app.js',
+  'visual.js',
+  'navigation.js',
+  'mvp.css',
+]) {
+  copyFileSync(resolve(root, 'src', file), resolve(out, file));
 }
-console.log('Menú estático preparado en dist/ y public/.');
+cpSync(resolve(root, 'public'), out, { recursive: true });
+console.log('Menú estático preparado en dist/.');

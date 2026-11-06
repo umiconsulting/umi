@@ -1,8 +1,0 @@
-.preview-choices { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
-.preview-choices .button-press-motion { height:44px; min-height:44px; border-radius:8px; padding:8px 12px; box-shadow:none; border:1px solid transparent; }
-.preview-choices .button-press-motion[aria-pressed=true] { background:var(--color-background-primary-default); border-color:var(--color-border-button-default); color:var(--color-text-primary); }
-.preview-controls { display:flex; flex-direction:column; gap:16px; max-width:1280px; width:100%; margin:0 auto 16px; }
-.preview-control-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; }
-.preview-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
-.preview-actions .button-press-motion { min-height:44px; border-radius:8px; }
-.study-app-picker { display:block; }

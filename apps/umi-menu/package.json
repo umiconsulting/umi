@@ -6,10 +6,10 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "python3 -m http.server 56456 --bind 127.0.0.1 --directory public",
+    "dev": "python3 -m http.server 56456 --bind 127.0.0.1 --directory dist",
     "build": "node scripts/build.cjs",
-    "test": "node --test state.test.cjs",
-    "check": "node --check base.js && node --check state.js && node --check app.js && node --check visual.js && node --check navigation.js",
+    "test": "node --test tests/*.test.cjs",
+    "check": "node --check src/base.js && node --check src/state.js && node --check src/app.js && node --check src/visual.js && node --check src/navigation.js",
     "predev": "node scripts/build.cjs"
   }
 }
