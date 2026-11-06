@@ -50,5 +50,9 @@ yarn-error.log*
 .vercel
 .env*.local
 
+.open-next/
+.wrangler/
+.dev.vars*
+
 # Supabase CLI local state (contains linked-project ref + pooler URL)
 supabase/.temp/

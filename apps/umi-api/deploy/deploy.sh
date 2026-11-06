@@ -16,7 +16,7 @@
 #                           from        (default: dirname of the compose file)
 #
 # Prereq (one-time, see docs/deploy-pipeline.md): the VPS has run
-#   `docker login ghcr.io` with a token that can read the image, and
+#   registry credentials through DOCKER_CONFIG or `docker login ghcr.io`, and
 #   $UMI_REPO_DIR is a git checkout of umiconsulting/umi tracking
 #   $UMI_DEPLOY_BRANCH (a second checkout — e.g. ~/umi-staging tracking
 #   `staging` — is how an isolated non-prod environment shares this same

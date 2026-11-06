@@ -13,6 +13,8 @@ interface LocationData {
   isActive: boolean;
 }
 
+type HoursGrid = Record<string, { open: boolean; from: string; to: string }>;
+
 interface TenantEditData {
   id: string;
   slug: string;
@@ -23,7 +25,7 @@ interface TenantEditData {
   cardPrefix: string;
   selfRegistration: boolean;
   topupEnabled: boolean;
-  businessHours: Record<string, [number, number] | null> | null;
+  businessHours: HoursGrid | null;
   timezone: string;
   subscriptionStatus: string;
   trialEndsAt: string | null;
@@ -40,8 +42,8 @@ export default function EditTenantPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  const defaultHours: Record<string, [number, number]> = { '0': [8, 20], '1': [8, 20], '2': [8, 20], '3': [8, 20], '4': [8, 20], '5': [8, 20], '6': [8, 20] };
+  const DAY_NAMES: Record<string, string> = { mon: 'Lun', tue: 'Mar', wed: 'Mié', thu: 'Jue', fri: 'Vie', sat: 'Sáb', sun: 'Dom' };
+  const defaultHours: HoursGrid = {};
 
   const [form, setForm] = useState({
     name: '',
@@ -50,7 +52,7 @@ export default function EditTenantPage() {
     secondaryColor: '',
     selfRegistration: true,
     topupEnabled: true,
-    businessHours: defaultHours as Record<string, [number, number] | null>,
+    businessHours: defaultHours,
     timezone: 'America/Mexico_City',
     subscriptionStatus: 'ACTIVE',
     rewardName: '',
@@ -66,7 +68,8 @@ export default function EditTenantPage() {
     try {
       const res = await fetch(`/api/umi/geocode?address=${encodeURIComponent(loc.address)}`);
       if (!res.ok) { setError('No se encontró la dirección'); return; }
-      const data = await res.json();
+      const { location: data } = await res.json();
+      if (!data) { setError('No se encontró la dirección'); return; }
       const next = [...locations];
       next[index] = { ...loc, latitude: String(data.latitude), longitude: String(data.longitude), address: data.formattedAddress || loc.address };
       setLocations(next);
@@ -127,34 +130,41 @@ export default function EditTenantPage() {
         longitude: l.longitude ? parseFloat(l.longitude) : null,
       }));
 
-    const res = await fetch(`/api/umi/tenants/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: form.name,
-        city: form.city,
-        primaryColor: form.primaryColor,
-        secondaryColor: form.secondaryColor || null,
-        selfRegistration: form.selfRegistration,
-        topupEnabled: form.topupEnabled,
-        businessHours: form.businessHours,
-        subscriptionStatus: form.subscriptionStatus,
-        // Only send reward fields if changed from what was loaded
-        ...(data?.rewardConfig && (form.rewardName !== data.rewardConfig.rewardName || form.visitsRequired !== data.rewardConfig.visitsRequired)
-          ? { rewardName: form.rewardName, visitsRequired: form.visitsRequired }
-          : {}),
-        locations: validLocations,
-      }),
-    });
+    try {
+      const res = await fetch(`/api/umi/tenants/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          city: form.city,
+          primaryColor: form.primaryColor,
+          secondaryColor: form.secondaryColor || null,
+          selfRegistration: form.selfRegistration,
+          topupEnabled: form.topupEnabled,
+          businessHours: form.businessHours,
+          timezone: form.timezone,
+          subscriptionStatus: form.subscriptionStatus,
+          // Only send reward fields if changed from what was loaded
+          ...(data?.rewardConfig && (form.rewardName !== data.rewardConfig.rewardName || form.visitsRequired !== data.rewardConfig.visitsRequired)
+            ? { rewardName: form.rewardName, visitsRequired: form.visitsRequired }
+            : {}),
+          locations: validLocations,
+        }),
+      });
 
-    const result = await res.json();
-    if (res.ok) {
-      setSuccess('Guardado correctamente');
-      router.refresh();
-    } else {
-      setError(result.error ?? 'Error al guardar');
+      const result = await res.json();
+      if (res.ok) {
+        setSuccess('Guardado correctamente');
+        router.refresh();
+      } else {
+        setError(result.error ?? 'Error al guardar');
+      }
+      setSaving(false);
+    } catch {
+      setError('No se pudo conectar con Umi. Intenta de nuevo.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   if (loading) {
@@ -361,59 +371,27 @@ export default function EditTenantPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-sm font-medium text-gray-700">Horarios por día</label>
-                <span className="text-xs text-gray-400">{form.timezone}</span>
+                <input aria-label="Zona horaria" className="text-xs border rounded px-2 py-1" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} required />
               </div>
               <div className="space-y-2">
-                {[0, 1, 2, 3, 4, 5, 6].map((day) => {
-                  const key = String(day);
-                  const dayHours = form.businessHours[key];
-                  const isClosed = dayHours === null;
-                  return (
-                    <div key={day} className="flex items-center gap-2">
-                      <span className="w-10 text-xs font-medium text-gray-500">{DAY_NAMES[day]}</span>
-                      <select
-                        value={isClosed ? 'closed' : String(dayHours?.[0] ?? 8)}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const next = { ...form.businessHours };
-                          if (val === 'closed') {
-                            next[key] = null;
-                          } else {
-                            const open = parseInt(val);
-                            next[key] = [open, dayHours?.[1] ?? 20];
-                          }
-                          setForm({ ...form, businessHours: next });
-                        }}
-                        className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
-                      >
-                        <option value="closed">Cerrado</option>
-                        {Array.from({ length: 24 }).map((_, h) => (
-                          <option key={h} value={h}>{h.toString().padStart(2, '0')}:00</option>
-                        ))}
-                      </select>
-                      {!isClosed && (
-                        <>
-                          <span className="text-xs text-gray-400">a</span>
-                          <select
-                            value={String(dayHours?.[1] ?? 20)}
-                            onChange={(e) => {
-                              const next = { ...form.businessHours };
-                              next[key] = [dayHours?.[0] ?? 8, parseInt(e.target.value)];
-                              setForm({ ...form, businessHours: next });
-                            }}
-                            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
-                          >
-                            {Array.from({ length: 24 }).map((_, h) => (
-                              <option key={h} value={h}>{h.toString().padStart(2, '0')}:00</option>
-                            ))}
-                          </select>
-                        </>
-                      )}
-                    </div>
-                  );
+                {['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((key) => {
+                  const hours = form.businessHours[key] ?? { open: false, from: '08:00', to: '20:00' };
+                  const setHours = (patch: Partial<typeof hours>) => setForm({ ...form,
+                    businessHours: { ...form.businessHours, [key]: { ...hours, ...patch } } });
+                  return <div key={key} className="flex items-center gap-2">
+                    <label className="w-20 text-xs font-medium flex gap-2">
+                      <input type="checkbox" checked={hours.open} onChange={(e) => setHours({ open: e.target.checked })} />
+                      {DAY_NAMES[key]}
+                    </label>
+                    {hours.open ? <>
+                      <input aria-label={`Apertura ${DAY_NAMES[key]}`} type="time" value={hours.from} onChange={(e) => setHours({ from: e.target.value })} required />
+                      <span className="text-xs text-gray-400">a</span>
+                      <input aria-label={`Cierre ${DAY_NAMES[key]}`} type="time" value={hours.to} onChange={(e) => setHours({ to: e.target.value })} required />
+                    </> : <span className="text-xs text-gray-400">Cerrado</span>}
+                  </div>;
                 })}
               </div>
-              <p className="text-xs text-gray-400 mt-2">Escaneos fuera de horario se marcan como sospechosos</p>
+              <p className="text-xs text-gray-400 mt-2">Este formulario muestra el primer turno del día. Los turnos adicionales y las fechas especiales se conservan.</p>
             </div>
           </div>
 

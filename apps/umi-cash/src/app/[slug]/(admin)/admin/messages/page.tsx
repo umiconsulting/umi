@@ -66,10 +66,10 @@ export default function MessagesPage() {
       <div className="u-fade-up mb-6">
         <div className="u-eyebrow mb-2">Bitácora</div>
         <h1 className="u-display" style={{ fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--color-ink)', margin: 0 }}>
-          Mensajes enviados
+          Recordatorios registrados
         </h1>
         <p className="text-sm mt-1" style={{ color: 'var(--color-ink-light)' }}>
-          Notificaciones automáticas que se han enviado a la wallet de tus clientes
+          Este registro no confirma la entrega ni conserva el texto de la notificación.
         </p>
       </div>
 
@@ -103,7 +103,7 @@ export default function MessagesPage() {
       ) : !data || data.events.length === 0 ? (
         <div className="u-surface p-6 text-center">
           <p className="text-sm" style={{ color: 'var(--color-ink-light)' }}>
-            Aún no se han enviado mensajes automáticos.
+            Aún no hay recordatorios registrados.
           </p>
         </div>
       ) : (

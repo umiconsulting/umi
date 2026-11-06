@@ -75,6 +75,14 @@ export class CashReadService {
     private readonly cards: CashCardRepository,
   ) {}
 
+  getMessages(merchantId: string, query: Row) {
+    const page = Math.max(1, Math.min(parseInt(query.page, 10) || 1, 100_000));
+    const limit = Math.max(1, Math.min(parseInt(query.limit, 10) || 50, 200));
+    const journey =
+      typeof query.journey === 'string' ? query.journey.trim().slice(0, 128) || null : null;
+    return this.repo.messageHistory(merchantId, page, limit, journey);
+  }
+
   async getSettings(merchantId: string): Promise<Row> {
     const t = await this.repo.branding(merchantId);
     if (!t) throw new NotFoundException({ error: 'Merchant no encontrado' });

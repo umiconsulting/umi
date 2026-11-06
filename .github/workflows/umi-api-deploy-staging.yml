@@ -49,7 +49,7 @@ jobs:
       # The staging checkout on the box. deploy.sh git-resets it to the branch before
       # rolling containers, so what runs always matches what CI built.
       repo_dir: /home/juan/umi-staging
-      branch: staging
+      branch: ${{ github.ref_name }}
       # The QA stack's compose file now lives in the repo; its .env, certs and
       # secrets deliberately do not (gitignored state that must survive the
       # reset). UMI_PROJECT_DIR keeps them resolving where they have always been.

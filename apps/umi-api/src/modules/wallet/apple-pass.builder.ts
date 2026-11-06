@@ -1,3 +1,4 @@
+import { WalletIsolation } from './wallet-isolation';
 import {
   policyRewardCopy,
   policyReadyFrontFields,
@@ -38,6 +39,7 @@ import { generateStampStrip, loadAsset } from './stamp-strip';
 @Injectable()
 export class ApplePassBuilder {
   private readonly logger = new Logger(ApplePassBuilder.name);
+  private readonly isolation: WalletIsolation;
   private readonly certs: PassCertificates | null;
   private readonly passTypeId: string;
   private readonly teamId: string;
@@ -48,6 +50,7 @@ export class ApplePassBuilder {
     config: ConfigService<AppConfig, true>,
     private readonly qr: QrService,
   ) {
+    this.isolation = new WalletIsolation(config);
     const cert = config.get('APPLE_SIGNER_CERT', { infer: true });
     const key = config.get('APPLE_SIGNER_KEY', { infer: true });
     const wwdr = config.get('APPLE_WWDR_CERT', { infer: true });
@@ -86,6 +89,7 @@ export class ApplePassBuilder {
   }
 
   async build(data: ApplePassData): Promise<Buffer> {
+    this.isolation.assertCanIssue(data.merchantHandle);
     if (!this.certs || !this.isConfigured()) {
       throw new Error('Apple Wallet signing is not configured');
     }

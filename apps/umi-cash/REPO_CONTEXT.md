@@ -1,41 +1,33 @@
 # Cash Repo Context
 
-## Purpose
-
-Umi Cash loyalty, wallet, pass, tenant/user/session behavior, and Cash-specific web runtime.
+Cash preserves the public loyalty pages, business panels, and internal UMI admin interface.
+All data access and wallet operations belong to `umi-api`.
 
 ## Load first
 
 1. `AGENTS.md`
 2. `package.json`
-3. `prisma/schema.prisma`
-4. `vercel.json`
-5. Relevant `src/` route, library, or component
-
-## High-authority files
-
-- `prisma/schema.prisma`
-- `src/`
-- `vercel.json`
-- `package.json`
-- `AGENTS.md`
+3. `wrangler.jsonc`
+4. Relevant `src/` route, library, or component
 
 ## Runtime boundary
 
-Cash owns loyalty and wallet behavior. It does not own ConversaFlow operational orders, KDS projections, or Logs trace schema.
+`src/lib/tenant.ts` reads the public merchant projection from the API.
+`src/lib/backend-proxy.ts` forwards browser requests, cookies, and binary responses.
+The proxy maps internal admin login to canonical identity authentication, including MFA.
+`umi-api/src/modules/cash` owns the compatibility contracts for the old interfaces.
+The backend uses the canonical `merchant`, `umi`, and `runtime` schemas.
+The retained `prisma/migrations` directory is historical. No Prisma runtime or generation step remains.
 
-## Sensitive surfaces
+## Configuration
 
-- `.env*`
-- wallet/pass certificates
-- private keys
-- service credentials
-
-Do not print secret values. Certificate cleanup or rotation needs human review.
+Cash requires `CASH_API_ORIGIN` and `NEXT_PUBLIC_APP_URL`.
+Backend keys and database credentials stay in the API environment.
+See [the staging runbook](../../docs/deployment/cash-cloudflare-staging.md).
+Provider tools now belong to `apps/umi-api/scripts`.
 
 ## Avoid by default
 
-- Build output.
-- Generated Prisma artifacts.
-- Local env files.
-- Historical deleted artifacts unless needed for recovery.
+- Build output and generated artifacts.
+- Local secret files and recovered Vercel exports.
+- Historical migrations, except for data recovery research.

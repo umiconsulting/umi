@@ -155,11 +155,26 @@ jobs:
           UMI_COMPOSE_FILE: ${{ inputs.compose_file }}
           UMI_PROJECT_DIR: ${{ inputs.project_dir }}
           DEPLOY_SCRIPT: ${{ inputs.app_dir }}/deploy/deploy.sh
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # Use job credentials for this pull. Keep shared VPS Docker credentials unchanged.
+          REGISTRY_CONFIG="/tmp/$APP_NAME-registry-${{ github.run_id }}-${{ github.run_attempt }}"
+          cleanup_registry() {
+            ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+              -o BatchMode=yes -o ConnectTimeout=15 -p "$SSH_PORT" \
+              "$SSH_USER@$SSH_HOST" \
+              "rm -f -- '$REGISTRY_CONFIG/config.json'; rmdir -- '$REGISTRY_CONFIG' 2>/dev/null || true" < /dev/null
+          }
+          trap cleanup_registry EXIT
+          printf '%s' "$GH_TOKEN" | ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+            -o BatchMode=yes -o ConnectTimeout=15 -p "$SSH_PORT" \
+            "$SSH_USER@$SSH_HOST" \
+            "umask 077; mkdir -p '$REGISTRY_CONFIG' && docker --config '$REGISTRY_CONFIG' login ghcr.io -u '$REGISTRY_USER' --password-stdin"
           # Stream deploy.sh to a temp file on the box, then run it with stdin
           # detached (< /dev/null). Piping the script straight into `bash -s`
           # breaks: deploy.sh's own `git fetch` spawns an ssh-to-GitHub that
@@ -173,7 +188,7 @@ jobs:
           ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
             -o BatchMode=yes -o ConnectTimeout=15 -p "$SSH_PORT" \
             "$SSH_USER@$SSH_HOST" \
-            "cat > /tmp/$APP_NAME-deploy.sh && APP_NAME='$APP_NAME' UMI_REPO_DIR='$UMI_REPO_DIR' UMI_DEPLOY_BRANCH='$UMI_DEPLOY_BRANCH' UMI_COMPOSE_FILE='$UMI_COMPOSE_FILE' UMI_PROJECT_DIR='$UMI_PROJECT_DIR' bash /tmp/$APP_NAME-deploy.sh 'sha-${{ github.sha }}' < /dev/null" \
+            "cat > /tmp/$APP_NAME-deploy.sh && DOCKER_CONFIG='$REGISTRY_CONFIG' APP_NAME='$APP_NAME' UMI_REPO_DIR='$UMI_REPO_DIR' UMI_DEPLOY_BRANCH='$UMI_DEPLOY_BRANCH' UMI_COMPOSE_FILE='$UMI_COMPOSE_FILE' UMI_PROJECT_DIR='$UMI_PROJECT_DIR' bash /tmp/$APP_NAME-deploy.sh 'sha-${{ github.sha }}' < /dev/null" \
             < "$DEPLOY_SCRIPT"
 
       - name: Health check

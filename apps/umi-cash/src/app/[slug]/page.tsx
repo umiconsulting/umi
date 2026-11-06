@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { getTenant } from '@/lib/tenant';
-import { getTenantRewardProfile } from '@/lib/prisma-helpers';
 import { nextTier } from '@/lib/reward-tiers';
 import { notFound } from 'next/navigation';
 
@@ -40,11 +39,12 @@ const ordinalEs = (n: number): string => ({
   8: 'octavo', 10: 'décimo', 12: 'duodécimo',
 }[n] || `${n}º`);
 
-export default async function TenantLandingPage({ params }: { params: { slug: string } }) {
-  const tenant = await getTenant(params.slug);
+export default async function TenantLandingPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const tenant = await getTenant(slug);
   if (!tenant) notFound();
 
-  const profile = await getTenantRewardProfile(tenant.id);
+  const profile = tenant.rewardProfile;
   // The cycle (top tier on a ladder) drives the stamp grid; the headline sells the
   // first reward the customer can reach.
   const { visitsRequired, rewardName } = profile;
@@ -168,10 +168,10 @@ export default async function TenantLandingPage({ params }: { params: { slug: st
                     return rows.map((row, ri) => (
                       <div key={ri} className="flex justify-center gap-1.5" style={{ marginTop: ri > 0 ? '6px' : undefined }}>
                         {row.map((i) => {
-                          const isWelcome = i === 0 && params.slug === 'nectarcafe';
+                          const isWelcome = i === 0 && slug === 'nectarcafe';
                           const src = isWelcome
-                            ? `/logos/${params.slug}-stamp-welcome.png`
-                            : `/logos/${params.slug}-stamp-${i < exampleVisits ? 'filled' : 'empty'}.png`;
+                            ? `/logos/${slug}-stamp-welcome.png`
+                            : `/logos/${slug}-stamp-${i < exampleVisits ? 'filled' : 'empty'}.png`;
                           // Ladder: the extra slots toward the upper tier get their own color,
                           // like the wallet strip (a ring + cool tint, no extra art needed here).
                           const isBonus = bonusFrom != null && i >= bonusFrom;
@@ -264,7 +264,7 @@ export default async function TenantLandingPage({ params }: { params: { slug: st
       >
         <div className="max-w-lg mx-auto">
           <Link
-            href={`/${params.slug}/register`}
+            href={`/${slug}/register`}
             className="u-btn u-btn-primary w-full"
             style={{ width: '100%', height: 54 }}
           >
@@ -284,11 +284,11 @@ export default async function TenantLandingPage({ params }: { params: { slug: st
             className="flex items-center justify-center gap-3 mt-2 border-t pt-2"
             style={{ fontSize: 10, color: 'var(--color-ink-light)', borderColor: 'var(--color-surface-dark)' }}
           >
-            <Link href={`/${params.slug}/admin-login`} className="underline hover:opacity-80">Acceso personal</Link>
+            <Link href={`/${slug}/admin-login`} className="underline hover:opacity-80">Acceso personal</Link>
             <span>·</span>
-            <Link href={`/${params.slug}/aviso-privacidad`} className="underline hover:opacity-80">Privacidad</Link>
+            <Link href={`/${slug}/aviso-privacidad`} className="underline hover:opacity-80">Privacidad</Link>
             <span>·</span>
-            <Link href={`/${params.slug}/terminos`} className="underline hover:opacity-80">Términos</Link>
+            <Link href={`/${slug}/terminos`} className="underline hover:opacity-80">Términos</Link>
           </div>
         </div>
       </div>
