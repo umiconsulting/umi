@@ -80,6 +80,11 @@ Screenshots and machine results are in `/tmp/umi-category-evidence` on the verif
 The reproducible browser driver is `tools/ux-sweep/category-sales-browser.mjs`.
 It requires an authorized local candidate API and a private session file.
 
+![ONCA category widget with real staging amounts and saved colors](evidence/2026-11-07-category-sales/category-widget.png)
+
+The [mobile capture](evidence/2026-11-07-category-sales/category-detail-mobile.png) shows the chart inside the viewport.
+The exact table retains horizontal scroll on narrow screens.
+
 ## Automated verification
 
 The new backend and allocation tests first failed because their implementation modules did not exist.
@@ -89,6 +94,18 @@ The PostgreSQL integration suite checks category totals, saved colors and existi
 
 Tools: Node 22.23.2, pnpm 10.29.3, Vitest, Playwright 1.62.1, Chromium 153.0.8010.52, axe-core and PostgreSQL.
 The canonical repository gates apply the existing lint warning baseline.
+
+Verified results:
+
+- `PR_BASE_REF=origin/staging pnpm check:pr`: passed, including the existing baseline of 68 dashboard lint warnings.
+- `pnpm turbo run build lint test '--filter=...[origin/staging]'`: eight tasks passed.
+- Dashboard: 655 tests passed across 47 files.
+- API: 2,166 tests passed. The existing suite skipped 29 tests.
+- Contract: 113 tests passed. API and contract typechecks passed.
+- Sales analysis PostgreSQL integration: eight tests passed against the local test database.
+- Real-data browser check: passed, with three axe scans, zero violations and zero JavaScript errors.
+
+The dashboard build retains its existing warning about large chunks.
 
 ## Standards
 
