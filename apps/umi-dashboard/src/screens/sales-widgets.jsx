@@ -19,6 +19,8 @@ export function SalesReportState({ loading, error, code, onRetry }) {
       <p>
         {code === 'PERMISSION_DENIED' ? (
           <Trans>No tienes permiso para consultar estas ventas.</Trans>
+        ) : code === 'REPORT_RANGE_TOO_COMPLEX' ? (
+          <Trans>El análisis combina demasiados productos. Consulta un periodo menor.</Trans>
         ) : code === 'REPORT_RANGE_TOO_LARGE' ? (
           <Trans>El periodo supera el límite de 20,000 tickets. Consulta menos días.</Trans>
         ) : (

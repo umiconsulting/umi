@@ -114,7 +114,6 @@ function BusinessWidgets({ options, context }) {
       return next;
     });
   }
-  const [refresh, setRefresh] = useState(0);
   const [editing, setEditing] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const preferenceKey = `umi-dashboard-widgets:v1:${getStoredSession()?.user?.id ?? 'session'}:${context.selectedMerchantId}`;
@@ -130,8 +129,12 @@ function BusinessWidgets({ options, context }) {
     refundView: 'sale_result',
     basketUnit: 'ticket',
   };
-  const report = useSalesAnalysis(query, refresh);
-  const prior = useSalesAnalysis({ ...query, ...previousReportPeriod(query) }, refresh);
+  const report = useSalesAnalysis(query);
+  const prior = useSalesAnalysis({ ...query, ...previousReportPeriod(query) });
+  function refreshReports() {
+    report.refetch();
+    prior.refetch();
+  }
   const scope =
     options.locations.find((location) => location.id === query.locationId)?.name ??
     t`Todas las sucursales`;
@@ -176,11 +179,7 @@ function BusinessWidgets({ options, context }) {
           >
             <Trans>Personalizar inicio</Trans>
           </button>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => setRefresh((value) => value + 1)}
-          >
+          <button type="button" className="btn btn-ghost" onClick={refreshReports}>
             <Trans>Actualizar</Trans>
           </button>
         </div>
@@ -192,6 +191,11 @@ function BusinessWidgets({ options, context }) {
           onClose={() => setEditing(false)}
         />
       )}
+      {report.refreshing && (
+        <p role="status">
+          <Trans>Actualizando ventas…</Trans>
+        </p>
+      )}
       {saveError && (
         <p role="alert">
           <Trans>
@@ -200,11 +204,7 @@ function BusinessWidgets({ options, context }) {
         </p>
       )}
       {report.loading || report.error ? (
-        <SalesReportState
-          {...report}
-          code={report.errorCode}
-          onRetry={() => setRefresh((value) => value + 1)}
-        />
+        <SalesReportState {...report} code={report.errorCode} onRetry={refreshReports} />
       ) : report.data ? (
         <>
           {report.data.totals.tickets === 0 && (

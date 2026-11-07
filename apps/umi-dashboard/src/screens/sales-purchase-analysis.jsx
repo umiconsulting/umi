@@ -28,7 +28,9 @@ function ReportError({ code, onRetry }) {
   return (
     <div className="analysis-panel surface" role="alert">
       <p>
-        {code === 'REPORT_RANGE_TOO_LARGE' || code === 'VALIDATION_FAILED' ? (
+        {code === 'REPORT_RANGE_TOO_COMPLEX' ? (
+          <Trans>El análisis combina demasiados productos. Consulta un periodo menor.</Trans>
+        ) : code === 'REPORT_RANGE_TOO_LARGE' || code === 'VALIDATION_FAILED' ? (
           <Trans>
             No se pudo consultar este periodo. Elige un rango menor, de hasta 731 días y 20,000
             tickets.
@@ -627,7 +629,6 @@ function AnalysisResults({ report, query, section, setSection }) {
 
 function AnalysisWorkspace({ merchantId, locationId, options, reloadOptions }) {
   const [params, setParams] = useSearchParams();
-  const [refresh, setRefresh] = useState(0);
   const query = availableGroupsQuery(initialAnalysisQuery(options, locationId, params), options);
   function setQuery(next) {
     setParams(
@@ -648,10 +649,9 @@ function AnalysisWorkspace({ merchantId, locationId, options, reloadOptions }) {
       return next;
     });
   }
-  const result = useSalesAnalysis(availableGroupsQuery(query, options), refresh);
+  const result = useSalesAnalysis(availableGroupsQuery(query, options));
   function reloadGroups() {
     reloadOptions();
-    setRefresh((current) => current + 1);
   }
   return (
     <div className="sales-analysis">
@@ -667,12 +667,18 @@ function AnalysisWorkspace({ merchantId, locationId, options, reloadOptions }) {
         setQuery={setQuery}
       />
 
+      {result.refreshing && (
+        <p role="status">
+          <Trans>Actualizando ventas…</Trans>
+        </p>
+      )}
+
       {result.loading ? (
         <p role="status">
           <Trans>Consultando compras…</Trans>
         </p>
       ) : result.error ? (
-        <ReportError code={result.errorCode} onRetry={() => setRefresh((current) => current + 1)} />
+        <ReportError code={result.errorCode} onRetry={result.refetch} />
       ) : (
         result.data && (
           <AnalysisResults
