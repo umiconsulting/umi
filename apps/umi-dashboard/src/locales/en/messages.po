@@ -196,6 +196,10 @@ msgid "hace {0} h"
 msgstr "{0} h ago"
 
 #: src/data.jsx
+msgid "Sin estación"
+msgstr "No station"
+
+#: src/data.jsx
 msgid "No pudimos preparar la imagen."
 msgstr "We couldn't prepare the image."
 
@@ -621,6 +625,7 @@ msgstr "Saved"
 #: src/screens/inventory-workspace.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
 #: src/screens/settings.jsx
 #: src/screens/ventas-report.jsx
 msgid "Reintentar"
@@ -660,7 +665,6 @@ msgstr "Floor plan"
 
 #: src/lib/module-registry.js
 #: src/screens/customers.jsx
-#: src/screens/ventas-report.jsx
 msgid "Resumen"
 msgstr "Overview"
 
@@ -2044,7 +2048,9 @@ msgstr "in total"
 #: src/screens/customers.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/orders.jsx
+#: src/screens/overview.jsx
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
 msgid "Ticket promedio"
 msgstr "Average ticket"
 
@@ -2656,7 +2662,6 @@ msgstr "The store could not be created. Try again."
 #~ msgstr "The device and its stations will be linked to this location."
 
 #: src/screens/devices.jsx
-#: src/screens/overview.jsx
 msgid "En vivo"
 msgstr "Live"
 
@@ -2686,7 +2691,6 @@ msgstr "Paired devices"
 
 #: src/screens/devices.jsx
 #: src/screens/operations-workspace.jsx
-#: src/screens/overview.jsx
 msgid "Actualizando…"
 msgstr "Updating…"
 
@@ -2726,12 +2730,10 @@ msgid "Reconectando…"
 msgstr "Reconnecting…"
 
 #: src/screens/devices.jsx
-#: src/screens/overview.jsx
 msgid "Lento"
 msgstr "Slow"
 
 #: src/screens/devices.jsx
-#: src/screens/overview.jsx
 #: src/screens/staff.jsx
 #: src/shell.jsx
 msgid "Sin conexión"
@@ -3858,6 +3860,7 @@ msgstr "Redeemed for {0}. New customer balance: {1}."
 
 #: src/screens/gift-cards.jsx
 #: src/screens/members.jsx
+#: src/screens/overview.jsx
 msgid "Listo"
 msgstr "Done"
 
@@ -4597,6 +4600,7 @@ msgid "Ingeniería de menú"
 msgstr "Menu engineering"
 
 #: src/screens/inventory-costing.jsx
+#: src/screens/overview.jsx
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Periodo"
 msgstr "Period"
@@ -4611,6 +4615,7 @@ msgstr "Loading the cost of what you sold…"
 
 #: src/screens/inventory-costing.jsx
 #: src/screens/inventory-workspace.jsx
+#: src/screens/overview.jsx
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Todas las sucursales"
 msgstr "All branches"
@@ -4638,7 +4643,9 @@ msgid "{0} días con venta en el periodo"
 msgstr "{0} days with sales in the period"
 
 #: src/screens/inventory-costing.jsx
+#: src/screens/overview.jsx
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
 msgid "Venta neta"
 msgstr "Net sales"
 
@@ -6675,7 +6682,6 @@ msgid "Registrar"
 msgstr "Register"
 
 #: src/screens/members.jsx
-#: src/screens/overview.jsx
 msgid "Miembros activos"
 msgstr "Active members"
 
@@ -7848,7 +7854,6 @@ msgid "Completados"
 msgstr "Completed"
 
 #: src/screens/orders.jsx
-#: src/screens/overview.jsx
 msgid "Cancelados"
 msgstr "Canceled"
 
@@ -7980,174 +7985,327 @@ msgstr "in progress · {0}"
 #~ msgstr "LIVE"
 
 #: src/screens/overview.jsx
-msgid "Pedido nuevo"
-msgstr "New order"
+#~ msgid "Pedido nuevo"
+#~ msgstr "New order"
 
 #: src/screens/overview.jsx
-msgid "Pedido actualizado"
-msgstr "Order updated"
+#~ msgid "Pedido actualizado"
+#~ msgstr "Order updated"
 
 #: src/screens/overview.jsx
-msgid "Platillo actualizado"
-msgstr "Item updated"
+#~ msgid "Platillo actualizado"
+#~ msgstr "Item updated"
 
 #: src/screens/overview.jsx
-msgid "Pedido cancelado"
-msgstr "Order cancelled"
+#~ msgid "Pedido cancelado"
+#~ msgstr "Order cancelled"
 
 #: src/screens/overview.jsx
-msgid "Prioridad cambiada"
-msgstr "Priority changed"
+#~ msgid "Prioridad cambiada"
+#~ msgstr "Priority changed"
 
 #: src/screens/overview.jsx
-msgid "Pedido recordado"
-msgstr "Order recalled"
+#~ msgid "Pedido recordado"
+#~ msgstr "Order recalled"
 
 #: src/screens/overview.jsx
-msgid "Recuperación requerida"
-msgstr "Recovery required"
+#~ msgid "Recuperación requerida"
+#~ msgstr "Recovery required"
+
+#: src/screens/overview.jsx
+#~ msgid "Pausado · aviso especial activo"
+#~ msgstr "Paused · special notice active"
+
+#: src/screens/overview.jsx
+#~ msgid "Visitas hoy"
+#~ msgstr "Visits today"
+
+#: src/screens/overview.jsx
+#~ msgid "Tarjetas de regalo abiertas"
+#~ msgstr "Open gift cards"
+
+#: src/screens/overview.jsx
+#~ msgid "Recompensas canjeadas · 7d"
+#~ msgstr "Rewards redeemed · 7d"
+
+#: src/screens/overview.jsx
+#~ msgid "28 días"
+#~ msgstr "28 days"
+
+#. placeholder {0}: formatNumber(ov.newThisWeek)
+#: src/screens/overview.jsx
+#~ msgid "+{0} nuevos esta semana"
+#~ msgstr "+{0} new this week"
+
+#. placeholder {0}: ov.birthdayActivatable
+#: src/screens/overview.jsx
+#~ msgid "{0} cumpleaños activables"
+#~ msgstr "{0} birthdays activatable"
+
+#. placeholder {0}: ov.highBalanceCount
+#: src/screens/overview.jsx
+#~ msgid "{0} con saldo > $1,000"
+#~ msgstr "{0} with balance > $1,000"
+
+#: src/screens/overview.jsx
+#~ msgid "Ingresos del mes"
+#~ msgstr "Revenue this month"
+
+#: src/screens/overview.jsx
+#~ msgid "Estaciones de cocina"
+#~ msgstr "Kitchen stations"
+
+#: src/screens/overview.jsx
+#~ msgid "Cada estación del KDS y cómo responde ahora."
+#~ msgstr "Every KDS station and how it responds right now."
+
+#: src/screens/overview.jsx
+#~ msgid "estaciones"
+#~ msgstr "stations"
+
+#: src/screens/overview.jsx
+#~ msgid "Actualizar las estaciones"
+#~ msgstr "Refresh the stations"
+
+#: src/screens/overview.jsx
+#~ msgid "cerrado"
+#~ msgstr "closed"
+
+#: src/screens/overview.jsx
+#~ msgid "Centro de acción"
+#~ msgstr "Action center"
+
+#. placeholder {0}: alerts.length
+#: src/screens/overview.jsx
+#~ msgid "{0, plural, one {# pendiente.} other {# pendientes.}}"
+#~ msgstr "{0, plural, one {# pending.} other {# pending.}}"
+
+#: src/screens/overview.jsx
+#~ msgid "Nada pendiente ahora mismo."
+#~ msgstr "Nothing pending right now."
+
+#: src/screens/overview.jsx
+#~ msgid "Ver pedidos"
+#~ msgstr "View orders"
+
+#: src/screens/overview.jsx
+#~ msgid "Escaneo cada 60 s · última verificación {nowLabel}"
+#~ msgstr "Scan every 60 s · last check {nowLabel}"
+
+#: src/screens/overview.jsx
+#~ msgid "Re-escanear"
+#~ msgstr "Rescan"
+
+#: src/screens/overview.jsx
+#~ msgid "Pedidos WhatsApp"
+#~ msgstr "WhatsApp orders"
+
+#. placeholder {0}: ov.avgTicketMXN
+#: src/screens/overview.jsx
+#~ msgid "pedidos · ticket promedio $ {0}"
+#~ msgstr "orders · average ticket $ {0}"
+
+#: src/screens/overview.jsx
+#~ msgid "pedidos · ticket promedio sin calcular"
+#~ msgstr "orders · average ticket not calculated"
+
+#: src/screens/overview.jsx
+#~ msgid "Aceptados"
+#~ msgstr "Accepted"
+
+#: src/screens/overview.jsx
+#~ msgid "Actividad del monedero"
+#~ msgstr "Wallet activity"
+
+#: src/screens/overview.jsx
+#~ msgid "MXN procesado hoy"
+#~ msgstr "MXN processed today"
+
+#: src/screens/overview.jsx
+#~ msgid "Recargas"
+#~ msgstr "Top-ups"
+
+#: src/screens/overview.jsx
+#~ msgid "movimientos"
+#~ msgstr "movements"
+
+#: src/screens/overview.jsx
+#~ msgid "Canjes"
+#~ msgstr "Redemptions"
+
+#: src/screens/overview.jsx
+#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
+msgid "Tickets de venta"
+msgstr "Sales receipts"
+
+#: src/screens/overview.jsx
+#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
+msgid "Piezas por ticket"
+msgstr "Units per receipt"
+
+#: src/screens/overview.jsx
+#: src/screens/sales-widgets.jsx
+#: src/screens/ventas-report.jsx
+msgid "Venta por día"
+msgstr "Sales by day"
+
+#: src/screens/overview.jsx
+#: src/screens/sales-widgets.jsx
+msgid "Horas con más venta"
+msgstr "Hours with the most sales"
+
+#: src/screens/overview.jsx
+#: src/screens/sales-widgets.jsx
+msgid "Productos que se compran juntos"
+msgstr "Products bought together"
+
+#: src/screens/overview.jsx
+#: src/screens/sales-widgets.jsx
+msgid "Piezas en cada ticket"
+msgstr "Units in each ticket"
+
+#: src/screens/overview.jsx
+msgid "Personalizar inicio"
+msgstr "Customize home"
+
+#: src/screens/overview.jsx
+msgid "Tus indicadores, en tu orden"
+msgstr "Your metrics, in your order"
+
+#: src/screens/overview.jsx
+msgid "Esta selección se guarda en este navegador para tu usuario y este negocio."
+msgstr "This selection is saved in this browser for your user and this business."
+
+#. placeholder {0}: labels[id]
+#: src/screens/overview.jsx
+msgid "Subir {0}"
+msgstr "Move {0} up"
+
+#. placeholder {0}: labels[id]
+#: src/screens/overview.jsx
+msgid "Bajar {0}"
+msgstr "Move {0} down"
+
+#: src/screens/overview.jsx
+msgid "Restaurar indicadores"
+msgstr "Restore metrics"
+
+#: src/screens/overview.jsx
+msgid "Tu negocio en números"
+msgstr "Your business in numbers"
+
+#: src/screens/overview.jsx
+msgid "Últimos 7 días"
+msgstr "Last 7 days"
+
+#: src/screens/overview.jsx
+msgid "Últimos 30 días"
+msgstr "Last 30 days"
+
+#: src/screens/overview.jsx
+msgid "La selección funciona en esta visita, pero el navegador no permitió guardarla."
+msgstr "The selection applies to this visit, but the browser could not save it."
+
+#: src/screens/overview.jsx
+msgid "No hay tickets de venta en este periodo."
+msgstr "There are no sales tickets in this period."
+
+#: src/screens/overview.jsx
+msgid "Consultar 30 días"
+msgstr "View 30 days"
+
+#. placeholder {0}: report.data.firstSaleDate
+#: src/screens/overview.jsx
+msgid "Historial desde {0}"
+msgstr "History since {0}"
+
+#: src/screens/overview.jsx
+msgid "No se pudo cargar el periodo anterior. La comparación no está disponible."
+msgstr "The previous period could not load. The comparison is unavailable."
+
+#: src/screens/overview.jsx
+msgid "Elige tus indicadores en Personalizar inicio."
+msgstr "Choose your metrics in Customize home."
+
+#: src/screens/overview.jsx
+msgid "Explorar ventas"
+msgstr "Explore sales"
+
+#. placeholder {0}: prior.data.from
+#. placeholder {1}: prior.data.to
+#: src/screens/overview.jsx
+msgid "Comparación: {0} a {1}. El periodo actual incluye el día en curso."
+msgstr "Comparison: {0} to {1}. The current period includes the current day."
+
+#: src/screens/overview.jsx
+msgid "Operación y clientes"
+msgstr "Operations and customers"
+
+#: src/screens/overview.jsx
+msgid "Actualizar operación"
+msgstr "Refresh operations"
 
 #: src/screens/overview.jsx
 msgid "Pedidos WhatsApp pausados"
 msgstr "WhatsApp orders paused"
 
 #: src/screens/overview.jsx
-msgid "Pausado · aviso especial activo"
-msgstr "Paused · special notice active"
-
-#: src/screens/overview.jsx
 msgid "Reanudar"
 msgstr "Resume"
 
 #: src/screens/overview.jsx
-msgid "Visitas hoy"
-msgstr "Visits today"
+msgid "Consultando operación…"
+msgstr "Loading operations…"
 
 #: src/screens/overview.jsx
-msgid "Tarjetas de regalo abiertas"
-msgstr "Open gift cards"
-
-#: src/screens/overview.jsx
-msgid "Recompensas canjeadas · 7d"
-msgstr "Rewards redeemed · 7d"
-
-#: src/screens/overview.jsx
-msgid "28 días"
-msgstr "28 days"
-
-#. placeholder {0}: formatNumber(ov.newThisWeek)
-#: src/screens/overview.jsx
-msgid "+{0} nuevos esta semana"
-msgstr "+{0} new this week"
-
-#. placeholder {0}: ov.birthdayActivatable
-#: src/screens/overview.jsx
-msgid "{0} cumpleaños activables"
-msgstr "{0} birthdays activatable"
-
-#. placeholder {0}: ov.highBalanceCount
-#: src/screens/overview.jsx
-msgid "{0} con saldo > $1,000"
-msgstr "{0} with balance > $1,000"
-
-#: src/screens/overview.jsx
-msgid "Ingresos del mes"
-msgstr "Revenue this month"
-
-#: src/screens/overview.jsx
-#: src/screens/ventas-report.jsx
-msgid "vs. período anterior"
-msgstr "vs. prior period"
-
-#: src/screens/overview.jsx
-msgid "Estaciones de cocina"
-msgstr "Kitchen stations"
-
-#: src/screens/overview.jsx
-msgid "Cada estación del KDS y cómo responde ahora."
-msgstr "Every KDS station and how it responds right now."
-
-#: src/screens/overview.jsx
-msgid "No hay pedidos abiertos en cocina."
-msgstr "There are no open kitchen orders."
-
-#: src/screens/overview.jsx
-msgid "estaciones"
-msgstr "stations"
-
-#: src/screens/overview.jsx
-msgid "Actualizar las estaciones"
-msgstr "Refresh the stations"
-
-#: src/screens/overview.jsx
-msgid "cerrado"
-msgstr "closed"
+msgid "Parte de la operación no está disponible. Reintenta la consulta."
+msgstr "Some operations are unavailable. Retry the request."
 
 #: src/screens/overview.jsx
 msgid "abiertos"
 msgstr "open"
 
 #: src/screens/overview.jsx
-msgid "Centro de acción"
-msgstr "Action center"
-
-#. placeholder {0}: alerts.length
-#: src/screens/overview.jsx
-msgid "{0, plural, one {# pendiente.} other {# pendientes.}}"
-msgstr "{0, plural, one {# pending.} other {# pending.}}"
+msgid "No hay pedidos abiertos en cocina."
+msgstr "There are no open kitchen orders."
 
 #: src/screens/overview.jsx
-msgid "Nada pendiente ahora mismo."
-msgstr "Nothing pending right now."
+msgid "Estado de cocina no disponible."
+msgstr "Kitchen status unavailable."
 
 #: src/screens/overview.jsx
-msgid "Ver pedidos"
-msgstr "View orders"
+msgid "Lealtad y monedero"
+msgstr "Loyalty and wallet"
 
 #: src/screens/overview.jsx
-msgid "Escaneo cada 60 s · última verificación {nowLabel}"
-msgstr "Scan every 60 s · last check {nowLabel}"
+msgid "MXN · Todo el negocio"
+msgstr "MXN · Entire business"
 
 #: src/screens/overview.jsx
-msgid "Re-escanear"
-msgstr "Rescan"
+msgid "Miembros registrados"
+msgstr "Registered members"
 
 #: src/screens/overview.jsx
-msgid "Pedidos WhatsApp"
-msgstr "WhatsApp orders"
-
-#. placeholder {0}: ov.avgTicketMXN
-#: src/screens/overview.jsx
-msgid "pedidos · ticket promedio $ {0}"
-msgstr "orders · average ticket $ {0}"
+msgid "Recargas del mes"
+msgstr "Wallet top-ups this month"
 
 #: src/screens/overview.jsx
-msgid "pedidos · ticket promedio sin calcular"
-msgstr "orders · average ticket not calculated"
+msgid "Revisar pedidos"
+msgstr "Review orders"
 
 #: src/screens/overview.jsx
-msgid "Aceptados"
-msgstr "Accepted"
+msgid "Revisar turnos de caja"
+msgstr "Review cash shifts"
 
 #: src/screens/overview.jsx
-msgid "Actividad del monedero"
-msgstr "Wallet activity"
+msgid "Revisar inventario"
+msgstr "Review inventory"
 
 #: src/screens/overview.jsx
-msgid "MXN procesado hoy"
-msgstr "MXN processed today"
-
-#: src/screens/overview.jsx
-msgid "Recargas"
-msgstr "Top-ups"
-
-#: src/screens/overview.jsx
-msgid "movimientos"
-msgstr "movements"
-
-#: src/screens/overview.jsx
-msgid "Canjes"
-msgstr "Redemptions"
+msgid "Consulta los módulos disponibles para tu función."
+msgstr "Open the modules available for your role."
 
 #: src/screens/permission-labels.js
 msgid "Ver el historial de auditoría"
@@ -9651,6 +9809,17 @@ msgstr "A business administrator can change the groups."
 #~ msgid "Las ventas se cuentan al hacer el pedido. Las devoluciones se restan en su fecha de confirmación, aunque la venta sea anterior al periodo."
 #~ msgstr "Sales use the order date. Refunds use their confirmation date, even if the sale precedes the period."
 
+#. placeholder {0}: report.from
+#. placeholder {1}: report.to
+#: src/screens/sales-purchase-analysis.jsx
+#~ msgid "Periodo consultado: {0} a {1}."
+#~ msgstr "Selected period: {0} to {1}."
+
+#. placeholder {0}: report.firstSaleDate ?? '—'
+#: src/screens/sales-purchase-analysis.jsx
+#~ msgid "Historial de ventas desde {0}. Datos consultados: {capturedAt}. El día y el mes actuales pueden estar incompletos."
+#~ msgstr "Sales history starts on {0}. Data queried at {capturedAt}. The current day and month can be incomplete."
+
 #: src/screens/sales-purchase-analysis.jsx
 msgid "No se pudo consultar este periodo. Elige un rango menor, de hasta 731 días y 20,000 tickets."
 msgstr "Could not query this period. Select a smaller range, up to 731 days and 20,000 receipts."
@@ -9717,10 +9886,6 @@ msgid "Ticket promedio sin propina"
 msgstr "Average sale per receipt, excluding tips"
 
 #: src/screens/sales-purchase-analysis.jsx
-msgid "Tickets de venta"
-msgstr "Sales receipts"
-
-#: src/screens/sales-purchase-analysis.jsx
 msgid "Piezas netas por ticket"
 msgstr "Net units per receipt"
 
@@ -9743,6 +9908,10 @@ msgstr "Sales and average receipt"
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Venta neta de productos, después de descuentos y devoluciones. Excluye propinas."
 msgstr "Net product sales after discounts and refunds. Excludes tips."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Cómo se calcula"
+msgstr "How this is calculated"
 
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Las devoluciones confirmadas hasta esta consulta ajustan la fecha del recibo y la hora del pedido original."
@@ -9819,6 +9988,14 @@ msgstr "With B among purchases of A"
 msgid "No hay pares de productos en estas compras."
 msgstr "These purchases contain no product pairs."
 
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Mostrar los primeros 10"
+msgstr "Show the first 10"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Ver todos los pares"
+msgstr "View all pairs"
+
 #. placeholder {0}: report.coverage.baskets
 #. placeholder {1}: report.coverage.ticketsWithoutVisit
 #: src/screens/sales-purchase-analysis.jsx
@@ -9840,10 +10017,7 @@ msgid "Las compras conjuntas muestran los productos de los tickets originales de
 msgstr "Joint purchases show original products from sales receipts in the period. Refunds affect amounts and net units."
 
 #: src/screens/sales-purchase-analysis.jsx
-msgid "Piezas por ticket"
-msgstr "Units per receipt"
-
-#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
 msgid "No hay movimientos en este periodo."
 msgstr "There are no movements in this period."
 
@@ -9868,6 +10042,14 @@ msgstr "Day of the week"
 msgid "Mes"
 msgstr "Month"
 
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Indicador del gráfico"
+msgstr "Chart metric"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Ver tabla del periodo"
+msgstr "View period table"
+
 #. placeholder {0}: report.timezone
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Las horas corresponden al pedido, en {0}. Las fechas conservan el día operativo de los recibos y las devoluciones."
@@ -9881,15 +10063,30 @@ msgstr "The table shows periods with movements. An hour with few sales requires 
 msgid "Los meses permiten comparar el historial disponible. Confirmar una temporada requiere observar ciclos completos y comparar periodos equivalentes."
 msgstr "Months allow comparison of available history. A seasonal pattern requires complete cycles and equivalent periods."
 
-#. placeholder {0}: report.from
-#. placeholder {1}: report.to
 #: src/screens/sales-purchase-analysis.jsx
-msgid "Periodo consultado: {0} a {1}."
-msgstr "Selected period: {0} to {1}."
+msgid "Resumen de ventas"
+msgstr "Sales overview"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Compras conjuntas"
+msgstr "Joint purchases"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Horas y tendencias"
+msgstr "Hours and trends"
+
+#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/settings.jsx
+msgid "Sucursales"
+msgstr "Locations"
 
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Este periodo no contiene tickets de venta. Puede incluir devoluciones de ventas anteriores."
 msgstr "This period has no sales receipts. It can include refunds of earlier sales."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Desglose de ventas"
+msgstr "Sales breakdown"
 
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Comparación entre sucursales"
@@ -9902,6 +10099,16 @@ msgstr "The business average uses total sales and receipts. To compare branches,
 #: src/screens/sales-purchase-analysis.jsx
 msgid "¿Cuántas piezas lleva cada ticket?"
 msgstr "How many units does each receipt contain?"
+
+#. placeholder {0}: row.units
+#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
+msgid "{0} piezas"
+msgstr "{0} units"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Ver tabla de piezas"
+msgstr "View units table"
 
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Piezas"
@@ -9917,8 +10124,14 @@ msgstr "Original units from sales receipts in the period."
 
 #. placeholder {0}: report.firstSaleDate ?? '—'
 #: src/screens/sales-purchase-analysis.jsx
-msgid "Historial de ventas desde {0}. Datos consultados: {capturedAt}. El día y el mes actuales pueden estar incompletos."
-msgstr "Sales history starts on {0}. Data queried at {capturedAt}. The current day and month can be incomplete."
+msgid "Historial de ventas desde {0}. Las categorías usan el catálogo actual."
+msgstr "Sales history since {0}. Categories use the current catalog."
+
+#. placeholder {0}: options.today
+#. placeholder {1}: options.timezone
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Día operativo y zona horaria: {0} · {1}"
+msgstr "Business date and time zone: {0} · {1}"
 
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Consultando compras…"
@@ -9931,6 +10144,79 @@ msgstr "Loading categories and groups…"
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Selecciona un negocio para consultar sus compras."
 msgstr "Select a business to view its purchases."
+
+#: src/screens/sales-widgets.jsx
+msgid "Consultando ventas…"
+msgstr "Loading sales…"
+
+#: src/screens/sales-widgets.jsx
+msgid "No tienes permiso para consultar estas ventas."
+msgstr "You do not have permission to view these sales."
+
+#: src/screens/sales-widgets.jsx
+msgid "El periodo supera el límite de 20,000 tickets. Consulta menos días."
+msgstr "This period exceeds the limit of 20,000 tickets. Select fewer days."
+
+#: src/screens/sales-widgets.jsx
+msgid "No se pudieron cargar las ventas. Los importes no están disponibles."
+msgstr "Sales could not load. Amounts are unavailable."
+
+#. placeholder {0}: rows.length
+#: src/screens/sales-widgets.jsx
+msgid "El gráfico muestra los primeros 31 de {0} periodos. La tabla conserva todos los periodos."
+msgstr "The chart shows the first 31 of {0} periods. The table keeps all periods."
+
+#. placeholder {0}: report.from
+#. placeholder {1}: report.to
+#. placeholder {2}: report.timezone
+#. placeholder {3}: report.currency
+#: src/screens/sales-widgets.jsx
+msgid "{0} a {1} · {2} · {3}"
+msgstr "{0} to {1} · {2} · {3}"
+
+#: src/screens/sales-widgets.jsx
+msgid "Venta neta sin propina, después de descuentos y devoluciones."
+msgstr "Net sales exclude tips, after discounts and refunds."
+
+#. placeholder {0}: formatDateTime(report.capturedAt, { timeZone: report.timezone, dateStyle: 'medium', timeStyle: 'short', })
+#: src/screens/sales-widgets.jsx
+msgid "Consulta: {0}. El día actual puede estar incompleto."
+msgstr "Retrieved: {0}. The current day can be incomplete."
+
+#: src/screens/sales-widgets.jsx
+msgid "vs. periodo anterior"
+msgstr "vs. previous period"
+
+#: src/screens/sales-widgets.jsx
+msgid "Sin tickets para calcular"
+msgstr "No tickets to calculate"
+
+#: src/screens/sales-widgets.jsx
+msgid "Periodo anterior sin base de comparación"
+msgstr "No comparison base in the previous period"
+
+#: src/screens/sales-widgets.jsx
+msgid "Comparación no disponible"
+msgstr "Comparison unavailable"
+
+#. placeholder {0}: pair.baskets
+#. placeholder {1}: report.coverage.baskets
+#: src/screens/sales-widgets.jsx
+msgid "{0} de {1} compras"
+msgstr "{0} of {1} purchases"
+
+#: src/screens/sales-widgets.jsx
+msgid "No hay productos comprados juntos en este periodo."
+msgstr "No products were bought together in this period."
+
+#. placeholder {0}: report.timezone
+#: src/screens/sales-widgets.jsx
+msgid "Hora del pedido en {0}. Una hora sin movimientos no demuestra falta de demanda."
+msgstr "Order time in {0}. An hour without transactions does not prove low demand."
+
+#: src/screens/sales-widgets.jsx
+msgid "Ver desglose"
+msgstr "View breakdown"
 
 #: src/screens/settings.jsx
 #~ msgid "Los cambios de Cash se guardan solo porque Umi Cash está activo."
@@ -10304,10 +10590,6 @@ msgstr "REWARD TYPE"
 #: src/screens/settings.jsx
 msgid "REGALO DE CUMPLEAÑOS"
 msgstr "BIRTHDAY GIFT"
-
-#: src/screens/settings.jsx
-msgid "Sucursales"
-msgstr "Locations"
 
 #: src/screens/settings.jsx
 msgid "Los locales de este café. Cada uno tiene su propio horario."
@@ -10915,10 +11197,6 @@ msgid "Venta por hora"
 msgstr "Sales by hour"
 
 #: src/screens/ventas-report.jsx
-msgid "Venta por día"
-msgstr "Sales by day"
-
-#: src/screens/ventas-report.jsx
 msgid "Serie de ventas del periodo"
 msgstr "Sales series for the period"
 
@@ -10955,6 +11233,10 @@ msgid "Análisis de compras"
 msgstr "Purchase analysis"
 
 #: src/screens/ventas-report.jsx
+msgid "Cobros originales"
+msgstr "Original payments"
+
+#: src/screens/ventas-report.jsx
 msgid "Tabla dinámica"
 msgstr "Pivot table"
 
@@ -10973,6 +11255,10 @@ msgstr "Sales collected, including tips"
 #: src/screens/ventas-report.jsx
 msgid "Importes originales de los recibos, antes de devoluciones. Consulta Análisis de compras para ver la venta neta sin propina."
 msgstr "Original receipt amounts before refunds. Open Purchase analysis to see net sales excluding tips."
+
+#: src/screens/ventas-report.jsx
+msgid "vs. período anterior"
+msgstr "vs. prior period"
 
 #: src/screens/ventas-report.jsx
 msgid "Órdenes"

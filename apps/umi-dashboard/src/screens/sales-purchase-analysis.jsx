@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { initialAnalysisQuery } from './sales-report-model.js';
+import { SalesBars, SalesDataNote, SalesDetailWidget } from './sales-widgets.jsx';
+import { formatNumber } from '@/lib/format.js';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { useSalesAnalysis, useSalesAnalysisOptions } from '@/data.jsx';
@@ -7,11 +11,8 @@ import SalesAnalysisGroups from './sales-analysis-groups.jsx';
 import './sales-purchase-analysis.css';
 
 const percent = (value) =>
-  value == null
-    ? '—'
-    : new Intl.NumberFormat('es-MX', { style: 'percent', maximumFractionDigits: 1 }).format(value);
-const number = (value) =>
-  value == null ? '—' : new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(value);
+  value == null ? '—' : formatNumber(value, { style: 'percent', maximumFractionDigits: 1 });
+const number = (value) => (value == null ? '—' : formatNumber(value, { maximumFractionDigits: 2 }));
 
 function Panel({ title, children }) {
   return (
@@ -202,32 +203,38 @@ function Totals({ report }) {
           </div>
         ))}
       </dl>
-      {report.refundView === 'sale_result' ? (
+      <details className="analysis-method">
+        <summary>
+          <Trans>Cómo se calcula</Trans>
+        </summary>
+        {report.refundView === 'sale_result' ? (
+          <p>
+            <Trans>
+              Las devoluciones confirmadas hasta esta consulta ajustan la fecha del recibo y la hora
+              del pedido original.
+            </Trans>
+          </p>
+        ) : (
+          <p>
+            <Trans>
+              Las ventas conservan la fecha del recibo. Las devoluciones se restan en su fecha de
+              confirmación, aunque la venta sea anterior al periodo.
+            </Trans>
+          </p>
+        )}
         <p>
           <Trans>
-            Las devoluciones confirmadas hasta esta consulta ajustan la fecha del recibo y la hora
-            del pedido original.
+            El promedio divide la venta neta entre los tickets de venta. Sin tickets, el promedio no
+            aplica. Un ticket devuelto permanece en el conteo.
           </Trans>
         </p>
-      ) : (
-        <p>
-          <Trans>
-            Las ventas conservan la fecha del recibo. Las devoluciones se restan en su fecha de
-            confirmación, aunque la venta sea anterior al periodo.
-          </Trans>
-        </p>
-      )}
-      <p>
-        <Trans>
-          El promedio divide la venta neta entre los tickets de venta. Sin tickets, el promedio no
-          aplica. Un ticket devuelto permanece en el conteo.
-        </Trans>
-      </p>
+      </details>
     </Panel>
   );
 }
 
 function JointPurchases({ report }) {
+  const [showAll, setShowAll] = useState(false);
   const group = report.selectedGroups;
   return (
     <Panel title={<Trans>¿Qué se compra junto?</Trans>}>
@@ -297,7 +304,7 @@ function JointPurchases({ report }) {
               </tr>
             </thead>
             <tbody>
-              {report.pairs.map((pair) => (
+              {report.pairs.slice(0, showAll ? 100 : 10).map((pair) => (
                 <tr key={`${pair.productAId}:${pair.productBId}`}>
                   <td>{pair.productAName}</td>
                   <td>{pair.productBName}</td>
@@ -315,6 +322,13 @@ function JointPurchases({ report }) {
         <p>
           <Trans>No hay pares de productos en estas compras.</Trans>
         </p>
+      )}
+      {report.pairs.length > 10 && (
+        <div className="analysis-pair-limit">
+          <button type="button" className="btn btn-secondary" onClick={() => setShowAll(!showAll)}>
+            {showAll ? <Trans>Mostrar los primeros 10</Trans> : <Trans>Ver todos los pares</Trans>}
+          </button>
+        </div>
       )}
       {report.basketUnit === 'table_visit' ? (
         <p>
@@ -394,7 +408,22 @@ function MetricsTable({ rows, currency, label }) {
 
 function TimeComparisons({ report }) {
   const { t } = useLingui();
-  const [dimension, setDimension] = useState('byHour');
+  const [params, setParams] = useSearchParams();
+  const dimension = ['byHour', 'byWeekday', 'byDay', 'byMonth'].includes(params.get('dimension'))
+    ? params.get('dimension')
+    : 'byHour';
+  const metric = ['netMinorUnits', 'averageTicketMinorUnits', 'tickets'].includes(
+    params.get('metric'),
+  )
+    ? params.get('metric')
+    : 'netMinorUnits';
+  function changeDimension(key, value) {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set(key, value);
+      return next;
+    });
+  }
   const days = [t`Lunes`, t`Martes`, t`Miércoles`, t`Jueves`, t`Viernes`, t`Sábado`, t`Domingo`];
   const rows = report[dimension].map((row) => ({
     ...row,
@@ -412,7 +441,7 @@ function TimeComparisons({ report }) {
         <select
           aria-label={t`Comparar por`}
           value={dimension}
-          onChange={(event) => setDimension(event.target.value)}
+          onChange={(event) => changeDimension('dimension', event.target.value)}
         >
           <option value="byHour">
             <Trans>Hora</Trans>
@@ -428,7 +457,26 @@ function TimeComparisons({ report }) {
           </option>
         </select>
       </label>
-      <MetricsTable rows={rows} currency={report.currency} label={<Trans>Periodo</Trans>} />
+      <label className="analysis-dimension">
+        <Trans>Indicador del gráfico</Trans>
+        <select value={metric} onChange={(event) => changeDimension('metric', event.target.value)}>
+          <option value="netMinorUnits">{t`Venta neta`}</option>
+          <option value="averageTicketMinorUnits">{t`Ticket promedio`}</option>
+          <option value="tickets">{t`Tickets de venta`}</option>
+        </select>
+      </label>
+      <SalesBars
+        rows={rows}
+        currency={report.currency}
+        metric={metric}
+        count={metric === 'tickets'}
+      />
+      <details className="analysis-method">
+        <summary>
+          <Trans>Ver tabla del periodo</Trans>
+        </summary>
+        <MetricsTable rows={rows} currency={report.currency} label={<Trans>Periodo</Trans>} />
+      </details>
       <p>
         <Trans>
           Las horas corresponden al pedido, en {report.timezone}. Las fechas conservan el día
@@ -451,19 +499,19 @@ function TimeComparisons({ report }) {
   );
 }
 
-function AnalysisResults({ report }) {
-  const capturedAt = new Intl.DateTimeFormat('es-MX', {
-    timeZone: report.timezone,
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(report.capturedAt));
+function AnalysisResults({ report, query, section, setSection }) {
+  const { t } = useLingui();
+  const sections = [
+    ['overview', t`Resumen de ventas`],
+    ['pairs', t`Compras conjuntas`],
+    ['time', t`Horas y tendencias`],
+    ['distribution', t`Piezas por ticket`],
+    ['locations', t`Sucursales`],
+  ];
+  const active = sections.some(([id]) => id === section) ? section : 'overview';
   return (
     <>
-      <p className="analysis-note">
-        <Trans>
-          Periodo consultado: {report.from} a {report.to}.
-        </Trans>
-      </p>
+      <SalesDataNote report={report} />
       {report.totals.tickets === 0 && (
         <p role="status">
           <Trans>
@@ -472,78 +520,124 @@ function AnalysisResults({ report }) {
           </Trans>
         </p>
       )}
-      <Totals report={report} />
-      <JointPurchases report={report} />
-      <TimeComparisons report={report} />
-      <Panel title={<Trans>Comparación entre sucursales</Trans>}>
-        <MetricsTable
-          rows={report.byLocation}
-          currency={report.currency}
-          label={<Trans>Sucursal</Trans>}
-        />
-        <p>
-          <Trans>
-            El promedio del negocio usa sus ventas y tickets totales. Para comparar sucursales,
-            elige todas las sucursales en los filtros del análisis.
-          </Trans>
-        </p>
-      </Panel>
-      <Panel title={<Trans>¿Cuántas piezas lleva cada ticket?</Trans>}>
-        <div className="analysis-table">
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  <Trans>Piezas</Trans>
-                </th>
-                <th>
-                  <Trans>Tickets</Trans>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.unitsDistribution.map((row) => (
-                <tr key={row.units}>
-                  <td>{number(row.units)}</td>
-                  <td>{number(row.tickets)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p>
-          {report.refundView === 'sale_result' ? (
-            <Trans>Piezas restantes después de las devoluciones de cada ticket.</Trans>
-          ) : (
-            <Trans>Piezas originales de los tickets de venta del periodo.</Trans>
-          )}
-        </p>
-      </Panel>
+      <nav className="analysis-section-nav" aria-label={t`Desglose de ventas`}>
+        {sections.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className="btn btn-ghost"
+            aria-pressed={id === active}
+            onClick={() => setSection(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      {active === 'overview' && (
+        <>
+          <Totals report={report} />
+          <div className="analysis-summary-grid">
+            {['trend', 'hours', 'pairs', 'distribution'].map((id) => (
+              <SalesDetailWidget key={id} id={id} report={report} query={query} />
+            ))}
+          </div>
+        </>
+      )}
+      {active === 'pairs' && <JointPurchases report={report} />}
+      {active === 'time' && <TimeComparisons report={report} />}
+      {active === 'locations' && (
+        <Panel title={<Trans>Comparación entre sucursales</Trans>}>
+          <MetricsTable
+            rows={report.byLocation}
+            currency={report.currency}
+            label={<Trans>Sucursal</Trans>}
+          />
+          <p>
+            <Trans>
+              El promedio del negocio usa sus ventas y tickets totales. Para comparar sucursales,
+              elige todas las sucursales en los filtros del análisis.
+            </Trans>
+          </p>
+        </Panel>
+      )}
+      {active === 'distribution' && (
+        <Panel title={<Trans>¿Cuántas piezas lleva cada ticket?</Trans>}>
+          <SalesBars
+            rows={report.unitsDistribution.map((row) => ({
+              key: row.units,
+              label: t`${row.units} piezas`,
+              tickets: row.tickets,
+            }))}
+            currency={report.currency}
+            metric="tickets"
+            count
+          />
+          <details className="analysis-method">
+            <summary>
+              <Trans>Ver tabla de piezas</Trans>
+            </summary>
+            <div className="analysis-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>
+                      <Trans>Piezas</Trans>
+                    </th>
+                    <th>
+                      <Trans>Tickets</Trans>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.unitsDistribution.map((row) => (
+                    <tr key={row.units}>
+                      <td>{number(row.units)}</td>
+                      <td>{number(row.tickets)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+          <p>
+            {report.refundView === 'sale_result' ? (
+              <Trans>Piezas restantes después de las devoluciones de cada ticket.</Trans>
+            ) : (
+              <Trans>Piezas originales de los tickets de venta del periodo.</Trans>
+            )}
+          </p>
+        </Panel>
+      )}
       <p className="analysis-note">
         <Trans>
-          Historial de ventas desde {report.firstSaleDate ?? '—'}. Datos consultados: {capturedAt}.
-          El día y el mes actuales pueden estar incompletos.
+          Historial de ventas desde {report.firstSaleDate ?? '—'}. Las categorías usan el catálogo
+          actual.
         </Trans>
       </p>
     </>
   );
 }
 
-function dateBefore(today, days) {
-  const date = new Date(`${today}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() - days);
-  return date.toISOString().slice(0, 10);
-}
-
-function AnalysisWorkspace({ merchantId, options, reloadOptions }) {
+function AnalysisWorkspace({ merchantId, locationId, options, reloadOptions }) {
+  const [params, setParams] = useSearchParams();
   const [refresh, setRefresh] = useState(0);
-  const [query, setQuery] = useState(() => ({
-    from: dateBefore(options.today, 29),
-    to: options.today,
-    locationId: options.canCompareLocations ? '' : (options.locations[0]?.id ?? ''),
-    refundView: 'sale_result',
-    basketUnit: 'ticket',
-  }));
+  const query = availableGroupsQuery(initialAnalysisQuery(options, locationId, params), options);
+  function setQuery(next) {
+    setParams(
+      new URLSearchParams(
+        Object.entries({ ...next, section: params.get('section') || 'overview' }).filter(
+          ([, value]) => value !== '',
+        ),
+      ),
+    );
+  }
+  function setSection(section) {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set('section', section);
+      return next;
+    });
+  }
   const result = useSalesAnalysis(availableGroupsQuery(query, options), refresh);
   function reloadGroups() {
     reloadOptions();
@@ -551,13 +645,18 @@ function AnalysisWorkspace({ merchantId, options, reloadOptions }) {
   }
   return (
     <div className="sales-analysis">
-      <AnalysisFilters options={options} query={query} setQuery={setQuery} />
-      <SalesAnalysisGroups
-        merchantId={merchantId}
+      <p className="analysis-note">
+        <Trans>
+          Día operativo y zona horaria: {options.today} · {options.timezone}
+        </Trans>
+      </p>
+      <AnalysisFilters
+        key={JSON.stringify(query)}
         options={options}
-        onSaved={reloadGroups}
-        onRefresh={reloadGroups}
+        query={query}
+        setQuery={setQuery}
       />
+
       {result.loading ? (
         <p role="status">
           <Trans>Consultando compras…</Trans>
@@ -565,13 +664,26 @@ function AnalysisWorkspace({ merchantId, options, reloadOptions }) {
       ) : result.error ? (
         <ReportError code={result.errorCode} onRetry={() => setRefresh((current) => current + 1)} />
       ) : (
-        result.data && <AnalysisResults report={result.data} />
+        result.data && (
+          <AnalysisResults
+            report={result.data}
+            query={query}
+            section={params.get('section')}
+            setSection={setSection}
+          />
+        )
       )}
+      <SalesAnalysisGroups
+        merchantId={merchantId}
+        options={options}
+        onSaved={reloadGroups}
+        onRefresh={reloadGroups}
+      />
     </div>
   );
 }
 
-function ScopedAnalysis({ merchantId }) {
+function ScopedAnalysis({ merchantId, locationId }) {
   const options = useSalesAnalysisOptions();
   const reload = () => options.refetch();
   if (options.loading && !options.data)
@@ -585,7 +697,12 @@ function ScopedAnalysis({ merchantId }) {
   return (
     <>
       {options.error && <ReportError code={options.errorCode} onRetry={reload} />}
-      <AnalysisWorkspace merchantId={merchantId} options={options.data} reloadOptions={reload} />
+      <AnalysisWorkspace
+        merchantId={merchantId}
+        locationId={locationId}
+        options={options.data}
+        reloadOptions={reload}
+      />
     </>
   );
 }
@@ -594,11 +711,38 @@ export default function SalesPurchaseAnalysis() {
   const context = useMerchant();
   const merchantId = context.selectedMerchantId || context.capabilities?.merchant?.id;
   const locationId = context.selectedLocationId || context.capabilities?.selectedLocation?.id || '';
+  const [, setParams] = useSearchParams();
+  const previousScope = useRef({ merchantId, locationId });
+  useEffect(() => {
+    if (
+      previousScope.current.merchantId === merchantId &&
+      previousScope.current.locationId === locationId
+    )
+      return;
+    previousScope.current = { merchantId, locationId };
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (locationId) next.set('locationId', locationId);
+        else next.delete('locationId');
+        next.delete('groupA');
+        next.delete('groupB');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [merchantId, locationId, setParams]);
   if (!merchantId)
     return (
       <p>
         <Trans>Selecciona un negocio para consultar sus compras.</Trans>
       </p>
     );
-  return <ScopedAnalysis key={`${merchantId}:${locationId}`} merchantId={merchantId} />;
+  return (
+    <ScopedAnalysis
+      key={`${merchantId}:${locationId}`}
+      merchantId={merchantId}
+      locationId={locationId}
+    />
+  );
 }
