@@ -22,7 +22,11 @@ import { MODULES, hasRequiredPermission, isProductActive } from '@/lib/module-re
 import { routes } from '@umi/contract/routes';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { queryClient } from '@/lib/query-client.js';
-import { salesAnalysisQuery, salesCachePolicy } from '@/lib/sales-analysis-query.js';
+import {
+  salesAnalysisQuery,
+  salesCachePolicy,
+  invalidateSalesReports,
+} from '@/lib/sales-analysis-query.js';
 import { subscribeConversationMessages } from '@/lib/conversation-realtime.js';
 
 const EMPTY_OVERVIEW = {};
@@ -1633,7 +1637,7 @@ export async function saveSalesAnalysisGroup(merchantId, group) {
     method: 'PUT',
     body: JSON.stringify(body),
   });
-  await queryClient.invalidateQueries({ queryKey: ['sales-analysis', merchantId] });
+  await invalidateSalesReports(queryClient, merchantId);
   return saved;
 }
 
@@ -1643,7 +1647,7 @@ export async function deleteSalesAnalysisGroup(merchantId, group) {
     `${routes.salesAnalysis.deleteGroup(merchantId, group.id)}?expectedVersion=${group.version}`,
     { method: 'DELETE' },
   );
-  await queryClient.invalidateQueries({ queryKey: ['sales-analysis', merchantId] });
+  await invalidateSalesReports(queryClient, merchantId);
   return deleted;
 }
 

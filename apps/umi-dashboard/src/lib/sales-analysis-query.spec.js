@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { QueryClient } from '@tanstack/react-query';
-import { salesAnalysisQuery, salesRefreshInterval } from './sales-analysis-query.js';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
+import {
+  salesAnalysisQuery,
+  salesRefreshInterval,
+  invalidateSalesReports,
+} from './sales-analysis-query.js';
 const clients = [];
 afterEach(() => {
   for (const client of clients) client.clear();
@@ -75,5 +79,54 @@ describe('shared sales report cache', () => {
     expect(options.staleTime).toBe(60000);
     expect(salesRefreshInterval({ state: { dataUpdatedAt: 10000 } }, 55000)).toBe(15000);
     expect(salesRefreshInterval({ state: { dataUpdatedAt: 10000 } }, 80000)).toBe(1000);
+  });
+  it('invalidates reports and inactive group options across branch contexts after a group write', async () => {
+    const cache = client();
+    const keys = [
+      ['sales-analysis-options', 'merchant', 'branch-a'],
+      ['sales-analysis-options', 'merchant', 'branch-b'],
+      ['sales-analysis', 'merchant', 'branch-a'],
+    ];
+    for (const key of keys) cache.setQueryData(key, { groups: ['removed'] });
+    cache.setQueryData(['sales-analysis-options', 'other'], { groups: ['keep'] });
+    await invalidateSalesReports(cache, 'merchant');
+    for (const key of keys) expect(cache.getQueryState(key).isInvalidated).toBe(true);
+    expect(cache.getQueryState(['sales-analysis-options', 'other']).isInvalidated).toBe(false);
+  });
+  it.each([
+    ['sales-analysis', true],
+    ['sales-analysis', false],
+    ['sales-analysis-options', true],
+    ['sales-analysis-options', false],
+  ])('replaces an in-flight pre-write %s with cached data: %s', async (prefix, cached) => {
+    const cache = client();
+    let resolveOld;
+    let calls = 0;
+    const oldResult = new Promise((resolve) => {
+      resolveOld = resolve;
+    });
+    const options = salesAnalysisQuery(identity, query, () =>
+      ++calls === 1 ? oldResult : Promise.resolve({ revision: 'after' }),
+    );
+    options.queryKey[0] = prefix;
+    if (cached) cache.setQueryData(options.queryKey, { revision: 'cached' });
+    const observer = new QueryObserver(cache, options);
+    const unsubscribe = observer.subscribe(() => {});
+    const oldFetch = cache.refetchQueries({ queryKey: options.queryKey });
+    const invalidation = invalidateSalesReports(cache, 'merchant');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    resolveOld({ revision: 'before' });
+    await Promise.all([oldFetch, invalidation]);
+    expect(cache.getQueryData(options.queryKey)).toEqual({ revision: 'after' });
+    expect(calls).toBe(2);
+    unsubscribe();
+  });
+  it('waits a full interval after a failed fetch instead of repeatedly polling an expired report', () => {
+    expect(
+      salesRefreshInterval({ state: { dataUpdatedAt: 10000, errorUpdatedAt: 80000 } }, 85000),
+    ).toBe(55000);
+    expect(
+      salesRefreshInterval({ state: { dataUpdatedAt: 0, errorUpdatedAt: 80000 } }, 85000),
+    ).toBe(55000);
   });
 });

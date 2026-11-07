@@ -67,6 +67,26 @@ try {
     return queryClient.getQueryCache().findAll({ queryKey: ['sales-analysis'] }).length;
   });
   assert.equal(countAfterRefresh, 2);
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const { queryClient } = await import('/src/lib/query-client.js');
+        return queryClient
+          .getQueryCache()
+          .findAll({ queryKey: ['sales-analysis'] })
+          .filter((query) => query.state.fetchStatus === 'fetching').length;
+      }),
+    )
+    .toBe(0);
+  const refreshedAt = await page.evaluate(async () => {
+    const { queryClient } = await import('/src/lib/query-client.js');
+    return Object.fromEntries(
+      queryClient
+        .getQueryCache()
+        .findAll({ queryKey: ['sales-analysis'] })
+        .map((query) => [query.queryKey.at(-1), query.state.dataUpdatedAt]),
+    );
+  });
   await page.screenshot({ path: `${output}/cache-browser.png`, fullPage: true });
   console.log(
     JSON.stringify({
@@ -81,7 +101,11 @@ try {
   await page.waitForTimeout(61000);
   await expect.poll(() => requests.length).toBeGreaterThan(initialRequests + 2);
   const firstAuto = requests.slice(initialRequests + 2).find((req) => req.at >= pollStart);
-  assert.ok(firstAuto.at - pollStart >= 55000 && firstAuto.at - pollStart <= 61000);
+  const autoDataAgeMs = firstAuto.at - refreshedAt[firstAuto.query.slice(1)];
+  assert.ok(
+    autoDataAgeMs >= 59000 && autoDataAgeMs <= 65000,
+    JSON.stringify({ autoDataAgeMs, firstAuto, refreshedAt }),
+  );
   await page.route('**/sales/analysis?**', (route) =>
     route.fulfill({ status: 422, json: { code: 'REPORT_RANGE_TOO_COMPLEX' } }),
   );
@@ -92,6 +116,9 @@ try {
     }),
   ).toBeVisible();
   await expect(page.locator('.sales-primary')).toHaveCount(0);
+  const failedCount = requests.length;
+  await page.waitForTimeout(3500);
+  assert.equal(requests.length, failedCount, 'Failed polls must respect the normal interval');
   await page.unrouteAll({ behavior: 'wait' });
   await page.getByRole('button', { name: 'Reintentar', exact: true }).click();
   await expect(page.locator('.sales-primary')).toBeVisible();
@@ -103,6 +130,7 @@ try {
     initialRequests,
     manualRefreshEntries: countAfterRefresh,
     autoRefreshDelayMs: firstAuto.at - pollStart,
+    autoDataAgeMs,
     requests,
     errors,
   };

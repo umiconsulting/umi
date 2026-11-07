@@ -692,7 +692,6 @@ function AnalysisWorkspace({ merchantId, locationId, options, reloadOptions }) {
       <SalesAnalysisGroups
         merchantId={merchantId}
         options={options}
-        onSaved={reloadGroups}
         onRefresh={reloadGroups}
       />
     </div>
