@@ -1583,7 +1583,7 @@ export function useSalesAnalysisOptions() {
   const ctx = useMerchant();
   const result = useQuery({
     queryKey: ['sales-analysis-options', ...salesQueryIdentity(ctx)],
-    queryFn: () => _apiFetch(_withLocation(ctx, routes.salesAnalysis.options(_merchantId(ctx)))),
+    queryFn: () => _apiFetch(routes.salesAnalysis.options(_merchantId(ctx))),
     enabled: Boolean(_merchantId(ctx)) && !ctx?.loading,
     retry: false,
   });

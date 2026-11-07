@@ -405,6 +405,7 @@ export default function OverviewScreen({ ordersPaused, setOrdersPaused }) {
         )}
       </div>
       <OperationalOverview
+        key={`${context.selectedMerchantId}:${context.selectedLocationId}:${permissions.join(',')}`}
         context={context}
         ordersPaused={ordersPaused}
         setOrdersPaused={setOrdersPaused}

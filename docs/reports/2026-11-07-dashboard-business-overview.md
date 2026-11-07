@@ -91,10 +91,28 @@ La nueva separación requiere un acceso inicial en staging. No migra cookies gen
 
 ## Verificación
 
-La primera ejecución completa del dashboard pasó 649 pruebas en 46 archivos.
-La comprobación de advertencias pasó sin categorías nuevas.
-La compilación pasó; conserva el aviso existente sobre el tamaño del paquete principal.
-Los estados y los recorridos finales se registran al completar la verificación.
+El dashboard pasó 650 pruebas en 46 archivos.
+Los gates `pnpm check:pr` y `turbo run build lint test --filter=...[origin/staging]` pasaron.
+El dashboard no define un comando `typecheck`; su gate usa ESLint y la compilación de Vite.
+La comprobación de advertencias aceptó las 68 advertencias existentes, sin categorías nuevas.
+La compilación conserva el aviso existente sobre el tamaño del paquete principal.
+
+Chromium verificó ONCA con la API real, en escritorio y a 390 píxeles.
+El inicio mostró $3,435.00 MXN, 27 tickets y 2.48 piezas por ticket, del 31 de octubre al 6 de noviembre.
+El recorrido comprobó selección, orden y persistencia de widgets, enlaces al detalle y regreso con el periodo original.
+También comprobó el indicador del gráfico después de aplicar filtros.
+Un periodo anterior a la primera venta mostró ausencia de tickets.
+La interrupción deliberada de la red mostró error, ocultó cifras y permitió reintentar.
+La espera deliberada de respuestas mostró carga sin cifras anteriores.
+Las tres revisiones de axe no registraron infracciones: inicio de escritorio, detalle de tiempo y compras conjuntas en móvil.
+El navegador no registró errores de JavaScript ni desbordamiento horizontal.
+La recuperación mediante cookies restauró el inicio después de borrar la sesión local.
+
+La revisión independiente de Standards detectó una pérdida de opciones de sucursal.
+La revisión de Spec detectó el mismo problema y un reinicio del indicador al aplicar filtros.
+Las tres observaciones quedaron corregidas y ambas revisiones confirmaron cero hallazgos abiertos.
+ONCA dispone de una sucursal en esta sesión; la comprobación de múltiples sucursales usa el contrato y las pruebas de contexto.
+La verificación del Worker en Cloudflare queda pendiente hasta que exista la vista previa del PR.
 
 Herramientas: Node 22.23.2, pnpm 10.29.3, Playwright 1.62.1, Chromium por CDP y axe-core.
 Las capturas y respuestas de API quedan en `/tmp/umi-business-evidence/`.

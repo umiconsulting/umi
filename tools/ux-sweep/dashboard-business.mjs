@@ -66,7 +66,11 @@ try {
   await page.getByRole('button', { name: 'Restaurar indicadores', exact: true }).click();
   await page.getByRole('button', { name: 'Listo', exact: true }).click();
   await a11y('home-desktop');
-  await page.screenshot({ path: `${output}/home-desktop.png`, fullPage: true });
+  await page.screenshot({
+    path: `${output}/home-desktop.png`,
+    fullPage: true,
+    animations: 'disabled',
+  });
   const metricLinks = page.locator('.sales-metric');
   assert.equal(await metricLinks.count(), 4);
   const query = new URL(await metricLinks.first().getAttribute('href'), base).searchParams;
@@ -94,7 +98,11 @@ try {
   await expect(page.locator('.sales-widget-grid > .sales-widget').first()).toContainText(
     'Piezas en cada ticket',
   );
-  await page.screenshot({ path: `${output}/home-custom.png`, fullPage: true });
+  await page.screenshot({
+    path: `${output}/home-custom.png`,
+    fullPage: true,
+    animations: 'disabled',
+  });
   await page.getByLabel('Periodo', { exact: true }).selectOption('30');
   await readyHome();
   await page.getByRole('link', { name: 'Venta por día', exact: false }).click();
@@ -109,12 +117,15 @@ try {
     .getByLabel('Indicador del gráfico', { exact: true })
     .selectOption('averageTicketMinorUnits');
   await page.getByText('Ver tabla del periodo', { exact: true }).click();
-  await page.screenshot({ path: `${output}/sales-time-desktop.png`, fullPage: true });
+  await page.screenshot({
+    path: `${output}/sales-time-desktop.png`,
+    fullPage: true,
+    animations: 'disabled',
+  });
   await a11y('sales-time');
-  await page.goBack();
-  await page.goBack();
-  await page.goBack();
-  if (!page.url().includes('?home=1')) await page.goto(`${base}/?home=1&days=30`);
+  for (let index = 0; index < 4 && !page.url().includes('?home=1'); index++) {
+    await page.goBack();
+  }
   await readyHome();
   await expect(page.getByLabel('Periodo', { exact: true })).toHaveValue('30');
   await page.getByRole('link', { name: /^Ticket promedio/ }).click();
@@ -126,22 +137,35 @@ try {
   await expect(
     page.getByRole('heading', { name: '¿Qué se compra junto?', exact: true }),
   ).toBeVisible();
-  await page.screenshot({ path: `${output}/sales-pairs-desktop.png`, fullPage: true });
+  await page.screenshot({
+    path: `${output}/sales-pairs-desktop.png`,
+    fullPage: true,
+    animations: 'disabled',
+  });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: `${output}/sales-mobile.png`, fullPage: true });
+  await page.screenshot({
+    path: `${output}/sales-mobile.png`,
+    fullPage: true,
+    animations: 'disabled',
+  });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await a11y('sales-mobile');
 
   await page.getByLabel('Desde', { exact: true }).fill('2026-10-01');
   await page.getByLabel('Hasta', { exact: true }).fill('2026-10-01');
   await page.getByRole('button', { name: 'Consultar', exact: true }).click();
+  assert.equal(new URL(page.url()).searchParams.get('metric'), 'averageTicketMinorUnits');
   await expect(
     page.getByText(
       'Este periodo no contiene tickets de venta. Puede incluir devoluciones de ventas anteriores.',
       { exact: true },
     ),
   ).toBeVisible();
-  await page.screenshot({ path: `${output}/sales-empty.png`, fullPage: true });
+  await page.screenshot({
+    path: `${output}/sales-empty.png`,
+    fullPage: true,
+    animations: 'disabled',
+  });
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await home();
@@ -151,7 +175,11 @@ try {
     page.getByRole('alert').filter({ hasText: 'No se pudieron cargar las ventas.' }),
   ).toBeVisible();
   await expect(page.locator('.sales-metric')).toHaveCount(0);
-  await page.screenshot({ path: `${output}/home-error.png`, fullPage: true });
+  await page.screenshot({
+    path: `${output}/home-error.png`,
+    fullPage: true,
+    animations: 'disabled',
+  });
   await page.getByRole('button', { name: 'Reintentar', exact: true }).click();
   await readyHome();
 
@@ -170,11 +198,19 @@ try {
   await page.getByRole('button', { name: 'Actualizar', exact: true }).click();
   await expect(page.getByText('Consultando ventas…', { exact: true })).toBeVisible();
   await expect(page.locator('.sales-metric')).toHaveCount(0);
-  await page.screenshot({ path: `${output}/home-loading.png`, fullPage: true });
+  await page.screenshot({
+    path: `${output}/home-loading.png`,
+    fullPage: true,
+    animations: 'disabled',
+  });
   release();
   await readyHome();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: `${output}/home-mobile.png`, fullPage: true });
+  await page.screenshot({
+    path: `${output}/home-mobile.png`,
+    fullPage: true,
+    animations: 'disabled',
+  });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.deepEqual(failures, []);
   console.log(

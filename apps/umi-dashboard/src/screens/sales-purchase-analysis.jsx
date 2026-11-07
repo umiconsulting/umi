@@ -276,7 +276,7 @@ function JointPurchases({ report }) {
         </Trans>
       </p>
       {report.pairs.length ? (
-        <div className="analysis-table">
+        <div className="analysis-table" tabIndex={0}>
           <table>
             <caption>
               <Trans>
@@ -366,7 +366,7 @@ function JointPurchases({ report }) {
 
 function MetricsTable({ rows, currency, label }) {
   return (
-    <div className="analysis-table">
+    <div className="analysis-table" tabIndex={0}>
       <table>
         <thead>
           <tr>
@@ -459,7 +459,11 @@ function TimeComparisons({ report }) {
       </label>
       <label className="analysis-dimension">
         <Trans>Indicador del gráfico</Trans>
-        <select value={metric} onChange={(event) => changeDimension('metric', event.target.value)}>
+        <select
+          aria-label={t`Indicador del gráfico`}
+          value={metric}
+          onChange={(event) => changeDimension('metric', event.target.value)}
+        >
           <option value="netMinorUnits">{t`Venta neta`}</option>
           <option value="averageTicketMinorUnits">{t`Ticket promedio`}</option>
           <option value="tickets">{t`Tickets de venta`}</option>
@@ -576,7 +580,7 @@ function AnalysisResults({ report, query, section, setSection }) {
             <summary>
               <Trans>Ver tabla de piezas</Trans>
             </summary>
-            <div className="analysis-table">
+            <div className="analysis-table" tabIndex={0}>
               <table>
                 <thead>
                   <tr>
@@ -625,9 +629,12 @@ function AnalysisWorkspace({ merchantId, locationId, options, reloadOptions }) {
   function setQuery(next) {
     setParams(
       new URLSearchParams(
-        Object.entries({ ...next, section: params.get('section') || 'overview' }).filter(
-          ([, value]) => value !== '',
-        ),
+        Object.entries({
+          ...next,
+          section: params.get('section') || 'overview',
+          dimension: params.get('dimension'),
+          metric: params.get('metric'),
+        }).filter(([, value]) => value != null && value !== ''),
       ),
     );
   }
