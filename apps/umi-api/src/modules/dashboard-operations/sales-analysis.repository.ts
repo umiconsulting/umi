@@ -18,6 +18,7 @@ interface ProductOption {
   name: string;
   categoryId: string | null;
   category: string | null;
+  categoryColor: string | null;
 }
 interface AnalysisContext {
   timezone: string;
@@ -63,7 +64,13 @@ export class SalesAnalysisRepository {
           coalesce((r.snapshot->'discountTotal'->>'minorUnits')::bigint, 0)::float8 as "discountsMinorUnits",
           exists (select 1 from jsonb_array_elements(r.snapshot->'lines') item where item->'discount' is null) as "legacyDiscount",
           coalesce((select jsonb_agg(jsonb_build_object(
-            'id', item->>'lineRef', 'productId', cl.product_id, 'name', item->>'description', 'quantity', (item->>'quantity')::int
+            'id', item->>'lineRef', 'productId', cl.product_id, 'name', item->>'description', 'quantity', (item->>'quantity')::int,
+            'merchandiseMinorUnits', case
+              when item->'discount' is not null and item->'discount' <> 'null'::jsonb
+                then (item->'lineTotal'->>'minorUnits')::bigint - (item->'discount'->>'minorUnits')::bigint
+              when coalesce((r.snapshot->'discountTotal'->>'minorUnits')::bigint, 0) = 0
+                then (item->'lineTotal'->>'minorUnits')::bigint
+              else null end
           ) order by ordinal)
           from jsonb_array_elements(r.snapshot->'lines') with ordinality as receipt_line(item, ordinal)
           left join merchant.pos_cart_line cl on cl.cart_id = s.cart_id and cl.id::text = item->>'lineRef'), '[]') as lines,
@@ -71,7 +78,8 @@ export class SalesAnalysisRepository {
             'id', x.id, 'day', x.business_date::text, 'hour', to_char(x.committed_at at time zone $5, 'HH24'),
             'weekday', extract(isodow from x.business_date)::text,
             'merchandiseMinorUnits', x.total_minor_units - x.tip_minor_units, 'tipsMinorUnits', x.tip_minor_units,
-            'quantities', coalesce((select jsonb_agg(jsonb_build_object('lineId', xl.sale_line_id, 'quantity', xl.compensated_quantity))
+            'quantities', coalesce((select jsonb_agg(jsonb_build_object('lineId', xl.sale_line_id, 'quantity', xl.compensated_quantity,
+              'merchandiseMinorUnits', xl.total_minor_units - xl.tip_minor_units))
               from merchant.pos_sale_exception_line xl where xl.exception_id = x.id and xl.merchant_id = $1::uuid), '[]')
           ) order by x.committed_at, x.id)
           from merchant.pos_sale_exception x
@@ -219,7 +227,7 @@ export class SalesAnalysisRepository {
     if (!meta.rows[0]) throw new NotFoundException({ code: 'RESOURCE_NOT_FOUND' });
     const products = await client.query<ProductOption>(
       `
-      select p.id::text, p.name, p.category_id::text as "categoryId", pc.name as category
+      select p.id::text, p.name, p.category_id::text as "categoryId", pc.name as category, pc.color as "categoryColor"
       from merchant.product p left join merchant.product_category pc on pc.id = p.category_id and pc.merchant_id = p.merchant_id
       where p.merchant_id = $1::uuid order by p.name, p.id limit $2
     `,

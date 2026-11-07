@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "0dc9beda70ff3b6925c59bdd870b5fdc03b1204719657d567ee72a68b54ca2e8",
-  "contractVersion": "2.52.0",
+  "contentHash": "8753b02375fdd1fc114dc310022af6e2d64ac7fe84cf5b53dd2e66ec330ebc8d",
+  "contractVersion": "2.53.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -90868,6 +90868,72 @@
             "table_visit"
           ],
           "type": "string"
+        },
+        "byCategory": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "categoryId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "pattern": "^#[0-9a-fA-F]{6}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "key": {
+                "maxLength": 100,
+                "type": "string"
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "merchandiseMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "netMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "refundsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "key",
+              "categoryId",
+              "label",
+              "color",
+              "merchandiseMinorUnits",
+              "refundsMinorUnits",
+              "netMinorUnits"
+            ],
+            "type": "object"
+          },
+          "maxItems": 5002,
+          "type": "array"
         },
         "byDay": {
           "items": {

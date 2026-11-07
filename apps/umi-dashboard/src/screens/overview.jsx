@@ -31,6 +31,7 @@ function WidgetSettings({ widgets, onChange, onClose }) {
     hours: t`Horas con más venta`,
     pairs: t`Productos que se compran juntos`,
     distribution: t`Piezas en cada ticket`,
+    categories: t`Venta neta por categoría`,
   };
   return (
     <section className="surface widget-settings" aria-label={t`Personalizar inicio`}>

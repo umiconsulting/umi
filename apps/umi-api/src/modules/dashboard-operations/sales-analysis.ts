@@ -6,6 +6,7 @@ export interface AnalysisLine {
   productId: string | null;
   name: string;
   quantity: number;
+  merchandiseMinorUnits?: number | null;
 }
 
 export interface AnalysisRefund {
@@ -15,7 +16,7 @@ export interface AnalysisRefund {
   weekday: string;
   merchandiseMinorUnits: number;
   tipsMinorUnits: number;
-  quantities: { lineId: string; quantity: number }[];
+  quantities: { lineId: string; quantity: number; merchandiseMinorUnits?: number | null }[];
 }
 
 export interface AnalysisSale {

@@ -160,42 +160,6 @@ msgid "No hay un negocio seleccionado"
 msgstr "No hay un negocio seleccionado"
 
 #: src/data.jsx
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-msgid "nunca"
-msgstr "nunca"
-
-#: src/data.jsx
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-msgid "hace un momento"
-msgstr "hace un momento"
-
-#. placeholder {0}: Math.floor(ms / 1000)
-#: src/data.jsx
-#: src/screens/devices.jsx
-msgid "hace {0} s"
-msgstr "hace {0} s"
-
-#. placeholder {0}: Math.floor(ms / 60000)
-#. placeholder {0}: Math.floor(ms / LAST_SEEN_MINUTE)
-#: src/data.jsx
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-#: src/screens/members.jsx
-msgid "hace {0} min"
-msgstr "hace {0} min"
-
-#. placeholder {0}: Math.floor(ms / 3600000)
-#. placeholder {0}: Math.floor(ms / LAST_SEEN_HOUR)
-#: src/data.jsx
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-#: src/screens/members.jsx
-msgid "hace {0} h"
-msgstr "hace {0} h"
-
-#: src/data.jsx
 msgid "Sin estación"
 msgstr "Sin estación"
 
@@ -770,6 +734,7 @@ msgstr "Productos"
 
 #: src/lib/module-registry.js
 #: src/screens/products-hub.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Categorías"
 msgstr "Categorías"
 
@@ -1322,6 +1287,7 @@ msgid "Ningún turno coincide con el filtro."
 msgstr "Ningún turno coincide con el filtro."
 
 #: src/screens/caja-turnos.jsx
+#: src/screens/category-sales.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/orders.jsx
 #: src/screens/recibos.jsx
@@ -1560,6 +1526,109 @@ msgstr "Cada categoría empieza con un color al azar; cámbialo cuando quieras. 
 msgid "Aún no hay categorías. Crea la primera arriba."
 msgstr "Aún no hay categorías. Crea la primera arriba."
 
+#: src/screens/category-sales.jsx
+msgid "Participación de venta neta por categoría"
+msgstr "Participación de venta neta por categoría"
+
+#: src/screens/category-sales.jsx
+msgid "Las celdas de color aproximan la participación. Los valores exactos aparecen en la lista. El fondo gris es decorativo."
+msgstr "Las celdas de color aproximan la participación. Los valores exactos aparecen en la lista. El fondo gris es decorativo."
+
+#: src/screens/category-sales.jsx
+msgid "Sin asignación verificable"
+msgstr "Sin asignación verificable"
+
+#: src/screens/category-sales.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Sin categoría"
+msgstr "Sin categoría"
+
+#: src/screens/category-sales.jsx
+msgid "Categoría sin nombre"
+msgstr "Categoría sin nombre"
+
+#: src/screens/category-sales.jsx
+msgid "<0.1%"
+msgstr "<0.1%"
+
+#: src/screens/category-sales.jsx
+#: src/screens/overview.jsx
+msgid "Venta neta por categoría"
+msgstr "Venta neta por categoría"
+
+#: src/screens/category-sales.jsx
+msgid "Ver informe"
+msgstr "Ver informe"
+
+#: src/screens/category-sales.jsx
+msgid "El desglose por categoría no está disponible. Actualiza la consulta para reintentar."
+msgstr "El desglose por categoría no está disponible. Actualiza la consulta para reintentar."
+
+#: src/screens/category-sales.jsx
+msgid "Las devoluciones generan importes negativos. Consulta los importes por categoría; no se muestra una distribución porcentual."
+msgstr "Las devoluciones generan importes negativos. Consulta los importes por categoría; no se muestra una distribución porcentual."
+
+#: src/screens/category-sales.jsx
+msgid "La venta neta es cero. No hay una participación porcentual que mostrar."
+msgstr "La venta neta es cero. No hay una participación porcentual que mostrar."
+
+#: src/screens/category-sales.jsx
+msgid "Categorías y venta neta"
+msgstr "Categorías y venta neta"
+
+#. placeholder {0}: rows.length
+#: src/screens/category-sales.jsx
+msgid "Ver las {0} categorías"
+msgstr "Ver las {0} categorías"
+
+#: src/screens/category-sales.jsx
+msgid "Importes exactos por categoría"
+msgstr "Importes exactos por categoría"
+
+#: src/screens/category-sales.jsx
+#: src/screens/cocina.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/ventas-report.jsx
+msgid "Categoría"
+msgstr "Categoría"
+
+#: src/screens/category-sales.jsx
+msgid "Ventas antes de devoluciones"
+msgstr "Ventas antes de devoluciones"
+
+#: src/screens/category-sales.jsx
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Devoluciones"
+msgstr "Devoluciones"
+
+#: src/screens/category-sales.jsx
+#: src/screens/inventory-costing.jsx
+#: src/screens/overview.jsx
+#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
+msgid "Venta neta"
+msgstr "Venta neta"
+
+#: src/screens/category-sales.jsx
+msgid "Participación"
+msgstr "Participación"
+
+#: src/screens/category-sales.jsx
+msgid "Mostrar más categorías"
+msgstr "Mostrar más categorías"
+
+#: src/screens/category-sales.jsx
+msgid "Las celdas aproximan la participación; los porcentajes usan los importes exactos."
+msgstr "Las celdas aproximan la participación; los porcentajes usan los importes exactos."
+
+#: src/screens/category-sales.jsx
+msgid "Algunos recibos no permiten verificar la asignación por categoría. Ese importe se conserva por separado."
+msgstr "Algunos recibos no permiten verificar la asignación por categoría. Ese importe se conserva por separado."
+
+#: src/screens/category-sales.jsx
+msgid "Categorías y colores del catálogo actual. Venta neta sin propinas, después de descuentos y devoluciones."
+msgstr "Categorías y colores del catálogo actual. Venta neta sin propinas, después de descuentos y devoluciones."
+
 #: src/screens/cocina.jsx
 msgid "Llegada · agudo breve"
 msgstr "Llegada · agudo breve"
@@ -1727,12 +1796,6 @@ msgstr "{0} · Prioridad {1} · Objetivo {2} s"
 #: src/screens/cocina.jsx
 msgid "Excepción por producto"
 msgstr "Excepción por producto"
-
-#: src/screens/cocina.jsx
-#: src/screens/operations-workspace.jsx
-#: src/screens/ventas-report.jsx
-msgid "Categoría"
-msgstr "Categoría"
 
 #: src/screens/cocina.jsx
 #: src/screens/operations-workspace.jsx
@@ -2537,6 +2600,32 @@ msgstr "UmiKDS"
 msgid "UmiPOS"
 msgstr "UmiPOS"
 
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+msgid "nunca"
+msgstr "nunca"
+
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+msgid "hace un momento"
+msgstr "hace un momento"
+
+#. placeholder {0}: Math.floor(ms / 60000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_MINUTE)
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+#: src/screens/members.jsx
+msgid "hace {0} min"
+msgstr "hace {0} min"
+
+#. placeholder {0}: Math.floor(ms / 3600000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_HOUR)
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+#: src/screens/members.jsx
+msgid "hace {0} h"
+msgstr "hace {0} h"
+
 #. placeholder {0}: Math.floor(ms / 86400000)
 #. placeholder {0}: Math.floor(ms / LAST_SEEN_DAY)
 #. placeholder {0}: Math.round(hours / 24)
@@ -2660,6 +2749,11 @@ msgstr "No se pudo crear la tienda. Intenta de nuevo."
 #: src/screens/devices.jsx
 #~ msgid "El dispositivo y sus estaciones quedarán vinculados a esta sucursal."
 #~ msgstr "El dispositivo y sus estaciones quedarán vinculados a esta sucursal."
+
+#. placeholder {0}: Math.floor(ms / 1000)
+#: src/screens/devices.jsx
+msgid "hace {0} s"
+msgstr "hace {0} s"
 
 #: src/screens/devices.jsx
 msgid "En vivo"
@@ -4641,13 +4735,6 @@ msgstr "{0} de {1} días con venta no tienen costo"
 #: src/screens/inventory-costing.jsx
 msgid "{0} días con venta en el periodo"
 msgstr "{0} días con venta en el periodo"
-
-#: src/screens/inventory-costing.jsx
-#: src/screens/overview.jsx
-#: src/screens/sales-purchase-analysis.jsx
-#: src/screens/sales-widgets.jsx
-msgid "Venta neta"
-msgstr "Venta neta"
 
 #: src/screens/inventory-costing.jsx
 msgid "Sin impuestos, tal como la mide el margen"
@@ -7266,10 +7353,6 @@ msgid "Código de barras"
 msgstr "Código de barras"
 
 #: src/screens/operations-workspace.jsx
-msgid "Sin categoría"
-msgstr "Sin categoría"
-
-#: src/screens/operations-workspace.jsx
 msgid "Impuesto (%)"
 msgstr "Impuesto (%)"
 
@@ -9840,10 +9923,6 @@ msgstr "Desde"
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Hasta"
 msgstr "Hasta"
-
-#: src/screens/sales-purchase-analysis.jsx
-msgid "Devoluciones"
-msgstr "Devoluciones"
 
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Resultado de las ventas del periodo"

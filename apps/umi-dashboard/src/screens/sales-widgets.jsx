@@ -4,6 +4,7 @@ import { formatNumber, formatDateTime, formatDate } from '@/lib/format.js';
 import { formatOperationMoney } from './operations-format.js';
 import { dailySalesRows, salesReportLink } from './sales-report-model.js';
 import './sales-widgets.css';
+import CategorySalesCard from './category-sales.jsx';
 
 export function SalesReportState({ loading, error, code, onRetry }) {
   if (loading)
@@ -164,6 +165,7 @@ export function SalesMetric({ id, report, prior, query }) {
 
 export function SalesDetailWidget({ id, report, query }) {
   const { t } = useLingui();
+  if (id === 'categories') return <CategorySalesCard report={report} query={query} />;
   const titles = {
     trend: t`Venta por día`,
     hours: t`Horas con más venta`,
