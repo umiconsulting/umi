@@ -17,9 +17,6 @@
   "src/lib/auth.jsx": {
     "no-unused-vars": {
       "count": 1
-    },
-    "react-hooks/set-state-in-effect": {
-      "count": 1
     }
   },
   "src/lib/merchant-context.jsx": {
@@ -59,11 +56,6 @@
     }
   },
   "src/screens/orders.jsx": {
-    "no-unused-vars": {
-      "count": 1
-    }
-  },
-  "src/screens/overview.jsx": {
     "no-unused-vars": {
       "count": 1
     }

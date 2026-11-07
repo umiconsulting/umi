@@ -663,3 +663,26 @@ describe('cross-tab fallback (browser without Web Locks)', () => {
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('cookie session recovery after browser storage loss', () => {
+  it('recovers the authenticated session from /me and stamps its remaining lifetime', async () => {
+    const browser = installBrowser({ stored: null });
+    const auth = await loadAuth();
+    globalThis.fetch = vi.fn(async () =>
+      jsonResponse(200, { session: { ...session, accessExpiresIn: 120 } }),
+    );
+    const recovered = await auth.restoreSession();
+    expect(recovered.user.id).toBe('u-1');
+    expect(JSON.parse(browser.storage.getItem(LOCAL_SESSION_KEY)).accessExpiresAt).toBe(
+      Date.now() + 120000,
+    );
+    expect(fetch.mock.calls[0][0]).toMatch(/\/api\/auth\/me$/);
+    expect(browser.location.assign).not.toHaveBeenCalled();
+  });
+  it('preserves the cached session during a temporary API failure', async () => {
+    installBrowser();
+    const auth = await loadAuth();
+    globalThis.fetch = vi.fn(async () => jsonResponse(503, SERVER_ERROR_BODY));
+    expect((await auth.restoreSession()).user.id).toBe('u-1');
+  });
+});

@@ -452,7 +452,7 @@ export default function VentasReport() {
   const [range, setRange] = useState('today');
   const [view, setView] = useState('analysis');
   const [refresh, setRefresh] = useState(0);
-  const { data, loading, loaded, error } = useSalesSummary(
+  const { data, loading, error } = useSalesSummary(
     range,
     refresh,
     view === 'resumen' || view === 'pivot',
@@ -517,7 +517,7 @@ export default function VentasReport() {
             aria-pressed={view === 'resumen'}
             onClick={() => setView('resumen')}
           >
-            <Trans>Resumen</Trans>
+            <Trans>Cobros originales</Trans>
           </button>
           <button
             type="button"
@@ -560,7 +560,7 @@ export default function VentasReport() {
             <I.Refresh size={13} /> <Trans>Reintentar</Trans>
           </button>
         </div>
-      ) : loading && !loaded ? (
+      ) : loading || !data ? (
         // The loading state holds the shape of the coming content, so the page
         // does not jump when the numbers arrive. It never claims a fact first.
         <div
@@ -686,7 +686,10 @@ export default function VentasReport() {
               <Fact label={<Trans>Órdenes</Trans>} value={totals?.orders ?? 0} />
               <Fact
                 label={<Trans>Ticket cobrado con propina</Trans>}
-                value={formatOperationMoney(totals?.averageTicketMinorUnits ?? 0, currency)}
+                value={formatOperationMoney(
+                  totals?.orders ? totals.averageTicketMinorUnits : null,
+                  currency,
+                )}
               />
               <Fact label={<Trans>Ítems vendidos</Trans>} value={totals?.itemsSold ?? 0} />
               <Fact

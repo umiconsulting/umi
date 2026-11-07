@@ -619,11 +619,45 @@ export function startSessionAutoRefresh() {
   };
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Session recovery is a public auth operation.
+export async function restoreSession() {
+  const cached = getLocalSession();
+  if (!COOKIE_AUTH) return cached;
+  try {
+    const response = await fetch(apiUrl(routes.auth.me), withCreds());
+    if (response.status === 401) {
+      const outcome = await refreshSession();
+      if (outcome === REFRESH_OK) return getLocalSession();
+      if (outcome === REFRESH_DEAD) {
+        window.localStorage.removeItem(LOCAL_SESSION_KEY);
+        return null;
+      }
+      return cached;
+    }
+    if (!response.ok) return cached;
+    const payload = await response.json();
+    if (!payload.session) return cached;
+    setLocalSession(payload.session);
+    return getLocalSession();
+  } catch {
+    return cached;
+  }
+}
+
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(undefined); // undefined = loading
+  const [session, setSession] = useState(undefined);
   useEffect(() => {
-    setSession(getLocalSession());
-    return startSessionAutoRefresh();
+    let active = true;
+    let cleanup = () => {};
+    restoreSession().then((restored) => {
+      if (!active) return;
+      setSession(restored);
+      cleanup = startSessionAutoRefresh();
+    });
+    return () => {
+      active = false;
+      cleanup();
+    };
   }, []);
 
   return (

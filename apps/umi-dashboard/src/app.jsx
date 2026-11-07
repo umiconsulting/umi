@@ -280,18 +280,18 @@ function DashboardLayout() {
   useEffect(() => {
     if (landedRef.current || !capabilities) return;
     landedRef.current = true;
-    if (location.pathname !== '/') return;
+    if (location.pathname !== '/' || new URLSearchParams(location.search).has('home')) return;
     const route = landingRouteFor({
       roleKey: capabilities.membership?.role,
       permissions: capabilities.membership?.permissions,
       canShow: (moduleKey) => merchantState.canShowModule(moduleKey),
     });
     if (route && route !== location.pathname) navigate(route, { replace: true });
-  }, [capabilities, location.pathname, merchantState, navigate]);
+  }, [capabilities, location.pathname, location.search, merchantState, navigate]);
 
   const nav = (id) => {
     setNavOpen(false);
-    navigate('/' + (id === 'overview' ? '' : id));
+    navigate(id === 'overview' ? '/?home=1' : '/' + id);
   };
 
   if (merchantState?.loading && !merchantState?.capabilities) {
