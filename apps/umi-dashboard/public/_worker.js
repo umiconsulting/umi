@@ -35,6 +35,52 @@ function isBackendPath(pathname) {
   );
 }
 
+const AUTH_COOKIE_NAMES = new Set(['umi_access', 'umi_refresh', 'umi_csrf', 'umi_remember']);
+const STAGING_COOKIE_PREFIX = 'umi_staging_';
+
+function stagingRequest(request, target) {
+  const headers = new Headers(request.headers);
+  const cookies = (headers.get('cookie') || '')
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const scoped = [];
+  for (const cookie of cookies) {
+    const separator = cookie.indexOf('=');
+    const name = cookie.slice(0, separator);
+    if (name.startsWith(STAGING_COOKIE_PREFIX)) {
+      const original = `umi_${name.slice(STAGING_COOKIE_PREFIX.length)}`;
+      if (AUTH_COOKIE_NAMES.has(original)) scoped.push(`${original}${cookie.slice(separator)}`);
+    } else if (!AUTH_COOKIE_NAMES.has(name)) {
+      scoped.push(cookie);
+    }
+  }
+  headers.set('cookie', scoped.join('; '));
+  return new Request(target, new Request(request, { headers }));
+}
+
+function stagingResponse(response) {
+  const cookies =
+    typeof response.headers.getSetCookie === 'function'
+      ? response.headers.getSetCookie()
+      : response.headers.getAll('Set-Cookie');
+  if (!cookies.length) return response;
+  const headers = new Headers(response.headers);
+  headers.delete('set-cookie');
+  for (const cookie of cookies) {
+    const name = cookie.slice(0, cookie.indexOf('='));
+    const scoped = AUTH_COOKIE_NAMES.has(name)
+      ? cookie.replace(/^umi_/, STAGING_COOKIE_PREFIX).replace(/;\s*Domain=[^;]*/gi, '')
+      : cookie;
+    headers.append('set-cookie', scoped);
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -50,6 +96,10 @@ export default {
       // socket.io survives. fetch() sets the Host header from the target URL,
       // so Caddy on the backend routes to the right vhost.
       const target = origin + url.pathname + url.search;
+      if (new URL(origin).hostname === 'api-staging.umiconsulting.co') {
+        const response = await fetch(stagingRequest(request, target));
+        return response.webSocket ? response : stagingResponse(response);
+      }
       return fetch(new Request(target, request));
     }
 

@@ -57,3 +57,7 @@ export function errMessage(payload, fallback = 'Error') {
   if (typeof payload.message === 'string' && payload.message) return payload.message;
   return fallback;
 }
+
+export function csrfCookieName() {
+  return CFG.environment === 'staging' && !CFG.apiBase ? 'umi_staging_csrf' : 'umi_csrf';
+}

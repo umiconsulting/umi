@@ -21,6 +21,21 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-11-07 - Modular dashboard and sales reliability
+
+- task type: product implementation and verification
+- request summary: Provide configurable home widgets and reliable sales details for all merchants.
+- filesystem slice inspected: apps/umi-dashboard, dashboard operations API, contract, deployment workflow.
+- chosen owner: apps/umi-dashboard
+- chosen path: feat/dashboard-business-overview, based on origin/staging.
+- skill or subagent used: product-feature-review, diagnosing-bugs, tdd, research, code-review, pr-gates, playwright-cli, dashboard-customer-ux-validation.
+- files touched: dashboard home, sales views, auth, Pages Worker, locale catalogues, tests, research and verification reports.
+- tools used: Node 22.23.2, pnpm 10.29.3, Playwright 1.62.1, Chromium CDP, axe-core, GitHub CLI.
+- outcome: Configurable widgets and consistent report context; real ONCA browser checks and local gates passed. Delivery targets staging.
+- reusable pattern observed: Match financial scope in the API query, cache identity, URL and detail view.
+- promotion follow-up: None. Existing product owners and skills cover this change.
+
+
 ### 2026-09-14 - Launch the local database, API, and POS stack
 - task type: local runtime startup
 - request summary: Start the local Postgres, Redis, umi-api, and native Linux UmiPOS, then prove readiness.

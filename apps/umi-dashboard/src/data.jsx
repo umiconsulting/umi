@@ -1,3 +1,4 @@
+import { csrfCookieName } from '@/lib/config.js';
 import { loadPreparationPages } from './screens/inventory-production-model.js';
 import { buildPath } from '@umi/contract/route-table';
 import { t } from '@lingui/core/macro';
@@ -58,8 +59,6 @@ const EMPTY_OPERATIONS = {
   items: [],
   page: { limit: 20, hasMore: false, nextCursor: null },
 };
-const DEVICE_LIVE_MS = 10_000;
-const DEVICE_OFFLINE_MS = 20_000;
 
 function _merchantId(ctx) {
   return ctx?.selectedMerchantId || ctx?.capabilities?.merchant?.id;
@@ -109,8 +108,8 @@ async function _apiFetch(path, opts, _retried) {
     const csrf = document.cookie
       .split(';')
       .map((part) => part.trim())
-      .find((part) => part.startsWith('umi_csrf='));
-    if (csrf) headers['X-UMI-CSRF'] = decodeURIComponent(csrf.slice('umi_csrf='.length));
+      .find((part) => part.startsWith(`${csrfCookieName()}=`));
+    if (csrf) headers['X-UMI-CSRF'] = decodeURIComponent(csrf.slice(csrfCookieName().length + 1));
   }
   if (opts.body != null) headers['Content-Type'] = 'application/json';
   const res = await fetch(
@@ -244,119 +243,42 @@ function _deps(ctx, extra) {
   ];
 }
 
-function _deviceStatus(lastUsedAt) {
-  if (!lastUsedAt) return 'offline';
-  var ms = Date.now() - new Date(lastUsedAt).getTime();
-  if (ms < DEVICE_LIVE_MS) return 'live';
-  if (ms < DEVICE_OFFLINE_MS) return 'slow';
-  return 'offline';
-}
-
-function _fmtLastSeen(lastUsedAt) {
-  if (!lastUsedAt) return t`nunca`;
-  var ms = Date.now() - new Date(lastUsedAt).getTime();
-  if (ms < 10000) return t`hace un momento`;
-  if (ms < 60000) return t`hace ${Math.floor(ms / 1000)} s`;
-  if (ms < 3600000) return t`hace ${Math.floor(ms / 60000)} min`;
-  return t`hace ${Math.floor(ms / 3600000)} h`;
-}
-
 async function _loadOverviewAndStations(ctx) {
-  const cashResults = _active(ctx, 'cash')
-    ? await Promise.allSettled([
-        _apiFetch(_merchantPath(ctx, '/cash/stats')),
-        _apiFetch(_merchantPath(ctx, '/cash/analytics')),
-        _apiFetch(_merchantPath(ctx, '/cash/gift-cards?limit=100')),
-      ])
-    : [];
-  const kdsResults = _active(ctx, 'kds')
-    ? await Promise.allSettled([
-        _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/kds/orders?filter=all'))),
-        _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/kds/devices'))),
-        _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/kds/ticker'))),
-      ])
-    : [];
-
-  const stats = cashResults[0]?.status === 'fulfilled' ? cashResults[0].value : null;
-  const analytics = cashResults[1]?.status === 'fulfilled' ? cashResults[1].value : null;
-  const giftCards =
-    cashResults[2]?.status === 'fulfilled' ? cashResults[2].value.giftCards || [] : [];
-  const orderPayload = kdsResults[0]?.status === 'fulfilled' ? kdsResults[0].value : null;
-  const devicePayload = kdsResults[1]?.status === 'fulfilled' ? kdsResults[1].value : null;
-  const tickerPayload = kdsResults[2]?.status === 'fulfilled' ? kdsResults[2].value : null;
-
-  const orders = orderPayload?.orders || [];
-  const devices = devicePayload?.devices || [];
-  const activeOrders = orders.filter(function (t) {
-    return ['new', 'accepted', 'preparing', 'ready'].indexOf(t.status) !== -1;
-  });
-  const completedOrders = orders.filter(function (t) {
-    return t.status === 'completed';
-  });
-  const cancelledOrders = orders.filter(function (t) {
-    return t.status === 'cancelled';
-  });
-  const totalAmount = orders.reduce(function (sum, t) {
-    return sum + (parseFloat(t.total_amount) || 0);
-  }, 0);
-
-  const byStation = {};
-  activeOrders.forEach(function (t) {
-    const sid = t.station_id || 'unassigned';
-    if (!byStation[sid]) byStation[sid] = { name: t.station_name || 'Unassigned', count: 0 };
-    byStation[sid].count++;
-  });
-  const devByStation = {};
-  devices.forEach(function (d) {
-    devByStation[d.station_id || 'unassigned'] = d.last_used_at;
-  });
-
-  const stations = Object.keys(byStation).map(function (sid) {
-    const lastAt = devByStation[sid] || null;
-    return {
-      station_id: sid,
-      station_name: byStation[sid].name,
-      label: sid.toUpperCase(),
-      status: _deviceStatus(lastAt),
-      open: byStation[sid].count,
-      foot: _fmtLastSeen(lastAt),
+  const cashEnabled =
+    _active(ctx, 'cash') && hasRequiredPermission(MODULES.loyalty, ctx?.capabilities);
+  const kitchenEnabled =
+    _active(ctx, 'kds') && hasRequiredPermission(MODULES.orders, ctx?.capabilities);
+  const [cash, kitchen] = await Promise.allSettled([
+    cashEnabled ? _apiFetch(_merchantPath(ctx, '/cash/analytics')) : null,
+    kitchenEnabled
+      ? _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/kds/orders?filter=all')))
+      : null,
+  ]);
+  const analytics = cash.status === 'fulfilled' ? cash.value : null;
+  const orders = kitchen.status === 'fulfilled' ? (kitchen.value?.orders ?? []) : [];
+  const stations = new Map();
+  for (const order of orders) {
+    if (!['new', 'accepted', 'preparing', 'ready'].includes(order.status)) continue;
+    const stationId = order.station_id || 'unassigned';
+    const station = stations.get(stationId) ?? {
+      station_id: stationId,
+      station_name: order.station_name || t`Sin estación`,
+      open: 0,
     };
-  });
-
-  const openGiftCards = giftCards.filter(function (card) {
-    return !card.isRedeemed;
-  });
-
+    station.open += 1;
+    stations.set(stationId, station);
+  }
   return {
     overview: {
       activeMembers: analytics?.totalCustomers ?? null,
-      memberDeltaPct: analytics?.memberDeltaPct ?? null,
-      memberHistory: analytics?.memberHistory ?? [],
-      newThisWeek: analytics?.newThisWeek ?? null,
-      birthdayActivatable: analytics?.birthdayActivatable ?? null,
-      highBalanceCount: analytics?.highBalanceCount ?? null,
-      visitsToday: stats?.visitsToday ?? null,
-      visitsDeltaPct: analytics?.visitsDeltaPct ?? null,
-      openGiftCards: openGiftCards.length,
-      openGiftCardsDelta: null,
-      rewardsRedeemed7d: analytics?.rewardsRedeemedThisMonth ?? null,
-      rewardsDelta7d: null,
-      revenueThisMonth: analytics?.topupsThisMonth ?? null,
-      revenueDeltaPct: null,
-      ordersToday: orders.length,
-      ordersAccepted: completedOrders.length + activeOrders.length,
-      ordersCancelled: cancelledOrders.length,
-      avgTicketMXN: orders.length ? Math.round(totalAmount / orders.length) : null,
-      walletProcessedToday: analytics?.topupsThisMonth ?? null,
-      topupsTodayMXN: stats?.topupsTodayMXN ?? null,
-      topupsTodayCount: stats?.topupsTodayCount ?? null,
-      redemptionsTodayMXN: null,
-      redemptionsTodayCount: null,
-      retentionRate: analytics?.retentionRate ?? null,
-      avgVisitsPerCustomer: analytics?.avgVisitsPerCustomer ?? null,
+      walletTopupsThisMonth: analytics?.topupsThisMonth ?? null,
     },
-    stations,
-    ticker: tickerPayload?.events || [],
+    sourceErrors: [cash, kitchen]
+      .filter((result) => result.status === 'rejected')
+      .map((result) => result.reason?.code || 'UNAVAILABLE'),
+    kitchenAvailable: kitchenEnabled && kitchen.status === 'fulfilled',
+    stations: [...stations.values()],
+    ticker: [],
   };
 }
 
@@ -1636,21 +1558,17 @@ function useSalesSummary(range, refresh, enabled = true) {
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
-export function useSalesAnalysisOptions() {
-  const ctx = useMerchant();
-  const result = useQuery({
-    queryKey: [
-      'sales-analysis-options',
-      _merchantId(ctx),
-      getStoredSession()?.user?.id,
-      ctx?.capabilities?.membership?.permissions,
-      ctx?.capabilities?.membership?.locationId,
-    ],
-    queryFn: () => _apiFetch(routes.salesAnalysis.options(_merchantId(ctx))),
-    enabled: Boolean(_merchantId(ctx)),
-    retry: false,
-  });
+function salesQueryIdentity(ctx) {
+  return [
+    _merchantId(ctx),
+    _locationId(ctx),
+    getStoredSession()?.user?.id,
+    ctx?.capabilities?.membership?.permissions,
+    ctx?.capabilities?.membership?.locationId,
+  ];
+}
+
+function salesQueryResult(result) {
   return {
     data: result.data,
     loading: result.isFetching,
@@ -1661,17 +1579,32 @@ export function useSalesAnalysisOptions() {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
+export function useSalesAnalysisOptions() {
+  const ctx = useMerchant();
+  const result = useQuery({
+    queryKey: ['sales-analysis-options', ...salesQueryIdentity(ctx)],
+    queryFn: () => _apiFetch(routes.salesAnalysis.options(_merchantId(ctx))),
+    enabled: Boolean(_merchantId(ctx)) && !ctx?.loading,
+    retry: false,
+  });
+  return salesQueryResult(result);
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
 export function useSalesAnalysis(query, refresh) {
   const ctx = useMerchant();
   const serialized = query
-    ? new URLSearchParams(Object.entries(query).filter(([, value]) => value !== '')).toString()
+    ? new URLSearchParams(
+        Object.entries(query).filter(([, value]) => value != null && value !== ''),
+      ).toString()
     : '';
-  return _useAsync(
-    () =>
-      query ? _apiFetch(`${routes.salesAnalysis.read(_merchantId(ctx))}?${serialized}`) : null,
-    _deps(ctx, [serialized, refresh]),
-    null,
-  );
+  const result = useQuery({
+    queryKey: ['sales-analysis', ...salesQueryIdentity(ctx), serialized, refresh],
+    queryFn: () => _apiFetch(`${routes.salesAnalysis.read(_merchantId(ctx))}?${serialized}`),
+    enabled: Boolean(query && _merchantId(ctx)) && !ctx?.loading,
+    retry: false,
+  });
+  return salesQueryResult(result);
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
