@@ -73,7 +73,8 @@ For October 9 through November 7, 2026, ONCA had 300 tickets and **MXN 42,111.00
 | Kombuchas  | `#000075`   |    MXN 750.00 |
 
 The selected seven-day period had a real zero total.
-The browser checks cover populated results, saved preferences, selection, navigation, mobile width, zero results and an absent category projection.
+The browser checks cover populated results, saved preferences, selection, navigation, mobile bounds, zero results and an absent category projection.
+The checks also cover the loading state, an API failure and successful retry.
 Three axe scans found zero violations. The browser reported zero JavaScript errors.
 Screenshots and machine results are in `/tmp/umi-category-evidence` on the verification host.
 The reproducible browser driver is `tools/ux-sweep/category-sales-browser.mjs`.
@@ -88,6 +89,19 @@ The PostgreSQL integration suite checks category totals, saved colors and existi
 
 Tools: Node 22.23.2, pnpm 10.29.3, Vitest, Playwright 1.62.1, Chromium 153.0.8010.52, axe-core and PostgreSQL.
 The canonical repository gates apply the existing lint warning baseline.
+
+## Standards
+
+The independent Standards review found zero material violations or code smells.
+The review compared the feature with `b04a1ba4` and used the repository instructions.
+
+## Spec
+
+The independent Spec review found one selection issue across cached report changes.
+A selected category absent from the new report could fade every cell.
+The fix limits the active selection to categories present in the current report.
+The reviewer confirmed the fix. Zero findings remain unresolved.
+The financial and context requirements passed the review.
 
 ## Delivery boundary
 

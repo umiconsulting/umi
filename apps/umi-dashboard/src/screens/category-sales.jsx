@@ -88,6 +88,7 @@ export default function CategorySalesCard({ report, query, detail = false }) {
   const rows = [...(report.byCategory ?? [])].sort(
     (a, b) => b.netMinorUnits - a.netMinorUnits || a.key.localeCompare(b.key),
   );
+  const activeSelected = rows.some((row) => row.key === selected) ? selected : null;
   const categoryName = (row) =>
     row.key === 'unattributed'
       ? t`Sin asignación verificable`
@@ -134,7 +135,7 @@ export default function CategorySalesCard({ report, query, detail = false }) {
       ) : (
         <>
           {state === 'ready' ? (
-            <HexagonMosaic rows={rows} selected={selected} categoryName={categoryName} />
+            <HexagonMosaic rows={rows} selected={activeSelected} categoryName={categoryName} />
           ) : (
             <p className="category-sales-notice" role="status">
               {state === 'signed' ? (
@@ -156,7 +157,7 @@ export default function CategorySalesCard({ report, query, detail = false }) {
                   <button
                     type="button"
                     className="category-sales-legend-row"
-                    aria-pressed={selected === row.key}
+                    aria-pressed={activeSelected === row.key}
                     onClick={() => setSelected(selected === row.key ? null : row.key)}
                   >
                     <span
@@ -212,7 +213,7 @@ export default function CategorySalesCard({ report, query, detail = false }) {
                           <button
                             type="button"
                             className="category-sales-category"
-                            aria-pressed={selected === row.key}
+                            aria-pressed={activeSelected === row.key}
                             onClick={() => setSelected(selected === row.key ? null : row.key)}
                           >
                             <span
