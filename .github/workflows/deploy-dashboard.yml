@@ -7,9 +7,9 @@
 #
 #   push to main     -> production deployment  (umi-dashboard.pages.dev, then the
 #                       custom domain once the CNAME points here)
-#   push to staging  -> staging preview        (staging.umi-dashboard.pages.dev,
+#   push to staging  -> staging project        (staging-dashboard.umiconsulting.co,
 #                       built against api-staging.umiconsulting.co)
-#   pull_request     -> preview deployment     (<branch>.umi-dashboard.pages.dev)
+#   pull_request     -> preview deployment     (pr-<number>.umi-dashboard.pages.dev)
 #
 # NOTE: GitHub runs the copy of this workflow that lives ON the pushed branch.
 #
@@ -62,8 +62,10 @@ permissions:
 
 jobs:
   deploy:
-    if: ${{ (github.head_ref || github.ref_name) != 'main' || vars.UMI_REWARD_RELEASE_HOLD != 'true' }}
+    if: ${{ github.event_name == 'pull_request' || github.ref_name != 'main' || vars.UMI_REWARD_RELEASE_HOLD != 'true' }}
     runs-on: ubuntu-latest
+    env:
+      DEPLOY_BRANCH: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref_name }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -84,6 +86,7 @@ jobs:
         run: pnpm install --frozen-lockfile --filter @umi/dashboard...
 
       - name: Write build env
+        id: build-config
         run: |
           # The deploy target branch selects the environment. Production (main)
           # calls the API directly — it is already same-site with the dashboard.
@@ -91,20 +94,29 @@ jobs:
           # so the SPA calls the API SAME-ORIGIN through public/_worker.js; that
           # keeps the session cookie first-party, which Safari iOS ITP requires
           # (…pages.dev and …umiconsulting.co are different sites). The preview
-          # backend is chosen at runtime by the Pages "Preview" env var
-          # API_ORIGIN. All values here are public build-time config.
-          BRANCH="${{ github.head_ref || github.ref_name }}"
+          # backend is chosen at runtime by API_ORIGIN on the selected Pages
+          # project and environment. All values here are public build-time config.
+          BRANCH="$DEPLOY_BRANCH"
+          PROJECT=umi-dashboard
           CONTRACT_VERSION="$(sed -n "s/^export const CONTRACT_VERSION = '\(.*\)';$/\1/p" packages/contract/src/catalog.ts)"
           test -n "$CONTRACT_VERSION" || { echo "CONTRACT_VERSION not found in packages/contract/src/catalog.ts"; exit 1; }
           if [ "$BRANCH" = "main" ]; then
             ENVIRONMENT=production
             API_BASE=https://api.umiconsulting.co
             PUBLIC_URL=https://dashboard.umiconsulting.co
+          elif [ "$BRANCH" = "staging" ]; then
+            ENVIRONMENT=staging
+            API_BASE=
+            PROJECT=umi-dashboard-staging
+            PUBLIC_URL=https://staging-dashboard.umiconsulting.co
           else
             ENVIRONMENT=staging
             API_BASE=
-            PUBLIC_URL=https://staging.umi-dashboard.pages.dev
+            PREVIEW_ALIAS=$(printf '%s' "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
+            PUBLIC_URL="https://$PREVIEW_ALIAS.umi-dashboard.pages.dev"
           fi
+          echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
+          echo "public_url=$PUBLIC_URL" >> "$GITHUB_OUTPUT"
           echo "Build env: branch=$BRANCH environment=$ENVIRONMENT api=${API_BASE:-(same-origin)}"
           cat > apps/umi-dashboard/.env.production.local <<EOF
           VITE_UMI_ENVIRONMENT=$ENVIRONMENT
@@ -136,17 +148,20 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 8aef562d6d0c51b70f1b83fa1d2912a4
+          PAGES_PROJECT: ${{ steps.build-config.outputs.project }}
+          PUBLIC_URL: ${{ steps.build-config.outputs.public_url }}
         run: |
-          # main -> production branch "main"; PR -> preview branch = head ref.
-          BRANCH="${{ github.head_ref || github.ref_name }}"
+          # Each stable branch has its own project. PRs preview on umi-dashboard.
+          BRANCH="$DEPLOY_BRANCH"
           echo "Deploying to Cloudflare Pages (branch: $BRANCH)"
           OUT=$(pnpm dlx wrangler@4.129.0 pages deploy apps/umi-dashboard/dist \
-            --project-name=umi-dashboard --branch="$BRANCH" --commit-dirty=true 2>&1)
+            --project-name="$PAGES_PROJECT" --branch="$BRANCH" --commit-dirty=true 2>&1)
           echo "$OUT"
           URL=$(echo "$OUT" | grep -oE 'https://[a-z0-9.-]+\.pages\.dev' | tail -1)
           {
-            echo "### Cloudflare Pages — umi-dashboard"
+            echo "### Cloudflare Pages — $PAGES_PROJECT"
             echo ""
             echo "- branch: \`$BRANCH\`"
+            echo "- public URL: $PUBLIC_URL"
             echo "- deployment: $URL"
           } >> "$GITHUB_STEP_SUMMARY"

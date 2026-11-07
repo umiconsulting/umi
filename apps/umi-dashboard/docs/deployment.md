@@ -1,10 +1,28 @@
 # UMI Dashboard Deployment
 
-Updated: 2026-08-13
+Updated: 2026-11-06
 
 UMI Dashboard is a static Vite application. UMI API owns all authentication, reads, commands, PostgreSQL access, and RLS enforcement.
 
 The Dashboard has no Express backend, direct database connection, Supabase credential, service-role credential, or independent identity system.
+
+## Cloudflare Pages targets
+
+The workflow `.github/workflows/deploy-dashboard.yml` deploys these targets:
+
+| Git branch    | Pages project            | Public URL                                   | API                                    |
+| ------------- | ------------------------ | -------------------------------------------- | -------------------------------------- |
+| `main`        | `umi-dashboard`          | `https://dashboard.umiconsulting.co`         | `https://api.umiconsulting.co`         |
+| `staging`     | `umi-dashboard-staging`  | `https://staging-dashboard.umiconsulting.co` | `https://api-staging.umiconsulting.co` |
+| Pull requests | `umi-dashboard` previews | URL in the workflow summary                  | `https://api-staging.umiconsulting.co` |
+
+The staging project uses `staging` as its production branch. Both of its Pages environments set `API_ORIGIN=https://api-staging.umiconsulting.co`.
+Its builds use an empty `VITE_API_BASE`. The Pages Worker forwards API calls under the same origin.
+The DNS record `staging-dashboard` is a CNAME to `umi-dashboard-staging.pages.dev`.
+
+Squarespace owns the authoritative DNS. A separate project keeps the custom domain on staging with external DNS.
+Cloudflare branch aliases require proxied Cloudflare DNS; an external CNAME to a preview alias can serve the production branch instead.
+See [Cloudflare's branch-domain guide](https://developers.cloudflare.com/pages/how-to/custom-branch-aliases/).
 
 ## Build contract
 
