@@ -128,7 +128,8 @@ No Redis cache or new service was added.
 - Requests consume the TanStack `AbortSignal`.
 - A background refresh preserves the current report and shows **Actualizando ventas…**.
 - Query errors retain the explicit error flow. They never become zero totals.
-- Successful group writes invalidate the merchant's report entries after the API confirms success.
+- Successful group writes cancel and invalidate the merchant's options and report entries after API confirmation.
+- Failed requests schedule the next automatic attempt from the error time, rather than poll each second.
 
 The backend still checks current permissions on every actual request.
 The change adds no shared server cache that could bypass RLS or expose another user's report.
@@ -141,6 +142,9 @@ The real browser verification confirmed:
 - Visible report values during background refresh.
 - Automatic refresh after 58,877 ms in the measured run.
 - Zero JavaScript errors.
+- A computation error preserves the explicit error state, avoids repeated requests and recovers through manual retry.
+
+The final category regression also passed all data states and three axe scans with zero violations.
 
 The driver is `tools/performance/dashboard-sales-browser.mjs`.
 It uses an authorized local browser session and preserves the user's tabs.
@@ -176,9 +180,19 @@ The local configuration was supplied before the next verification run.
 No production or staging configuration changed.
 
 The affected gate passed seven tasks: builds, lint and tests.
-The dashboard suite passed 654 tests. The API suite passed 2,163 tests and retained 29 existing skips.
+The dashboard suite passed 660 tests. The API suite passed 2,163 tests and retained 29 existing skips.
 The sales analysis PostgreSQL integration suite passed seven tests.
 The API typecheck and canonical repository gate passed.
 The dashboard retains its baseline of 68 lint warnings and its existing bundle size warning.
+
+## Independent reviews
+
+Standards: zero unresolved material findings.
+Spec: zero unresolved findings.
+The reviews found failed-poll repetition and stale inactive options after group writes.
+They also reproduced an in-flight write race with cached and empty query data.
+The fixes use the latest error time for polling and explicit cancellation before options and report invalidation.
+Ten cache tests cover reuse, scope, refresh, errors and all four invalidation race cases.
+The reviewers independently confirmed the final fixes.
 
 Tools: Node 22.23.2, pnpm 10.29.3, PostgreSQL 17.10, pg 8.22.0, TanStack Query 5.102.8, Playwright 1.62.1 and Chromium CDP.
