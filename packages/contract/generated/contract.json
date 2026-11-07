@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "ba77791df8f978708456ed47f19779546f5499601c2693c404f71dcf90858227",
-  "contractVersion": "2.51.0",
+  "contentHash": "0dc9beda70ff3b6925c59bdd870b5fdc03b1204719657d567ee72a68b54ca2e8",
+  "contractVersion": "2.52.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -746,6 +746,15 @@
       "properties": {
         "code": {
           "enum": [
+            "REPORT_RANGE_TOO_LARGE",
+            "REPORT_AMOUNT_OUT_OF_RANGE",
+            "REPORT_CATALOG_TOO_LARGE",
+            "REPORT_CURRENCY_MISMATCH",
+            "REPORT_GROUP_INVALID",
+            "REPORT_GROUP_CHANGED",
+            "REPORT_GROUP_NAME_EXISTS",
+            "REPORT_GROUP_PRODUCT_INVALID",
+            "REPORT_GROUP_LIMIT",
             "VALIDATION_FAILED",
             "AUTHENTICATION_REQUIRED",
             "PERMISSION_DENIED",
@@ -977,6 +986,15 @@
           "properties": {
             "code": {
               "enum": [
+                "REPORT_RANGE_TOO_LARGE",
+                "REPORT_AMOUNT_OUT_OF_RANGE",
+                "REPORT_CATALOG_TOO_LARGE",
+                "REPORT_CURRENCY_MISMATCH",
+                "REPORT_GROUP_INVALID",
+                "REPORT_GROUP_CHANGED",
+                "REPORT_GROUP_NAME_EXISTS",
+                "REPORT_GROUP_PRODUCT_INVALID",
+                "REPORT_GROUP_LIMIT",
                 "VALIDATION_FAILED",
                 "AUTHENTICATION_REQUIRED",
                 "PERMISSION_DENIED",
@@ -90841,6 +90859,1142 @@
       ],
       "type": "object"
     },
+    "SalesAnalysis": {
+      "additionalProperties": false,
+      "properties": {
+        "basketUnit": {
+          "enum": [
+            "ticket",
+            "table_visit"
+          ],
+          "type": "string"
+        },
+        "byDay": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "averageTicketMinorUnits": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "discountsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "merchandiseMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "netMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "refundsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "tickets": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "tipsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "units": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "unitsPerTicket": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "tickets",
+              "units",
+              "merchandiseMinorUnits",
+              "refundsMinorUnits",
+              "netMinorUnits",
+              "averageTicketMinorUnits",
+              "unitsPerTicket",
+              "tipsMinorUnits",
+              "discountsMinorUnits",
+              "key",
+              "label"
+            ],
+            "type": "object"
+          },
+          "maxItems": 731,
+          "type": "array"
+        },
+        "byHour": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "averageTicketMinorUnits": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "discountsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "merchandiseMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "netMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "refundsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "tickets": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "tipsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "units": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "unitsPerTicket": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "tickets",
+              "units",
+              "merchandiseMinorUnits",
+              "refundsMinorUnits",
+              "netMinorUnits",
+              "averageTicketMinorUnits",
+              "unitsPerTicket",
+              "tipsMinorUnits",
+              "discountsMinorUnits",
+              "key",
+              "label"
+            ],
+            "type": "object"
+          },
+          "maxItems": 24,
+          "type": "array"
+        },
+        "byLocation": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "averageTicketMinorUnits": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "discountsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "merchandiseMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "netMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "refundsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "tickets": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "tipsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "units": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "unitsPerTicket": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "tickets",
+              "units",
+              "merchandiseMinorUnits",
+              "refundsMinorUnits",
+              "netMinorUnits",
+              "averageTicketMinorUnits",
+              "unitsPerTicket",
+              "tipsMinorUnits",
+              "discountsMinorUnits",
+              "key",
+              "label"
+            ],
+            "type": "object"
+          },
+          "maxItems": 1000,
+          "type": "array"
+        },
+        "byMonth": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "averageTicketMinorUnits": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "discountsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "merchandiseMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "netMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "refundsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "tickets": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "tipsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "units": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "unitsPerTicket": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "tickets",
+              "units",
+              "merchandiseMinorUnits",
+              "refundsMinorUnits",
+              "netMinorUnits",
+              "averageTicketMinorUnits",
+              "unitsPerTicket",
+              "tipsMinorUnits",
+              "discountsMinorUnits",
+              "key",
+              "label"
+            ],
+            "type": "object"
+          },
+          "maxItems": 25,
+          "type": "array"
+        },
+        "byWeekday": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "averageTicketMinorUnits": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "discountsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "merchandiseMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "netMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "refundsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "tickets": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "tipsMinorUnits": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "units": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "unitsPerTicket": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "tickets",
+              "units",
+              "merchandiseMinorUnits",
+              "refundsMinorUnits",
+              "netMinorUnits",
+              "averageTicketMinorUnits",
+              "unitsPerTicket",
+              "tipsMinorUnits",
+              "discountsMinorUnits",
+              "key",
+              "label"
+            ],
+            "type": "object"
+          },
+          "maxItems": 7,
+          "type": "array"
+        },
+        "capturedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "coverage": {
+          "additionalProperties": false,
+          "properties": {
+            "baskets": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "categoriesUseCurrentCatalog": {
+              "const": true,
+              "type": "boolean"
+            },
+            "legacyDiscountTickets": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "pairsAvailable": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "refundedUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "ticketsWithoutProducts": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "ticketsWithoutVisit": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "ticketsWithVisit": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "baskets",
+            "ticketsWithVisit",
+            "ticketsWithoutVisit",
+            "ticketsWithoutProducts",
+            "refundedUnits",
+            "legacyDiscountTickets",
+            "pairsAvailable",
+            "categoriesUseCurrentCatalog"
+          ],
+          "type": "object"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "firstSaleDate": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "from": {
+          "format": "date",
+          "type": "string"
+        },
+        "locationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "pairs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "baskets": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "basketsWithA": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "basketsWithB": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "confidenceAtoB": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "confidenceBtoA": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lift": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "productAId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "productAName": {
+                "type": "string"
+              },
+              "productBId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "productBName": {
+                "type": "string"
+              },
+              "support": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "productAId",
+              "productAName",
+              "productBId",
+              "productBName",
+              "baskets",
+              "basketsWithA",
+              "basketsWithB",
+              "support",
+              "confidenceAtoB",
+              "confidenceBtoA",
+              "lift"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "refundView": {
+          "enum": [
+            "sale_result",
+            "period_movements"
+          ],
+          "type": "string"
+        },
+        "selectedGroups": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "b": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "basketsWithA": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "basketsWithB": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "basketsWithBoth": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "confidenceAtoB": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lift": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "overlappingProducts": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "support": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "a",
+            "b",
+            "basketsWithA",
+            "basketsWithB",
+            "basketsWithBoth",
+            "support",
+            "confidenceAtoB",
+            "lift",
+            "overlappingProducts"
+          ],
+          "type": "object"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "to": {
+          "format": "date",
+          "type": "string"
+        },
+        "totals": {
+          "additionalProperties": false,
+          "properties": {
+            "averageTicketMinorUnits": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "discountsMinorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "merchandiseMinorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "netMinorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "refundsMinorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "tickets": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "tipsMinorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "units": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "unitsPerTicket": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "tickets",
+            "units",
+            "merchandiseMinorUnits",
+            "refundsMinorUnits",
+            "netMinorUnits",
+            "averageTicketMinorUnits",
+            "unitsPerTicket",
+            "tipsMinorUnits",
+            "discountsMinorUnits"
+          ],
+          "type": "object"
+        },
+        "unitsDistribution": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "tickets": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "units": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "units",
+              "tickets"
+            ],
+            "type": "object"
+          },
+          "maxItems": 20000,
+          "type": "array"
+        }
+      },
+      "required": [
+        "merchantId",
+        "locationId",
+        "from",
+        "to",
+        "timezone",
+        "currency",
+        "refundView",
+        "basketUnit",
+        "capturedAt",
+        "firstSaleDate",
+        "totals",
+        "byHour",
+        "byDay",
+        "byWeekday",
+        "byMonth",
+        "byLocation",
+        "coverage",
+        "unitsDistribution",
+        "pairs",
+        "selectedGroups"
+      ],
+      "type": "object"
+    },
+    "SalesAnalysisDeleteQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "expectedVersion"
+      ],
+      "type": "object"
+    },
+    "SalesAnalysisGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "productIds": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "version": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "productIds",
+        "id",
+        "version"
+      ],
+      "type": "object"
+    },
+    "SalesAnalysisGroupDeleted": {
+      "additionalProperties": false,
+      "properties": {
+        "deleted": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "deleted"
+      ],
+      "type": "object"
+    },
+    "SalesAnalysisGroupInput": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "productIds": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 500,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "productIds"
+      ],
+      "type": "object"
+    },
+    "SalesAnalysisGroupWrite": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedVersion": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer"
+        },
+        "name": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "productIds": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 500,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "productIds",
+        "expectedVersion"
+      ],
+      "type": "object"
+    },
+    "SalesAnalysisOptions": {
+      "additionalProperties": false,
+      "properties": {
+        "canCompareLocations": {
+          "type": "boolean"
+        },
+        "canManageGroups": {
+          "type": "boolean"
+        },
+        "firstSaleDate": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "groups": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "productIds": {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "type": "array"
+              },
+              "version": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "productIds",
+              "id",
+              "version"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
+        },
+        "locations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "products": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "categoryId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "categoryId",
+              "category"
+            ],
+            "type": "object"
+          },
+          "maxItems": 5000,
+          "type": "array"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "today": {
+          "format": "date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "timezone",
+        "today",
+        "firstSaleDate",
+        "products",
+        "groups",
+        "canManageGroups",
+        "canCompareLocations",
+        "locations"
+      ],
+      "type": "object"
+    },
+    "SalesAnalysisOptionsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SalesAnalysisQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "basketUnit": {
+          "default": "ticket",
+          "enum": [
+            "ticket",
+            "table_visit"
+          ],
+          "type": "string"
+        },
+        "from": {
+          "format": "date",
+          "type": "string"
+        },
+        "groupA": {
+          "maxLength": 80,
+          "type": "string"
+        },
+        "groupB": {
+          "maxLength": 80,
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "refundView": {
+          "default": "sale_result",
+          "enum": [
+            "sale_result",
+            "period_movements"
+          ],
+          "type": "string"
+        },
+        "to": {
+          "format": "date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
     "SaleSnapshot": {
       "additionalProperties": false,
       "properties": {
@@ -105653,6 +106807,42 @@
       "public": true,
       "retryable": false
     },
+    "REPORT_AMOUNT_OUT_OF_RANGE": {
+      "public": true,
+      "retryable": false
+    },
+    "REPORT_CATALOG_TOO_LARGE": {
+      "public": true,
+      "retryable": false
+    },
+    "REPORT_CURRENCY_MISMATCH": {
+      "public": true,
+      "retryable": false
+    },
+    "REPORT_GROUP_CHANGED": {
+      "public": true,
+      "retryable": false
+    },
+    "REPORT_GROUP_INVALID": {
+      "public": true,
+      "retryable": false
+    },
+    "REPORT_GROUP_LIMIT": {
+      "public": true,
+      "retryable": false
+    },
+    "REPORT_GROUP_NAME_EXISTS": {
+      "public": true,
+      "retryable": false
+    },
+    "REPORT_GROUP_PRODUCT_INVALID": {
+      "public": true,
+      "retryable": false
+    },
+    "REPORT_RANGE_TOO_LARGE": {
+      "public": true,
+      "retryable": false
+    },
     "RESERVATION_CONFLICT": {
       "public": true,
       "retryable": false
@@ -105852,6 +107042,33 @@
       "pin": false,
       "request": "PointTerminalQuery",
       "response": "PointTerminal"
+    },
+    "DELETE /api/merchants/:merchantId/operations/reports/sales/analysis/groups/:groupId": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "location_scope_required",
+        "location_switch_denied",
+        "VALIDATION_FAILED",
+        "REPORT_RANGE_TOO_LARGE",
+        "REPORT_AMOUNT_OUT_OF_RANGE",
+        "REPORT_CATALOG_TOO_LARGE",
+        "REPORT_CURRENCY_MISMATCH",
+        "REPORT_GROUP_INVALID",
+        "REPORT_GROUP_CHANGED",
+        "REPORT_GROUP_NAME_EXISTS",
+        "REPORT_GROUP_PRODUCT_INVALID",
+        "REPORT_GROUP_LIMIT"
+      ],
+      "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "merchant.manage",
+      "pin": false,
+      "request": "SalesAnalysisDeleteQuery",
+      "response": "SalesAnalysisGroupDeleted"
     },
     "DELETE /api/v1/pos/merchants/:merchantId/cart/lines/:lineId": {
       "approval": false,
@@ -106152,6 +107369,60 @@
       "pin": false,
       "request": "DashboardOperationsQuery",
       "response": "DashboardOperationsSnapshot"
+    },
+    "GET /api/merchants/:merchantId/operations/reports/sales/analysis": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "location_scope_required",
+        "location_switch_denied",
+        "VALIDATION_FAILED",
+        "REPORT_RANGE_TOO_LARGE",
+        "REPORT_AMOUNT_OUT_OF_RANGE",
+        "REPORT_CATALOG_TOO_LARGE",
+        "REPORT_CURRENCY_MISMATCH",
+        "REPORT_GROUP_INVALID",
+        "REPORT_GROUP_CHANGED",
+        "REPORT_GROUP_NAME_EXISTS",
+        "REPORT_GROUP_PRODUCT_INVALID",
+        "REPORT_GROUP_LIMIT"
+      ],
+      "idempotent": false,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "sale.lifecycle",
+      "pin": false,
+      "request": "SalesAnalysisQuery",
+      "response": "SalesAnalysis"
+    },
+    "GET /api/merchants/:merchantId/operations/reports/sales/analysis/options": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "location_scope_required",
+        "location_switch_denied",
+        "VALIDATION_FAILED",
+        "REPORT_RANGE_TOO_LARGE",
+        "REPORT_AMOUNT_OUT_OF_RANGE",
+        "REPORT_CATALOG_TOO_LARGE",
+        "REPORT_CURRENCY_MISMATCH",
+        "REPORT_GROUP_INVALID",
+        "REPORT_GROUP_CHANGED",
+        "REPORT_GROUP_NAME_EXISTS",
+        "REPORT_GROUP_PRODUCT_INVALID",
+        "REPORT_GROUP_LIMIT"
+      ],
+      "idempotent": false,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "sale.lifecycle",
+      "pin": false,
+      "request": "SalesAnalysisOptionsQuery",
+      "response": "SalesAnalysisOptions"
     },
     "GET /api/merchants/:merchantId/prep-list": {
       "approval": false,
@@ -109743,6 +111014,33 @@
       "pin": false,
       "request": "PointTerminalBindRequest",
       "response": "PointTerminal"
+    },
+    "PUT /api/merchants/:merchantId/operations/reports/sales/analysis/groups/:groupId": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "location_scope_required",
+        "location_switch_denied",
+        "VALIDATION_FAILED",
+        "REPORT_RANGE_TOO_LARGE",
+        "REPORT_AMOUNT_OUT_OF_RANGE",
+        "REPORT_CATALOG_TOO_LARGE",
+        "REPORT_CURRENCY_MISMATCH",
+        "REPORT_GROUP_INVALID",
+        "REPORT_GROUP_CHANGED",
+        "REPORT_GROUP_NAME_EXISTS",
+        "REPORT_GROUP_PRODUCT_INVALID",
+        "REPORT_GROUP_LIMIT"
+      ],
+      "idempotent": true,
+      "locationContext": false,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "merchant.manage",
+      "pin": false,
+      "request": "SalesAnalysisGroupWrite",
+      "response": "SalesAnalysisGroup"
     },
     "PUT /api/merchants/:merchantId/suppliers/:supplierId": {
       "approval": false,

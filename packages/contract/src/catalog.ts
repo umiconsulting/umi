@@ -17,6 +17,7 @@ import { posCashModels } from './pos-cash';
 import { posExceptionModels } from './pos-exception';
 import { posInventoryModels } from './pos-inventory';
 import { procurementModels } from './procurement';
+import { salesAnalysisModels } from './sales-analysis';
 import { inventoryCostingModels } from './inventory-costing';
 import { recipesModels } from './recipes';
 import { posCustomerValueModels } from './pos-customer-value';
@@ -188,7 +189,8 @@ import type { ZodTypeAny } from 'zod';
  * 2.46.0 — kitchen snapshots expose the normalized order fulfillment type.
  */
 /** 2.50.0 adds exact preparation previews and optional quantities for a production plan. */
-export const CONTRACT_VERSION = '2.51.0';
+/** 2.52.0 adds purchase analysis, configurable groups and explicit report errors. */
+export const CONTRACT_VERSION = '2.52.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;
@@ -233,6 +235,7 @@ export const modelCatalog: Readonly<Record<string, ZodTypeAny>> = {
   ...posInventoryModels,
   ...procurementModels,
   ...inventoryCostingModels,
+  ...salesAnalysisModels,
   // Recipes and inventory authoring (workstream E step 4, build-v3-76). No name
   // here is also named by `posInventoryModels`: the console's item is
   // `InventoryAuthoringItem`, so the POS stock view keeps the plain `InventoryItem`
