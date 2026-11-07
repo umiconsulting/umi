@@ -21,6 +21,8 @@ import { useMerchant } from '@/lib/merchant-context.jsx';
 import { MODULES, hasRequiredPermission, isProductActive } from '@/lib/module-registry.js';
 import { routes } from '@umi/contract/routes';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { queryClient } from '@/lib/query-client.js';
+import { salesAnalysisQuery, salesCachePolicy } from '@/lib/sales-analysis-query.js';
 import { subscribeConversationMessages } from '@/lib/conversation-realtime.js';
 
 const EMPTY_OVERVIEW = {};
@@ -1571,7 +1573,8 @@ function salesQueryIdentity(ctx) {
 function salesQueryResult(result) {
   return {
     data: result.data,
-    loading: result.isFetching,
+    loading: !result.data && result.isFetching,
+    refreshing: Boolean(result.data && result.isFetching),
     error: result.error?.message,
     errorCode: result.error?.code,
     refetch: result.refetch,
@@ -1582,8 +1585,9 @@ function salesQueryResult(result) {
 export function useSalesAnalysisOptions() {
   const ctx = useMerchant();
   const result = useQuery({
+    ...salesCachePolicy,
     queryKey: ['sales-analysis-options', ...salesQueryIdentity(ctx)],
-    queryFn: () => _apiFetch(routes.salesAnalysis.options(_merchantId(ctx))),
+    queryFn: ({ signal }) => _apiFetch(routes.salesAnalysis.options(_merchantId(ctx)), { signal }),
     enabled: Boolean(_merchantId(ctx)) && !ctx?.loading,
     retry: false,
   });
@@ -1591,16 +1595,10 @@ export function useSalesAnalysisOptions() {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
-export function useSalesAnalysis(query, refresh) {
+export function useSalesAnalysis(query) {
   const ctx = useMerchant();
-  const serialized = query
-    ? new URLSearchParams(
-        Object.entries(query).filter(([, value]) => value != null && value !== ''),
-      ).toString()
-    : '';
   const result = useQuery({
-    queryKey: ['sales-analysis', ...salesQueryIdentity(ctx), serialized, refresh],
-    queryFn: () => _apiFetch(`${routes.salesAnalysis.read(_merchantId(ctx))}?${serialized}`),
+    ...salesAnalysisQuery(salesQueryIdentity(ctx), query, _apiFetch),
     enabled: Boolean(query && _merchantId(ctx)) && !ctx?.loading,
     retry: false,
   });
@@ -1608,20 +1606,24 @@ export function useSalesAnalysis(query, refresh) {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
-export function saveSalesAnalysisGroup(merchantId, group) {
+export async function saveSalesAnalysisGroup(merchantId, group) {
   const { id, ...body } = group;
-  return _apiFetch(routes.salesAnalysis.saveGroup(merchantId, id), {
+  const saved = await _apiFetch(routes.salesAnalysis.saveGroup(merchantId, id), {
     method: 'PUT',
     body: JSON.stringify(body),
   });
+  await queryClient.invalidateQueries({ queryKey: ['sales-analysis', merchantId] });
+  return saved;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
-export function deleteSalesAnalysisGroup(merchantId, group) {
-  return _apiFetch(
+export async function deleteSalesAnalysisGroup(merchantId, group) {
+  const deleted = await _apiFetch(
     `${routes.salesAnalysis.deleteGroup(merchantId, group.id)}?expectedVersion=${group.version}`,
     { method: 'DELETE' },
   );
+  await queryClient.invalidateQueries({ queryKey: ['sales-analysis', merchantId] });
+  return deleted;
 }
 
 // The AI sales narrative for the current range/scope. Lazy companion to useSalesSummary;

@@ -5,14 +5,16 @@ const ratio = (numerator: number, denominator: number) =>
   denominator ? numerator / denominator : null;
 
 function retainedLines(sale: AnalysisSale, query: SalesAnalysisQuery) {
+  const returnedByLine = new Map<string, number>();
+  if (query.refundView === 'sale_result') {
+    for (const refund of sale.refunds) {
+      for (const entry of refund.quantities) {
+        returnedByLine.set(entry.lineId, (returnedByLine.get(entry.lineId) ?? 0) + entry.quantity);
+      }
+    }
+  }
   return sale.lines.map((line) => {
-    const returned =
-      query.refundView === 'sale_result'
-        ? sale.refunds
-            .flatMap((refund) => refund.quantities)
-            .filter((entry) => entry.lineId === line.id)
-            .reduce((sum, entry) => sum + entry.quantity, 0)
-        : 0;
+    const returned = returnedByLine.get(line.id) ?? 0;
     return { ...line, quantity: Math.max(0, line.quantity - returned) };
   });
 }
@@ -43,18 +45,41 @@ function buildBaskets(sales: AnalysisSale[], query: SalesAnalysisQuery) {
 function countPairs(baskets: Set<string>[]) {
   const singles = new Map<string, number>();
   const pairs = new Map<string, { a: string; b: string; count: number }>();
-  for (const basket of baskets) {
-    const products = [...basket].sort();
-    for (const product of products) singles.set(product, (singles.get(product) ?? 0) + 1);
+  // Limit retained patterns and actual pair work independently of distinct pairs.
+  const patterns = new Map<string, { products: string[]; count: number }>();
+  const maxPatterns = 1000;
+  const maxPairEvaluations = 5_000_000;
+  let evaluations = 0;
+  function count(products: string[], weight: number) {
+    evaluations += (products.length * (products.length - 1)) / 2;
+    if (evaluations > maxPairEvaluations) throw new RangeError('REPORT_RANGE_TOO_COMPLEX');
+    for (const product of products) singles.set(product, (singles.get(product) ?? 0) + weight);
     for (let a = 0; a < products.length; a++) {
       for (let b = a + 1; b < products.length; b++) {
         const key = `${products[a]}:${products[b]}`;
         const pair = pairs.get(key) ?? { a: products[a], b: products[b], count: 0 };
-        pair.count++;
+        pair.count += weight;
         pairs.set(key, pair);
-        if (pairs.size > 100_000) throw new RangeError('REPORT_RANGE_TOO_LARGE');
+        if (pairs.size > 100_000) throw new RangeError('REPORT_RANGE_TOO_COMPLEX');
       }
     }
+  }
+  for (const basket of baskets) {
+    const products = [...basket].sort();
+    if ((products.length * (products.length - 1)) / 2 > 100_000)
+      throw new RangeError('REPORT_RANGE_TOO_COMPLEX');
+    if (products.length < 8) {
+      count(products, 1);
+      continue;
+    }
+    const key = JSON.stringify(products);
+    const pattern = patterns.get(key);
+    if (pattern) pattern.count++;
+    else if (patterns.size < maxPatterns) patterns.set(key, { products, count: 1 });
+    else count(products, 1);
+  }
+  for (const { products, count: weight } of patterns.values()) {
+    count(products, weight);
   }
   return { singles, pairs };
 }
@@ -72,8 +97,12 @@ function selectedGroups(
   let basketsWithB = 0;
   let basketsWithBoth = 0;
   for (const basket of baskets) {
-    const presentA = [...basket].filter((product) => productsA.has(product));
-    const presentB = [...basket].filter((product) => productsB.has(product));
+    const presentA: string[] = [];
+    const presentB: string[] = [];
+    for (const product of basket) {
+      if (productsA.has(product)) presentA.push(product);
+      if (productsB.has(product)) presentB.push(product);
+    }
     if (presentA.length) basketsWithA++;
     if (presentB.length) basketsWithB++;
     if (presentA.some((first) => presentB.some((second) => first !== second))) basketsWithBoth++;
@@ -104,22 +133,21 @@ export function analyzeBaskets(
   const rankedPairs = [...pairs.values()].sort(
     (a, b) => b.count - a.count || a.a.localeCompare(b.a) || a.b.localeCompare(b.b),
   );
+  let refundedUnits = 0;
+  for (const sale of allSales) {
+    for (const refund of sale.refunds) {
+      const day = query.refundView === 'sale_result' ? sale.day : refund.day;
+      if (day < query.from || day > query.to) continue;
+      for (const line of refund.quantities) refundedUnits += line.quantity;
+    }
+  }
   return {
     coverage: {
       baskets: baskets.length,
       ticketsWithVisit: sales.filter((sale) => sale.visitId).length,
       ticketsWithoutVisit: sales.filter((sale) => !sale.visitId).length,
       ticketsWithoutProducts,
-      refundedUnits: allSales
-        .flatMap((sale) =>
-          sale.refunds.filter((refund) =>
-            query.refundView === 'sale_result'
-              ? sale.day >= query.from && sale.day <= query.to
-              : refund.day >= query.from && refund.day <= query.to,
-          ),
-        )
-        .flatMap((refund) => refund.quantities)
-        .reduce((sum, entry) => sum + entry.quantity, 0),
+      refundedUnits,
       legacyDiscountTickets: sales.filter((sale) => sale.legacyDiscount).length,
       pairsAvailable: pairs.size,
       categoriesUseCurrentCatalog: true as const,

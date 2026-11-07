@@ -8288,6 +8288,11 @@ msgid "Últimos 30 días"
 msgstr "Last 30 days"
 
 #: src/screens/overview.jsx
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Actualizando ventas…"
+msgstr "Updating sales…"
+
+#: src/screens/overview.jsx
 msgid "La selección funciona en esta visita, pero el navegador no permitió guardarla."
 msgstr "The selection applies to this visit, but the browser could not save it."
 
@@ -9902,6 +9907,11 @@ msgstr "A business administrator can change the groups."
 #: src/screens/sales-purchase-analysis.jsx
 #~ msgid "Historial de ventas desde {0}. Datos consultados: {capturedAt}. El día y el mes actuales pueden estar incompletos."
 #~ msgstr "Sales history starts on {0}. Data queried at {capturedAt}. The current day and month can be incomplete."
+
+#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
+msgid "El análisis combina demasiados productos. Consulta un periodo menor."
+msgstr "The analysis combines too many products. Select a shorter period."
 
 #: src/screens/sales-purchase-analysis.jsx
 msgid "No se pudo consultar este periodo. Elige un rango menor, de hasta 731 días y 20,000 tickets."
