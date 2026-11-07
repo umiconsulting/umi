@@ -1,8 +1,11 @@
 # Verificación del análisis de compras
 
 Fecha: 6 de noviembre de 2026.
-Rama: `feat/sales-analysis-20261106`. Base: `e68ed51e63043397fb25a0936f8c601d01071435`, de `origin/staging`.
+Rama: `feat/sales-analysis`. Base de implementación: `e68ed51e63043397fb25a0936f8c601d01071435`, de `origin/staging`.
 La [especificación](../plans/2026-11-06-sales-analysis-spec.md) define el comportamiento aceptado.
+
+La rama se actualizó sobre `921c2b20`, de `origin/staging`, antes de publicar el PR.
+La suite de PostgreSQL está incluida en `test:integration:schema`, que ejecuta CI.
 
 ## Resultado local
 
