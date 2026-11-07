@@ -1,0 +1,147 @@
+.sales-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.analysis-panel,
+.analysis-filters {
+  padding: 20px;
+}
+.analysis-panel h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  color: var(--ink-1);
+}
+.analysis-panel p,
+.analysis-note {
+  font-size: 12px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.analysis-filters,
+.analysis-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+}
+.sales-analysis label,
+.analysis-dimension {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.sales-analysis input,
+.sales-analysis select {
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink-1);
+  max-width: 100%;
+  min-height: 36px;
+}
+.sales-analysis input:focus-visible,
+.sales-analysis select:focus-visible,
+.sales-analysis summary:focus-visible {
+  outline: 2px solid var(--merchant-brand);
+  outline-offset: 2px;
+}
+.analysis-filters label {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.analysis-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.analysis-lead {
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.analysis-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.analysis-facts dt {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.analysis-facts dd {
+  margin: 8px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+.analysis-table {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+.analysis-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.analysis-table th,
+.analysis-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.analysis-table caption {
+  text-align: left;
+  font-size: 12px;
+  margin-bottom: 12px;
+  color: var(--ink-2);
+}
+.analysis-table thead th {
+  color: var(--ink-2);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.analysis-panel summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.analysis-group-form {
+  margin-top: 16px;
+}
+.analysis-group-form fieldset {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: grid;
+  gap: 12px;
+}
+.analysis-products {
+  max-height: 240px;
+  overflow: auto;
+  border-block: 1px solid var(--line);
+}
+.sales-analysis .analysis-checkbox {
+  flex-direction: row;
+  align-items: center;
+  padding: 4px;
+}
+.analysis-checkbox input {
+  min-height: 20px;
+  width: 18px;
+  height: 18px;
+}
+@media (max-width: 600px) {
+  .analysis-panel,
+  .analysis-filters {
+    padding: 14px;
+  }
+  .analysis-lead {
+    font-size: 28px;
+  }
+}

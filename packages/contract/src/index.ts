@@ -33,6 +33,7 @@ export * from './pos-hardware';
 export * from './pos-kitchen';
 export * from './dashboard-operations';
 export * from './reports';
+export * from './sales-analysis';
 export * from './fiscal';
 export * from './tender';
 export * from './mercado-pago';

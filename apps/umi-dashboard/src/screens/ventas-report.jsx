@@ -5,6 +5,7 @@ import { I } from '@/icons.jsx';
 import { useSalesSummary, useSalesInsight } from '@/data.jsx';
 import { formatOperationMoney } from './operations-format.js';
 import Recibos from './recibos.jsx';
+import SalesPurchaseAnalysis from './sales-purchase-analysis.jsx';
 
 // Reportes → Ventas. Archetype: Board.
 //
@@ -395,7 +396,7 @@ function Pivot({ productMix, byOperator, byHour, currency }) {
               )}
               {th(
                 'net',
-                <Trans>Venta neta</Trans>,
+                <Trans>Importe antes de descuentos</Trans>,
                 true,
                 sort.col === 'net' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none',
               )}
@@ -449,11 +450,15 @@ function Pivot({ productMix, byOperator, byHour, currency }) {
 export default function VentasReport() {
   const { t, i18n } = useLingui();
   const [range, setRange] = useState('today');
-  const [view, setView] = useState('resumen');
+  const [view, setView] = useState('analysis');
   const [refresh, setRefresh] = useState(0);
-  const { data, loading, loaded, error } = useSalesSummary(range, refresh);
+  const { data, loading, loaded, error } = useSalesSummary(
+    range,
+    refresh,
+    view === 'resumen' || view === 'pivot',
+  );
   // Optional AI narrative over the same range. Fail-safe: hidden until it returns text.
-  const insight = useSalesInsight(range, refresh);
+  const insight = useSalesInsight(range, refresh, view === 'resumen');
 
   const totals = data?.totals;
   const currency = data?.currency || 'MXN';
@@ -480,7 +485,7 @@ export default function VentasReport() {
       >
         {/* The range drives the aggregate and not the receipt list; hide it in
             Recibos, which carries its own view of committed receipts. */}
-        {view !== 'recibos' ? (
+        {view !== 'recibos' && view !== 'analysis' ? (
           <div className="seg" role="group" aria-label={t`Rango de fechas`}>
             {RANGES.map((r) => (
               <button
@@ -498,6 +503,14 @@ export default function VentasReport() {
           <span />
         )}
         <div className="seg" role="group" aria-label={t`Vista`}>
+          <button
+            type="button"
+            className={view === 'analysis' ? 'on' : ''}
+            aria-pressed={view === 'analysis'}
+            onClick={() => setView('analysis')}
+          >
+            <Trans>Análisis de compras</Trans>
+          </button>
           <button
             type="button"
             className={view === 'resumen' ? 'on' : ''}
@@ -525,7 +538,9 @@ export default function VentasReport() {
         </div>
       </div>
 
-      {view === 'recibos' ? (
+      {view === 'analysis' ? (
+        <SalesPurchaseAnalysis />
+      ) : view === 'recibos' ? (
         <Recibos />
       ) : error ? (
         <div
@@ -623,7 +638,7 @@ export default function VentasReport() {
           <section className="surface">
             <div style={{ padding: 24 }}>
               <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
-                <Trans>Ventas netas</Trans>
+                <Trans>Ventas cobradas con propina</Trans>
               </div>
               <div
                 className="figures"
@@ -639,6 +654,12 @@ export default function VentasReport() {
               >
                 {formatOperationMoney(net, currency)}
               </div>
+              <p style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                <Trans>
+                  Importes originales de los recibos, antes de devoluciones. Consulta Análisis de
+                  compras para ver la venta neta sin propina.
+                </Trans>
+              </p>
               {delta != null ? (
                 <div
                   style={{
@@ -664,7 +685,7 @@ export default function VentasReport() {
             >
               <Fact label={<Trans>Órdenes</Trans>} value={totals?.orders ?? 0} />
               <Fact
-                label={<Trans>Ticket promedio</Trans>}
+                label={<Trans>Ticket cobrado con propina</Trans>}
                 value={formatOperationMoney(totals?.averageTicketMinorUnits ?? 0, currency)}
               />
               <Fact label={<Trans>Ítems vendidos</Trans>} value={totals?.itemsSold ?? 0} />

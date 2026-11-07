@@ -14,11 +14,12 @@ import {
   handleSessionExpired,
   REFRESH_OK,
   REFRESH_DEAD,
+  getStoredSession,
 } from '@/lib/auth.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { MODULES, hasRequiredPermission, isProductActive } from '@/lib/module-registry.js';
 import { routes } from '@umi/contract/routes';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { subscribeConversationMessages } from '@/lib/conversation-realtime.js';
 
 const EMPTY_OVERVIEW = {};
@@ -1624,26 +1625,81 @@ function useOperationsData(domain, cursor, refresh, merchantWide, limit) {
 
 // The Reportes → Ventas aggregate for a range ('today' | 'yesterday' | 'last_7_days' |
 // 'last_30_days'). Re-fetches when the range, merchant, or location changes.
-function useSalesSummary(range, refresh) {
+function useSalesSummary(range, refresh, enabled = true) {
   const ctx = useMerchant();
   return _useAsync(
     function () {
-      return _loadSalesSummary(ctx, range);
+      return enabled ? _loadSalesSummary(ctx, range) : null;
     },
-    _deps(ctx, [range || 'today', refresh || 0]),
+    _deps(ctx, [range || 'today', refresh || 0, enabled]),
     null,
+  );
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
+export function useSalesAnalysisOptions() {
+  const ctx = useMerchant();
+  const result = useQuery({
+    queryKey: [
+      'sales-analysis-options',
+      _merchantId(ctx),
+      getStoredSession()?.user?.id,
+      ctx?.capabilities?.membership?.permissions,
+      ctx?.capabilities?.membership?.locationId,
+    ],
+    queryFn: () => _apiFetch(routes.salesAnalysis.options(_merchantId(ctx))),
+    enabled: Boolean(_merchantId(ctx)),
+    retry: false,
+  });
+  return {
+    data: result.data,
+    loading: result.isFetching,
+    error: result.error?.message,
+    errorCode: result.error?.code,
+    refetch: result.refetch,
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
+export function useSalesAnalysis(query, refresh) {
+  const ctx = useMerchant();
+  const serialized = query
+    ? new URLSearchParams(Object.entries(query).filter(([, value]) => value !== '')).toString()
+    : '';
+  return _useAsync(
+    () =>
+      query ? _apiFetch(`${routes.salesAnalysis.read(_merchantId(ctx))}?${serialized}`) : null,
+    _deps(ctx, [serialized, refresh]),
+    null,
+  );
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
+export function saveSalesAnalysisGroup(merchantId, group) {
+  const { id, ...body } = group;
+  return _apiFetch(routes.salesAnalysis.saveGroup(merchantId, id), {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
+export function deleteSalesAnalysisGroup(merchantId, group) {
+  return _apiFetch(
+    `${routes.salesAnalysis.deleteGroup(merchantId, group.id)}?expectedVersion=${group.version}`,
+    { method: 'DELETE' },
   );
 }
 
 // The AI sales narrative for the current range/scope. Lazy companion to useSalesSummary;
 // seeds empty and hides itself on a null narrative (fail-safe).
-function useSalesInsight(range, refresh) {
+function useSalesInsight(range, refresh, enabled = true) {
   const ctx = useMerchant();
   return _useAsync(
     function () {
-      return _loadSalesInsight(ctx, range);
+      return enabled ? _loadSalesInsight(ctx, range) : EMPTY_SALES_INSIGHT;
     },
-    _deps(ctx, [range || 'today', refresh || 0]),
+    _deps(ctx, [range || 'today', refresh || 0, enabled]),
     EMPTY_SALES_INSIGHT,
   );
 }

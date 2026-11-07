@@ -28,3 +28,19 @@
 - `location.switch` permite seleccionar otra sucursal del mismo merchant.
 - El `Alcance de sucursal` es la sucursal que la API obtiene de la asignación y de los permisos efectivos.
 - Una `Sucursal seleccionada` es una intención de navegación. No concede autoridad por sí misma.
+
+## Análisis de compras
+
+- La primera entrega da visibilidad al administrador. ONCA es el primer usuario; el cálculo pertenece al producto compartido.
+- El `Ticket de venta` es una venta confirmada con un recibo original inmutable.
+- La `Venta neta de productos` resta propinas y devoluciones al total del recibo, que ya contiene sus descuentos.
+- El `Ticket promedio sin propina` divide la venta neta de productos entre los tickets de venta del periodo.
+- El promedio del negocio usa sus importes y tickets totales. Evita promediar los promedios de sucursales.
+- El `Resultado de las ventas` asigna las devoluciones a la fecha de la venta original.
+- Los `Movimientos del periodo` asignan cada devolución a su fecha de confirmación, aunque la venta sea anterior.
+- La `Fecha de venta` conserva el día operativo del recibo. La `Hora comercial` conserva la hora del pedido.
+- Una `Compra conjunta` exige productos distintos dentro del mismo ticket o visita de mesa identificada.
+- Un `Grupo de análisis` reúne productos del mismo negocio, incluso si tienen distintas categorías.
+- Las categorías y los grupos actuales se aplican al historial consultado.
+
+La [especificación](docs/plans/2026-11-06-sales-analysis-spec.md) define denominadores, devoluciones, cobertura y límites.

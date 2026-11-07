@@ -15,6 +15,14 @@ import { buildPath, routePath, merchantBase } from './route-table';
 export { merchantBase };
 
 export const routes = {
+  salesAnalysis: {
+    read: (merchantId: string) => buildPath('salesAnalysis.read', { merchantId }),
+    options: (merchantId: string) => buildPath('salesAnalysis.options', { merchantId }),
+    saveGroup: (merchantId: string, groupId: string) =>
+      buildPath('salesAnalysis.saveGroup', { merchantId, groupId }),
+    deleteGroup: (merchantId: string, groupId: string) =>
+      buildPath('salesAnalysis.deleteGroup', { merchantId, groupId }),
+  },
   auth: {
     login: routePath('auth.login'),
     /** Second half of the two-step login, when `login` answers `mfaRequired`. */

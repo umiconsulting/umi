@@ -620,6 +620,7 @@ msgstr "Saved"
 #: src/screens/inventory-count.jsx
 #: src/screens/inventory-workspace.jsx
 #: src/screens/operations-workspace.jsx
+#: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings.jsx
 #: src/screens/ventas-report.jsx
 msgid "Reintentar"
@@ -938,6 +939,7 @@ msgstr "Password · 8 characters or more"
 #: src/screens/invoice-inbox.jsx
 #: src/screens/members.jsx
 #: src/screens/recipe-workspace.jsx
+#: src/screens/sales-analysis-groups.jsx
 #: src/screens/settings.jsx
 #: src/screens/staff.jsx
 msgid "Cancelar"
@@ -1208,6 +1210,7 @@ msgstr "Enter a CLABE or account number. You can save both."
 #: src/screens/devices.jsx
 #: src/screens/hours.jsx
 #: src/screens/reset-password.jsx
+#: src/screens/sales-analysis-groups.jsx
 #: src/screens/settings.jsx
 #: src/screens/staff.jsx
 msgid "Guardando…"
@@ -2041,7 +2044,7 @@ msgstr "in total"
 #: src/screens/customers.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/orders.jsx
-#: src/screens/ventas-report.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Ticket promedio"
 msgstr "Average ticket"
 
@@ -2502,6 +2505,7 @@ msgstr "No location"
 #: src/screens/device-utils.js
 #: src/screens/devices.jsx
 #: src/screens/inventory-count.jsx
+#: src/screens/sales-purchase-analysis.jsx
 #: src/screens/staff.jsx
 #: src/shell.jsx
 msgid "Sucursal"
@@ -4000,6 +4004,7 @@ msgid "Siguiente"
 msgstr "Next"
 
 #: src/screens/hours.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Lunes"
 msgstr "Monday"
 
@@ -4009,6 +4014,7 @@ msgid "Lun"
 msgstr "Mon"
 
 #: src/screens/hours.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Martes"
 msgstr "Tuesday"
 
@@ -4018,6 +4024,7 @@ msgid "Mar"
 msgstr "Tue"
 
 #: src/screens/hours.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Miércoles"
 msgstr "Wednesday"
 
@@ -4027,6 +4034,7 @@ msgid "Mié"
 msgstr "Wed"
 
 #: src/screens/hours.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Jueves"
 msgstr "Thursday"
 
@@ -4036,6 +4044,7 @@ msgid "Jue"
 msgstr "Thu"
 
 #: src/screens/hours.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Viernes"
 msgstr "Friday"
 
@@ -4045,6 +4054,7 @@ msgid "Vie"
 msgstr "Fri"
 
 #: src/screens/hours.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Sábado"
 msgstr "Saturday"
 
@@ -4054,6 +4064,7 @@ msgid "Sáb"
 msgstr "Sat"
 
 #: src/screens/hours.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Domingo"
 msgstr "Sunday"
 
@@ -4586,6 +4597,7 @@ msgid "Ingeniería de menú"
 msgstr "Menu engineering"
 
 #: src/screens/inventory-costing.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Periodo"
 msgstr "Period"
 
@@ -4599,6 +4611,7 @@ msgstr "Loading the cost of what you sold…"
 
 #: src/screens/inventory-costing.jsx
 #: src/screens/inventory-workspace.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Todas las sucursales"
 msgstr "All branches"
 
@@ -4625,7 +4638,7 @@ msgid "{0} días con venta en el periodo"
 msgstr "{0} days with sales in the period"
 
 #: src/screens/inventory-costing.jsx
-#: src/screens/ventas-report.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Venta neta"
 msgstr "Net sales"
 
@@ -4704,6 +4717,7 @@ msgid "Margen %"
 msgstr "Margin %"
 
 #: src/screens/inventory-costing.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Tickets"
 msgstr "Tickets"
 
@@ -7323,6 +7337,7 @@ msgid "Leche, Extras, Endulzante…"
 msgstr "Milk, Extras, Sweetener…"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/sales-analysis-groups.jsx
 msgid "Nombre del grupo"
 msgstr "Group name"
 
@@ -9461,6 +9476,7 @@ msgid "Aprobación"
 msgstr "Approval"
 
 #: src/screens/reembolsos.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Fecha"
 msgstr "Date"
 
@@ -9543,6 +9559,378 @@ msgstr "Repeat the password"
 #: src/screens/reset-password.jsx
 msgid "Guardar contraseña"
 msgstr "Save password"
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "El grupo cambió en otra sesión. Cierra el editor y actualiza los grupos."
+msgstr "The group changed in another session. Close the editor and refresh the groups."
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "Ya existe un grupo con ese nombre."
+msgstr "A group with this name already exists."
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "No se pudo guardar el cambio. Reintenta o actualiza los grupos."
+msgstr "Could not save the change. Try again or refresh the groups."
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "Editar grupo"
+msgstr "Edit group"
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "Nuevo grupo"
+msgstr "New group"
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "Buscar productos"
+msgstr "Search products"
+
+#. placeholder {0}: selected.length
+#: src/screens/sales-analysis-groups.jsx
+msgid "{0} de 500 productos seleccionados"
+msgstr "{0} of 500 products selected"
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "Guardar grupo"
+msgstr "Save group"
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "Eliminar grupo"
+msgstr "Delete group"
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "Grupos de productos"
+msgstr "Product groups"
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "Las categorías vienen del catálogo. Crea grupos para combinar productos de distintas categorías."
+msgstr "Categories come from the catalog. Create groups to combine products from different categories."
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "Los grupos y las categorías actuales se aplican a todo el historial consultado."
+msgstr "Current groups and categories apply to all sales in the selected period."
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "Actualizar grupos"
+msgstr "Refresh groups"
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "Crear grupo"
+msgstr "Create group"
+
+#: src/screens/sales-analysis-groups.jsx
+msgid "Un administrador del negocio puede modificar los grupos."
+msgstr "A business administrator can change the groups."
+
+#: src/screens/sales-purchase-analysis.jsx
+#~ msgid "El promedio del negocio usa sus ventas y tickets totales. Para comparar sucursales, elige todas las sucursales en el selector del Dashboard."
+#~ msgstr "The business average uses total sales and receipts. To compare branches, select all branches in the Dashboard selector."
+
+#. placeholder {0}: group.a
+#. placeholder {1}: percent(group.confidenceAtoB)
+#. placeholder {2}: group.b
+#: src/screens/sales-purchase-analysis.jsx
+#~ msgid "Entre quienes compraron {0}, {1} también compraron {2}."
+#~ msgstr "Among purchases with {0}, {1} also included {2}."
+
+#. placeholder {0}: report.timezone
+#: src/screens/sales-purchase-analysis.jsx
+#~ msgid "Las horas corresponden al pedido, en {0}. Las fechas usan el día operativo del negocio."
+#~ msgstr "Hours use the order time in {0}. Dates use the business operational day."
+
+#. placeholder {0}: report.firstSaleDate ?? '—'
+#. placeholder {1}: report.capturedAt
+#: src/screens/sales-purchase-analysis.jsx
+#~ msgid "Historial de ventas desde {0}. Datos consultados: {1}. El día y el mes actuales pueden estar incompletos."
+#~ msgstr "Sales history starts on {0}. Data queried at {1}. The current day and month can be incomplete."
+
+#: src/screens/sales-purchase-analysis.jsx
+#~ msgid "Las devoluciones confirmadas hasta esta consulta ajustan la fecha y la hora del pedido original."
+#~ msgstr "Refunds confirmed by the time of this query adjust the original order date and hour."
+
+#: src/screens/sales-purchase-analysis.jsx
+#~ msgid "Las ventas se cuentan al hacer el pedido. Las devoluciones se restan en su fecha de confirmación, aunque la venta sea anterior al periodo."
+#~ msgstr "Sales use the order date. Refunds use their confirmation date, even if the sale precedes the period."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "No se pudo consultar este periodo. Elige un rango menor, de hasta 731 días y 20,000 tickets."
+msgstr "Could not query this period. Select a smaller range, up to 731 days and 20,000 receipts."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "No se pudo cargar el análisis. Revisa los filtros y reintenta."
+msgstr "Could not load the analysis. Check the filters and try again."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Sucursal del análisis"
+msgstr "Branch for analysis"
+
+#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/staff.jsx
+msgid "Desde"
+msgstr "Since"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Hasta"
+msgstr "To"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Devoluciones"
+msgstr "Refunds"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Resultado de las ventas del periodo"
+msgstr "Results of sales in the period"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Movimientos del periodo"
+msgstr "Movements in the period"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Compras conjuntas por"
+msgstr "Group joint purchases by"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Ticket"
+msgstr "Receipt"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Visita de mesa identificada"
+msgstr "Identified table visit"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Grupo A"
+msgstr "Group A"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Grupo B"
+msgstr "Group B"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Seleccionar grupo"
+msgstr "Select group"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Consultar"
+msgstr "Apply"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Ticket promedio sin propina"
+msgstr "Average sale per receipt, excluding tips"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Tickets de venta"
+msgstr "Sales receipts"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Piezas netas por ticket"
+msgstr "Net units per receipt"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Devoluciones sin propina"
+msgstr "Refunds excluding tips"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Propinas netas"
+msgstr "Net tips"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Descuentos de las ventas"
+msgstr "Sales discounts"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Ventas y ticket promedio"
+msgstr "Sales and average receipt"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Venta neta de productos, después de descuentos y devoluciones. Excluye propinas."
+msgstr "Net product sales after discounts and refunds. Excludes tips."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Las devoluciones confirmadas hasta esta consulta ajustan la fecha del recibo y la hora del pedido original."
+msgstr "Refunds confirmed by this query adjust the receipt date and the original order hour."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Las ventas conservan la fecha del recibo. Las devoluciones se restan en su fecha de confirmación, aunque la venta sea anterior al periodo."
+msgstr "Sales retain the receipt date. Refunds use their confirmation date, even if the sale precedes the period."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "El promedio divide la venta neta entre los tickets de venta. Sin tickets, el promedio no aplica. Un ticket devuelto permanece en el conteo."
+msgstr "The average divides net sales by sales receipts. With no sales receipts, the average does not apply. Refunded receipts remain in the count."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "¿Qué se compra junto?"
+msgstr "What is purchased together?"
+
+#. placeholder {0}: group.basketsWithBoth
+#. placeholder {1}: report.coverage.baskets
+#. placeholder {2}: group.a
+#. placeholder {3}: group.b
+#: src/screens/sales-purchase-analysis.jsx
+msgid "{0} de {1} compras incluyen {2} y {3}."
+msgstr "{0} of {1} purchases include {2} and {3}."
+
+#. placeholder {0}: group.basketsWithA
+#. placeholder {1}: group.a
+#. placeholder {2}: group.basketsWithBoth
+#. placeholder {3}: group.b
+#. placeholder {4}: percent(group.confidenceAtoB)
+#: src/screens/sales-purchase-analysis.jsx
+msgid "De {0} compras con {1}, {2} también incluyen {3} ({4})."
+msgstr "Of {0} purchases with {1}, {2} also include {3} ({4})."
+
+#. placeholder {0}: group.overlappingProducts
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Los grupos comparten {0} productos. La compra conjunta exige dos productos distintos."
+msgstr "The groups share {0} products. A joint purchase requires two different products."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Selecciona dos categorías o grupos y pulsa Consultar para ver su compra conjunta."
+msgstr "Select two categories or groups and select Apply to see their joint purchases."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "La frecuencia cuenta cada compra una sola vez, aunque incluya varias piezas del mismo producto."
+msgstr "Frequency counts each purchase once, even if it includes several units of the same product."
+
+#. placeholder {0}: report.coverage.pairsAvailable
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Hasta 100 pares con mayor frecuencia, de {0} pares observados"
+msgstr "Up to 100 most frequent pairs, out of {0} observed pairs"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Producto A"
+msgstr "Product A"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Producto B"
+msgstr "Product B"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Compras juntas"
+msgstr "Joint purchases"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Del total"
+msgstr "Share of total"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Con B entre compras de A"
+msgstr "With B among purchases of A"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "No hay pares de productos en estas compras."
+msgstr "These purchases contain no product pairs."
+
+#. placeholder {0}: report.coverage.baskets
+#. placeholder {1}: report.coverage.ticketsWithoutVisit
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Se usan {0} visitas identificadas. Se excluyen {1} tickets sin visita. Solo se agrupan tickets del periodo consultado."
+msgstr "Uses {0} identified visits. Excludes {1} receipts without a visit. Only receipts in the selected period are grouped."
+
+#. placeholder {0}: report.coverage.baskets
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Se usan {0} tickets. Un ticket anónimo no permite identificar otras compras de la misma visita."
+msgstr "Uses {0} receipts. An anonymous receipt cannot identify other purchases from the same visit."
+
+#. placeholder {0}: report.coverage.ticketsWithoutProducts
+#: src/screens/sales-purchase-analysis.jsx
+msgid "{0} tickets carecen de productos identificados con piezas restantes. Permanecen en el total de tickets."
+msgstr "{0} receipts have no identified products with remaining units. They remain in the receipt count."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Las compras conjuntas muestran los productos de los tickets originales del periodo. Las devoluciones afectan los importes y las piezas netas."
+msgstr "Joint purchases show original products from sales receipts in the period. Refunds affect amounts and net units."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Piezas por ticket"
+msgstr "Units per receipt"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "No hay movimientos en este periodo."
+msgstr "There are no movements in this period."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Horas, días y meses"
+msgstr "Hours, days and months"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Comparar por"
+msgstr "Compare by"
+
+#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/ventas-report.jsx
+msgid "Hora"
+msgstr "Hour"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Día de la semana"
+msgstr "Day of the week"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Mes"
+msgstr "Month"
+
+#. placeholder {0}: report.timezone
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Las horas corresponden al pedido, en {0}. Las fechas conservan el día operativo de los recibos y las devoluciones."
+msgstr "Hours use the order time in {0}. Dates retain the operational day of receipts and refunds."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "La tabla muestra periodos con movimientos. Una hora con pocas ventas requiere revisar el horario de apertura y la demanda."
+msgstr "The table shows periods with movements. An hour with few sales requires a review of opening hours and demand."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Los meses permiten comparar el historial disponible. Confirmar una temporada requiere observar ciclos completos y comparar periodos equivalentes."
+msgstr "Months allow comparison of available history. A seasonal pattern requires complete cycles and equivalent periods."
+
+#. placeholder {0}: report.from
+#. placeholder {1}: report.to
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Periodo consultado: {0} a {1}."
+msgstr "Selected period: {0} to {1}."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Este periodo no contiene tickets de venta. Puede incluir devoluciones de ventas anteriores."
+msgstr "This period has no sales receipts. It can include refunds of earlier sales."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Comparación entre sucursales"
+msgstr "Branch comparison"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "El promedio del negocio usa sus ventas y tickets totales. Para comparar sucursales, elige todas las sucursales en los filtros del análisis."
+msgstr "The business average uses total sales and receipts. To compare branches, select all branches in the analysis filters."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "¿Cuántas piezas lleva cada ticket?"
+msgstr "How many units does each receipt contain?"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Piezas"
+msgstr "Units"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Piezas restantes después de las devoluciones de cada ticket."
+msgstr "Remaining units after refunds for each receipt."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Piezas originales de los tickets de venta del periodo."
+msgstr "Original units from sales receipts in the period."
+
+#. placeholder {0}: report.firstSaleDate ?? '—'
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Historial de ventas desde {0}. Datos consultados: {capturedAt}. El día y el mes actuales pueden estar incompletos."
+msgstr "Sales history starts on {0}. Data queried at {capturedAt}. The current day and month can be incomplete."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Consultando compras…"
+msgstr "Loading purchases…"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Cargando categorías y grupos…"
+msgstr "Loading categories and groups…"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Selecciona un negocio para consultar sus compras."
+msgstr "Select a business to view its purchases."
 
 #: src/screens/settings.jsx
 #~ msgid "Los cambios de Cash se guardan solo porque Umi Cash está activo."
@@ -10380,10 +10768,6 @@ msgid "Quitar el PIN actual"
 msgstr "Remove the current PIN"
 
 #: src/screens/staff.jsx
-msgid "Desde"
-msgstr "Since"
-
-#: src/screens/staff.jsx
 msgid "Escribe el nombre de la persona."
 msgstr "Enter the person's name."
 
@@ -10499,6 +10883,10 @@ msgstr "Waste, damage, count correction and yield loss have a name. The rest doe
 #~ msgstr "per order"
 
 #: src/screens/ventas-report.jsx
+#~ msgid "Ventas netas"
+#~ msgstr "Net sales"
+
+#: src/screens/ventas-report.jsx
 msgid "7 días"
 msgstr "7 days"
 
@@ -10543,12 +10931,12 @@ msgid "La atribución por canal se activa cuando el punto de venta enlaza los pe
 msgstr "Channel attribution turns on when the point of sale links WhatsApp orders. Until then, sales count as counter."
 
 #: src/screens/ventas-report.jsx
-msgid "Hora"
-msgstr "Hour"
-
-#: src/screens/ventas-report.jsx
 msgid "Agrupar por"
 msgstr "Group by"
+
+#: src/screens/ventas-report.jsx
+msgid "Importe antes de descuentos"
+msgstr "Amount before discounts"
 
 #: src/screens/ventas-report.jsx
 msgid "% del total"
@@ -10563,6 +10951,10 @@ msgid "Vista"
 msgstr "View"
 
 #: src/screens/ventas-report.jsx
+msgid "Análisis de compras"
+msgstr "Purchase analysis"
+
+#: src/screens/ventas-report.jsx
 msgid "Tabla dinámica"
 msgstr "Pivot table"
 
@@ -10575,12 +10967,20 @@ msgid "Cargando ventas…"
 msgstr "Loading sales…"
 
 #: src/screens/ventas-report.jsx
-msgid "Ventas netas"
-msgstr "Net sales"
+msgid "Ventas cobradas con propina"
+msgstr "Sales collected, including tips"
+
+#: src/screens/ventas-report.jsx
+msgid "Importes originales de los recibos, antes de devoluciones. Consulta Análisis de compras para ver la venta neta sin propina."
+msgstr "Original receipt amounts before refunds. Open Purchase analysis to see net sales excluding tips."
 
 #: src/screens/ventas-report.jsx
 msgid "Órdenes"
 msgstr "Orders"
+
+#: src/screens/ventas-report.jsx
+msgid "Ticket cobrado con propina"
+msgstr "Average receipt collected, including tips"
 
 #: src/screens/ventas-report.jsx
 msgid "Ítems vendidos"
