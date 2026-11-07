@@ -15,6 +15,14 @@ BASE_REF=${PR_BASE_REF:-origin/main}
 BASE=$(git merge-base "$BASE_REF" HEAD)
 ```
 
+## Branch names and PR descriptions
+
+- Use `<type>/<short-description>` for feature and fix branches.
+- Select a conventional prefix that matches the change: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `build`, `ci`, or `chore`.
+- Write the description in English, with lowercase words separated by hyphens. Keep it short and specific, such as `feat/sales-analysis` or `fix/refund-totals`.
+- Write the PR description as one very brief paragraph. State the problem, the resulting behavior, and relevant validation in two or three short sentences.
+- Check the branch name and PR description before publication or an update. Correct either when it does not follow these rules.
+
 ## Before — local, before the PR exists
 
 1. **Tests-first** (`tdd` skill) — new behavior ships with tests written test-first; the full affected suite is green, and every regression test is red-green verified (revert the fix → test fails → restore → passes). No test, no code.
