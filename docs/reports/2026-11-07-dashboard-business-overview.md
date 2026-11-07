@@ -112,7 +112,15 @@ La revisión independiente de Standards detectó una pérdida de opciones de suc
 La revisión de Spec detectó el mismo problema y un reinicio del indicador al aplicar filtros.
 Las tres observaciones quedaron corregidas y ambas revisiones confirmaron cero hallazgos abiertos.
 ONCA dispone de una sucursal en esta sesión; la comprobación de múltiples sucursales usa el contrato y las pruebas de contexto.
-La verificación del Worker en Cloudflare queda pendiente hasta que exista la vista previa del PR.
+La [vista previa del PR #264](https://pr-264.umi-dashboard.pages.dev/?home=1) pasó la verificación en Cloudflare Pages.
+El inicio mostró la misma venta neta de ONCA y el widget de promedio abrió su indicador correcto.
+`GET /api/auth/me` respondió 200 y el refresco respondió 201.
+El navegador recibió las cuatro cookies `umi_staging_*` con el dominio exclusivo de la vista previa.
+Las cookies de sesión conservaron `HttpOnly` y `Secure`; la cookie CSRF conservó su acceso desde el cliente.
+La recarga recuperó la sesión después de borrar la copia local.
+La vista previa no registró errores de JavaScript.
+El [PR #264](https://github.com/umiconsulting/umi/pull/264) tiene `staging` como destino y queda disponible para revisión.
+Los checks de CI son visibles en el PR; este informe registra las verificaciones locales y de navegador.
 
 Herramientas: Node 22.23.2, pnpm 10.29.3, Playwright 1.62.1, Chromium por CDP y axe-core.
 Las capturas y respuestas de API quedan en `/tmp/umi-business-evidence/`.
