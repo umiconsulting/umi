@@ -75,6 +75,19 @@ on:
           repo but whose state (gitignored .env/certs/secrets) lives elsewhere.
         type: string
         default: ''
+      release_sha:
+        description: >-
+          Exact commit to deploy. When set, checkout, image tag and
+          RELEASE_GIT_COMMIT use it, and the host plus /health/release must
+          report the same commit. Empty keeps the legacy branch-tip path.
+        type: string
+        default: ''
+      release_url:
+        description: >-
+          URL of the release identity endpoint (for example /health/release).
+          Required when release_sha is set.
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -90,6 +103,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
+          ref: ${{ inputs.release_sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -112,6 +126,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
+          ref: ${{ inputs.release_sha || github.sha }}
           persist-credentials: false
 
       - name: Build & push image to GHCR
@@ -120,6 +135,7 @@ jobs:
           DIR: ${{ inputs.app_dir }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUSH_LATEST: ${{ inputs.push_latest }}
+          DEPLOY_SHA: ${{ inputs.release_sha || github.sha }}
         run: |
           echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           # Bake the immutable release identity into the image (config.schema.ts
@@ -127,18 +143,19 @@ jobs:
           # CONTRACT_VERSION's source of truth is packages/contract/src/catalog.ts.
           CONTRACT_VERSION="$(sed -n "s/^export const CONTRACT_VERSION = '\(.*\)';$/\1/p" packages/contract/src/catalog.ts)"
           test -n "$CONTRACT_VERSION" || { echo "CONTRACT_VERSION not found in packages/contract/src/catalog.ts"; exit 1; }
-          TAGS=(-t "$IMAGE:sha-${{ github.sha }}")
+          TAG="sha-$DEPLOY_SHA"
+          TAGS=(-t "$IMAGE:$TAG")
           if [ "$PUSH_LATEST" = "true" ]; then
             TAGS+=(-t "$IMAGE:latest")
           fi
           docker build \
             --build-arg RELEASE_VERSION="$(git describe --tags --always)" \
-            --build-arg RELEASE_GIT_COMMIT="${{ github.sha }}" \
+            --build-arg RELEASE_GIT_COMMIT="$DEPLOY_SHA" \
             --build-arg RELEASE_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" \
             --build-arg CONTRACT_VERSION="$CONTRACT_VERSION" \
             "${TAGS[@]}" \
             -f "$DIR/Dockerfile" .
-          docker push "$IMAGE:sha-${{ github.sha }}"
+          docker push "$IMAGE:$TAG"
           if [ "$PUSH_LATEST" = "true" ]; then
             docker push "$IMAGE:latest"
           fi
@@ -154,6 +171,8 @@ jobs:
           UMI_DEPLOY_BRANCH: ${{ inputs.branch }}
           UMI_COMPOSE_FILE: ${{ inputs.compose_file }}
           UMI_PROJECT_DIR: ${{ inputs.project_dir }}
+          RELEASE_SHA_INPUT: ${{ inputs.release_sha }}
+          DEPLOY_SHA: ${{ inputs.release_sha || github.sha }}
           DEPLOY_SCRIPT: ${{ inputs.app_dir }}/deploy/deploy.sh
         run: |
           mkdir -p ~/.ssh
@@ -173,7 +192,7 @@ jobs:
           ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
             -o BatchMode=yes -o ConnectTimeout=15 -p "$SSH_PORT" \
             "$SSH_USER@$SSH_HOST" \
-            "cat > /tmp/$APP_NAME-deploy.sh && APP_NAME='$APP_NAME' UMI_REPO_DIR='$UMI_REPO_DIR' UMI_DEPLOY_BRANCH='$UMI_DEPLOY_BRANCH' UMI_COMPOSE_FILE='$UMI_COMPOSE_FILE' UMI_PROJECT_DIR='$UMI_PROJECT_DIR' bash /tmp/$APP_NAME-deploy.sh 'sha-${{ github.sha }}' < /dev/null" \
+            "cat > /tmp/$APP_NAME-deploy.sh && APP_NAME='$APP_NAME' UMI_REPO_DIR='$UMI_REPO_DIR' UMI_DEPLOY_BRANCH='$UMI_DEPLOY_BRANCH' UMI_COMPOSE_FILE='$UMI_COMPOSE_FILE' UMI_PROJECT_DIR='$UMI_PROJECT_DIR' RELEASE_SHA='$RELEASE_SHA_INPUT' bash /tmp/$APP_NAME-deploy.sh 'sha-$DEPLOY_SHA' < /dev/null" \
             < "$DEPLOY_SCRIPT"
 
       - name: Health check
@@ -186,3 +205,49 @@ jobs:
             echo "Waiting for health ($i/10)..."; sleep 6
           done
           echo "Health check failed: ${{ inputs.health_url }}"; exit 1
+
+      - name: Verify release identity
+        if: ${{ inputs.release_sha != '' }}
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_HOST: ${{ secrets.VPS_HOST }}
+          SSH_USER: ${{ secrets.VPS_USER }}
+          SSH_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
+          UMI_REPO_DIR: ${{ inputs.repo_dir }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          RELEASE_URL: ${{ inputs.release_url }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_URL" || {
+            echo "release_url is required when release_sha is set" >&2
+            exit 1
+          }
+          mkdir -p ~/.ssh
+          if [ -n "$SSH_KEY" ]; then
+            printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+            chmod 600 ~/.ssh/id_deploy
+          fi
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # Compare the checkout on the host with the SHA that CI validated.
+          REMOTE_HEAD="$(ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+            -o BatchMode=yes -o ConnectTimeout=15 -p "$SSH_PORT" \
+            "$SSH_USER@$SSH_HOST" \
+            "UMI_REPO_DIR='$UMI_REPO_DIR' bash -s" <<'REMOTE'
+          repo="${UMI_REPO_DIR:-$HOME/umi}"
+          git -C "$repo" rev-parse HEAD
+          REMOTE
+          )"
+          # Then compare the commit the running process reports.
+          HEALTH_COMMIT="$(curl -fsS --max-time 10 "$RELEASE_URL" | jq -er '.gitCommit')"
+          echo "release_sha=$RELEASE_SHA"
+          echo "host_head=$REMOTE_HEAD"
+          echo "health_git_commit=$HEALTH_COMMIT"
+          test "$REMOTE_HEAD" = "$RELEASE_SHA" || {
+            echo "host HEAD does not match release_sha" >&2
+            exit 1
+          }
+          test "$HEALTH_COMMIT" = "$RELEASE_SHA" || {
+            echo "/health/release gitCommit does not match release_sha" >&2
+            exit 1
+          }
+          echo "release identity verified: host and health agree with release_sha"

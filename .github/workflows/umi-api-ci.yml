@@ -20,6 +20,9 @@ on:
   pull_request:
   push:
     branches: [staging]
+  # The staging deploy calls this same gate before it rolls containers, so the
+  # image, checkout and migrations all come from a commit that passed here.
+  workflow_call:
 
 permissions:
   contents: read

@@ -38,7 +38,13 @@ permissions:
   packages: write
 
 jobs:
+  # Run the same CI gate on the exact commit that this push deploys. The
+  # deploy job cannot start until this call is green.
+  validate:
+    uses: ./.github/workflows/umi-api-ci.yml
+
   deploy:
+    needs: validate
     uses: ./.github/workflows/deploy-backend.yml
     with:
       app_name: umi-api
@@ -46,6 +52,10 @@ jobs:
       package_name: '@umi/api'
       image: ghcr.io/umiconsulting/umi-api
       health_url: https://api-staging.umiconsulting.co/health
+      # The commit that `validate` just tested. deploy.sh refuses to roll if
+      # the branch tip no longer matches it.
+      release_sha: ${{ github.sha }}
+      release_url: https://api-staging.umiconsulting.co/health/release
       # The staging checkout on the box. deploy.sh git-resets it to the branch before
       # rolling containers, so what runs always matches what CI built.
       repo_dir: /home/juan/umi-staging

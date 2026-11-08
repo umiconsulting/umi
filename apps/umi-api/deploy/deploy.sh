@@ -14,6 +14,9 @@
 #         UMI_PROJECT_DIR   compose project directory — where `.env`, certs and
 #                           secrets resolve, and the default project name comes
 #                           from        (default: dirname of the compose file)
+#         RELEASE_SHA       exact 40-hex commit to deploy. When set, the branch
+#                           tip must match it and the checkout is reset to it.
+#                           Empty uses the branch-tip path (default: empty).
 #
 # Prereq (one-time, see docs/deploy-pipeline.md): the VPS has run
 #   `docker login ghcr.io` with a token that can read the image, and
@@ -23,6 +26,7 @@
 #   script and docker-compose.yml on one box).
 set -euo pipefail
 
+RELEASE_SHA="${RELEASE_SHA:-}"
 TAG="${1:-latest}"
 APP_NAME="${APP_NAME:-umi-api}"
 REPO_DIR="${UMI_REPO_DIR:-$HOME/umi}"
@@ -30,6 +34,16 @@ BRANCH="${UMI_DEPLOY_BRANCH:-main}"
 APP_DIR="$REPO_DIR/apps/$APP_NAME"
 # umi-api -> UMI_API_TAG (the var docker-compose.yml interpolates)
 TAG_VAR="$(printf '%s' "$APP_NAME" | tr '[:lower:]-' '[:upper:]_')_TAG"
+
+if [ -n "$RELEASE_SHA" ]; then
+  if ! [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "FATAL: RELEASE_SHA must be 40 lowercase hex characters: $RELEASE_SHA" >&2
+    exit 1
+  fi
+  # The image tag is derived from the same SHA, so it cannot drift from the
+  # checkout and the migrations.
+  TAG="sha-$RELEASE_SHA"
+fi
 
 # Compose file + project directory. Prod keeps both inside $APP_DIR, which is
 # why they default to it. A second environment on the same box (the staging QA
@@ -55,11 +69,31 @@ compose() {
 echo "==> Deploying $APP_NAME  tag=$TAG  ($TAG_VAR)  branch=$BRANCH"
 echo "    compose=$COMPOSE_FILE  project_dir=$PROJECT_DIR"
 
-# 1) Sync the checkout to $BRANCH so compose/Caddyfile match the shipped code.
+# 1) Sync the checkout so compose/Caddyfile match the shipped code.
 #    .env is gitignored, so the reset never touches local secrets/config.
+#
+#    With RELEASE_SHA, the branch tip must still be the commit that CI
+#    validated. A moved branch aborts here, BEFORE the checkout moves and before
+#    .env, migrations or compose. The reset then targets the exact object and
+#    HEAD is verified.
 cd "$REPO_DIR"
-git fetch --depth=1 origin "$BRANCH"
-git reset --hard FETCH_HEAD
+if [ -n "$RELEASE_SHA" ]; then
+  TIP="$(git ls-remote --heads origin "refs/heads/$BRANCH" | cut -f1 | head -n 1)"
+  if [ "$TIP" != "$RELEASE_SHA" ]; then
+    echo "FATAL: branch $BRANCH moved: expected RELEASE_SHA $RELEASE_SHA, remote refs/heads/$BRANCH is ${TIP:-missing}" >&2
+    exit 1
+  fi
+  git fetch --depth=1 origin "$RELEASE_SHA"
+  git reset --hard "$RELEASE_SHA"
+  HEAD_SHA="$(git rev-parse HEAD)"
+  if [ "$HEAD_SHA" != "$RELEASE_SHA" ]; then
+    echo "FATAL: checkout HEAD $HEAD_SHA does not match RELEASE_SHA $RELEASE_SHA" >&2
+    exit 1
+  fi
+else
+  git fetch --depth=1 origin "$BRANCH"
+  git reset --hard FETCH_HEAD
+fi
 
 # 1b) Make sure the compose file is actually on disk.
 #
