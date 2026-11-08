@@ -21,6 +21,20 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-11-07 - Category sales hexagon widget
+
+- task type: product implementation and verification
+- request summary: Show net sales by category with saved category colors and access to the detailed report.
+- filesystem slice inspected: dashboard home and sales analysis, dashboard operations API, receipt allocations, contract.
+- chosen owner: apps/umi-api owns financial allocations; apps/umi-dashboard owns the presentation.
+- chosen path: feat/category-sales-widgets, based on origin/staging.
+- skill or subagent used: product-feature-review, research, tdd, code-review, pr-gates, task-router; independent research and review agents.
+- files touched: category projection, report contract, category widget and detail table, locales, tests and verification reports.
+- tools used: Node 22.23.2, pnpm 10.29.3, Vitest, Playwright 1.62.1, Chromium 153.0.8010.52 over CDP, axe-core, PostgreSQL, GitHub CLI.
+- outcome: Exact category allocation reconciles with ONCA's real staging total. Browser evidence covers desktop, mobile, selection and data states. Delivery targets staging.
+- reusable pattern observed: Verify approximate visual shares against exact canonical financial amounts before chart display.
+- promotion follow-up: None. Existing report owners and native SVG cover this change.
+
 ### 2026-11-07 - Modular dashboard and sales reliability
 
 - task type: product implementation and verification

@@ -77,6 +77,26 @@ describe('purchase analysis against PostgreSQL with RLS', () => {
     expect(report.coverage.refundedUnits).toBe(1);
   });
 
+  it('reconciles category sales with frozen discounts, refunds and saved colors', async () => {
+    const report = await service.read(user, access, query({ to: '2026-11-04' }));
+    expect(report.byCategory).toEqual([
+      expect.objectContaining({
+        categoryId: ids.coffeeCategory,
+        merchandiseMinorUnits: 18000,
+        refundsMinorUnits: 0,
+        netMinorUnits: 18000,
+        color: expect.stringMatching(/^#[0-9a-fA-F]{6}$/),
+      }),
+      expect.objectContaining({
+        categoryId: ids.breadCategory,
+        merchandiseMinorUnits: 18000,
+        refundsMinorUnits: 9000,
+        netMinorUnits: 9000,
+        color: expect.stringMatching(/^#[0-9a-fA-F]{6}$/),
+      }),
+    ]);
+  });
+
   it('keeps category presence distinct from quantities and respects the selected refund view', async () => {
     const report = await service.read(
       user,

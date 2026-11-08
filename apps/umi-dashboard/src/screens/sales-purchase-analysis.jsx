@@ -8,6 +8,7 @@ import { useMerchant } from '@/lib/merchant-context.jsx';
 import { useSalesAnalysis, useSalesAnalysisOptions } from '@/data.jsx';
 import { formatOperationMoney } from './operations-format.js';
 import SalesAnalysisGroups from './sales-analysis-groups.jsx';
+import CategorySalesCard from './category-sales.jsx';
 import './sales-purchase-analysis.css';
 
 const percent = (value) =>
@@ -507,6 +508,7 @@ function AnalysisResults({ report, query, section, setSection }) {
   const { t } = useLingui();
   const sections = [
     ['overview', t`Resumen de ventas`],
+    ['categories', t`Categorías`],
     ['pairs', t`Compras conjuntas`],
     ['time', t`Horas y tendencias`],
     ['distribution', t`Piezas por ticket`],
@@ -548,6 +550,7 @@ function AnalysisResults({ report, query, section, setSection }) {
         </>
       )}
       {active === 'pairs' && <JointPurchases report={report} />}
+      {active === 'categories' && <CategorySalesCard report={report} query={query} detail />}
       {active === 'time' && <TimeComparisons report={report} />}
       {active === 'locations' && (
         <Panel title={<Trans>Comparación entre sucursales</Trans>}>

@@ -10,6 +10,7 @@ import { canSwitchLocations, resolveLocationAuthority } from '../auth/location-a
 import { hasDashboardPermission } from './dashboard-operations.policy';
 import { SalesAnalysisRepository } from './sales-analysis.repository';
 import { analyzePurchases, type AnalysisGroup } from './sales-analysis';
+import { analyzeCategorySales } from './category-sales';
 
 @Injectable()
 export class SalesAnalysisService {
@@ -22,7 +23,12 @@ export class SalesAnalysisService {
       timezone: context.timezone,
       today: context.today,
       firstSaleDate: context.firstSaleDate,
-      products: context.products,
+      products: context.products.map(({ id, name, categoryId, category }) => ({
+        id,
+        name,
+        categoryId,
+        category,
+      })),
       groups: context.groups,
       canManageGroups: this.canManageGroups(access),
       canCompareLocations: canSwitchLocations(access) && !access.locationId,
@@ -57,6 +63,7 @@ export class SalesAnalysisService {
         capturedAt: context.capturedAt,
         firstSaleDate: context.firstSaleDate,
         ...analyzePurchases(sales, query, groups),
+        byCategory: analyzeCategorySales(sales, query, context.products),
       });
     } catch (error) {
       if (error instanceof RangeError)

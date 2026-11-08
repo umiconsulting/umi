@@ -45,7 +45,16 @@ export function initialAnalysisQuery(options, locationId, params = new URLSearch
   };
 }
 
-export const DEFAULT_WIDGETS = ['net', 'tickets', 'average', 'units', 'trend', 'hours', 'pairs'];
+export const DEFAULT_WIDGETS = [
+  'net',
+  'tickets',
+  'average',
+  'units',
+  'trend',
+  'categories',
+  'hours',
+  'pairs',
+];
 export const AVAILABLE_WIDGETS = [...DEFAULT_WIDGETS, 'distribution'];
 
 export function loadWidgetPreferences(storage, key) {

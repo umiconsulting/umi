@@ -87,6 +87,21 @@ const Metrics = z
 export type SalesAnalysisMetrics = z.infer<typeof Metrics>;
 
 const Dimension = Metrics.extend({ key: z.string(), label: z.string() });
+export const SalesAnalysisCategory = z
+  .object({
+    key: z.string().max(100),
+    categoryId: Uuid.nullable(),
+    label: z.string().nullable(),
+    color: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .nullable(),
+    merchandiseMinorUnits: Amount,
+    refundsMinorUnits: Amount,
+    netMinorUnits: Amount,
+  })
+  .strict();
+export type SalesAnalysisCategory = z.infer<typeof SalesAnalysisCategory>;
 const Pair = z
   .object({
     productAId: Uuid,
@@ -121,6 +136,7 @@ export const SalesAnalysis = z
     byWeekday: z.array(Dimension).max(7),
     byMonth: z.array(Dimension).max(25),
     byLocation: z.array(Dimension).max(1000),
+    byCategory: z.array(SalesAnalysisCategory).max(5002).optional(),
     coverage: z
       .object({
         baskets: Count,

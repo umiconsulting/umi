@@ -160,42 +160,6 @@ msgid "No hay un negocio seleccionado"
 msgstr "No business selected"
 
 #: src/data.jsx
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-msgid "nunca"
-msgstr "never"
-
-#: src/data.jsx
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-msgid "hace un momento"
-msgstr "just now"
-
-#. placeholder {0}: Math.floor(ms / 1000)
-#: src/data.jsx
-#: src/screens/devices.jsx
-msgid "hace {0} s"
-msgstr "{0} s ago"
-
-#. placeholder {0}: Math.floor(ms / 60000)
-#. placeholder {0}: Math.floor(ms / LAST_SEEN_MINUTE)
-#: src/data.jsx
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-#: src/screens/members.jsx
-msgid "hace {0} min"
-msgstr "{0} min ago"
-
-#. placeholder {0}: Math.floor(ms / 3600000)
-#. placeholder {0}: Math.floor(ms / LAST_SEEN_HOUR)
-#: src/data.jsx
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-#: src/screens/members.jsx
-msgid "hace {0} h"
-msgstr "{0} h ago"
-
-#: src/data.jsx
 msgid "Sin estación"
 msgstr "No station"
 
@@ -770,6 +734,7 @@ msgstr "Products"
 
 #: src/lib/module-registry.js
 #: src/screens/products-hub.jsx
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Categorías"
 msgstr "Categories"
 
@@ -1322,6 +1287,7 @@ msgid "Ningún turno coincide con el filtro."
 msgstr "No shift matches the filter."
 
 #: src/screens/caja-turnos.jsx
+#: src/screens/category-sales.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/orders.jsx
 #: src/screens/recibos.jsx
@@ -1560,6 +1526,109 @@ msgstr "Each category starts with a random color; change it whenever you want. I
 msgid "Aún no hay categorías. Crea la primera arriba."
 msgstr "There are no categories yet. Create the first one above."
 
+#: src/screens/category-sales.jsx
+msgid "Participación de venta neta por categoría"
+msgstr "Net sales share by category"
+
+#: src/screens/category-sales.jsx
+msgid "Las celdas de color aproximan la participación. Los valores exactos aparecen en la lista. El fondo gris es decorativo."
+msgstr "Colored cells approximate each share. The list shows exact values. The gray background is decorative."
+
+#: src/screens/category-sales.jsx
+msgid "Sin asignación verificable"
+msgstr "Unallocated"
+
+#: src/screens/category-sales.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Sin categoría"
+msgstr "No category"
+
+#: src/screens/category-sales.jsx
+msgid "Categoría sin nombre"
+msgstr "Unnamed category"
+
+#: src/screens/category-sales.jsx
+msgid "<0.1%"
+msgstr "<0.1%"
+
+#: src/screens/category-sales.jsx
+#: src/screens/overview.jsx
+msgid "Venta neta por categoría"
+msgstr "Net sales by category"
+
+#: src/screens/category-sales.jsx
+msgid "Ver informe"
+msgstr "View full report"
+
+#: src/screens/category-sales.jsx
+msgid "El desglose por categoría no está disponible. Actualiza la consulta para reintentar."
+msgstr "The category breakdown is unavailable. Refresh the report to try again."
+
+#: src/screens/category-sales.jsx
+msgid "Las devoluciones generan importes negativos. Consulta los importes por categoría; no se muestra una distribución porcentual."
+msgstr "Refunds produce negative amounts. Read the category amounts; percentage shares are unavailable."
+
+#: src/screens/category-sales.jsx
+msgid "La venta neta es cero. No hay una participación porcentual que mostrar."
+msgstr "Net sales are zero. There is no percentage share to show."
+
+#: src/screens/category-sales.jsx
+msgid "Categorías y venta neta"
+msgstr "Categories and net sales"
+
+#. placeholder {0}: rows.length
+#: src/screens/category-sales.jsx
+msgid "Ver las {0} categorías"
+msgstr "View all {0} categories"
+
+#: src/screens/category-sales.jsx
+msgid "Importes exactos por categoría"
+msgstr "Exact category amounts"
+
+#: src/screens/category-sales.jsx
+#: src/screens/cocina.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/ventas-report.jsx
+msgid "Categoría"
+msgstr "Category"
+
+#: src/screens/category-sales.jsx
+msgid "Ventas antes de devoluciones"
+msgstr "Sales before refunds"
+
+#: src/screens/category-sales.jsx
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Devoluciones"
+msgstr "Refunds"
+
+#: src/screens/category-sales.jsx
+#: src/screens/inventory-costing.jsx
+#: src/screens/overview.jsx
+#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
+msgid "Venta neta"
+msgstr "Net sales"
+
+#: src/screens/category-sales.jsx
+msgid "Participación"
+msgstr "Share"
+
+#: src/screens/category-sales.jsx
+msgid "Mostrar más categorías"
+msgstr "Show more categories"
+
+#: src/screens/category-sales.jsx
+msgid "Las celdas aproximan la participación; los porcentajes usan los importes exactos."
+msgstr "Cells approximate each share; percentages use exact amounts."
+
+#: src/screens/category-sales.jsx
+msgid "Algunos recibos no permiten verificar la asignación por categoría. Ese importe se conserva por separado."
+msgstr "Some receipts lack verified category allocations. Their amount remains separate."
+
+#: src/screens/category-sales.jsx
+msgid "Categorías y colores del catálogo actual. Venta neta sin propinas, después de descuentos y devoluciones."
+msgstr "Categories and colors use the current catalog. Net sales exclude tips and reflect discounts and refunds."
+
 #: src/screens/cocina.jsx
 msgid "Llegada · agudo breve"
 msgstr "Arrival · short high tone"
@@ -1727,12 +1796,6 @@ msgstr "{0} · Priority {1} · Target {2} s"
 #: src/screens/cocina.jsx
 msgid "Excepción por producto"
 msgstr "Product override"
-
-#: src/screens/cocina.jsx
-#: src/screens/operations-workspace.jsx
-#: src/screens/ventas-report.jsx
-msgid "Categoría"
-msgstr "Category"
 
 #: src/screens/cocina.jsx
 #: src/screens/operations-workspace.jsx
@@ -2537,6 +2600,32 @@ msgstr "UmiKDS"
 msgid "UmiPOS"
 msgstr "UmiPOS"
 
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+msgid "nunca"
+msgstr "never"
+
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+msgid "hace un momento"
+msgstr "just now"
+
+#. placeholder {0}: Math.floor(ms / 60000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_MINUTE)
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+#: src/screens/members.jsx
+msgid "hace {0} min"
+msgstr "{0} min ago"
+
+#. placeholder {0}: Math.floor(ms / 3600000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_HOUR)
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+#: src/screens/members.jsx
+msgid "hace {0} h"
+msgstr "{0} h ago"
+
 #. placeholder {0}: Math.floor(ms / 86400000)
 #. placeholder {0}: Math.floor(ms / LAST_SEEN_DAY)
 #. placeholder {0}: Math.round(hours / 24)
@@ -2660,6 +2749,11 @@ msgstr "The store could not be created. Try again."
 #: src/screens/devices.jsx
 #~ msgid "El dispositivo y sus estaciones quedarán vinculados a esta sucursal."
 #~ msgstr "The device and its stations will be linked to this location."
+
+#. placeholder {0}: Math.floor(ms / 1000)
+#: src/screens/devices.jsx
+msgid "hace {0} s"
+msgstr "{0} s ago"
 
 #: src/screens/devices.jsx
 msgid "En vivo"
@@ -4641,13 +4735,6 @@ msgstr "{0} of {1} days with sales have no cost"
 #: src/screens/inventory-costing.jsx
 msgid "{0} días con venta en el periodo"
 msgstr "{0} days with sales in the period"
-
-#: src/screens/inventory-costing.jsx
-#: src/screens/overview.jsx
-#: src/screens/sales-purchase-analysis.jsx
-#: src/screens/sales-widgets.jsx
-msgid "Venta neta"
-msgstr "Net sales"
 
 #: src/screens/inventory-costing.jsx
 msgid "Sin impuestos, tal como la mide el margen"
@@ -7266,10 +7353,6 @@ msgid "Código de barras"
 msgstr "Barcode"
 
 #: src/screens/operations-workspace.jsx
-msgid "Sin categoría"
-msgstr "No category"
-
-#: src/screens/operations-workspace.jsx
 msgid "Impuesto (%)"
 msgstr "Tax (%)"
 
@@ -9840,10 +9923,6 @@ msgstr "Since"
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Hasta"
 msgstr "To"
-
-#: src/screens/sales-purchase-analysis.jsx
-msgid "Devoluciones"
-msgstr "Refunds"
 
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Resultado de las ventas del periodo"
