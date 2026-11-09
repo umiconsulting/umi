@@ -168,3 +168,13 @@ test('an absent basketState cannot hide a missing basket field', () => {
   const { coverage: _coverage, ...withoutCoverage } = analysisBaskets;
   assert.equal(SalesAnalysis.safeParse({ ...analysisBase, ...withoutCoverage }).success, false);
 });
+
+test('basketState rejects an unknown state code', () => {
+  assert.equal(
+    SalesAnalysis.safeParse({
+      ...analysisBase,
+      basketState: { state: 'unavailable', code: 'OTHER' },
+    }).success,
+    false,
+  );
+});

@@ -124,7 +124,7 @@ export const BASKETS_TOO_COMPLEX_CODE = 'BASKETS_TOO_COMPLEX';
 export const SalesAnalysisBasketState = z
   .object({
     state: z.enum(['complete', 'unavailable']),
-    code: z.literal(BASKETS_TOO_COMPLEX_CODE).nullable(),
+    code: z.enum([BASKETS_TOO_COMPLEX_CODE]).nullable(),
   })
   .strict();
 export type SalesAnalysisBasketState = z.infer<typeof SalesAnalysisBasketState>;
