@@ -3854,6 +3854,12 @@ time,
   .cash-detail-grid {
     grid-template-columns: 1fr !important;
   }
+  /* The report chart must keep the viewport as its containing block. `1fr` uses
+     the chart's min-content width (991px with 30 days), so the grid grows past
+     the phone. `minmax(0, 1fr)` lets the chart column shrink and scroll. */
+  .ventas-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
 }
 
 /* ===== Login (redesign: split-navy, "elegant") ===== */
@@ -5589,4 +5595,32 @@ time,
   font-weight: 600;
   color: var(--ink-1);
   font-variant-numeric: tabular-nums;
+}
+
+/* The report pivot table sets a 480px inline minimum. On a 360px phone that
+   makes a second horizontal scroll box beside the series chart. Let the table
+   follow the card width and wrap its labels instead. */
+@media (max-width: 600px) {
+  .surface table[style*='min-width: 480px'] {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+    font-size: 10px !important;
+  }
+  .surface table[style*='min-width: 480px'] th,
+  .surface table[style*='min-width: 480px'] td,
+  .surface table[style*='min-width: 480px'] button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 1px 2px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Programmatic focus on a tabindex element still gets a visible 2px ring. */
+[tabindex]:focus:not(:focus-visible),
+[role='img']:focus {
+  outline: 2px solid var(--umi-blue);
+  outline-offset: 2px;
 }
