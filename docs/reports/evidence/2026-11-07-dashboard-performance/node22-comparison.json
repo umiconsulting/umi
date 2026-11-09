@@ -1,0 +1,61 @@
+{
+  "node": "22.23.2",
+  "repetitions": 3,
+  "cases": [
+    {
+      "tickets": 300,
+      "products": 4,
+      "refunds": 0,
+      "baselineMedianMs": 12.137509999999999,
+      "optimizedMedianMs": 11.082169,
+      "speedup": 1.0952287408719357,
+      "baselineMedianHeapDelta": 638464,
+      "optimizedMedianHeapDelta": 295896,
+      "reportHash": "c1cc90a9abaac30d69dc07485d7c7118113f3206bcd46e7649719a97be268c69"
+    },
+    {
+      "tickets": 20000,
+      "products": 4,
+      "refunds": 0,
+      "baselineMedianMs": 119.40982100000001,
+      "optimizedMedianMs": 104.865555,
+      "speedup": 1.1386944073294611,
+      "baselineMedianHeapDelta": 11318392,
+      "optimizedMedianHeapDelta": 20004672,
+      "reportHash": "12760f6ab067e083fb799062f8def939e43008a43066fa3a016d6287672b64b2"
+    },
+    {
+      "tickets": 10000,
+      "products": 50,
+      "refunds": 0,
+      "baselineMedianMs": 2193.1430189999996,
+      "optimizedMedianMs": 146.42368100000004,
+      "speedup": 14.97806231903157,
+      "baselineMedianHeapDelta": 28897264,
+      "optimizedMedianHeapDelta": 23010264,
+      "reportHash": "1fd4bd83bf4b5e639f67eeef0ea23ad293bfdea03bbec2094ae201c1872693b3"
+    },
+    {
+      "tickets": 10000,
+      "products": 4,
+      "refunds": 20,
+      "baselineMedianMs": 507.63443499999994,
+      "optimizedMedianMs": 425.39916500000004,
+      "speedup": 1.1933131909179933,
+      "baselineMedianHeapDelta": 50972848,
+      "optimizedMedianHeapDelta": 17711880,
+      "reportHash": "3db4d05dc5d91d471d1a3b6f6b77a371396fc0b0935e464d38954d91244e2167"
+    },
+    {
+      "tickets": 1000,
+      "products": 400,
+      "refunds": 0,
+      "baselineMedianMs": 18947.97696,
+      "optimizedMedianMs": 120.15622100000019,
+      "speedup": 157.6945147101453,
+      "baselineMedianHeapDelta": 33931312,
+      "optimizedMedianHeapDelta": 30021752,
+      "reportHash": "7884d0a485704c0f4864016996debd293d5561a767a07d21815af2770b4a9bf7"
+    }
+  ]
+}

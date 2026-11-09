@@ -57,6 +57,7 @@ describe('purchase analysis against PostgreSQL with RLS', () => {
     expect(report.byHour.map((row) => row.key)).toEqual(['03', '09', '10']);
     expect(report.byLocation.map((row) => row.tickets).sort()).toEqual([1, 2]);
     expect(report.byDay.map((row) => row.key)).toEqual(['2026-11-02', '2026-11-04']);
+    expect(report.basketState).toEqual({ state: 'complete', code: null });
   });
 
   it('includes a later refund without its sale in period movements', async () => {
@@ -73,8 +74,8 @@ describe('purchase analysis against PostgreSQL with RLS', () => {
       units: -1,
     });
     expect(report.byHour[0].key).toBe('12');
-    expect(report.coverage.baskets).toBe(0);
-    expect(report.coverage.refundedUnits).toBe(1);
+    expect(report.coverage!.baskets).toBe(0);
+    expect(report.coverage!.refundedUnits).toBe(1);
   });
 
   it('reconciles category sales with frozen discounts, refunds and saved colors', async () => {
@@ -113,7 +114,7 @@ describe('purchase analysis against PostgreSQL with RLS', () => {
       support: 1 / 3,
       confidenceAtoB: 1 / 2,
     });
-    expect(report.pairs[0].baskets).toBe(1);
+    expect(report.pairs![0].baskets).toBe(1);
   });
 
   it('forces assigned location scope and denies attempts to widen it', async () => {
@@ -180,7 +181,7 @@ describe('purchase analysis against PostgreSQL with RLS', () => {
         refundView: 'period_movements',
       }),
     );
-    expect(report.selectedGroups.basketsWithBoth).toBe(1);
+    expect(report.selectedGroups!.basketsWithBoth).toBe(1);
     await service.deleteGroup(user, access, id, saved.version);
     expect((await service.options(user, access)).groups).toEqual([]);
   });

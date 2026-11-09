@@ -1,7 +1,9 @@
 import { ForbiddenException, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import {
+  BASKETS_TOO_COMPLEX_CODE,
   SalesAnalysis,
   SalesAnalysisOptions,
+  type SalesAnalysisBasketState,
   type SalesAnalysisGroupWrite,
   type SalesAnalysisQuery,
 } from '@umi/contract';
@@ -9,7 +11,8 @@ import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { canSwitchLocations, resolveLocationAuthority } from '../auth/location-authority';
 import { hasDashboardPermission } from './dashboard-operations.policy';
 import { SalesAnalysisRepository } from './sales-analysis.repository';
-import { analyzePurchases, type AnalysisGroup } from './sales-analysis';
+import { analyzeSummary, type AnalysisGroup } from './sales-analysis';
+import { analyzeBaskets } from './purchase-baskets';
 import { analyzeCategorySales } from './category-sales';
 
 @Injectable()
@@ -51,6 +54,18 @@ export class SalesAnalysisService {
       }
     }
     try {
+      const summary = analyzeSummary(sales, query);
+      let baskets: ReturnType<typeof analyzeBaskets> | null = null;
+      let basketState: SalesAnalysisBasketState = { state: 'complete', code: null };
+      try {
+        baskets = analyzeBaskets(sales, query, groups);
+      } catch (error) {
+        if (error instanceof RangeError && error.message === BASKETS_TOO_COMPLEX_CODE) {
+          basketState = { state: 'unavailable', code: BASKETS_TOO_COMPLEX_CODE };
+        } else {
+          throw error;
+        }
+      }
       return SalesAnalysis.parse({
         merchantId: access.merchantId,
         locationId,
@@ -62,7 +77,9 @@ export class SalesAnalysisService {
         basketUnit: query.basketUnit,
         capturedAt: context.capturedAt,
         firstSaleDate: context.firstSaleDate,
-        ...analyzePurchases(sales, query, groups),
+        ...summary,
+        ...(baskets ?? {}),
+        basketState,
         byCategory: analyzeCategorySales(sales, query, context.products),
       });
     } catch (error) {

@@ -118,6 +118,17 @@ const Pair = z
   })
   .strict();
 
+/** The basket state code. It is a state discriminator, not an HTTP error code. */
+export const BASKETS_TOO_COMPLEX_CODE = 'BASKETS_TOO_COMPLEX';
+
+export const SalesAnalysisBasketState = z
+  .object({
+    state: z.enum(['complete', 'unavailable']),
+    code: z.literal(BASKETS_TOO_COMPLEX_CODE).nullable(),
+  })
+  .strict();
+export type SalesAnalysisBasketState = z.infer<typeof SalesAnalysisBasketState>;
+
 export const SalesAnalysis = z
   .object({
     merchantId: Uuid,
@@ -137,6 +148,7 @@ export const SalesAnalysis = z
     byMonth: z.array(Dimension).max(25),
     byLocation: z.array(Dimension).max(1000),
     byCategory: z.array(SalesAnalysisCategory).max(5002).optional(),
+    basketState: SalesAnalysisBasketState.optional(),
     coverage: z
       .object({
         baskets: Count,
@@ -148,9 +160,13 @@ export const SalesAnalysis = z
         pairsAvailable: Count,
         categoriesUseCurrentCatalog: z.literal(true),
       })
-      .strict(),
-    unitsDistribution: z.array(z.object({ units: Count, tickets: Count }).strict()).max(20000),
-    pairs: z.array(Pair).max(100),
+      .strict()
+      .optional(),
+    unitsDistribution: z
+      .array(z.object({ units: Count, tickets: Count }).strict())
+      .max(20000)
+      .optional(),
+    pairs: z.array(Pair).max(100).optional(),
     selectedGroups: z
       .object({
         a: z.string().nullable(),
@@ -163,9 +179,51 @@ export const SalesAnalysis = z
         lift: Ratio,
         overlappingProducts: Count,
       })
-      .strict(),
+      .strict()
+      .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((report, context) => {
+    const basketFields = ['coverage', 'unitsDistribution', 'pairs', 'selectedGroups'] as const;
+    const missing = basketFields.filter((key) => report[key] === undefined);
+    const present = basketFields.filter((key) => report[key] !== undefined);
+    if (!report.basketState) {
+      if (missing.length)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['basketState'],
+          message: 'basketState is required when a basket field is absent',
+        });
+      return;
+    }
+    if (report.basketState.state === 'complete') {
+      if (report.basketState.code !== null)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['basketState', 'code'],
+          message: 'A complete basketState requires code null',
+        });
+      if (missing.length)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['basketState'],
+          message: 'A complete basketState requires all four basket fields',
+        });
+      return;
+    }
+    if (report.basketState.code !== BASKETS_TOO_COMPLEX_CODE)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['basketState', 'code'],
+        message: 'An unavailable basketState requires code BASKETS_TOO_COMPLEX',
+      });
+    if (present.length)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['basketState'],
+        message: 'An unavailable basketState requires no basket fields',
+      });
+  });
 export type SalesAnalysis = z.infer<typeof SalesAnalysis>;
 
 export const SalesAnalysisOptionsQuery = z.object({ locationId: Uuid.optional() }).strict();
@@ -182,5 +240,6 @@ export const salesAnalysisModels = {
   SalesAnalysisGroupWrite,
   SalesAnalysisGroup,
   SalesAnalysisOptions,
+  SalesAnalysisBasketState,
   SalesAnalysis,
 } as const;

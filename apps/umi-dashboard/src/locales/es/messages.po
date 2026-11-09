@@ -102,6 +102,10 @@ msgid "Cargando negocio…"
 msgstr "Cargando negocio…"
 
 #: src/app.jsx
+msgid "Saltar al contenido"
+msgstr "Saltar al contenido"
+
+#: src/app.jsx
 #: src/screens/cafes.jsx
 #: src/screens/categories-workspace.jsx
 #: src/screens/conversations.jsx
@@ -584,6 +588,7 @@ msgid "Guardado"
 msgstr "Guardado"
 
 #: src/lib/inventory-import/display.js
+#: src/screens/category-sales.jsx
 #: src/screens/floor-plan.jsx
 #: src/screens/inventory-count.jsx
 #: src/screens/inventory-workspace.jsx
@@ -1527,6 +1532,10 @@ msgid "Aún no hay categorías. Crea la primera arriba."
 msgstr "Aún no hay categorías. Crea la primera arriba."
 
 #: src/screens/category-sales.jsx
+#~ msgid "El desglose por categoría no está disponible. Actualiza la consulta para reintentar."
+#~ msgstr "El desglose por categoría no está disponible. Actualiza la consulta para reintentar."
+
+#: src/screens/category-sales.jsx
 msgid "Participación de venta neta por categoría"
 msgstr "Participación de venta neta por categoría"
 
@@ -1561,8 +1570,8 @@ msgid "Ver informe"
 msgstr "Ver informe"
 
 #: src/screens/category-sales.jsx
-msgid "El desglose por categoría no está disponible. Actualiza la consulta para reintentar."
-msgstr "El desglose por categoría no está disponible. Actualiza la consulta para reintentar."
+msgid "El desglose por categoría no está disponible."
+msgstr "El desglose por categoría no está disponible."
 
 #: src/screens/category-sales.jsx
 msgid "Las devoluciones generan importes negativos. Consulta los importes por categoría; no se muestra una distribución porcentual."
@@ -8288,6 +8297,20 @@ msgid "Últimos 30 días"
 msgstr "Últimos 30 días"
 
 #: src/screens/overview.jsx
+msgid "Explorar ventas"
+msgstr "Explorar ventas"
+
+#: src/screens/overview.jsx
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Actualizando ventas…"
+msgstr "Actualizando ventas…"
+
+#. placeholder {0}: formatTime(report.dataUpdatedAt, { timeZone: options.timezone })
+#: src/screens/overview.jsx
+msgid "Datos de las {0}. Actualiza para ver el estado actual."
+msgstr "Datos de las {0}. Actualiza para ver el estado actual."
+
+#: src/screens/overview.jsx
 msgid "La selección funciona en esta visita, pero el navegador no permitió guardarla."
 msgstr "La selección funciona en esta visita, pero el navegador no permitió guardarla."
 
@@ -8305,16 +8328,22 @@ msgid "Historial desde {0}"
 msgstr "Historial desde {0}"
 
 #: src/screens/overview.jsx
+#: src/screens/sales-purchase-analysis.jsx
+msgid "La afinidad de compras no está disponible para este periodo. Los totales y las categorías siguen disponibles."
+msgstr "La afinidad de compras no está disponible para este periodo. Los totales y las categorías siguen disponibles."
+
+#: src/screens/overview.jsx
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Reintentar análisis"
+msgstr "Reintentar análisis"
+
+#: src/screens/overview.jsx
 msgid "No se pudo cargar el periodo anterior. La comparación no está disponible."
 msgstr "No se pudo cargar el periodo anterior. La comparación no está disponible."
 
 #: src/screens/overview.jsx
 msgid "Elige tus indicadores en Personalizar inicio."
 msgstr "Elige tus indicadores en Personalizar inicio."
-
-#: src/screens/overview.jsx
-msgid "Explorar ventas"
-msgstr "Explorar ventas"
 
 #. placeholder {0}: prior.data.from
 #. placeholder {1}: prior.data.to
@@ -9904,6 +9933,11 @@ msgstr "Un administrador del negocio puede modificar los grupos."
 #~ msgstr "Historial de ventas desde {0}. Datos consultados: {capturedAt}. El día y el mes actuales pueden estar incompletos."
 
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
+#~ msgid "El análisis combina demasiados productos. Consulta un periodo menor."
+#~ msgstr "El análisis combina demasiados productos. Consulta un periodo menor."
+
+#: src/screens/sales-purchase-analysis.jsx
 msgid "No se pudo consultar este periodo. Elige un rango menor, de hasta 731 días y 20,000 tickets."
 msgstr "No se pudo consultar este periodo. Elige un rango menor, de hasta 731 días y 20,000 tickets."
 
@@ -10143,6 +10177,11 @@ msgid "Los meses permiten comparar el historial disponible. Confirmar una tempor
 msgstr "Los meses permiten comparar el historial disponible. Confirmar una temporada requiere observar ciclos completos y comparar periodos equivalentes."
 
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
+msgid "La afinidad de compras no está disponible para este periodo."
+msgstr "La afinidad de compras no está disponible para este periodo."
+
+#: src/screens/sales-purchase-analysis.jsx
 msgid "Resumen de ventas"
 msgstr "Resumen de ventas"
 
@@ -10162,6 +10201,18 @@ msgstr "Sucursales"
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Este periodo no contiene tickets de venta. Puede incluir devoluciones de ventas anteriores."
 msgstr "Este periodo no contiene tickets de venta. Puede incluir devoluciones de ventas anteriores."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "La afinidad de compras está oculta en esta visita."
+msgstr "La afinidad de compras está oculta en esta visita."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Mostrar afinidad"
+msgstr "Mostrar afinidad"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Ocultar afinidad"
+msgstr "Ocultar afinidad"
 
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Desglose de ventas"
@@ -10216,6 +10267,13 @@ msgstr "Día operativo y zona horaria: {0} · {1}"
 msgid "Consultando compras…"
 msgstr "Consultando compras…"
 
+#. placeholder {0}: formatTime(capturedAt, { timeZone: timezone })
+#. placeholder {0}: formatTime(result.data.capturedAt, { timeZone: result.data.timezone })
+#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
+msgid "No se pudo actualizar. Estos importes son de las {0}."
+msgstr "No se pudo actualizar. Estos importes son de las {0}."
+
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Cargando categorías y grupos…"
 msgstr "Cargando categorías y grupos…"
@@ -10239,6 +10297,20 @@ msgstr "El periodo supera el límite de 20,000 tickets. Consulta menos días."
 #: src/screens/sales-widgets.jsx
 msgid "No se pudieron cargar las ventas. Los importes no están disponibles."
 msgstr "No se pudieron cargar las ventas. Los importes no están disponibles."
+
+#. placeholder {0}: coverage.ticketsWithoutProducts
+#: src/screens/sales-widgets.jsx
+msgid "{0} tickets carecen de productos identificados. Permanecen en el total de tickets."
+msgstr "{0} tickets carecen de productos identificados. Permanecen en el total de tickets."
+
+#. placeholder {0}: coverage.legacyDiscountTickets
+#: src/screens/sales-widgets.jsx
+msgid "{0} tickets usan un descuento anterior. El descuento puede estar incompleto."
+msgstr "{0} tickets usan un descuento anterior. El descuento puede estar incompleto."
+
+#: src/screens/sales-widgets.jsx
+msgid "Cobertura parcial"
+msgstr "Cobertura parcial"
 
 #. placeholder {0}: rows.length
 #: src/screens/sales-widgets.jsx
@@ -10278,8 +10350,12 @@ msgstr "Periodo anterior sin base de comparación"
 msgid "Comparación no disponible"
 msgstr "Comparación no disponible"
 
+#: src/screens/sales-widgets.jsx
+msgid "La distribución de piezas no está disponible para este periodo."
+msgstr "La distribución de piezas no está disponible para este periodo."
+
 #. placeholder {0}: pair.baskets
-#. placeholder {1}: report.coverage.baskets
+#. placeholder {1}: report.coverage?.baskets ?? 0
 #: src/screens/sales-widgets.jsx
 msgid "{0} de {1} compras"
 msgstr "{0} de {1} compras"
