@@ -118,10 +118,13 @@ const Pair = z
   })
   .strict();
 
+/** The basket state code. It is a state discriminator, not an HTTP error code. */
+export const BASKETS_TOO_COMPLEX_CODE = 'BASKETS_TOO_COMPLEX';
+
 export const SalesAnalysisBasketState = z
   .object({
     state: z.enum(['complete', 'unavailable']),
-    code: z.enum(['BASKETS_TOO_COMPLEX']).nullable(),
+    code: z.literal(BASKETS_TOO_COMPLEX_CODE).nullable(),
   })
   .strict();
 export type SalesAnalysisBasketState = z.infer<typeof SalesAnalysisBasketState>;
@@ -208,7 +211,7 @@ export const SalesAnalysis = z
         });
       return;
     }
-    if (report.basketState.code !== 'BASKETS_TOO_COMPLEX')
+    if (report.basketState.code !== BASKETS_TOO_COMPLEX_CODE)
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['basketState', 'code'],

@@ -1,4 +1,4 @@
-import type { SalesAnalysisQuery } from '@umi/contract';
+import { BASKETS_TOO_COMPLEX_CODE, type SalesAnalysisQuery } from '@umi/contract';
 import type { AnalysisGroup, AnalysisSale } from './sales-analysis';
 
 const ratio = (numerator: number, denominator: number) =>
@@ -52,7 +52,7 @@ function countPairs(baskets: Set<string>[]) {
   let evaluations = 0;
   function count(products: string[], weight: number) {
     evaluations += (products.length * (products.length - 1)) / 2;
-    if (evaluations > maxPairEvaluations) throw new RangeError('BASKETS_TOO_COMPLEX');
+    if (evaluations > maxPairEvaluations) throw new RangeError(BASKETS_TOO_COMPLEX_CODE);
     for (const product of products) singles.set(product, (singles.get(product) ?? 0) + weight);
     for (let a = 0; a < products.length; a++) {
       for (let b = a + 1; b < products.length; b++) {
@@ -60,14 +60,14 @@ function countPairs(baskets: Set<string>[]) {
         const pair = pairs.get(key) ?? { a: products[a], b: products[b], count: 0 };
         pair.count += weight;
         pairs.set(key, pair);
-        if (pairs.size > 100_000) throw new RangeError('BASKETS_TOO_COMPLEX');
+        if (pairs.size > 100_000) throw new RangeError(BASKETS_TOO_COMPLEX_CODE);
       }
     }
   }
   for (const basket of baskets) {
     const products = [...basket].sort();
     if ((products.length * (products.length - 1)) / 2 > 100_000)
-      throw new RangeError('BASKETS_TOO_COMPLEX');
+      throw new RangeError(BASKETS_TOO_COMPLEX_CODE);
     if (products.length < 8) {
       count(products, 1);
       continue;

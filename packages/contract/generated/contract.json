@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "ef2041007e120f6775070ebcbc78ff85f63a098f9935569d9c1176f96f391c5d",
+  "contentHash": "8d1e90992b68a8f5b1bb7626317228d4a9a8f6855cd65be1f32576714a7ca03c",
   "contractVersion": "2.54.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -90868,9 +90868,7 @@
             "code": {
               "anyOf": [
                 {
-                  "enum": [
-                    "BASKETS_TOO_COMPLEX"
-                  ],
+                  "const": "BASKETS_TOO_COMPLEX",
                   "type": "string"
                 },
                 {
@@ -91785,9 +91783,7 @@
         "code": {
           "anyOf": [
             {
-              "enum": [
-                "BASKETS_TOO_COMPLEX"
-              ],
+              "const": "BASKETS_TOO_COMPLEX",
               "type": "string"
             },
             {
