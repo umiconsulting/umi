@@ -3729,31 +3729,20 @@ time,
     width: auto;
     margin-left: auto;
     justify-content: flex-end;
-    overflow-x: auto;
-    /* The cluster has to be able to SHRINK, not wrap. At 360px its controls plus
-       the drawer button were wider than the line, so it wrapped to a row of its
-       own and pushed the title onto a third: a 200px masthead, and the screen's
-       own actions below it out of reach. `flex: 1 1 auto` with `min-width: 0`
-       lets it take whatever is left and scroll internally, which keeps the
-       masthead at two rows all the way down. */
+    flex-wrap: wrap;
+    /* At 360px the controls plus the drawer button are wider than one line. Wrap
+       the cluster inside its own width instead of scrolling it. The masthead
+       grows by one control row, and the page has no third horizontal scroll box. */
     /* Basis 0, not auto. A wrapping flex container decides where to break using
-       each item's flex BASE size, so `auto` meant the cluster was measured at its
-       332px of content and pushed onto a line of its own even though `flex-shrink`
-       could have taken it down. With a basis of 0 it takes the space that is left
-       (278px at 360px) and scrolls the remainder internally. */
+       each item's flex BASE size. With a basis of 0 it takes the space that is
+       left (278px at 360px), then wraps the controls inside that width. */
     flex: 1 1 0;
     min-width: 0;
-    /* A scroll container clips on BOTH axes. The cluster keeps its scroll for the
-       cases that need it, but the couple of pixels its controls' focus rings and
-       the avatar's edge occupy are clipped without this, so the row reads as
-       misaligned. The negative margin means the row's own height is unchanged. */
+    /* Keep the focus rings visible. The old scroll container clipped them on the
+       horizontal axis; the negative block margin keeps the row height unchanged. */
+    overflow: visible;
     padding-block: 4px;
     margin-block: -4px;
-    /* The bar is sticky: a rail scrolling inside it is noise, not an affordance. */
-    scrollbar-width: none;
-  }
-  .top-actions::-webkit-scrollbar {
-    display: none;
   }
   .masthead-row .h-page {
     order: 3;
