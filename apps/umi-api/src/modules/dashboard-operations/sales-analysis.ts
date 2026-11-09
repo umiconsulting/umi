@@ -150,11 +150,7 @@ function finishDimension(groups: MetricGroups) {
     .map(([key, group]) => ({ key, label: group.label, ...finishMetrics(group.metrics) }));
 }
 
-export function analyzePurchases(
-  sales: AnalysisSale[],
-  query: SalesAnalysisQuery,
-  groups: AnalysisGroup[],
-) {
+export function analyzeSummary(sales: AnalysisSale[], query: SalesAnalysisQuery) {
   const totals = emptyMetrics();
   const byHour: MetricGroups = new Map();
   const byDay: MetricGroups = new Map();
@@ -170,7 +166,6 @@ export function analyzePurchases(
     addDimension(byLocation, event.locationId, event, event.locationName);
   }
   return {
-    ...analyzeBaskets(sales, query, groups),
     totals: finishMetrics(totals),
     byHour: finishDimension(byHour),
     byDay: finishDimension(byDay),
@@ -178,4 +173,12 @@ export function analyzePurchases(
     byMonth: finishDimension(byMonth),
     byLocation: finishDimension(byLocation),
   };
+}
+
+export function analyzePurchases(
+  sales: AnalysisSale[],
+  query: SalesAnalysisQuery,
+  groups: AnalysisGroup[],
+) {
+  return { ...analyzeBaskets(sales, query, groups), ...analyzeSummary(sales, query) };
 }

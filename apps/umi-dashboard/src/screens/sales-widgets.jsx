@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro';
 import { Link } from 'react-router-dom';
-import { formatNumber, formatDateTime, formatDate } from '@/lib/format.js';
+import { formatNumber, formatDateTime, formatDate, formatTime } from '@/lib/format.js';
 import { formatOperationMoney } from './operations-format.js';
 import { dailySalesRows, salesReportLink } from './sales-report-model.js';
 import './sales-widgets.css';
@@ -19,8 +19,6 @@ export function SalesReportState({ loading, error, code, onRetry }) {
       <p>
         {code === 'PERMISSION_DENIED' ? (
           <Trans>No tienes permiso para consultar estas ventas.</Trans>
-        ) : code === 'REPORT_RANGE_TOO_COMPLEX' ? (
-          <Trans>El análisis combina demasiados productos. Consulta un periodo menor.</Trans>
         ) : code === 'REPORT_RANGE_TOO_LARGE' ? (
           <Trans>El periodo supera el límite de 20,000 tickets. Consulta menos días.</Trans>
         ) : (
@@ -30,6 +28,56 @@ export function SalesReportState({ loading, error, code, onRetry }) {
       <button type="button" className="btn btn-secondary" onClick={onRetry}>
         <Trans>Reintentar</Trans>
       </button>
+    </div>
+  );
+}
+
+export function SalesRefreshError({ capturedAt, timezone, onRetry }) {
+  return (
+    <div className="sales-state surface" role="alert">
+      <p>
+        <Trans>
+          No se pudo actualizar. Estos importes son de las{' '}
+          {formatTime(capturedAt, { timeZone: timezone })}.
+        </Trans>
+      </p>
+      <button type="button" className="btn btn-secondary" onClick={onRetry}>
+        <Trans>Reintentar</Trans>
+      </button>
+    </div>
+  );
+}
+
+export function SalesCoverageNotice({ coverage }) {
+  if (!coverage) return null;
+  const gaps = [];
+  if (coverage.ticketsWithoutProducts > 0)
+    gaps.push(
+      <li key="products">
+        <Trans>
+          {coverage.ticketsWithoutProducts} tickets carecen de productos identificados. Permanecen
+          en el total de tickets.
+        </Trans>
+      </li>,
+    );
+  if (coverage.legacyDiscountTickets > 0)
+    gaps.push(
+      <li key="discounts">
+        <Trans>
+          {coverage.legacyDiscountTickets} tickets usan un descuento anterior. El descuento puede
+          estar incompleto.
+        </Trans>
+      </li>,
+    );
+  if (!gaps.length) return null;
+  return (
+    <div className="sales-state surface" role="status">
+      <p>
+        <strong>
+          <Trans>Cobertura parcial</Trans>
+        </strong>
+      </p>
+      <ul>{gaps}</ul>
     </div>
   );
 }
@@ -165,9 +213,11 @@ export function SalesMetric({ id, report, prior, query }) {
   );
 }
 
-export function SalesDetailWidget({ id, report, query }) {
+export function SalesDetailWidget({ id, report, query, onRetry }) {
   const { t } = useLingui();
-  if (id === 'categories') return <CategorySalesCard report={report} query={query} />;
+  if (id === 'categories')
+    return <CategorySalesCard report={report} query={query} onRetry={onRetry} />;
+  const basketsAvailable = report.basketState?.state !== 'unavailable';
   const titles = {
     trend: t`Venta por día`,
     hours: t`Horas con más venta`,
@@ -195,9 +245,11 @@ export function SalesDetailWidget({ id, report, query }) {
       .slice(0, 4)
       .map((row) => ({ ...row, label: `${row.key}:00` }));
   if (id === 'distribution')
-    rows = report.unitsDistribution
-      .map((row) => ({ key: row.units, label: t`${row.units} piezas`, tickets: row.tickets }))
-      .slice(0, 5);
+    rows = basketsAvailable
+      ? (report.unitsDistribution ?? [])
+          .map((row) => ({ key: row.units, label: t`${row.units} piezas`, tickets: row.tickets }))
+          .slice(0, 5)
+      : [];
   return (
     <section className="sales-widget sales-detail-widget surface">
       <h2>
@@ -205,8 +257,16 @@ export function SalesDetailWidget({ id, report, query }) {
           {titles[id]} <span aria-hidden="true">↗</span>
         </Link>
       </h2>
-      {id === 'pairs' ? (
-        report.pairs.length ? (
+      {id === 'pairs' && !basketsAvailable ? (
+        <p>
+          <Trans>La afinidad de compras no está disponible para este periodo.</Trans>
+        </p>
+      ) : id === 'distribution' && !basketsAvailable ? (
+        <p>
+          <Trans>La distribución de piezas no está disponible para este periodo.</Trans>
+        </p>
+      ) : id === 'pairs' ? (
+        report.pairs?.length ? (
           <ol className="sales-pairs">
             {report.pairs.slice(0, 4).map((pair) => (
               <li key={`${pair.productAId}:${pair.productBId}`}>
@@ -218,7 +278,7 @@ export function SalesDetailWidget({ id, report, query }) {
                 </strong>
                 <small>
                   <Trans>
-                    {pair.baskets} de {report.coverage.baskets} compras
+                    {pair.baskets} de {report.coverage?.baskets ?? 0} compras
                   </Trans>
                 </small>
               </li>

@@ -4,6 +4,7 @@ import {
   salesAnalysisQuery,
   salesRefreshInterval,
   invalidateSalesReports,
+  clearSalesReports,
 } from './sales-analysis-query.js';
 const clients = [];
 afterEach(() => {
@@ -128,5 +129,62 @@ describe('shared sales report cache', () => {
     expect(
       salesRefreshInterval({ state: { dataUpdatedAt: 0, errorUpdatedAt: 80000 } }, 85000),
     ).toBe(55000);
+  });
+  it('sorts the permission fingerprint so a reordered list reuses the same entry', async () => {
+    const cache = client();
+    let calls = 0;
+    const fetcher = async () => ++calls;
+    const first = salesAnalysisQuery(
+      ['merchant', 'branch', 'user', ['a', 'b'], null],
+      query,
+      fetcher,
+    );
+    const second = salesAnalysisQuery(
+      ['merchant', 'branch', 'user', ['b', 'a'], null],
+      query,
+      fetcher,
+    );
+    expect(first.queryKey).toEqual(second.queryKey);
+    await cache.fetchQuery(first);
+    await cache.fetchQuery(second);
+    expect(calls).toBe(1);
+  });
+  it('does not poll while the affinity capability is unavailable', () => {
+    expect(
+      salesRefreshInterval(
+        {
+          state: {
+            dataUpdatedAt: 10000,
+            errorUpdatedAt: 0,
+            data: { basketState: { state: 'unavailable', code: 'BASKETS_TOO_COMPLEX' } },
+          },
+        },
+        90000,
+      ),
+    ).toBe(false);
+  });
+  it('clears only the denied merchant sales and options entries', () => {
+    const cache = client();
+    const merchantKeys = [
+      ['sales-analysis-options', 'merchant', 'branch'],
+      ['sales-analysis', 'merchant', 'branch', 'user', 'sale.lifecycle', null, 'from=...'],
+    ];
+    const other = ['sales-analysis-options', 'other', 'branch'];
+    for (const key of [...merchantKeys, other]) cache.setQueryData(key, { stale: true });
+    clearSalesReports(cache, 'merchant');
+    for (const key of merchantKeys) expect(cache.getQueryData(key)).toBeUndefined();
+    expect(cache.getQueryData(other)).toEqual({ stale: true });
+  });
+  it('keeps the last valid values when a refresh fails', async () => {
+    const cache = client();
+    let calls = 0;
+    const options = salesAnalysisQuery(identity, query, async () => {
+      if (++calls === 1) return { totals: { netMinorUnits: 100 } };
+      throw Object.assign(new Error('offline'), { status: 503 });
+    });
+    await cache.fetchQuery(options);
+    await cache.refetchQueries({ queryKey: options.queryKey });
+    expect(cache.getQueryData(options.queryKey)).toEqual({ totals: { netMinorUnits: 100 } });
+    expect(cache.getQueryState(options.queryKey).error).toBeTruthy();
   });
 });

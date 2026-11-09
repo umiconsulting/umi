@@ -503,7 +503,7 @@ const Topbar = ({
               <I.Menu size={18} />
             </button>
           ) : null}
-          <h1 className="h-page">
+          <h1 className="h-page" id="page-title" tabIndex={-1}>
             {screen === 'overview' ? (
               <>
                 {greet}

@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useSalesAnalysis, useSalesAnalysisOptions, useOverviewData } from '@/data.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { getStoredSession } from '@/lib/auth.jsx';
-import { formatNumber } from '@/lib/format.js';
+import { formatNumber, formatTime } from '@/lib/format.js';
 import {
+  SalesCoverageNotice,
   SalesDataNote,
   SalesDetailWidget,
   SalesMetric,
+  SalesRefreshError,
   SalesReportState,
 } from './sales-widgets.jsx';
 import {
@@ -147,13 +149,24 @@ function BusinessWidgets({ options, context }) {
       setSaveError(true);
     }
   }
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const stale = Boolean(
+    report.data &&
+    report.dataUpdatedAt &&
+    !report.refreshing &&
+    now - report.dataUpdatedAt > 60_000,
+  );
   return (
     <>
       <div className="sales-toolbar">
         <div>
-          <h1>
+          <h2>
             <Trans>Tu negocio en números</Trans>
-          </h1>
+          </h2>
           <p>
             {scope} · {query.from} — {query.to} · {options.timezone}
           </p>
@@ -182,6 +195,9 @@ function BusinessWidgets({ options, context }) {
           <button type="button" className="btn btn-ghost" onClick={refreshReports}>
             <Trans>Actualizar</Trans>
           </button>
+          <Link className="btn btn-primary" to={salesReportLink(query)}>
+            <Trans>Explorar ventas</Trans> →
+          </Link>
         </div>
       </div>
       {editing && (
@@ -191,9 +207,17 @@ function BusinessWidgets({ options, context }) {
           onClose={() => setEditing(false)}
         />
       )}
-      {report.refreshing && (
+      {report.refreshing && !report.loading && (
         <p role="status">
           <Trans>Actualizando ventas…</Trans>
+        </p>
+      )}
+      {stale && !report.error && (
+        <p role="status">
+          <Trans>
+            Datos de las {formatTime(report.dataUpdatedAt, { timeZone: options.timezone })}.
+            Actualiza para ver el estado actual.
+          </Trans>
         </p>
       )}
       {saveError && (
@@ -203,11 +227,20 @@ function BusinessWidgets({ options, context }) {
           </Trans>
         </p>
       )}
-      {report.loading || report.error ? (
-        <SalesReportState {...report} code={report.errorCode} onRetry={refreshReports} />
+      {report.loading ? (
+        <SalesReportState loading onRetry={refreshReports} />
+      ) : !report.data && report.error ? (
+        <SalesReportState error={report.error} code={report.errorCode} onRetry={refreshReports} />
       ) : report.data ? (
         <>
-          {report.data.totals.tickets === 0 && (
+          {report.refreshError && (
+            <SalesRefreshError
+              capturedAt={report.data.capturedAt}
+              timezone={report.data.timezone}
+              onRetry={refreshReports}
+            />
+          )}
+          {report.data.totals.tickets === 0 && report.data.totals.netMinorUnits === 0 && (
             <p role="status">
               <Trans>No hay tickets de venta en este periodo.</Trans>{' '}
               <Link to={salesReportLink({ ...query, ...reportPeriod(options.today, 30) })}>
@@ -221,6 +254,20 @@ function BusinessWidgets({ options, context }) {
               )}
             </p>
           )}
+          {report.data.basketState?.state === 'unavailable' && (
+            <div className="sales-state surface" role="status">
+              <p>
+                <Trans>
+                  La afinidad de compras no está disponible para este periodo. Los totales y las
+                  categorías siguen disponibles.
+                </Trans>
+              </p>
+              <button type="button" className="btn btn-secondary" onClick={refreshReports}>
+                <Trans>Reintentar análisis</Trans>
+              </button>
+            </div>
+          )}
+          <SalesCoverageNotice coverage={report.data.coverage} />
           {prior.error && (
             <p role="status">
               <Trans>
@@ -240,7 +287,13 @@ function BusinessWidgets({ options, context }) {
                     query={query}
                   />
                 ) : (
-                  <SalesDetailWidget key={id} id={id} report={report.data} query={query} />
+                  <SalesDetailWidget
+                    key={id}
+                    id={id}
+                    report={report.data}
+                    query={query}
+                    onRetry={refreshReports}
+                  />
                 ),
               )}
             </div>
@@ -251,9 +304,6 @@ function BusinessWidgets({ options, context }) {
           )}
           <div className="sales-toolbar">
             <SalesDataNote report={report.data} />
-            <Link className="btn btn-secondary" to={salesReportLink(query)}>
-              <Trans>Explorar ventas</Trans> →
-            </Link>
           </div>
           {prior.data && !prior.error && !prior.loading && (
             <p className="sales-data-note">
