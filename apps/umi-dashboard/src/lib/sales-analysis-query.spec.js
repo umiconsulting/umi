@@ -235,12 +235,12 @@ describe('shared sales report cache', () => {
     const first = Object.assign(new Error('Unauthorized'), { status: 401 });
     const second = Object.assign(new Error('Unauthorized again'), { status: 401 });
     const forbidden = Object.assign(new Error('Forbidden'), { status: 403 });
-    expect(shouldClearDeniedSales({ error: first }, null)).toBe(true);
-    expect(shouldClearDeniedSales({ error: first }, first)).toBe(false);
-    expect(shouldClearDeniedSales({ error: null }, first)).toBe(false);
-    expect(shouldClearDeniedSales({ error: second }, first)).toBe(true);
-    expect(shouldClearDeniedSales({ error: second }, second)).toBe(false);
-    expect(shouldClearDeniedSales({ error: forbidden }, null)).toBe(true);
+    expect(shouldClearDeniedSales({ error: first }, 100, null)).toBe(true);
+    expect(shouldClearDeniedSales({ error: first }, 100, 100)).toBe(false);
+    expect(shouldClearDeniedSales({ error: null }, 200, 100)).toBe(false);
+    expect(shouldClearDeniedSales({ error: second }, 200, 100)).toBe(true);
+    expect(shouldClearDeniedSales({ error: second }, 200, 200)).toBe(false);
+    expect(shouldClearDeniedSales({ error: forbidden }, 300, 200)).toBe(true);
   });
   it('evicts the scoped entries on a final 401 and on a second revocation', () => {
     const cache = client();
@@ -251,11 +251,11 @@ describe('shared sales report cache', () => {
     const first = Object.assign(new Error('Unauthorized'), { status: 401 });
     const second = Object.assign(new Error('Unauthorized again'), { status: 401 });
     for (const key of keys) cache.setQueryData(key, { stale: true });
-    expect(shouldClearDeniedSales({ error: first }, null)).toBe(true);
+    expect(shouldClearDeniedSales({ error: first }, 100, null)).toBe(true);
     clearSalesReports(cache, 'merchant');
     for (const key of keys) expect(cache.getQueryData(key)).toBeUndefined();
     for (const key of keys) cache.setQueryData(key, { fresh: true });
-    expect(shouldClearDeniedSales({ error: second }, first)).toBe(true);
+    expect(shouldClearDeniedSales({ error: second }, 200, 100)).toBe(true);
     clearSalesReports(cache, 'merchant');
     for (const key of keys) expect(cache.getQueryData(key)).toBeUndefined();
   });

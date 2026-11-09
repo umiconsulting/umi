@@ -55,8 +55,8 @@ export function salesDenied(result) {
   );
 }
 
-export function shouldClearDeniedSales(result, clearedError) {
-  return salesDenied(result) && result.error !== clearedError;
+export function shouldClearDeniedSales(result, lastSuccessAt, clearedSuccessAt) {
+  return salesDenied(result) && clearedSuccessAt !== lastSuccessAt;
 }
 
 export function salesResult(result) {
