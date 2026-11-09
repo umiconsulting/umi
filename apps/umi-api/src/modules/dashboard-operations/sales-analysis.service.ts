@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import {
+  BASKETS_TOO_COMPLEX_CODE,
   SalesAnalysis,
   SalesAnalysisOptions,
   type SalesAnalysisBasketState,
@@ -59,8 +60,8 @@ export class SalesAnalysisService {
       try {
         baskets = analyzeBaskets(sales, query, groups);
       } catch (error) {
-        if (error instanceof RangeError && error.message === 'BASKETS_TOO_COMPLEX') {
-          basketState = { state: 'unavailable', code: 'BASKETS_TOO_COMPLEX' };
+        if (error instanceof RangeError && error.message === BASKETS_TOO_COMPLEX_CODE) {
+          basketState = { state: 'unavailable', code: BASKETS_TOO_COMPLEX_CODE };
         } else {
           throw error;
         }
