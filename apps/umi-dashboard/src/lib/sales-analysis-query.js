@@ -46,9 +46,17 @@ export function clearSalesReports(client, merchantId) {
 }
 
 export function salesDenied(result) {
+  // A final 401 is a refused session. A transient refresh becomes 503 in _apiFetch.
   return Boolean(
-    result.error && (result.error.status === 403 || result.error.code === 'PERMISSION_DENIED'),
+    result.error &&
+    (result.error.status === 401 ||
+      result.error.status === 403 ||
+      result.error.code === 'PERMISSION_DENIED'),
   );
+}
+
+export function shouldClearDeniedSales(result, clearedError) {
+  return salesDenied(result) && result.error !== clearedError;
 }
 
 export function salesResult(result) {

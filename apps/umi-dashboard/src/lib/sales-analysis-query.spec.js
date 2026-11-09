@@ -6,6 +6,7 @@ import {
   invalidateSalesReports,
   clearSalesReports,
   salesResult,
+  shouldClearDeniedSales,
 } from './sales-analysis-query.js';
 const clients = [];
 afterEach(() => {
@@ -201,5 +202,61 @@ describe('shared sales report cache', () => {
     expect(result.refreshing).toBe(false);
     expect(result.errorCode).toBe('PERMISSION_DENIED');
     expect(result.refreshError).toBe(false);
+  });
+  it('maps a final 401 to no values and no refresh state', () => {
+    const result = salesResult({
+      data: { totals: { netMinorUnits: 18000 } },
+      isFetching: true,
+      dataUpdatedAt: 1000,
+      error: Object.assign(new Error('Unauthorized'), { status: 401 }),
+      refetch: () => {},
+    });
+    expect(result.data).toBeNull();
+    expect(result.loading).toBe(false);
+    expect(result.refreshing).toBe(false);
+    expect(result.errorCode).toBe('PERMISSION_DENIED');
+    expect(result.refreshError).toBe(false);
+  });
+  it('keeps valid values on a transient 503 refresh', () => {
+    const data = { totals: { netMinorUnits: 18000 } };
+    const result = salesResult({
+      data,
+      isFetching: true,
+      dataUpdatedAt: 1000,
+      error: Object.assign(new Error('Service unavailable'), { status: 503 }),
+      refetch: () => {},
+    });
+    expect(result.data).toEqual(data);
+    expect(result.refreshError).toBe(true);
+    expect(result.errorCode).toBeUndefined();
+    expect(result.loading).toBe(false);
+  });
+  it('clears on the first denial and again after recovery', () => {
+    const first = Object.assign(new Error('Unauthorized'), { status: 401 });
+    const second = Object.assign(new Error('Unauthorized again'), { status: 401 });
+    const forbidden = Object.assign(new Error('Forbidden'), { status: 403 });
+    expect(shouldClearDeniedSales({ error: first }, null)).toBe(true);
+    expect(shouldClearDeniedSales({ error: first }, first)).toBe(false);
+    expect(shouldClearDeniedSales({ error: null }, first)).toBe(false);
+    expect(shouldClearDeniedSales({ error: second }, first)).toBe(true);
+    expect(shouldClearDeniedSales({ error: second }, second)).toBe(false);
+    expect(shouldClearDeniedSales({ error: forbidden }, null)).toBe(true);
+  });
+  it('evicts the scoped entries on a final 401 and on a second revocation', () => {
+    const cache = client();
+    const keys = [
+      ['sales-analysis-options', 'merchant', 'branch'],
+      ['sales-analysis', 'merchant', 'branch'],
+    ];
+    const first = Object.assign(new Error('Unauthorized'), { status: 401 });
+    const second = Object.assign(new Error('Unauthorized again'), { status: 401 });
+    for (const key of keys) cache.setQueryData(key, { stale: true });
+    expect(shouldClearDeniedSales({ error: first }, null)).toBe(true);
+    clearSalesReports(cache, 'merchant');
+    for (const key of keys) expect(cache.getQueryData(key)).toBeUndefined();
+    for (const key of keys) cache.setQueryData(key, { fresh: true });
+    expect(shouldClearDeniedSales({ error: second }, first)).toBe(true);
+    clearSalesReports(cache, 'merchant');
+    for (const key of keys) expect(cache.getQueryData(key)).toBeUndefined();
   });
 });

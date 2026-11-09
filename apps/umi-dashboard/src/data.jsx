@@ -25,8 +25,8 @@ import { queryClient } from '@/lib/query-client.js';
 import {
   salesAnalysisQuery,
   salesCachePolicy,
-  salesDenied,
   salesResult,
+  shouldClearDeniedSales,
   clearSalesReports,
   invalidateSalesReports,
 } from '@/lib/sales-analysis-query.js';
@@ -1600,13 +1600,12 @@ function salesQueryIdentity(ctx) {
 }
 
 function useClearDeniedSales(result, merchantId) {
-  const denied = salesDenied(result);
-  const clearedFor = useRefD(null);
+  const clearedError = useRefD(null);
   useEffectD(() => {
-    if (!denied || !merchantId || clearedFor.current === merchantId) return;
-    clearedFor.current = merchantId;
+    if (!merchantId || !shouldClearDeniedSales(result, clearedError.current)) return;
+    clearedError.current = result.error;
     clearSalesReports(queryClient, merchantId);
-  }, [denied, merchantId]);
+  }, [merchantId, result.error]);
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
