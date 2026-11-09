@@ -5596,3 +5596,39 @@ time,
   color: var(--ink-1);
   font-variant-numeric: tabular-nums;
 }
+
+/* Scoped report fixes: the series chart is the allowed scroll box; the pivot
+   table fits its card at phone width. */
+.series-chart-scroll:focus {
+  outline: 2px solid var(--umi-blue);
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .report-pivot-scroll {
+    overflow-x: auto;
+  }
+  .report-pivot-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 10px !important;
+  }
+  .report-pivot-table th,
+  .report-pivot-table td {
+    height: 44px;
+    min-width: 44px;
+    padding: 1px 2px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    box-sizing: border-box;
+  }
+  .report-pivot-table th button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 1px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    box-sizing: border-box;
+  }
+}
