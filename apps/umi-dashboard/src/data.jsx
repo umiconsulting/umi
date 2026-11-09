@@ -25,6 +25,7 @@ import { queryClient } from '@/lib/query-client.js';
 import {
   salesAnalysisQuery,
   salesCachePolicy,
+  clearSalesReports,
   invalidateSalesReports,
 } from '@/lib/sales-analysis-query.js';
 import { subscribeConversationMessages } from '@/lib/conversation-realtime.js';
@@ -1565,13 +1566,27 @@ function useSalesSummary(range, refresh, enabled = true) {
 }
 
 function salesQueryIdentity(ctx) {
+  const permissions = ctx?.capabilities?.membership?.permissions ?? [];
   return [
     _merchantId(ctx),
     _locationId(ctx),
     getStoredSession()?.user?.id,
-    ctx?.capabilities?.membership?.permissions,
+    [...new Set(permissions)].sort().join(','),
     ctx?.capabilities?.membership?.locationId,
   ];
+}
+
+function salesFetcher(merchantId) {
+  return async function fetchSales(path, opts) {
+    try {
+      return await _apiFetch(path, opts);
+    } catch (error) {
+      if (error?.status === 401 || error?.status === 403) {
+        clearSalesReports(queryClient, merchantId);
+      }
+      throw error;
+    }
+  };
 }
 
 function salesQueryResult(result) {
@@ -1581,6 +1596,8 @@ function salesQueryResult(result) {
     refreshing: Boolean(result.data && result.isFetching),
     error: result.error?.message,
     errorCode: result.error?.code,
+    refreshError: Boolean(result.data && result.error),
+    dataUpdatedAt: result.dataUpdatedAt,
     refetch: result.refetch,
   };
 }
@@ -1588,11 +1605,13 @@ function salesQueryResult(result) {
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
 export function useSalesAnalysisOptions() {
   const ctx = useMerchant();
+  const merchantId = _merchantId(ctx);
   const result = useQuery({
     ...salesCachePolicy,
     queryKey: ['sales-analysis-options', ...salesQueryIdentity(ctx)],
-    queryFn: ({ signal }) => _apiFetch(routes.salesAnalysis.options(_merchantId(ctx)), { signal }),
-    enabled: Boolean(_merchantId(ctx)) && !ctx?.loading,
+    queryFn: ({ signal }) =>
+      salesFetcher(merchantId)(routes.salesAnalysis.options(merchantId), { signal }),
+    enabled: Boolean(merchantId) && !ctx?.loading,
     retry: false,
   });
   return salesQueryResult(result);
@@ -1601,9 +1620,10 @@ export function useSalesAnalysisOptions() {
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
 export function useSalesAnalysis(query) {
   const ctx = useMerchant();
+  const merchantId = _merchantId(ctx);
   const result = useQuery({
-    ...salesAnalysisQuery(salesQueryIdentity(ctx), query, _apiFetch),
-    enabled: Boolean(query && _merchantId(ctx)) && !ctx?.loading,
+    ...salesAnalysisQuery(salesQueryIdentity(ctx), query, salesFetcher(merchantId)),
+    enabled: Boolean(query && merchantId) && !ctx?.loading,
     retry: false,
   });
   return salesQueryResult(result);

@@ -190,7 +190,8 @@ import type { ZodTypeAny } from 'zod';
  */
 /** 2.50.0 adds exact preparation previews and optional quantities for a production plan. */
 /** 2.52.0 adds purchase analysis, configurable groups and explicit report errors. */
-export const CONTRACT_VERSION = '2.53.0';
+/** 2.54.0 adds the typed basket state and keeps the summary when the basket budget fails. */
+export const CONTRACT_VERSION = '2.54.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;
@@ -291,6 +292,8 @@ export const invariantCatalog = {
     'A kitchen projection references one committed sale. A KDS command cannot change a financial fact.',
   KitchenEventOrder:
     'A client applies only a newer aggregate version. It recovers a gap from the authoritative snapshot.',
+  SalesAnalysisBasketState:
+    'basketState is absent with all four basket fields, or complete with code null and all four fields, or unavailable with code BASKETS_TOO_COMPLEX and no basket fields.',
 } as const;
 
 /** Hours a recorded command result stays replayable. Mirrored by `business_command.expires_at`. */

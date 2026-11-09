@@ -81,6 +81,6 @@ describe('bounded purchase analysis', () => {
       }
       return sale(String(i), products.slice(0, 50));
     });
-    expect(() => analyzePurchases(sales, query, [])).toThrow('REPORT_RANGE_TOO_COMPLEX');
+    expect(() => analyzePurchases(sales, query, [])).toThrow('BASKETS_TOO_COMPLEX');
   });
 });

@@ -313,6 +313,9 @@ function DashboardLayout() {
 
   return (
     <div className={'app' + (collapsed ? ' collapsed' : '') + (navOpen ? ' nav-open' : '')}>
+      <a className="skip-link" href="#main-content">
+        <Trans>Saltar al contenido</Trans>
+      </a>
       {/* Below 1080 the sidebar leaves the grid and becomes a drawer. The scrim
           both dims the page and gives the drawer a dismiss target — a drawer you
           can only close from its own button is a trap on a touch screen. */}
@@ -335,7 +338,7 @@ function DashboardLayout() {
         selectedMerchantId={merchantState?.selectedMerchantId}
         onMerchantChange={merchantState?.setSelectedMerchantId}
       />
-      <main className="main">
+      <main className="main" id="main-content" tabIndex={-1}>
         <Topbar
           merchant={merchantName}
           onMenu={() => setNavOpen(true)}

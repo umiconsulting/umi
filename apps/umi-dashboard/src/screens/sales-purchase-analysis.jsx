@@ -1,8 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { initialAnalysisQuery } from './sales-report-model.js';
-import { SalesBars, SalesDataNote, SalesDetailWidget } from './sales-widgets.jsx';
-import { formatNumber } from '@/lib/format.js';
+import {
+  SalesBars,
+  SalesCoverageNotice,
+  SalesDataNote,
+  SalesDetailWidget,
+} from './sales-widgets.jsx';
+import { formatNumber, formatTime } from '@/lib/format.js';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { useSalesAnalysis, useSalesAnalysisOptions } from '@/data.jsx';
@@ -28,9 +33,7 @@ function ReportError({ code, onRetry }) {
   return (
     <div className="analysis-panel surface" role="alert">
       <p>
-        {code === 'REPORT_RANGE_TOO_COMPLEX' ? (
-          <Trans>El análisis combina demasiados productos. Consulta un periodo menor.</Trans>
-        ) : code === 'REPORT_RANGE_TOO_LARGE' || code === 'VALIDATION_FAILED' ? (
+        {code === 'REPORT_RANGE_TOO_LARGE' || code === 'VALIDATION_FAILED' ? (
           <Trans>
             No se pudo consultar este periodo. Elige un rango menor, de hasta 731 días y 20,000
             tickets.
@@ -506,8 +509,23 @@ function TimeComparisons({ report }) {
   );
 }
 
-function AnalysisResults({ report, query, section, setSection }) {
+function AffinityUnavailable({ onRetry }) {
+  return (
+    <div className="analysis-panel surface" role="status">
+      <p>
+        <Trans>La afinidad de compras no está disponible para este periodo.</Trans>
+      </p>
+      <button type="button" className="btn btn-secondary" onClick={onRetry}>
+        <Trans>Reintentar análisis</Trans>
+      </button>
+    </div>
+  );
+}
+
+function AnalysisResults({ report, query, section, setSection, onRetry }) {
   const { t } = useLingui();
+  const [affinityHidden, setAffinityHidden] = useState(false);
+  const basketsAvailable = report.basketState?.state !== 'unavailable';
   const sections = [
     ['overview', t`Resumen de ventas`],
     ['categories', t`Categorías`],
@@ -520,6 +538,7 @@ function AnalysisResults({ report, query, section, setSection }) {
   return (
     <>
       <SalesDataNote report={report} />
+      <SalesCoverageNotice coverage={report.coverage} />
       {report.totals.tickets === 0 && (
         <p role="status">
           <Trans>
@@ -528,6 +547,40 @@ function AnalysisResults({ report, query, section, setSection }) {
           </Trans>
         </p>
       )}
+      {!basketsAvailable &&
+        (affinityHidden ? (
+          <p className="analysis-note" role="status">
+            <Trans>La afinidad de compras está oculta en esta visita.</Trans>{' '}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setAffinityHidden(false)}
+            >
+              <Trans>Mostrar afinidad</Trans>
+            </button>
+          </p>
+        ) : (
+          <div className="analysis-panel surface" role="status">
+            <p>
+              <Trans>
+                La afinidad de compras no está disponible para este periodo. Los totales y las
+                categorías siguen disponibles.
+              </Trans>
+            </p>
+            <div className="analysis-affinity-actions">
+              <button type="button" className="btn btn-secondary" onClick={onRetry}>
+                <Trans>Reintentar análisis</Trans>
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setAffinityHidden(true)}
+              >
+                <Trans>Ocultar afinidad</Trans>
+              </button>
+            </div>
+          </div>
+        ))}
       <nav className="analysis-section-nav" aria-label={t`Desglose de ventas`}>
         {sections.map(([id, label]) => (
           <button
@@ -546,13 +599,20 @@ function AnalysisResults({ report, query, section, setSection }) {
           <Totals report={report} />
           <div className="analysis-summary-grid">
             {['trend', 'hours', 'pairs', 'distribution'].map((id) => (
-              <SalesDetailWidget key={id} id={id} report={report} query={query} />
+              <SalesDetailWidget key={id} id={id} report={report} query={query} onRetry={onRetry} />
             ))}
           </div>
         </>
       )}
-      {active === 'pairs' && <JointPurchases report={report} />}
-      {active === 'categories' && <CategorySalesCard report={report} query={query} detail />}
+      {active === 'pairs' &&
+        (basketsAvailable ? (
+          <JointPurchases report={report} />
+        ) : (
+          <AffinityUnavailable onRetry={onRetry} />
+        ))}
+      {active === 'categories' && (
+        <CategorySalesCard report={report} query={query} detail onRetry={onRetry} />
+      )}
       {active === 'time' && <TimeComparisons report={report} />}
       {active === 'locations' && (
         <Panel title={<Trans>Comparación entre sucursales</Trans>}>
@@ -569,54 +629,57 @@ function AnalysisResults({ report, query, section, setSection }) {
           </p>
         </Panel>
       )}
-      {active === 'distribution' && (
-        <Panel title={<Trans>¿Cuántas piezas lleva cada ticket?</Trans>}>
-          <SalesBars
-            rows={report.unitsDistribution.map((row) => ({
-              key: row.units,
-              label: t`${row.units} piezas`,
-              tickets: row.tickets,
-            }))}
-            currency={report.currency}
-            metric="tickets"
-            count
-          />
-          <details className="analysis-method">
-            <summary>
-              <Trans>Ver tabla de piezas</Trans>
-            </summary>
-            <div className="analysis-table" tabIndex={0}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>
-                      <Trans>Piezas</Trans>
-                    </th>
-                    <th>
-                      <Trans>Tickets</Trans>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.unitsDistribution.map((row) => (
-                    <tr key={row.units}>
-                      <td>{number(row.units)}</td>
-                      <td>{number(row.tickets)}</td>
+      {active === 'distribution' &&
+        (basketsAvailable ? (
+          <Panel title={<Trans>¿Cuántas piezas lleva cada ticket?</Trans>}>
+            <SalesBars
+              rows={report.unitsDistribution.map((row) => ({
+                key: row.units,
+                label: t`${row.units} piezas`,
+                tickets: row.tickets,
+              }))}
+              currency={report.currency}
+              metric="tickets"
+              count
+            />
+            <details className="analysis-method">
+              <summary>
+                <Trans>Ver tabla de piezas</Trans>
+              </summary>
+              <div className="analysis-table" tabIndex={0}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>
+                        <Trans>Piezas</Trans>
+                      </th>
+                      <th>
+                        <Trans>Tickets</Trans>
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
-          <p>
-            {report.refundView === 'sale_result' ? (
-              <Trans>Piezas restantes después de las devoluciones de cada ticket.</Trans>
-            ) : (
-              <Trans>Piezas originales de los tickets de venta del periodo.</Trans>
-            )}
-          </p>
-        </Panel>
-      )}
+                  </thead>
+                  <tbody>
+                    {report.unitsDistribution.map((row) => (
+                      <tr key={row.units}>
+                        <td>{number(row.units)}</td>
+                        <td>{number(row.tickets)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+            <p>
+              {report.refundView === 'sale_result' ? (
+                <Trans>Piezas restantes después de las devoluciones de cada ticket.</Trans>
+              ) : (
+                <Trans>Piezas originales de los tickets de venta del periodo.</Trans>
+              )}
+            </p>
+          </Panel>
+        ) : (
+          <AffinityUnavailable onRetry={onRetry} />
+        ))}
       <p className="analysis-note">
         <Trans>
           Historial de ventas desde {report.firstSaleDate ?? '—'}. Las categorías usan el catálogo
@@ -677,18 +740,32 @@ function AnalysisWorkspace({ merchantId, locationId, options, reloadOptions }) {
         <p role="status">
           <Trans>Consultando compras…</Trans>
         </p>
-      ) : result.error ? (
+      ) : !result.data && result.error ? (
         <ReportError code={result.errorCode} onRetry={result.refetch} />
-      ) : (
-        result.data && (
+      ) : result.data ? (
+        <>
+          {result.refreshError && (
+            <div className="analysis-panel surface" role="alert">
+              <p>
+                <Trans>
+                  No se pudo actualizar. Estos importes son de las{' '}
+                  {formatTime(result.data.capturedAt, { timeZone: result.data.timezone })}.
+                </Trans>
+              </p>
+              <button type="button" className="btn btn-secondary" onClick={result.refetch}>
+                <Trans>Reintentar</Trans>
+              </button>
+            </div>
+          )}
           <AnalysisResults
             report={result.data}
             query={query}
             section={params.get('section')}
             setSection={setSection}
+            onRetry={result.refetch}
           />
-        )
-      )}
+        </>
+      ) : null}
       <SalesAnalysisGroups merchantId={merchantId} options={options} onRefresh={reloadGroups} />
     </div>
   );

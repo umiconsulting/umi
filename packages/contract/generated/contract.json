@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "8753b02375fdd1fc114dc310022af6e2d64ac7fe84cf5b53dd2e66ec330ebc8d",
-  "contractVersion": "2.53.0",
+  "contentHash": "ef2041007e120f6775070ebcbc78ff85f63a098f9935569d9c1176f96f391c5d",
+  "contractVersion": "2.54.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -90862,6 +90862,36 @@
     "SalesAnalysis": {
       "additionalProperties": false,
       "properties": {
+        "basketState": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "BASKETS_TOO_COMPLEX"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "enum": [
+                "complete",
+                "unavailable"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "code"
+          ],
+          "type": "object"
+        },
         "basketUnit": {
           "enum": [
             "ticket",
@@ -91745,11 +91775,37 @@
         "byDay",
         "byWeekday",
         "byMonth",
-        "byLocation",
-        "coverage",
-        "unitsDistribution",
-        "pairs",
-        "selectedGroups"
+        "byLocation"
+      ],
+      "type": "object"
+    },
+    "SalesAnalysisBasketState": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "anyOf": [
+            {
+              "enum": [
+                "BASKETS_TOO_COMPLEX"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "complete",
+            "unavailable"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "code"
       ],
       "type": "object"
     },
@@ -107058,6 +107114,7 @@
     "PostSaleCompensation": "Original sale facts stay immutable. Each exception creates linked append-only compensation facts.",
     "RefundAmbiguity": "An unknown terminal refund is query-only and blocks a replacement refund.",
     "RefundLimit": "Cumulative line, tax, discount, tip, tender, and cash compensation cannot exceed original facts.",
+    "SalesAnalysisBasketState": "basketState is absent with all four basket fields, or complete with code null and all four fields, or unavailable with code BASKETS_TOO_COMPLEX and no basket fields.",
     "StoredValueAtomicity": "A stored-value debit and its committed sale are one database transaction."
   },
   "manifestVersion": 1,
