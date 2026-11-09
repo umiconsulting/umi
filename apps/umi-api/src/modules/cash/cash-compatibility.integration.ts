@@ -1,5 +1,7 @@
+import 'reflect-metadata';
 import { WalletPassRepository } from '../wallet/wallet-pass.repository';
 import { randomUUID } from 'node:crypto';
+import { NotFoundException } from '@nestjs/common';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../../shared/config/config.schema';
@@ -9,6 +11,8 @@ import { PasswordService } from '../../shared/auth/password.service';
 import { MerchantsRepository } from '../merchants/merchants.repository';
 import { MerchantsService } from '../merchants/merchants.service';
 import { CashRepository } from './cash.repository';
+import { CashCardRepository } from './cash-card.repository';
+import { CashReadService } from './cash-read.service';
 import { CashPublicController } from './cash-public.controller';
 import { CashPlatformController } from './cash-platform.controller';
 import { CashPlatformRepository } from './cash-platform.repository';
@@ -17,10 +21,12 @@ describe('old Cash interfaces on the canonical schema', () => {
   let pg: PgService;
   let cash: CashRepository;
   let platform: CashPlatformRepository;
+  let read: CashReadService;
   let controller: CashPlatformController;
   const merchants: string[] = [];
   const users: string[] = [];
   const cards: string[] = [];
+  const customers: string[] = [];
   const locations: string[] = [];
   const scope = <T>(index: number, fn: () => T) =>
     runWithRequestContext(
@@ -47,6 +53,7 @@ describe('old Cash interfaces on the canonical schema', () => {
     >);
     await pg.onModuleInit();
     cash = new CashRepository(pg);
+    read = new CashReadService(cash, new CashCardRepository(pg));
     platform = new CashPlatformRepository(pg);
     controller = new CashPlatformController(platform, cash, {
       refreshMerchant: async () => undefined,
@@ -72,6 +79,7 @@ describe('old Cash interfaces on the canonical schema', () => {
           [fixture.merchantId, `Customer ${i}`],
         )
       ).rows[0].id;
+      customers.push(customer);
       const card = (
         await pg.query<{ id: string }>(
           'INSERT INTO merchant.loyalty_card (merchant_id,customer_id,card_number) VALUES ($1::uuid,$2::uuid,$3) RETURNING id::text',
@@ -220,5 +228,79 @@ describe('old Cash interfaces on the canonical schema', () => {
     ).rows;
     expect(rows.find((r) => r.id === cards[0])?.lifecycle_message).toBe('Test announcement');
     expect(rows.find((r) => r.id === cards[1])?.lifecycle_message).toBeNull();
+  });
+
+  it('sets a per-customer reward and returns it as customReward', async () => {
+    await scope(0, () =>
+      read.setCustomerReward(merchants[0], customers[0], {
+        name: '  Postre gratis  ',
+        description: '  Solo clienta VIP  ',
+      }),
+    );
+
+    const detail = await scope(0, () => read.getCustomer(merchants[0], customers[0]));
+    expect(detail.customReward).toEqual({
+      name: 'Postre gratis',
+      description: 'Solo clienta VIP',
+    });
+
+    // The override stays inactive, so the café ladder cannot read it.
+    const row = (
+      await pg.query<{ kind: string; active: boolean; stamps_required: number }>(
+        `SELECT r.kind, r.active, r.stamps_required
+           FROM merchant.loyalty_card c
+           JOIN merchant.loyalty_reward r ON r.id = c.reward_override_id
+          WHERE c.id = $1::uuid`,
+        [cards[0]],
+      )
+    ).rows[0];
+    expect(row).toMatchObject({ kind: 'override', active: false });
+  });
+
+  it('clears the per-customer reward and keeps the inactive row for reuse', async () => {
+    await scope(0, () => read.setCustomerReward(merchants[0], customers[0], null));
+
+    const detail = await scope(0, () => read.getCustomer(merchants[0], customers[0]));
+    expect(detail.customReward).toBeNull();
+
+    const link = (
+      await pg.query<{ reward_override_id: string | null }>(
+        'SELECT reward_override_id FROM merchant.loyalty_card WHERE id=$1::uuid',
+        [cards[0]],
+      )
+    ).rows[0];
+    expect(link.reward_override_id).toBeNull();
+
+    const rows = (
+      await pg.query<{ n: number }>(
+        "SELECT count(*)::int AS n FROM merchant.loyalty_reward WHERE merchant_id=$1::uuid AND kind='override'",
+        [merchants[0]],
+      )
+    ).rows[0];
+    expect(rows.n).toBe(1);
+  });
+
+  it('refuses a customer id from another café and writes nothing', async () => {
+    await expect(
+      scope(1, () =>
+        read.setCustomerReward(merchants[1], customers[0], { name: 'Foreign reward' }),
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    const link = (
+      await pg.query<{ reward_override_id: string | null }>(
+        'SELECT reward_override_id FROM merchant.loyalty_card WHERE id=$1::uuid',
+        [cards[0]],
+      )
+    ).rows[0];
+    expect(link.reward_override_id).toBeNull();
+
+    const rows = (
+      await pg.query<{ n: number }>(
+        "SELECT count(*)::int AS n FROM merchant.loyalty_reward WHERE merchant_id=$1::uuid AND kind='override'",
+        [merchants[1]],
+      )
+    ).rows[0];
+    expect(rows.n).toBe(0);
   });
 });

@@ -7,6 +7,7 @@ import {
   CARD_OVERRIDE_ROW_SQL,
 } from '../../shared/loyalty/reward-config.sql';
 import type { RewardConfigRow } from '../../shared/loyalty/reward-profile';
+import { DEFAULT_VISITS_REQUIRED } from '../../shared/loyalty/reward-profile';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
@@ -566,6 +567,89 @@ export class CashRepository {
         upgradeConfig: (rows.rows.find((r) => r.kind === 'upgrade') as RewardConfigRow) ?? null,
         overrideConfig: (override.rows[0] as RewardConfigRow) ?? null,
       };
+    });
+  }
+
+  /**
+   * Point one card at a per-customer reward, or clear the pointer.
+   *
+   * The override is a `merchant.loyalty_reward` row with `kind='override'` and
+   * `active=false`. The inactive flag is deliberate: the ladder reader selects
+   * active rows only, so an override can never enter another card's ladder.
+   * The card reaches its override through `loyalty_card.reward_override_id`.
+   *
+   * The threshold on the override row is informational. `resolveRewardProfile`
+   * always takes `visitsRequired` from the café default.
+   *
+   * The card row is locked first. Two saves for one card then serialize, and an
+   * identical-name reuse cannot insert two rows at the same time.
+   */
+  async setCardRewardOverride(
+    merchantId: string,
+    cardId: string,
+    reward: { name: string; description: string | null } | null,
+  ): Promise<{
+    cardId: string;
+    customReward: { name: string; description: string | null } | null;
+  } | null> {
+    return this.pg.withMerchant(async (c) => {
+      const card = await c.query(
+        `SELECT id::text FROM merchant.loyalty_card
+          WHERE merchant_id = $1::uuid AND id = $2::uuid
+          FOR UPDATE`,
+        [merchantId, cardId],
+      );
+      if (!card.rowCount) return null;
+
+      if (!reward) {
+        await c.query(
+          `UPDATE merchant.loyalty_card
+              SET reward_override_id = NULL, updated_at = now()
+            WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+          [merchantId, cardId],
+        );
+        return { cardId, customReward: null };
+      }
+
+      const existing = await c.query<{ id: string }>(
+        `SELECT id::text FROM merchant.loyalty_reward
+          WHERE merchant_id = $1::uuid AND kind = 'override'
+            AND type = 'stamps_free_item' AND active = false
+            AND name = $2 AND description IS NOT DISTINCT FROM $3::text
+          ORDER BY created_at DESC NULLS LAST LIMIT 1`,
+        [merchantId, reward.name, reward.description],
+      );
+      let overrideId = existing.rows[0]?.id;
+      if (!overrideId) {
+        const standard = await c.query<{ stamps_required: number | null }>(
+          `SELECT stamps_required FROM merchant.loyalty_reward
+            WHERE merchant_id = $1::uuid AND type = 'stamps_free_item'
+              AND kind = 'standard' AND active = true
+            ORDER BY created_at DESC NULLS LAST LIMIT 1`,
+          [merchantId],
+        );
+        const created = await c.query<{ id: string }>(
+          `INSERT INTO merchant.loyalty_reward
+             (merchant_id, name, description, type, kind, stamps_required, active)
+           VALUES ($1::uuid, $2, $3::text, 'stamps_free_item', 'override', $4, false)
+           RETURNING id::text`,
+          [
+            merchantId,
+            reward.name,
+            reward.description,
+            standard.rows[0]?.stamps_required ?? DEFAULT_VISITS_REQUIRED,
+          ],
+        );
+        overrideId = created.rows[0].id;
+      }
+
+      await c.query(
+        `UPDATE merchant.loyalty_card
+            SET reward_override_id = $3::uuid, updated_at = now()
+          WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+        [merchantId, cardId, overrideId],
+      );
+      return { cardId, customReward: reward };
     });
   }
 

@@ -458,6 +458,41 @@ export class CashReadService {
   }
 
   /**
+   * Set or clear one customer's reward.
+   *
+   * The customer id addresses the customer, not the card. `adminCustomerDetail`
+   * resolves the card inside the merchant scope, so a customer id from another
+   * café cannot reach a card here.
+   *
+   * `null` clears the override. An object trims the text before the write.
+   */
+  async setCustomerReward(
+    merchantId: string,
+    customerId: string,
+    reward: { name: string; description?: string | null } | null,
+  ): Promise<{
+    cardId: string;
+    customReward: { name: string; description: string | null } | null;
+  }> {
+    const detail = await this.repo.adminCustomerDetail(merchantId, customerId);
+    if (!detail) throw new NotFoundException({ error: 'Cliente no encontrado' });
+
+    const clean = reward
+      ? {
+          name: reward.name.trim(),
+          description: reward.description?.trim() || null,
+        }
+      : null;
+    if (clean && !clean.name) {
+      throw new BadRequestException({ error: 'El nombre de la recompensa es obligatorio' });
+    }
+
+    const result = await this.repo.setCardRewardOverride(merchantId, detail.cardId, clean);
+    if (!result) throw new NotFoundException({ error: 'Cliente no encontrado' });
+    return result;
+  }
+
+  /**
    * One customer, for the staff detail screen.
    *
    * NOT FOUND covers two cases and answers them the same way, exactly as

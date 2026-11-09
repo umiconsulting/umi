@@ -13,7 +13,7 @@ import { EntitlementGuard } from './entitlement.guard';
 import { RolesGuard } from './roles.guard';
 import { REQUIRE_PRODUCT } from './require-product.decorator';
 import { IS_PUBLIC } from './public.decorator';
-import { ROLES_KEY } from './roles.decorator';
+import { ROLES_KEY, PERMISSION_KEY } from './roles.decorator';
 
 function ctxFor(req: Record<string, unknown>): ExecutionContext {
   return {
@@ -210,6 +210,26 @@ describe('RolesGuard', () => {
     );
     const guard = new RolesGuard(reflector);
     const req = { merchantAccess: { roles: ['admin'], permissions: [] } };
+    expect(guard.canActivate(ctxFor(req))).toBe(true);
+  });
+
+  it('403s when the membership lacks merchant.manage', () => {
+    // A cashier can read customers. Only owner and admin hold merchant.manage,
+    // so a staff membership cannot set a per-customer reward.
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
+      k === PERMISSION_KEY ? 'merchant.manage' : undefined,
+    );
+    const guard = new RolesGuard(reflector);
+    const req = { merchantAccess: { roles: ['staff'], permissions: ['customer.read'] } };
+    expect(() => guard.canActivate(ctxFor(req))).toThrow(ForbiddenException);
+  });
+
+  it('allows the merchant.manage holder', () => {
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
+      k === PERMISSION_KEY ? 'merchant.manage' : undefined,
+    );
+    const guard = new RolesGuard(reflector);
+    const req = { merchantAccess: { roles: ['admin'], permissions: ['merchant.manage'] } };
     expect(guard.canActivate(ctxFor(req))).toBe(true);
   });
 });

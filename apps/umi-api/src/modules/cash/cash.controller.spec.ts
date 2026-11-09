@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Logger } from '@nestjs/common';
 import { CashController } from './cash.controller';
@@ -6,6 +7,7 @@ import type { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapte
 import type { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import type { CashScanService } from './cash-scan.service';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
+import { PERMISSION_KEY } from '../auth/roles.decorator';
 
 const MERCHANT = { merchantId: '9f000000-0000-4000-8000-00000000e001' } as MerchantAccess;
 const USER = { id: '9f000000-0000-4000-8000-00000000e002' } as AuthUser;
@@ -65,5 +67,45 @@ describe('cash client-error sink', () => {
     });
     const payload = JSON.parse(logged[0].replace('client_error ', ''));
     expect(payload).toHaveProperty('online', null);
+  });
+});
+
+describe('cash customer reward override', () => {
+  function harness(result: { cardId: string; customReward: unknown }) {
+    const setCustomerReward = vi.fn().mockResolvedValue(result);
+    const refreshCard = vi.fn().mockResolvedValue(undefined);
+    const instance = new CashController(
+      { setCustomerReward } as unknown as CashReadService,
+      { refreshCard } as unknown as WalletPassAdapter,
+      {} as RateLimitService,
+      {} as CashScanService,
+    );
+    return { instance, setCustomerReward, refreshCard };
+  }
+
+  it('requires merchant.manage — the admin-only key', () => {
+    expect(Reflect.getMetadata(PERMISSION_KEY, CashController.prototype.updateCustomerReward)).toBe(
+      'merchant.manage',
+    );
+  });
+
+  it('passes the tenant and the customer id to the service, then refreshes the card', async () => {
+    const reward = { name: 'Postre gratis', description: null };
+    const h = harness({ cardId: 'card-1', customReward: reward });
+    const out = await h.instance.updateCustomerReward(MERCHANT, 'customer-1', {
+      customReward: reward,
+    });
+    expect(h.setCustomerReward).toHaveBeenCalledWith(MERCHANT.merchantId, 'customer-1', reward);
+    expect(h.refreshCard).toHaveBeenCalledWith('card-1');
+    expect(out).toEqual({ success: true, customReward: reward });
+  });
+
+  it('clears the override with null', async () => {
+    const h = harness({ cardId: 'card-1', customReward: null });
+    const out = await h.instance.updateCustomerReward(MERCHANT, 'customer-1', {
+      customReward: null,
+    });
+    expect(h.setCustomerReward).toHaveBeenCalledWith(MERCHANT.merchantId, 'customer-1', null);
+    expect(out).toEqual({ success: true, customReward: null });
   });
 });
