@@ -450,9 +450,7 @@ export default function OverviewScreen({ ordersPaused, setOrdersPaused }) {
         {canReadSales ? (
           <BusinessOverview context={context} />
         ) : (
-          <p>
-            <Trans>Consulta los módulos disponibles para tu función.</Trans>
-          </p>
+          <SalesReportState error="denied" code="PERMISSION_DENIED" />
         )}
       </div>
       <OperationalOverview

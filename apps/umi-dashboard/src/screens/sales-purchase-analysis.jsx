@@ -30,6 +30,14 @@ function Panel({ title, children }) {
 }
 
 function ReportError({ code, onRetry }) {
+  if (code === 'PERMISSION_DENIED')
+    return (
+      <div className="analysis-panel surface" role="alert">
+        <p>
+          <Trans>No tienes permiso para consultar estas ventas.</Trans>
+        </p>
+      </div>
+    );
   return (
     <div className="analysis-panel surface" role="alert">
       <p>

@@ -507,6 +507,11 @@ table th {
 /* Note: the native <select> popup highlight cannot be recolored by CSS in this
    Chromium, so the white-in-dark-mode highlight lives on the custom <Select>
    listbox instead (see .ui-select-option rules). */
+@media (max-width: 600px) {
+  .side-foot .ui-select-trigger {
+    min-height: 44px;
+  }
+}
 
 /* The rail's collapse handle. The visible circle stays 24px — it is a quiet
    discovery affordance, not a banner — but the BUTTON around it is a pointer

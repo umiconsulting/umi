@@ -45,6 +45,26 @@ export function clearSalesReports(client, merchantId) {
   client.removeQueries({ queryKey: keys.reports });
 }
 
+export function salesDenied(result) {
+  return Boolean(
+    result.error && (result.error.status === 403 || result.error.code === 'PERMISSION_DENIED'),
+  );
+}
+
+export function salesResult(result) {
+  const denied = salesDenied(result);
+  return {
+    data: denied ? null : result.data,
+    loading: denied ? false : !result.data && result.isFetching,
+    refreshing: denied ? false : Boolean(result.data && result.isFetching),
+    error: result.error?.message,
+    errorCode: denied ? 'PERMISSION_DENIED' : result.error?.code,
+    refreshError: denied ? false : Boolean(result.data && result.error),
+    dataUpdatedAt: denied ? 0 : result.dataUpdatedAt,
+    refetch: result.refetch,
+  };
+}
+
 export function salesAnalysisQuery(identity, query, fetcher) {
   const [merchantId, locationId, userId, permissions, membershipLocationId] = identity;
   const params = new URLSearchParams(

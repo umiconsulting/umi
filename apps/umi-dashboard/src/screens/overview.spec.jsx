@@ -106,9 +106,24 @@ describe('Business overview', () => {
     expect(render()).toContain('role="status"');
     expect(render()).not.toContain('900000');
   });
-  it('does not show financial reports to a user without sales permission', () => {
+  it('shows the denied state without values for a user without sales permission', () => {
     state.context.capabilities.membership.permissions = ['kitchen.read'];
-    expect(render()).not.toContain('Venta neta');
+    const html = render();
+    expect(html).toContain('No tienes permiso para consultar estas ventas.');
+    expect(html).not.toContain('Consulta los módulos disponibles para tu función.');
+    expect(html).not.toContain('Venta neta');
+    expect(html).not.toContain('Reintentar');
+  });
+  it('clears values and offers no retry when a report refresh is denied', () => {
+    state.report = loaded(report(), {
+      data: null,
+      error: 'Forbidden',
+      errorCode: 'PERMISSION_DENIED',
+    });
+    const html = render();
+    expect(html).toContain('No tienes permiso para consultar estas ventas.');
+    expect(html).not.toContain('Venta neta');
+    expect(html).not.toContain('Reintentar');
   });
   it('keeps the current values when a refresh fails', () => {
     state.report = loaded(report(), { error: 'Failed to fetch', refreshError: true });

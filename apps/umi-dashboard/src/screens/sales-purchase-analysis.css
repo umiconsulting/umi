@@ -144,6 +144,11 @@
   .analysis-lead {
     font-size: 28px;
   }
+  .sales-analysis .analysis-filters input,
+  .sales-analysis .analysis-filters select,
+  .sales-analysis .analysis-panel summary {
+    min-height: 44px;
+  }
 }
 .analysis-affinity-actions {
   display: flex;

@@ -5,6 +5,7 @@ import {
   salesRefreshInterval,
   invalidateSalesReports,
   clearSalesReports,
+  salesResult,
 } from './sales-analysis-query.js';
 const clients = [];
 afterEach(() => {
@@ -186,5 +187,19 @@ describe('shared sales report cache', () => {
     await cache.refetchQueries({ queryKey: options.queryKey });
     expect(cache.getQueryData(options.queryKey)).toEqual({ totals: { netMinorUnits: 100 } });
     expect(cache.getQueryState(options.queryKey).error).toBeTruthy();
+  });
+  it('maps a 403 to no values and no refresh state', () => {
+    const result = salesResult({
+      data: { totals: { netMinorUnits: 18000 } },
+      isFetching: true,
+      dataUpdatedAt: 1000,
+      error: Object.assign(new Error('Forbidden'), { status: 403 }),
+      refetch: () => {},
+    });
+    expect(result.data).toBeNull();
+    expect(result.loading).toBe(false);
+    expect(result.refreshing).toBe(false);
+    expect(result.errorCode).toBe('PERMISSION_DENIED');
+    expect(result.refreshError).toBe(false);
   });
 });

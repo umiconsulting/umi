@@ -14,10 +14,11 @@ export function SalesReportState({ loading, error, code, onRetry }) {
       </div>
     );
   if (!error) return null;
+  const denied = code === 'PERMISSION_DENIED';
   return (
     <div className="sales-state surface" role="alert">
       <p>
-        {code === 'PERMISSION_DENIED' ? (
+        {denied ? (
           <Trans>No tienes permiso para consultar estas ventas.</Trans>
         ) : code === 'REPORT_RANGE_TOO_LARGE' ? (
           <Trans>El periodo supera el límite de 20,000 tickets. Consulta menos días.</Trans>
@@ -25,9 +26,11 @@ export function SalesReportState({ loading, error, code, onRetry }) {
           <Trans>No se pudieron cargar las ventas. Los importes no están disponibles.</Trans>
         )}
       </p>
-      <button type="button" className="btn btn-secondary" onClick={onRetry}>
-        <Trans>Reintentar</Trans>
-      </button>
+      {!denied && (
+        <button type="button" className="btn btn-secondary" onClick={onRetry}>
+          <Trans>Reintentar</Trans>
+        </button>
+      )}
     </div>
   );
 }

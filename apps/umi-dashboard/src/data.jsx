@@ -25,6 +25,8 @@ import { queryClient } from '@/lib/query-client.js';
 import {
   salesAnalysisQuery,
   salesCachePolicy,
+  salesDenied,
+  salesResult,
   clearSalesReports,
   invalidateSalesReports,
 } from '@/lib/sales-analysis-query.js';
@@ -1597,30 +1599,14 @@ function salesQueryIdentity(ctx) {
   ];
 }
 
-function salesFetcher(merchantId) {
-  return async function fetchSales(path, opts) {
-    try {
-      return await _apiFetch(path, opts);
-    } catch (error) {
-      if (error?.status === 401 || error?.status === 403) {
-        clearSalesReports(queryClient, merchantId);
-      }
-      throw error;
-    }
-  };
-}
-
-function salesQueryResult(result) {
-  return {
-    data: result.data,
-    loading: !result.data && result.isFetching,
-    refreshing: Boolean(result.data && result.isFetching),
-    error: result.error?.message,
-    errorCode: result.error?.code,
-    refreshError: Boolean(result.data && result.error),
-    dataUpdatedAt: result.dataUpdatedAt,
-    refetch: result.refetch,
-  };
+function useClearDeniedSales(result, merchantId) {
+  const denied = salesDenied(result);
+  const clearedFor = useRefD(null);
+  useEffectD(() => {
+    if (!denied || !merchantId || clearedFor.current === merchantId) return;
+    clearedFor.current = merchantId;
+    clearSalesReports(queryClient, merchantId);
+  }, [denied, merchantId]);
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
@@ -1630,12 +1616,12 @@ export function useSalesAnalysisOptions() {
   const result = useQuery({
     ...salesCachePolicy,
     queryKey: ['sales-analysis-options', ...salesQueryIdentity(ctx)],
-    queryFn: ({ signal }) =>
-      salesFetcher(merchantId)(routes.salesAnalysis.options(merchantId), { signal }),
+    queryFn: ({ signal }) => _apiFetch(routes.salesAnalysis.options(merchantId), { signal }),
     enabled: Boolean(merchantId) && !ctx?.loading,
     retry: false,
   });
-  return salesQueryResult(result);
+  useClearDeniedSales(result, merchantId);
+  return salesResult(result);
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
@@ -1643,11 +1629,12 @@ export function useSalesAnalysis(query) {
   const ctx = useMerchant();
   const merchantId = _merchantId(ctx);
   const result = useQuery({
-    ...salesAnalysisQuery(salesQueryIdentity(ctx), query, salesFetcher(merchantId)),
+    ...salesAnalysisQuery(salesQueryIdentity(ctx), query, _apiFetch),
     enabled: Boolean(query && merchantId) && !ctx?.loading,
     retry: false,
   });
-  return salesQueryResult(result);
+  useClearDeniedSales(result, merchantId);
+  return salesResult(result);
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
