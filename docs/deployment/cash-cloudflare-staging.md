@@ -16,7 +16,7 @@ Production stays on Vercel until Juan approves the cutover.
 | ----------------- | --------------------------------------------------------------------------------------------- |
 | Worktree          | `/home/juan/Projects/umiconsulting/umi/.worktrees/cash-cloudflare-candidate-20261108`         |
 | Branch            | `feat/cash-cloudflare-candidate-20261108`                                                     |
-| Code head tested  | `a53b46ffd0aa7b0b1e453bb1c03e630b0e22c8ff`                                                    |
+| Code head tested  | `1ba1e5d0144b526124cbb11632b0d637925aabde`                                                    |
 | First parent      | `d01c9f47a349af58aaa0e5ddebfa4c745598a7ef` (original Cash candidate)                          |
 | Second parent     | `b4ba45fc7ec111dd02e0a0f86dad324697a4ca48` (current `origin/staging`)                         |
 | Original worktree | `/home/juan/Projects/umiconsulting/umi-cash-cloudflare-staging-20261104`, clean at `d01c9f47` |
@@ -32,6 +32,13 @@ The merge resolves two conflicts:
   Keep the `cash-compatibility` integration test from the Cash branch.
 
 No other conflict occurred. No gate is weaker after the merge.
+
+The commit `1ba1e5d0` restores the per-customer reward route.
+The UI sends `PATCH /api/<slug>/admin/customers/<id>` with `{ customReward }`.
+The canonical API now has the same route. The route needs `merchant.manage`.
+It stores an inactive `kind='override'` row and points the card at that row.
+A `null` body clears the pointer. It does not delete the row.
+The section "Local candidate checks" records the tests.
 
 Pins:
 
@@ -94,12 +101,15 @@ The two origins must agree. A mismatch breaks installed passes.
 
 Read status:
 
-- Wrangler 4.157.0 is not authenticated in this shell.
+- Wrangler 4.157.0 is installed. Its configured token expired and cannot refresh
+  in a non-interactive shell. The CLI reports `Not logged in. Your auth token has expired`.
   Version, deployment, domain, and rollback inventory reads are blocked.
   The last documented Worker version is `d5300352-324b-4861-a6fe-36c2d65bc1d2` (2026-11-05 UTC).
-- Vercel CLI 62.4.0 is installed. The stored credential is rejected with
-  `The specified token is not valid`.
+- Vercel CLI 62.4.0 is installed. The stored user is `umiconsulting-dev`.
+  Its token expired at `2026-11-07T14:47Z`.
   Project, environment, and domain inventory reads are blocked.
+- Both failures are expired sessions. They are not a missing environment variable.
+  Juan must re-authenticate before a live inventory read.
 - A read-only probe of `https://cash.umiconsulting.co` returns `server: Vercel`.
   `/umi/login` returns HTTP 200. The frozen Apple route returns HTTP 401 without a token.
 
@@ -134,10 +144,17 @@ The required API build contains these capabilities:
   It returns HTTP 401 for an invalid token, even when the date matches.
 - `POST /api/:merchantRef/customers` returns HTTP 409 with the existing customer session.
   The controller returns the session directly so the global error filter cannot remove it.
+- `PATCH /api/:merchantRef/admin/customers/:id` sets or clears `customReward`.
+  The route needs `merchant.manage`. It is tenant-scoped. The customer id from another café
+  returns HTTP 404. A `null` value clears the pointer and returns `customReward: null`.
 - `WALLET_MODE` isolation guards for Apple and Google delivery.
 
 The candidate contains all of these capabilities in source.
 They are not deployed.
+
+Current staging `b4ba45fc` has no `PATCH customers/:id` handler.
+The `apps/umi-api/src/modules/cash/cash.controller.ts` file on staging has only the GET.
+The candidate adds the handler in `1ba1e5d0`.
 
 Local Worker probes against staging show the dependency:
 
@@ -176,6 +193,53 @@ It deploys the same branch that the workflow builds. Push events still deploy `s
 
 Wrangler needs a writable configuration directory.
 This shell uses `/tmp` for `XDG_CONFIG_HOME` because the default home is read-only.
+
+## Local candidate checks, 2026-11-09 UTC
+
+API checks at `1ba1e5d0`, with Node 24.21.0 and pnpm 10.29.3:
+
+| Check     | Command                                           | Exit | Result                                                      |
+| --------- | ------------------------------------------------- | ---- | ----------------------------------------------------------- |
+| Install   | `pnpm install --frozen-lockfile --ignore-scripts` | 0    | 1,455 packages resolved                                     |
+| Unit      | `pnpm --filter @umi/api test`                     | 0    | 216 files passed, 1 skipped. 2,197 tests passed, 29 skipped |
+| Typecheck | `pnpm --filter @umi/api typecheck`                | 0    | No type error                                               |
+| Lint      | `pnpm --filter @umi/api lint`                     | 0    | No warning                                                  |
+| Build     | `pnpm --filter @umi/api build`                    | 0    | Nest build complete                                         |
+
+The install needed `--ignore-scripts` because the `sharp` postinstall tried a source build.
+`require('sharp')` loads version 0.34.5 in the installed tree.
+The `@umi/contract` package needs one build before the API tests run.
+
+Integration checks use a disposable PostgreSQL 17 with pgvector:
+
+| Item       | Value                                                                       |
+| ---------- | --------------------------------------------------------------------------- |
+| Container  | `umi-cash-ci-9a86f02a`                                                      |
+| Port       | `127.0.0.1:5233`                                                            |
+| Database   | `umi_build_v3_ci`                                                           |
+| Schema     | `bash db/00_run.sh umi_build_v3_ci`                                         |
+| Migrations | `bash db/migrate.sh umi_build_v3_ci`, 64 applied                            |
+| Roles      | `apps/umi-api/test/integration/harness-roles.sql` as superuser              |
+| Seeds      | `db/backfill/seed_rbac.sql` and `apps/umi-api/db/roles/004_login_roles.sql` |
+
+`npm run test:integration:schema` passes 37 files and 381 tests, with 2 skipped.
+The run covers `cash-compatibility`, `cash-login`, `cash-seals`, `register-flip`,
+`credential-upgrade`, and `dashboard-session`.
+It also covers the four new per-customer reward tests: allowed, cross-tenant,
+clear-to-null, and the inactive-row reuse.
+
+Cash checks at `1ba1e5d0`:
+
+| Check        | Command                         | Exit | Result                                            |
+| ------------ | ------------------------------- | ---- | ------------------------------------------------- |
+| Install      | `npm ci`                        | 0    | Install complete                                  |
+| Unit         | `npm test`                      | 0    | 9 files, 59 tests passed                          |
+| Typecheck    | `npx tsc --noEmit`              | 0    | No type error                                     |
+| Build        | `npm run build`                 | 0    | Next build complete                               |
+| Worker build | `npm run build:cloudflare`      | 0    | `.open-next/worker.js` generated                  |
+| Dry run      | `npx wrangler deploy --dry-run` | 0    | 143 assets, 5,976.54 KiB total, 1,140.70 KiB gzip |
+
+The evidence is in `.umi-runs/cash-cloudflare-20261108/builder/checks.md`.
 
 ## Cookie and domain behavior
 
@@ -261,6 +325,8 @@ Run these probes after the API deploy and after the Worker deploy.
 | `GET /:ref/terminos` and `/:ref/aviso-privacidad`                       | 200                                                     |
 | Anonymous `GET /api/umi/tenants`                                        | 401                                                     |
 | Business identity `GET /api/umi/tenants`                                | 403                                                     |
+| `PATCH /api/:ref/admin/customers/:id` with a staff session              | 403                                                     |
+| `PATCH /api/:ref/admin/customers/:id` with an admin session and `null`  | 200. `customReward` is null. The card pointer is null   |
 | Cross-site `POST /api/umi/tenants`                                      | 403 at the Worker                                       |
 | Business login, then one read                                           | 200. The session survives one refresh                   |
 | Worker `Set-Cookie` header                                              | No `Domain` attribute                                   |
