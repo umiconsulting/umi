@@ -1,0 +1,11 @@
+PASS HTTP boundary, SQL, scope and actor assertions
+PASS context-before
+PASS unsent-scopes-canceled
+PASS storage-refused
+PASS inflight-location
+PASS inflight-merchant
+PASS mobile-pointer-saved
+PASS mobile-pointer-canceled
+PASS remaining integrated purchase acceptance
+PASS all 11 frozen source/test hashes match
+PASS final SQL: manual/photo/XML dates, sources, supplier nullability, origins, receipt links/costs,4receipts/8ledger effects, exact stock deltas and unchanged transit

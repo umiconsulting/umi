@@ -1,0 +1,416 @@
+{
+  "http": {
+    "utf8Boundary": {
+      "accepted": 1048576,
+      "refused": 1048577,
+      "acceptedStatus": 201,
+      "refusedStatus": 413
+    },
+    "persisted": {
+      "rows": [
+        {
+          "date": "2026-11-03",
+          "source": "manual",
+          "supplier": null,
+          "origin": "direct_purchase",
+          "order_supplier": null,
+          "line_number": 1,
+          "quantity": "1234567",
+          "scale": 6,
+          "cost": "1250",
+          "total": "1543",
+          "entry_type": "purchase_received",
+          "invoice_link": true
+        }
+      ],
+      "onHandDelta": "1234567",
+      "netTransitDelta": "0",
+      "oneReceipt": true,
+      "noInventedSupplier": true,
+      "journalsContainNoArtifact": true
+    },
+    "refusals": [
+      {
+        "label": "archived item",
+        "status": 404,
+        "code": "INVENTORY_ITEM_ARCHIVED"
+      },
+      {
+        "label": "foreign item",
+        "status": 404,
+        "code": "INVENTORY_ITEM_ARCHIVED"
+      },
+      {
+        "label": "archived supplier",
+        "status": 409,
+        "code": "SUPPLIER_ARCHIVED"
+      },
+      {
+        "label": "foreign supplier",
+        "status": 404,
+        "code": "SUPPLIER_NOT_FOUND"
+      },
+      {
+        "label": "foreign destination",
+        "status": 404,
+        "code": "INVENTORY_LOCATION_CHANGED"
+      },
+      {
+        "label": "wrong branch destination",
+        "status": 404,
+        "code": "INVENTORY_LOCATION_CHANGED"
+      }
+    ],
+    "permissions": [
+      {
+        "actor": "capture",
+        "operation": "inventory.purchase.record",
+        "status": 403,
+        "code": "PERMISSION_DENIED"
+      },
+      {
+        "actor": "capture",
+        "operation": "inventory.invoice.receive_direct",
+        "status": 403,
+        "code": "PERMISSION_DENIED"
+      },
+      {
+        "actor": "reader",
+        "operation": "inventory.purchase.record",
+        "status": 403,
+        "code": "PERMISSION_DENIED"
+      },
+      {
+        "actor": "reader",
+        "operation": "inventory.invoice.receive_direct",
+        "status": 403,
+        "code": "PERMISSION_DENIED"
+      }
+    ],
+    "artifactReads": [
+      {
+        "actor": "owner",
+        "scope": "owned image",
+        "status": 200
+      },
+      {
+        "actor": "capture",
+        "scope": "owned image",
+        "status": 200
+      },
+      {
+        "actor": "reader",
+        "scope": "owned image",
+        "status": 403
+      },
+      {
+        "actor": "anonymous",
+        "scope": "owned image",
+        "status": 401
+      },
+      {
+        "actor": "owner",
+        "scope": "other merchant",
+        "status": 404
+      },
+      {
+        "actor": "owner",
+        "scope": "no image",
+        "status": 404
+      }
+    ]
+  },
+  "browser": {
+    "outcomes": [
+      {
+        "kind": "location",
+        "originalJournal": "succeeded; envelope removed",
+        "newMerchantJournal": null,
+        "lateListRefreshes": 0
+      },
+      {
+        "kind": "merchant",
+        "originalJournal": "succeeded; envelope removed",
+        "newMerchantJournal": null,
+        "lateListRefreshes": 0
+      }
+    ],
+    "mobile": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "controls": {
+        "Cancelar": {
+          "x": 34,
+          "y": 715.171875,
+          "width": 84.171875,
+          "height": 44
+        },
+        "Guardar compra": {
+          "x": 34,
+          "y": 771.171875,
+          "width": 125.1953125,
+          "height": 44
+        }
+      },
+      "actualCancelClick": true,
+      "actualSaveClick": true
+    },
+    "purchaseRequests": 3
+  },
+  "checkpoints": {
+    "context-before": {
+      "counts": {
+        "supplier": 3,
+        "supplier_invoice": 12,
+        "purchase_order": 11,
+        "purchase_order_receipt": 11,
+        "purchase_order_receipt_line": 17,
+        "stock_ledger_entry": 34
+      },
+      "stocks": [
+        {
+          "item": "items-1",
+          "destination": "inventoryLocations-1",
+          "hand": "8",
+          "transit": "0"
+        },
+        {
+          "item": "items-3",
+          "destination": "inventoryLocations-1",
+          "hand": "1234567",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-2",
+          "hand": "4000",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-1",
+          "hand": "8000",
+          "transit": "0"
+        }
+      ]
+    },
+    "unsent-scopes-canceled": {
+      "counts": {
+        "supplier": 3,
+        "supplier_invoice": 12,
+        "purchase_order": 11,
+        "purchase_order_receipt": 11,
+        "purchase_order_receipt_line": 17,
+        "stock_ledger_entry": 34
+      },
+      "stocks": [
+        {
+          "item": "items-1",
+          "destination": "inventoryLocations-1",
+          "hand": "8",
+          "transit": "0"
+        },
+        {
+          "item": "items-3",
+          "destination": "inventoryLocations-1",
+          "hand": "1234567",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-2",
+          "hand": "4000",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-1",
+          "hand": "8000",
+          "transit": "0"
+        }
+      ]
+    },
+    "storage-refused": {
+      "counts": {
+        "supplier": 3,
+        "supplier_invoice": 12,
+        "purchase_order": 11,
+        "purchase_order_receipt": 11,
+        "purchase_order_receipt_line": 17,
+        "stock_ledger_entry": 34
+      },
+      "stocks": [
+        {
+          "item": "items-1",
+          "destination": "inventoryLocations-1",
+          "hand": "8",
+          "transit": "0"
+        },
+        {
+          "item": "items-3",
+          "destination": "inventoryLocations-1",
+          "hand": "1234567",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-2",
+          "hand": "4000",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-1",
+          "hand": "8000",
+          "transit": "0"
+        }
+      ]
+    },
+    "inflight-location": {
+      "counts": {
+        "supplier": 3,
+        "supplier_invoice": 13,
+        "purchase_order": 12,
+        "purchase_order_receipt": 12,
+        "purchase_order_receipt_line": 18,
+        "stock_ledger_entry": 36
+      },
+      "stocks": [
+        {
+          "item": "items-1",
+          "destination": "inventoryLocations-1",
+          "hand": "9",
+          "transit": "0"
+        },
+        {
+          "item": "items-3",
+          "destination": "inventoryLocations-1",
+          "hand": "1234567",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-2",
+          "hand": "4000",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-1",
+          "hand": "8000",
+          "transit": "0"
+        }
+      ]
+    },
+    "inflight-merchant": {
+      "counts": {
+        "supplier": 3,
+        "supplier_invoice": 14,
+        "purchase_order": 13,
+        "purchase_order_receipt": 13,
+        "purchase_order_receipt_line": 19,
+        "stock_ledger_entry": 38
+      },
+      "stocks": [
+        {
+          "item": "items-1",
+          "destination": "inventoryLocations-1",
+          "hand": "10",
+          "transit": "0"
+        },
+        {
+          "item": "items-3",
+          "destination": "inventoryLocations-1",
+          "hand": "1234567",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-2",
+          "hand": "4000",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-1",
+          "hand": "8000",
+          "transit": "0"
+        }
+      ]
+    },
+    "mobile-pointer-saved": {
+      "counts": {
+        "supplier": 3,
+        "supplier_invoice": 15,
+        "purchase_order": 14,
+        "purchase_order_receipt": 14,
+        "purchase_order_receipt_line": 20,
+        "stock_ledger_entry": 40
+      },
+      "stocks": [
+        {
+          "item": "items-1",
+          "destination": "inventoryLocations-1",
+          "hand": "11",
+          "transit": "0"
+        },
+        {
+          "item": "items-3",
+          "destination": "inventoryLocations-1",
+          "hand": "1234567",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-2",
+          "hand": "4000",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-1",
+          "hand": "8000",
+          "transit": "0"
+        }
+      ]
+    },
+    "mobile-pointer-canceled": {
+      "counts": {
+        "supplier": 3,
+        "supplier_invoice": 15,
+        "purchase_order": 14,
+        "purchase_order_receipt": 14,
+        "purchase_order_receipt_line": 20,
+        "stock_ledger_entry": 40
+      },
+      "stocks": [
+        {
+          "item": "items-1",
+          "destination": "inventoryLocations-1",
+          "hand": "11",
+          "transit": "0"
+        },
+        {
+          "item": "items-3",
+          "destination": "inventoryLocations-1",
+          "hand": "1234567",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-2",
+          "hand": "4000",
+          "transit": "0"
+        },
+        {
+          "item": "items-2",
+          "destination": "inventoryLocations-1",
+          "hand": "8000",
+          "transit": "0"
+        }
+      ]
+    }
+  }
+}

@@ -1,5 +1,239 @@
 import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
+
+// Remaining integrated acceptance uses the same real dialog and isolated fixture.
+export async function runPurchaseContextAcceptance({
+  page,
+  fixture: f,
+  expect,
+  screenshot,
+  checkpoint,
+}) {
+  if (new URL(page.url()).origin !== 'http://127.0.0.1:4093' || f.api !== 'http://127.0.0.1:4092')
+    throw new Error('Isolated local purchase fixture required');
+  const dialog = () => page.getByRole('dialog');
+  const open = async () => {
+    await page.getByRole('button', { name: 'Registrar compra', exact: true }).click();
+    await expect(dialog().getByLabel('Artículo 1', { exact: true })).toBeVisible();
+  };
+  const prepare = async (reference) => {
+    await open();
+    await dialog()
+      .getByLabel('Dónde entra el inventario', { exact: true })
+      .selectOption(f.inventoryLocations[0].id);
+    await dialog().getByLabel('Artículo 1', { exact: true }).selectOption(f.items[0].id);
+    await dialog().getByLabel('Cantidad 1', { exact: true }).fill('1');
+    await dialog().getByLabel('Costo por unidad 1', { exact: true }).fill('1');
+    await dialog().getByLabel('Referencia (opcional)', { exact: true }).fill(reference);
+    await dialog().getByRole('button', { name: 'Revisar compra', exact: true }).click();
+  };
+  const choose = async (name, option) => {
+    await page.getByRole('button', { name, exact: true }).click();
+    await page.getByRole('option', { name: option, exact: true }).click();
+  };
+  const journals = () =>
+    page.evaluate(
+      (ids) =>
+        Object.fromEntries(
+          ids.map((id) => [
+            id,
+            JSON.parse(sessionStorage.getItem(`umi-purchase-attempt:${id}`) || 'null'),
+          ]),
+        ),
+      f.merchants.map((m) => m.id),
+    );
+  const requests = [];
+  const listener = (r) => {
+    if (
+      r.method() === 'POST' &&
+      r.url().endsWith('/administrative-commands') &&
+      r.postDataJSON().operation === 'inventory.purchase.record'
+    )
+      requests.push(r);
+  };
+  page.on('request', listener);
+  await checkpoint('context-before');
+  // Unsent review is canceled before navigating through real scope controls.
+  for (const kind of ['location', 'merchant']) {
+    await prepare(`unsent-${kind}`);
+    await page.keyboard.press('Escape');
+    if (kind === 'location') {
+      await choose('Sucursal', f.locations[1].name);
+      await open();
+      await expect(dialog().getByLabel('Dónde entra el inventario', { exact: true })).toHaveValue(
+        f.inventoryLocations[2].id,
+      );
+    } else {
+      await choose('Negocio', f.merchants[1].name);
+      await open();
+      await expect(
+        dialog().getByLabel('Artículo 1', { exact: true }).locator('option'),
+      ).toHaveCount(2);
+    }
+    await expect(dialog().getByLabel('Referencia (opcional)', { exact: true })).toHaveValue('');
+    await page.keyboard.press('Escape');
+    if (kind === 'merchant') await choose('Negocio', f.merchants[0].name);
+    await choose('Sucursal', f.locations[0].name);
+  }
+  expect(requests).toHaveLength(0);
+  await checkpoint('unsent-scopes-canceled');
+  // A real quota/storage error blocks transport before any request is emitted.
+  await prepare('storage-refusal');
+  await page.evaluate(() => {
+    window.__purchaseOriginalSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key.startsWith('umi-purchase-attempt:'))
+        throw new DOMException('Test quota', 'QuotaExceededError');
+      return window.__purchaseOriginalSetItem.call(this, key, value);
+    };
+  });
+  await dialog().getByRole('button', { name: 'Guardar compra', exact: true }).click();
+  await expect(
+    dialog().getByText(
+      'No se pudo conservar o enviar la compra. Conserva esta pestaña y vuelve a intentar.',
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    Storage.prototype.setItem = window.__purchaseOriginalSetItem;
+    delete window.__purchaseOriginalSetItem;
+  });
+  await page.keyboard.press('Escape');
+  expect(requests).toHaveLength(0);
+  await checkpoint('storage-refused');
+  // Each committed response waits while real clicks select a new scope.
+  const outcomes = [];
+  for (const kind of ['location', 'merchant']) {
+    const reference = `Task3 ${kind} ${Date.now()}`;
+    await prepare(reference);
+    let release;
+    const released = new Promise((resolve) => {
+      release = resolve;
+    });
+    let committed;
+    const serverCommitted = new Promise((resolve) => {
+      committed = resolve;
+    });
+    const handler = async (route) => {
+      const response = await route.fetch();
+      expect(response.ok()).toBe(true);
+      committed();
+      await released;
+      await route.fulfill({ response });
+    };
+    await page.route('**/administrative-commands', handler);
+    await dialog().getByRole('button', { name: 'Guardar compra', exact: true }).click();
+    await serverCommitted;
+    await page.keyboard.press('Escape');
+    const newMerchant = kind === 'merchant' ? f.merchants[1].id : f.merchants[0].id;
+    const newLocation = kind === 'merchant' ? f.locations[2].id : f.locations[1].id;
+    const scopeReads = Promise.all([
+      page.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname === `/api/merchants/${newMerchant}/supplier-invoices` &&
+          r.request().method() === 'GET',
+      ),
+      page.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname === `/api/merchants/${newMerchant}/purchase-orders` &&
+          new URL(r.url()).searchParams.get('locationId') === newLocation &&
+          r.request().method() === 'GET',
+      ),
+    ]);
+    if (kind === 'location') await choose('Sucursal', f.locations[1].name);
+    else await choose('Negocio', f.merchants[1].name);
+    for (const response of await scopeReads) {
+      expect(response.ok()).toBe(true);
+      await response.finished();
+    }
+    let afterSwitchLists = 0;
+    const onList = (r) => {
+      if (
+        r.method() === 'GET' &&
+        new URL(r.url()).pathname === `/api/merchants/${newMerchant}/supplier-invoices`
+      )
+        afterSwitchLists++;
+    };
+    page.on('request', onList);
+    // The exact scope reads and usable controls prove readiness; live polling need not stop.
+    await expect(page.getByRole('button', { name: 'Registrar compra', exact: true })).toBeVisible();
+    if (kind === 'merchant')
+      await expect(
+        page.getByText('Aún no hay facturas. Sube el archivo XML del proveedor.', { exact: true }),
+      ).toBeVisible();
+    else await expect(page.getByRole('article').filter({ hasText: reference })).toBeVisible();
+    afterSwitchLists = 0;
+    release();
+    await expect.poll(async () => (await journals())[f.merchants[0].id]?.state).toBe('succeeded');
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+    expect(afterSwitchLists).toBe(0);
+    const saved = await journals();
+    expect(saved[f.merchants[0].id].envelope).toBeUndefined();
+    expect(saved[f.merchants[1].id]).toBeNull();
+    if (kind === 'merchant')
+      await expect(page.getByRole('article').filter({ hasText: reference })).toHaveCount(0);
+    page.off('request', onList);
+    await page.unroute('**/administrative-commands', handler);
+    if (kind === 'merchant') await choose('Negocio', f.merchants[0].name);
+    await choose('Sucursal', f.locations[0].name);
+    await expect(page.getByRole('article').filter({ hasText: reference })).toBeVisible();
+    await page.getByRole('button', { name: 'Registrar compra', exact: true }).click();
+    await expect(dialog().getByText('La compra quedó registrada.', { exact: true })).toBeVisible();
+    await dialog().getByRole('button', { name: 'Cerrar compra', exact: true }).click();
+    outcomes.push({
+      kind,
+      originalJournal: 'succeeded; envelope removed',
+      newMerchantJournal: null,
+      lateListRefreshes: afterSwitchLists,
+    });
+    await checkpoint(`inflight-${kind}`, {
+      attempt: { merchantId: f.merchants[0].id, body: requests.at(-1).postDataJSON() },
+    });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await prepare('mobile-pointer-cancel');
+  await page.mouse.move(200, 500);
+  for (let i = 0; i < 8; i++) await page.mouse.wheel(0, 550);
+  const controls = {};
+  for (const name of ['Cancelar', 'Guardar compra']) {
+    const control = dialog().getByRole('button', { name, exact: true });
+    const box = await control.boundingBox();
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(844);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+    await control.click({ trial: true });
+    controls[name] = box;
+  }
+  await screenshot('task3-mobile-footer', { fullPage: false });
+  await dialog().getByRole('button', { name: 'Guardar compra', exact: true }).click();
+  await expect(dialog().getByText('La compra quedó registrada.', { exact: true })).toBeVisible();
+  await dialog().getByRole('button', { name: 'Cerrar compra', exact: true }).click();
+  await checkpoint('mobile-pointer-saved', {
+    attempt: { merchantId: f.merchants[0].id, body: requests.at(-1).postDataJSON() },
+  });
+  await prepare('mobile-pointer-cancel');
+  await page.mouse.move(200, 500);
+  for (let i = 0; i < 8; i++) await page.mouse.wheel(0, 550);
+  await dialog().getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await expect(dialog()).toHaveCount(0);
+  expect(requests).toHaveLength(3);
+  await checkpoint('mobile-pointer-canceled');
+  page.off('request', listener);
+  return {
+    outcomes,
+    mobile: {
+      viewport: { width: 390, height: 844 },
+      controls,
+      actualCancelClick: true,
+      actualSaveClick: true,
+    },
+    purchaseRequests: requests.length,
+  };
+}
+
 export async function runPurchaseEntryScenarios({
   page,
   fixture: f,
