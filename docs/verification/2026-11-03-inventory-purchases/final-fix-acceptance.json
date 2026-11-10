@@ -1,0 +1,183 @@
+{
+  "tools": {
+    "node": "22.23.3",
+    "pnpm": "10.29.3",
+    "dart": "3.13.4"
+  },
+  "sourceFreeze": {
+    "files": 20,
+    "allHashesMatch": true
+  },
+  "task2": {
+    "completionMarker": "PASS full purchase browser scenarios",
+    "exitReceipt": "lost after daemon restart; complete success marker retained",
+    "businessDeltas": {
+      "supplier_invoice": 3,
+      "purchase_order": 3,
+      "purchase_order_receipt": 3,
+      "purchase_order_receipt_line": 5,
+      "stock_ledger_entry": 10
+    },
+    "replayHasNoBusinessDelta": true
+  },
+  "task3": {
+    "completionMarker": "PASS remaining integrated purchase acceptance",
+    "http": {
+      "utf8Boundary": {
+        "accepted": 1048576,
+        "refused": 1048577,
+        "acceptedStatus": 201,
+        "refusedStatus": 413
+      },
+      "persisted": {
+        "rows": [
+          {
+            "date": "2026-11-03",
+            "source": "manual",
+            "supplier": null,
+            "origin": "direct_purchase",
+            "order_supplier": null,
+            "line_number": 1,
+            "quantity": "1234567",
+            "scale": 6,
+            "cost": "1250",
+            "total": "1543",
+            "entry_type": "purchase_received",
+            "invoice_link": true
+          }
+        ],
+        "onHandDelta": "1234567",
+        "netTransitDelta": "0",
+        "oneReceipt": true,
+        "noInventedSupplier": true,
+        "journalsContainNoArtifact": true
+      },
+      "refusals": [
+        {
+          "label": "archived item",
+          "status": 404,
+          "code": "INVENTORY_ITEM_ARCHIVED"
+        },
+        {
+          "label": "foreign item",
+          "status": 404,
+          "code": "INVENTORY_ITEM_ARCHIVED"
+        },
+        {
+          "label": "archived supplier",
+          "status": 409,
+          "code": "SUPPLIER_ARCHIVED"
+        },
+        {
+          "label": "foreign supplier",
+          "status": 404,
+          "code": "SUPPLIER_NOT_FOUND"
+        },
+        {
+          "label": "foreign destination",
+          "status": 404,
+          "code": "INVENTORY_LOCATION_CHANGED"
+        },
+        {
+          "label": "wrong branch destination",
+          "status": 404,
+          "code": "INVENTORY_LOCATION_CHANGED"
+        }
+      ],
+      "permissions": [
+        {
+          "actor": "capture",
+          "operation": "inventory.purchase.record",
+          "status": 403,
+          "code": "PERMISSION_DENIED"
+        },
+        {
+          "actor": "capture",
+          "operation": "inventory.invoice.receive_direct",
+          "status": 403,
+          "code": "PERMISSION_DENIED"
+        },
+        {
+          "actor": "reader",
+          "operation": "inventory.purchase.record",
+          "status": 403,
+          "code": "PERMISSION_DENIED"
+        },
+        {
+          "actor": "reader",
+          "operation": "inventory.invoice.receive_direct",
+          "status": 403,
+          "code": "PERMISSION_DENIED"
+        }
+      ],
+      "artifactReads": [
+        {
+          "actor": "owner",
+          "scope": "owned image",
+          "status": 200
+        },
+        {
+          "actor": "capture",
+          "scope": "owned image",
+          "status": 200
+        },
+        {
+          "actor": "reader",
+          "scope": "owned image",
+          "status": 403
+        },
+        {
+          "actor": "anonymous",
+          "scope": "owned image",
+          "status": 401
+        },
+        {
+          "actor": "owner",
+          "scope": "other merchant",
+          "status": 404
+        },
+        {
+          "actor": "owner",
+          "scope": "no image",
+          "status": 404
+        }
+      ]
+    },
+    "browserBusinessDeltas": {
+      "supplier": 0,
+      "supplier_invoice": 3,
+      "purchase_order": 3,
+      "purchase_order_receipt": 3,
+      "purchase_order_receipt_line": 3,
+      "stock_ledger_entry": 6
+    },
+    "passedCheckpoints": [
+      "context-before",
+      "unsent-scopes-canceled",
+      "storage-refused",
+      "inflight-location",
+      "inflight-merchant",
+      "mobile-pointer-saved",
+      "mobile-pointer-canceled"
+    ],
+    "exitStatus": 0
+  },
+  "static": {
+    "focusedDashboard": 57,
+    "fullDashboard": 712,
+    "fullDashboardFiles": 50,
+    "contract": 122,
+    "dartWire": "passed current generated models",
+    "typechecks": ["contract", "api"],
+    "tokens": 8,
+    "tokenDrift": false,
+    "catalogs": "strict compile passed",
+    "dashboardBuild": "passed; existing chunk warning",
+    "requiredPrCheck": {
+      "exitStatus": 0,
+      "warningBaseline": 68,
+      "useCases": 63
+    }
+  },
+  "controlledOverlap": "Actual session helper with deferred transport; permission refusal is injected. Browser runs use real HTTP and SQL."
+}

@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: manual purchase accepts no supplier or artifact
+ok 1 - manual purchase accepts no supplier or artifact
+  ---
+  duration_ms: 2.679583
+  type: 'test'
+  ...
+# Subtest: manual purchase treats an explicit null photo as no artifact
+ok 2 - manual purchase treats an explicit null photo as no artifact
+  ---
+  duration_ms: 0.214208
+  type: 'test'
+  ...
+# Subtest: purchase refuses more than 100 rows, invalid dates and unsafe amounts
+ok 3 - purchase refuses more than 100 rows, invalid dates and unsafe amounts
+  ---
+  duration_ms: 0.8585
+  type: 'test'
+  ...
+# Subtest: purchase artifact enforces the final photo byte limit
+ok 4 - purchase artifact enforces the final photo byte limit
+  ---
+  duration_ms: 5.079625
+  type: 'test'
+  ...
+# Subtest: direct receive accepts identity and destination, refuses client replacement lines
+ok 5 - direct receive accepts identity and destination, refuses client replacement lines
+  ---
+  duration_ms: 0.160417
+  type: 'test'
+  ...
+# Subtest: manual purchase preserves repeated items with separate prices
+ok 6 - manual purchase preserves repeated items with separate prices
+  ---
+  duration_ms: 0.399875
+  type: 'test'
+  ...
+# Subtest: ordinary orders still require a supplier
+ok 7 - ordinary orders still require a supplier
+  ---
+  duration_ms: 0.155625
+  type: 'test'
+  ...
+# Subtest: RecordInventoryPurchaseLine publishes positive quantity and nonnegative cost bounds
+ok 8 - RecordInventoryPurchaseLine publishes positive quantity and nonnegative cost bounds
+  ---
+  duration_ms: 13.7415
+  type: 'test'
+  ...
+# Subtest: RecordInventoryPurchaseRequest publishes positive quantity and nonnegative cost bounds
+ok 9 - RecordInventoryPurchaseRequest publishes positive quantity and nonnegative cost bounds
+  ---
+  duration_ms: 8.268625
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 92.291875

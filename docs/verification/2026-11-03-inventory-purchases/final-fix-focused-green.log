@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 /Users/moon/Documents/umi-worktrees/inventory-purchases-20261104/apps/umi-dashboard
+
+ ✓ src/screens/purchase-entry-photo.spec.js (7 tests) 3ms
+ ✓ src/screens/purchase-entry-model.spec.js (23 tests) 11ms
+ ✓ src/screens/purchase-entry-session.spec.js (27 tests) 8ms
+
+ Test Files  3 passed (3)
+      Tests  57 passed (57)
+   Start at  15:28:49
+   Duration  305ms (transform 440ms, setup 0ms, collect 488ms, tests 22ms, environment 0ms, prepare 78ms)

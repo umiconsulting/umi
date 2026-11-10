@@ -102,3 +102,44 @@ A first read-only checker attempt expected the wrong XML source literal (`xml`);
 Token regeneration left `packages/tokens/dist` unchanged; all **8** token tests passed.
 The dashboard build retains its disclosed Vite chunk warning; API full-suite skips remain the existing 29.
 This evidence covers local synthetic data; no production/staging database, provider, notification/outbox worker, push, merge or deployment was used.
+
+## Final review fix verification
+
+The bounded final fix wave addresses I1 and all three Minor findings from review base `393fde36`.
+The earlier evidence above remains the record of those earlier runs.
+New evidence: [final fix results](final-fix-acceptance.json), [updated XML review](final-fix-xml-review.png),
+[session RED](final-fix-session-red.log), [focused GREEN](final-fix-focused-green.log),
+[contract RED](final-fix-contract-red.log), [contract GREEN](final-fix-contract-green.log), and [Dart wire checks](final-fix-dart.log).
+
+The session helper persists a retry marker before another send.
+A delayed initial refusal preserves the exact request when another send or ambiguous result exists.
+Clear and new identity allocation remain blocked for that unresolved attempt.
+The replacement deferred tests cover refusal/success in both completion orders and refusal/retry failure in both orders.
+Single-send definitive correction, absent/new owner guards and terminal success remain covered.
+The controlled refusal is injected into the actual session helper; it is not a live server permission-race claim.
+
+The invoice flow now uses `Asignar artículo a la línea`, `Sin artículo asignado`, and `Artículos asignados` through Lingui.
+The actual browser XML path passed with the new action name.
+The new screenshot shows line counts with assigned articles in the invoice list.
+The six HTTP reference checks now require each exact status/code pair from the table above.
+Both restricted actors must return `403 PERMISSION_DENIED` for both operations, with no business change.
+The new published purchase line and request schemas now require quantity value at least 1 and cost at least 0.
+The JSON artifact tests assert both bounds and their safe maxima; canonical generation supplies all artifacts.
+
+Final static results use Node **22.23.3**, pnpm **10.29.3** and Dart **3.13.4**:
+focused dashboard **57**, full dashboard **712 tests in 50 files**, contract **122**, and tokens **8** passed.
+Current generated Dart omission/null/photo round trips, contract/API typechecks, strict catalogs and the isolated dashboard build passed.
+Contract generation/build completed before consumer typechecks. Generated tokens have no drift.
+The Vite chunk warning and the existing **68-warning** dashboard baseline remain unchanged.
+Unchanged broad API and PostgreSQL suites were not repeated.
+
+The controller reran the existing complete Task 2 and Task 3 wrappers against the frozen final source.
+Task 2 retained `PASS full purchase browser scenarios`; its process handle was lost after the daemon restart.
+The full run again verified real manual/photo/XML writes, separate prices, exact retry without new SQL facts, private artifact reads and mobile cancellation.
+Task 3 exited **0** and retained `PASS remaining integrated purchase acceptance`, including exact HTTP refusal pairs, SQL, scope changes and mobile actions.
+All **20** frozen application/test/catalog/contract/wrapper hashes matched after both runs.
+Private runtime logs remain in the permanent local test stack. Historical screenshots and result files above were preserved.
+
+The final `PR_BASE_REF=origin/staging pnpm check:pr` exited **0** with the new evidence staged.
+It verified canonical generation, RBAC, lint, the unchanged warning baseline, formatting, contract checksum, migration freeze and 63 use cases.
+The evidence log exports remove trailing whitespace only; the original private logs remain unchanged.
