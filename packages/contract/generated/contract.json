@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "36a332a26d2bdd1713e708fb567ca11d73ecd2265a40b086714b5bacabc2784c",
+  "contentHash": "ae6b6095cbccb8d0da5579ccc406c44a2c2fcba40fef0bd31692ca32b8216df9",
   "contractVersion": "2.54.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -80091,7 +80091,7 @@
             },
             "value": {
               "maximum": 9007199254740991,
-              "minimum": -9007199254740991,
+              "minimum": 1,
               "type": "integer"
             }
           },
@@ -80104,7 +80104,7 @@
         },
         "unitCostMinor": {
           "maximum": 9007199254740991,
-          "minimum": -9007199254740991,
+          "minimum": 0,
           "type": "integer"
         }
       },
@@ -80193,7 +80193,7 @@
                   },
                   "value": {
                     "maximum": 9007199254740991,
-                    "minimum": -9007199254740991,
+                    "minimum": 1,
                     "type": "integer"
                   }
                 },
@@ -80206,7 +80206,7 @@
               },
               "unitCostMinor": {
                 "maximum": 9007199254740991,
-                "minimum": -9007199254740991,
+                "minimum": 0,
                 "type": "integer"
               }
             },

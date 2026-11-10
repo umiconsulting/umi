@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import * as contract from '../dist/index.js';
 const id = '11111111-1111-4111-8111-111111111111';
 const other = '22222222-2222-4222-8222-222222222222';
@@ -102,3 +103,17 @@ test('ordinary orders still require a supplier', () => {
     false,
   );
 });
+
+for (const name of ['RecordInventoryPurchaseLine', 'RecordInventoryPurchaseRequest']) {
+  test(`${name} publishes positive quantity and nonnegative cost bounds`, async () => {
+    const artifact = JSON.parse(
+      await readFile(new URL('../generated/contract.json', import.meta.url), 'utf8'),
+    );
+    const schema = artifact.definitions[name];
+    const row = name === 'RecordInventoryPurchaseLine' ? schema : schema.properties.lines.items;
+    assert.equal(row.properties.quantity.properties.value.minimum, 1);
+    assert.equal(row.properties.unitCostMinor.minimum, 0);
+    assert.equal(row.properties.quantity.properties.value.maximum, 9007199254740991);
+    assert.equal(row.properties.unitCostMinor.maximum, 9007199254740991);
+  });
+}

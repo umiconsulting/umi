@@ -561,8 +561,8 @@ export type SupplierInvoiceCommitRequest = z.infer<typeof SupplierInvoiceCommitR
 export const RecordInventoryPurchaseLine = z
   .object({
     inventoryItemId: Uuid,
-    quantity: PurchaseQuantity,
-    unitCostMinor: MinorUnits,
+    quantity: PurchaseQuantity.extend({ value: z.number().int().safe().min(1) }),
+    unitCostMinor: z.number().int().safe().min(0),
   })
   .strict();
 export const RecordInventoryPurchaseRequest = z
