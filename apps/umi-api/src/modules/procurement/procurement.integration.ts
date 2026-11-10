@@ -22,6 +22,7 @@ import { ProcurementRepository } from './procurement.repository';
 import { ProcurementService } from './procurement.service';
 import { PurchaseEntryRepository } from './purchase-entry.repository';
 import { PurchaseEntryService } from './purchase-entry.service';
+import { PurchasingPostingGate } from '../../../test/integration/purchasing-posting-gate';
 
 /**
  * WORKSTREAM E, STEP 3 — "Add purchase orders, suppliers, and receiving", against
@@ -2127,6 +2128,164 @@ describe('purchasing · send, receive, cancel, and the stock they move', () => {
       const after = await invoiceBalance(ITEM_INVOICE);
       expect(after.onHand - before.onHand).toBe(1250);
       expect(after.inTransit).toBe(before.inTransit);
+    });
+
+    it('completes distinct reversed-item purchases once without a stock lock cycle', async () => {
+      const itemA = randomUUID();
+      const itemB = randomUUID();
+      await pg.tquery(
+        INVOICE_MERCHANT,
+        `INSERT INTO merchant.inventory_item(id,merchant_id,public_reference,display_name,item_type,base_unit,quantity_scale)
+         VALUES ($1::uuid,$3::uuid,$1::text,'Lock A','ingredient','unit',0),
+                ($2::uuid,$3::uuid,$2::text,'Lock B','ingredient','unit',0)`,
+        [itemA, itemB, INVOICE_MERCHANT],
+      );
+      const row = (inventoryItemId: string, value: number, unitCostMinor: number) => ({
+        inventoryItemId,
+        quantity: { value, scale: 0, unit: 'unit' },
+        unitCostMinor,
+      });
+      const base = {
+        locationId: INVOICE_LOCATION,
+        inventoryLocationId: INVOICE_STOCK_ROOM,
+        issuedOn: '2026-11-03',
+        currency: 'MXN',
+      };
+      await command('inventory.purchase.record', randomUUID(), {
+        ...base,
+        lines: [row(itemA, 1, 1), row(itemB, 1, 1)],
+      });
+      const beforeA = await invoiceBalance(itemA);
+      const beforeB = await invoiceBalance(itemB);
+      const attempts = [
+        {
+          invoiceId: randomUUID(),
+          commandId: randomUUID(),
+          idempotencyKey: randomUUID(),
+          lines: [row(itemA, 1, 101), row(itemB, 2, 202)],
+        },
+        {
+          invoiceId: randomUUID(),
+          commandId: randomUUID(),
+          idempotencyKey: randomUUID(),
+          lines: [row(itemB, 3, 303), row(itemA, 4, 404)],
+        },
+      ];
+      const gate = await PurchasingPostingGate.open(
+        pg,
+        attempts.map((attempt) => attempt.commandId),
+      );
+      const controlled = new AdministrativeCommandExecutionService(
+        new AdministrativeCommandContextService(new AdministrativeCommandRepository(pg)),
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        procurement,
+        new PurchaseEntryService(
+          new PurchaseEntryRepository(gate),
+          new IntegrityService(new IntegrityRepository(pg)),
+        ),
+      );
+      const execute = (attempt: (typeof attempts)[number]) =>
+        scoped(
+          () =>
+            controlled.execute(consoleUser, invoiceAccess, {
+              operation: 'inventory.purchase.record',
+              locationId: INVOICE_LOCATION,
+              targetAggregateId: attempt.invoiceId,
+              targetVersion: null,
+              commandId: attempt.commandId,
+              idempotencyKey: attempt.idempotencyKey,
+              parameters: { ...base, lines: attempt.lines },
+              approvalId: null,
+            }),
+          INVOICE_MERCHANT,
+          INVOICE_LOCATION,
+        );
+      const completed = Promise.allSettled(attempts.map(execute));
+      let waits: string[] = [];
+      let schedulingError: unknown;
+      try {
+        waits = await gate.waitForBothBlocked();
+      } catch (error) {
+        schedulingError = error;
+      } finally {
+        await gate.release();
+      }
+      const outcomes = await completed;
+      expect(schedulingError).toBeUndefined();
+      expect(waits).toHaveLength(2);
+      for (const [index, outcome] of outcomes.entries()) {
+        if (outcome.status !== 'rejected') continue;
+        // Confirm the original deadlock rollback and retained-identity refusal before the final assertion fails.
+        expect(outcome.reason).toMatchObject({ code: '40P01' });
+        const attempt = attempts[index];
+        const failed = await pg.tquery<{ status: string }>(
+          INVOICE_MERCHANT,
+          'SELECT status FROM merchant.administrative_command WHERE merchant_id=$1::uuid AND command_id=$2::uuid',
+          [INVOICE_MERCHANT, attempt.commandId],
+        );
+        expect(failed.rows[0].status).toBe('failed');
+        expect(
+          (
+            await pg.tquery(
+              INVOICE_MERCHANT,
+              'SELECT id FROM merchant.supplier_invoice WHERE id=$1::uuid',
+              [attempt.invoiceId],
+            )
+          ).rows,
+        ).toEqual([]);
+        expect((await refusal(() => execute(attempt))).code).toBe('ADMINISTRATIVE_COMMAND_FAILED');
+      }
+      expect(outcomes.map((outcome) => outcome.status)).toEqual(['fulfilled', 'fulfilled']);
+      for (const [index, attempt] of attempts.entries()) {
+        expect(await execute(attempt)).toEqual(
+          (outcomes[index] as PromiseFulfilledResult<unknown>).value,
+        );
+        const links = await pg.tquery<{
+          item: string;
+          quantity: string;
+          price: string;
+          amount: string;
+        }>(
+          INVOICE_MERCHANT,
+          `SELECT rl.inventory_item_id::text AS item,rl.received_quantity::text AS quantity,
+             rl.actual_unit_cost_minor::text AS price,rl.line_total_minor::text AS amount
+           FROM merchant.supplier_invoice_line il JOIN merchant.purchase_order_receipt_line rl
+             ON rl.merchant_id=il.merchant_id AND rl.invoice_line_id=il.id
+           WHERE il.merchant_id=$1::uuid AND il.supplier_invoice_id=$2::uuid ORDER BY il.line_number`,
+          [INVOICE_MERCHANT, attempt.invoiceId],
+        );
+        expect(links.rows).toEqual(
+          index === 0
+            ? [
+                { item: itemA, quantity: '1', price: '101', amount: '101' },
+                { item: itemB, quantity: '2', price: '202', amount: '404' },
+              ]
+            : [
+                { item: itemB, quantity: '3', price: '303', amount: '909' },
+                { item: itemA, quantity: '4', price: '404', amount: '1616' },
+              ],
+        );
+        const receipts = await pg.tquery<{ count: string }>(
+          INVOICE_MERCHANT,
+          'SELECT count(*)::text AS count FROM merchant.purchase_order_receipt WHERE merchant_id=$1::uuid AND command_id=$2::uuid',
+          [INVOICE_MERCHANT, attempt.commandId],
+        );
+        expect(receipts.rows[0].count).toBe('1');
+      }
+      const afterA = await invoiceBalance(itemA);
+      const afterB = await invoiceBalance(itemB);
+      expect(afterA.onHand - beforeA.onHand).toBe(5);
+      expect(afterB.onHand - beforeB.onHand).toBe(5);
+      expect(afterA.inTransit).toBe(beforeA.inTransit);
+      expect(afterB.inTransit).toBe(beforeB.inTransit);
     });
 
     it('posts one direct receipt under concurrent requests with the same identity', async () => {

@@ -923,6 +923,7 @@ export class ProcurementRepository {
         });
       return {
         ...line,
+        inventoryItemId: onOrder.inventory_item_id,
         quantity: normalizeQuantity(line.quantity, onOrder.unit, onOrder.quantity_scale),
       };
     });
@@ -987,12 +988,14 @@ export class ProcurementRepository {
     );
     const receiptId = receipt.rows[0].id;
     const businessDate = receipt.rows[0].business_date;
-    for (const line of lines) {
-      const onOrder = byId.get(line.purchaseOrderLineId);
-      // Unreachable: `overReceivedLine` refused an unknown line above. Kept as a
-      // hard failure rather than a `!` so a future edit cannot silently skip a line.
-      if (!onOrder) throw new ConflictException({ code: 'PURCHASE_ORDER_LINE_NOT_FOUND' });
-
+    // Every order has one destination. Sort stock posts by item and line identity across all purchasing writers.
+    const postingLines = [...lines].sort(
+      (left, right) =>
+        left.inventoryItemId.localeCompare(right.inventoryItemId) ||
+        left.purchaseOrderLineId.localeCompare(right.purchaseOrderLineId),
+    );
+    const ledgerIds = new Map<string, string>();
+    for (const line of postingLines) {
       /*
        * THE LEDGER FIRST, THE RECEIPT LINE SECOND, AND THE ORDER MATTERS.
        *
@@ -1015,7 +1018,7 @@ export class ProcurementRepository {
       const ledger = await this.postLedger(client, merchantId, {
         locationId: dto.locationId,
         inventoryLocationId: order.inventory_location_id,
-        inventoryItemId: onOrder.inventory_item_id,
+        inventoryItemId: line.inventoryItemId,
         entryType: 'purchase_received',
         quantity: quantity.value,
         commandId: dto.commandId,
@@ -1032,6 +1035,13 @@ export class ProcurementRepository {
           receiptId,
         },
       });
+      ledgerIds.set(line.purchaseOrderLineId, ledger.id);
+    }
+    // Keep receipt insertion in the original document order, with the posted fact for each line.
+    for (const line of lines) {
+      const quantity = line.quantity;
+      const ledgerId = ledgerIds.get(line.purchaseOrderLineId);
+      if (!ledgerId) throw new Error('purchase_receipt_ledger_missing');
       await client.query(
         `INSERT INTO merchant.purchase_order_receipt_line
            (merchant_id,receipt_id,purchase_order_id,purchase_order_line_id,inventory_item_id,
@@ -1043,8 +1053,8 @@ export class ProcurementRepository {
           receiptId,
           dto.purchaseOrderId,
           line.purchaseOrderLineId,
-          onOrder.inventory_item_id,
-          ledger.id,
+          line.inventoryItemId,
+          ledgerId,
           quantity.value,
           quantity.scale,
           quantity.unit,
@@ -1186,9 +1196,8 @@ export class ProcurementRepository {
 
   /**
    * The lines as the database holds them, with the two quantities a posting needs.
-   * Ordered by `line_number` so a ledger entry's order is the document's order —
-   * the balance projection only accepts a strictly increasing `sequence`, and a
-   * shuffled set of entries would make its replay non-deterministic.
+   * Each order has one destination. Shared send and cancel paths lock stock in item order.
+   * Line IDs break ties without changing stored document ordinals or invoice links.
    */
   private async orderLinesForPosting(
     client: PoolClient,
@@ -1221,7 +1230,7 @@ export class ProcurementRepository {
          FROM merchant.purchase_order_line l
          JOIN merchant.inventory_item i ON i.merchant_id=l.merchant_id AND i.id=l.inventory_item_id
         WHERE l.merchant_id=$1::uuid AND l.purchase_order_id=$2::uuid
-        ORDER BY l.line_number FOR UPDATE OF l`,
+        ORDER BY l.inventory_item_id,l.id FOR UPDATE OF l`,
       [merchantId, purchaseOrderId],
     );
     for (const line of result.rows) {
