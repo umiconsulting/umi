@@ -6363,8 +6363,36 @@ msgstr "No results"
 #~ msgstr "Match every line before you register the receipt."
 
 #: src/screens/invoice-inbox.jsx
-msgid "La factura tiene líneas sin casar. Casa cada línea marcada antes de registrar la entrada."
-msgstr "The invoice has lines with no match. Match every marked line before you register the receipt."
+#~ msgid "La factura tiene líneas sin casar. Casa cada línea marcada antes de registrar la entrada."
+#~ msgstr "The invoice has lines with no match. Match every marked line before you register the receipt."
+
+#. placeholder {0}: line.lineNumber
+#: src/screens/invoice-inbox.jsx
+#~ msgid "Casar la línea {0}"
+#~ msgstr "Match line {0}"
+
+#: src/screens/invoice-inbox.jsx
+#~ msgid "Esta línea no está casada. Asigna un artículo antes de registrar la entrada."
+#~ msgstr "Assign an item to this line before recording the receipt."
+
+#. placeholder {0}: tally.unmatched
+#: src/screens/invoice-inbox.jsx
+#~ msgid "{0, plural, one {# línea sin casar} other {# líneas sin casar}}"
+#~ msgstr "{0, plural, one {# unmatched line} other {# unmatched lines}}"
+
+#. placeholder {0}: tally.matched
+#: src/screens/invoice-inbox.jsx
+#~ msgid "{0, plural, one {# línea casada} other {# líneas casadas}}"
+#~ msgstr "{0, plural, one {# matched line} other {# matched lines}}"
+
+#: src/screens/invoice-inbox.jsx
+#: src/screens/invoice-model.js
+#~ msgid "Sin casar"
+#~ msgstr "Unmatched"
+
+#: src/screens/invoice-inbox.jsx
+msgid "La factura tiene líneas sin artículo asignado. Asigna un artículo a cada línea marcada antes de registrar la entrada."
+msgstr "The invoice has lines with no assigned item. Assign an item to each marked line before you register the receipt."
 
 #: src/screens/invoice-inbox.jsx
 msgid "La factura ya no existe. Recarga la lista."
@@ -6393,8 +6421,8 @@ msgstr "You cannot manage the invoices."
 
 #. placeholder {0}: line.lineNumber
 #: src/screens/invoice-inbox.jsx
-msgid "Casar la línea {0}"
-msgstr "Match line {0}"
+msgid "Asignar artículo a la línea {0}"
+msgstr "Assign an item to line {0}"
 
 #: src/screens/invoice-inbox.jsx
 msgid "Descripción del proveedor"
@@ -6447,8 +6475,8 @@ msgid "Elige un pedido"
 msgstr "Choose an order"
 
 #: src/screens/invoice-inbox.jsx
-msgid "Esta línea no está casada. Asigna un artículo antes de registrar la entrada."
-msgstr "Assign an item to this line before recording the receipt."
+msgid "Esta línea no tiene artículo asignado. Asigna un artículo antes de registrar la entrada."
+msgstr "This line has no assigned item. Assign an item before you register the receipt."
 
 #: src/screens/invoice-inbox.jsx
 msgid "El pedido no tiene una línea para este artículo."
@@ -6474,8 +6502,8 @@ msgstr "Received quantity of line {0}"
 
 #. placeholder {0}: tally.unmatched
 #: src/screens/invoice-inbox.jsx
-msgid "{0, plural, one {# línea sin casar} other {# líneas sin casar}}"
-msgstr "{0, plural, one {# unmatched line} other {# unmatched lines}}"
+msgid "{0, plural, one {# línea sin artículo asignado} other {# líneas sin artículo asignado}}"
+msgstr "{0, plural, one {# line with no assigned item} other {# lines with no assigned item}}"
 
 #: src/screens/invoice-inbox.jsx
 msgid "Comprobante de la compra"
@@ -6548,8 +6576,8 @@ msgstr "Tax {0}"
 
 #. placeholder {0}: tally.matched
 #: src/screens/invoice-inbox.jsx
-msgid "{0, plural, one {# línea casada} other {# líneas casadas}}"
-msgstr "{0, plural, one {# matched line} other {# matched lines}}"
+msgid "{0, plural, one {# línea con artículo asignado} other {# líneas con artículo asignado}}"
+msgstr "{0, plural, one {# line with an assigned item} other {# lines with an assigned item}}"
 
 #. placeholder {0}: tally.priceChanged
 #: src/screens/invoice-inbox.jsx
@@ -6589,8 +6617,8 @@ msgstr "SKU {0}"
 
 #: src/screens/invoice-inbox.jsx
 #: src/screens/invoice-model.js
-msgid "Sin casar"
-msgstr "Unmatched"
+msgid "Sin artículo asignado"
+msgstr "No assigned item"
 
 #: src/screens/invoice-inbox.jsx
 msgid "Cambió el precio"
@@ -6623,6 +6651,10 @@ msgid "Asigna un artículo a cada línea antes de registrar la entrada."
 msgstr "Assign an item to each line before recording the receipt."
 
 #: src/screens/invoice-model.js
+#~ msgid "Casada"
+#~ msgstr "Matched"
+
+#: src/screens/invoice-model.js
 msgid "Cotejo recordado"
 msgstr "Remembered match"
 
@@ -6647,8 +6679,8 @@ msgid "Leída"
 msgstr "Read"
 
 #: src/screens/invoice-model.js
-msgid "Casada"
-msgstr "Matched"
+msgid "Artículos asignados"
+msgstr "Items assigned"
 
 #: src/screens/invoice-model.js
 msgid "Registrada"

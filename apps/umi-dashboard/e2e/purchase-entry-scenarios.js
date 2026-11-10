@@ -457,7 +457,9 @@ export async function runPurchaseEntryScenarios({
   let xmlArticle = page.getByRole('article').filter({ hasText: xmlRef });
   await expect(xmlArticle).toBeVisible();
   for (const n of [1, 2]) {
-    await xmlArticle.getByRole('button', { name: `Casar la línea ${n}`, exact: true }).click();
+    await xmlArticle
+      .getByRole('button', { name: `Asignar artículo a la línea ${n}`, exact: true })
+      .click();
     await expect(dialog().locator('.ui-select-trigger')).toHaveCount(1);
     await dialog().locator('.ui-select-trigger').click();
     await page

@@ -85,7 +85,7 @@ const UNIT_LABEL = {
 };
 
 const INVOICE_ERROR_COPY = {
-  SUPPLIER_INVOICE_UNMATCHED_LINES: msg`La factura tiene líneas sin casar. Casa cada línea marcada antes de registrar la entrada.`,
+  SUPPLIER_INVOICE_UNMATCHED_LINES: msg`La factura tiene líneas sin artículo asignado. Asigna un artículo a cada línea marcada antes de registrar la entrada.`,
   SUPPLIER_INVOICE_NOT_FOUND: msg`La factura ya no existe. Recarga la lista.`,
   SUPPLIER_INVOICE_ALREADY_COMMITTED: msg`La factura ya tiene su entrada registrada.`,
   PURCHASE_ORDER_NOT_FOUND: msg`El pedido ya no existe. Recarga la lista.`,
@@ -205,12 +205,12 @@ function MatchLineDialog({ invoice, line, items, onClose, onMatched }) {
         className="card modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label={t`Casar la línea ${line.lineNumber}`}
+        aria-label={t`Asignar artículo a la línea ${line.lineNumber}`}
         style={{ width: 'min(560px, 94vw)', display: 'grid', gap: 16 }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <h3 style={{ margin: 0 }}>
-            <Trans>Casar la línea {line.lineNumber}</Trans>
+            <Trans>Asignar artículo a la línea {line.lineNumber}</Trans>
           </h3>
           <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             <I.X size={16} />
@@ -401,7 +401,8 @@ function CommitInvoiceDialog({ invoice, orders, onClose, onCommitted }) {
                 {isUnmatched ? (
                   <p style={{ margin: 0, color: 'var(--warning)', fontSize: 12.5 }}>
                     <Trans>
-                      Esta línea no está casada. Asigna un artículo antes de registrar la entrada.
+                      Esta línea no tiene artículo asignado. Asigna un artículo antes de registrar
+                      la entrada.
                     </Trans>
                   </p>
                 ) : candidates.length === 0 ? (
@@ -457,7 +458,11 @@ function CommitInvoiceDialog({ invoice, orders, onClose, onCommitted }) {
         {tally.unmatched > 0 ? (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <Pill tone="warning">
-              <Plural value={tally.unmatched} one="# línea sin casar" other="# líneas sin casar" />
+              <Plural
+                value={tally.unmatched}
+                one="# línea sin artículo asignado"
+                other="# líneas sin artículo asignado"
+              />
             </Pill>
             <span className="muted" style={{ fontSize: 11.5 }}>
               {tally.unmatchedLines
@@ -772,14 +777,18 @@ export default function InvoiceInbox() {
 
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Pill tone="ok">
-                  <Plural value={tally.matched} one="# línea casada" other="# líneas casadas" />
+                  <Plural
+                    value={tally.matched}
+                    one="# línea con artículo asignado"
+                    other="# líneas con artículo asignado"
+                  />
                 </Pill>
                 {tally.unmatched > 0 ? (
                   <Pill tone="warning">
                     <Plural
                       value={tally.unmatched}
-                      one="# línea sin casar"
-                      other="# líneas sin casar"
+                      one="# línea sin artículo asignado"
+                      other="# líneas sin artículo asignado"
                     />
                   </Pill>
                 ) : null}
@@ -851,7 +860,7 @@ export default function InvoiceInbox() {
                                 ) : null}
                                 {matched ? null : (
                                   <Pill tone="warning">
-                                    <Trans>Sin casar</Trans>
+                                    <Trans>Sin artículo asignado</Trans>
                                   </Pill>
                                 )}
                                 {line.priceChanged ? (
@@ -900,7 +909,7 @@ export default function InvoiceInbox() {
                               </div>
                             ) : (
                               <Pill tone="warning">
-                                <Trans>Sin casar</Trans>
+                                <Trans>Sin artículo asignado</Trans>
                               </Pill>
                             )}
                           </td>
@@ -909,8 +918,8 @@ export default function InvoiceInbox() {
                               <button
                                 className="btn-icon"
                                 type="button"
-                                aria-label={t`Casar la línea ${line.lineNumber}`}
-                                title={t`Casar la línea ${line.lineNumber}`}
+                                aria-label={t`Asignar artículo a la línea ${line.lineNumber}`}
+                                title={t`Asignar artículo a la línea ${line.lineNumber}`}
                                 onClick={() => setMatching({ invoice, line })}
                               >
                                 <I.Edit size={15} />
