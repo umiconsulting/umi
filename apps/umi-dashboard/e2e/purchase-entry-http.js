@@ -58,7 +58,7 @@ export async function runPurchaseHttpAcceptance({
   assert.deepEqual(await snapshot(), after);
   const persisted = await facts(accepted, before, after);
   const refusals = [];
-  for (const [label, patch] of [
+  for (const [label, patch, status, code] of [
     [
       'archived item',
       {
@@ -71,6 +71,8 @@ export async function runPurchaseHttpAcceptance({
           },
         ],
       },
+      404,
+      'INVENTORY_ITEM_ARCHIVED',
     ],
     [
       'foreign item',
@@ -84,18 +86,28 @@ export async function runPurchaseHttpAcceptance({
           },
         ],
       },
+      404,
+      'INVENTORY_ITEM_ARCHIVED',
     ],
-    ['archived supplier', { supplierId: f.suppliers[1].id }],
-    ['foreign supplier', { supplierId: f.suppliers[2].id }],
-    ['foreign destination', { inventoryLocationId: f.inventoryLocations[3].id }],
-    ['wrong branch destination', { inventoryLocationId: f.inventoryLocations[2].id }],
+    ['archived supplier', { supplierId: f.suppliers[1].id }, 409, 'SUPPLIER_ARCHIVED'],
+    ['foreign supplier', { supplierId: f.suppliers[2].id }, 404, 'SUPPLIER_NOT_FOUND'],
+    [
+      'foreign destination',
+      { inventoryLocationId: f.inventoryLocations[3].id },
+      404,
+      'INVENTORY_LOCATION_CHANGED',
+    ],
+    [
+      'wrong branch destination',
+      { inventoryLocationId: f.inventoryLocations[2].id },
+      404,
+      'INVENTORY_LOCATION_CHANGED',
+    ],
   ]) {
     const body = envelope({ ...parameters, ...patch });
     const result = await send('owner', JSON.stringify(body));
-    assert.ok(
-      [400, 403, 404, 409, 422].includes(result.status),
-      `${label}: ${JSON.stringify(result)}`,
-    );
+    assert.equal(result.status, status, `${label}: ${JSON.stringify(result)}`);
+    assert.equal(result.body.code || result.body.error?.code, code, label);
     assert.deepEqual(await snapshot(), after, `${label}: business facts must roll back`);
     refusals.push({
       label,
@@ -117,6 +129,11 @@ export async function runPurchaseHttpAcceptance({
       );
       const result = await send(actor, JSON.stringify(body));
       assert.equal(result.status, 403, `${actor} ${operation}`);
+      assert.equal(
+        result.body.code || result.body.error?.code,
+        'PERMISSION_DENIED',
+        `${actor} ${operation}`,
+      );
       permissions.push({
         actor,
         operation,
