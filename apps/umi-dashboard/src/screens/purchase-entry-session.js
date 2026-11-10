@@ -64,6 +64,12 @@ function persistOutcome(next, storage) {
   const owner = readPurchaseAttempt({ merchantId: next.merchantId, storage });
   if (!owner || owner.commandId !== next.commandId) return next;
   if (['succeeded', 'rejected'].includes(owner.state)) return owner;
+  // A refusal settles only the first send. A retry can still commit this purchase.
+  if (
+    next.state === 'ambiguous' ||
+    (next.state === 'rejected' && (owner.retryStarted || owner.state === 'ambiguous'))
+  )
+    return persist({ ...owner, state: 'ambiguous' }, storage);
   return persist(next, storage);
 }
 export function preparePurchaseAttempt({
@@ -117,7 +123,11 @@ export async function runPurchaseAttempt({ attempt, storage, send }) {
     JSON.stringify(current.envelope) !== JSON.stringify(attempt.envelope)
   )
     throw new Error(t`Este intento ya terminó o cambió. Revisa la compra pendiente.`);
-  const pending = { ...current, state: 'pending' };
+  const pending = {
+    ...current,
+    state: 'pending',
+    retryStarted: current.retryStarted === true || current.state !== 'prepared',
+  };
   persist(pending, storage);
   let response;
   try {

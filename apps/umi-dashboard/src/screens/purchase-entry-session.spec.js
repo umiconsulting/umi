@@ -299,27 +299,110 @@ it.each(['success', 'failure'])(
   },
 );
 
-it.each(['success', 'failure'])(
-  'keeps a definitive refusal terminal after the overlapping retry has a late %s',
-  async (outcome) => {
+it.each(['refusal-first', 'success-first'])(
+  'retains the committed retry after a delayed initial permission refusal: %s',
+  async (order) => {
+    const s = storage();
+    const original = preparePurchaseAttempt({
+      ...input(s),
+      parameters: { ...input(s).parameters, artifactBase64: 'abc' },
+    });
+    const calls = [];
+    const first = deferredSend();
+    const retry = deferredSend();
+    const tracked = (transport) => (merchant, envelope) => {
+      calls.push([merchant, envelope]);
+      return transport.send();
+    };
+    const firstTask = runPurchaseAttempt({ attempt: original, storage: s, send: tracked(first) });
+    const retryTask = runPurchaseAttempt({
+      attempt: readPurchaseAttempt({ merchantId: 'm', storage: s }),
+      storage: s,
+      send: tracked(retry),
+    });
+    const refuse = () =>
+      first.reject(
+        Object.assign(new Error('permission'), {
+          status: 403,
+          code: 'PERMISSION_DENIED',
+        }),
+      );
+    if (order === 'refusal-first') {
+      refuse();
+      const result = await firstTask;
+      const recovered = readPurchaseAttempt({ merchantId: 'm', storage: s });
+      expect(result.state).toBe('ambiguous');
+      expect(recovered.envelope).toEqual(original.envelope);
+      expect(recovered.commandId).toBe(original.commandId);
+      expect(() => clearPurchaseAttempt({ merchantId: 'm', storage: s })).toThrow();
+      expect(() => preparePurchaseAttempt(input(s))).toThrow();
+      retry.resolve({ supplierInvoice: { id: 'committed' } });
+      await retryTask;
+    } else {
+      retry.resolve({ supplierInvoice: { id: 'committed' } });
+      await retryTask;
+      refuse();
+      expect((await firstTask).state).toBe('succeeded');
+    }
+    expect(calls[1]).toEqual(calls[0]);
+    expect(readPurchaseAttempt({ merchantId: 'm', storage: s })).toMatchObject({
+      state: 'succeeded',
+      commandId: original.commandId,
+      invoiceId: 'committed',
+    });
+    expect(readPurchaseAttempt({ merchantId: 'm', storage: s }).envelope).toBeUndefined();
+  },
+);
+
+it.each(['refusal-first', 'retry-failure-first'])(
+  'retains exact recovery after an overlapping retry fails: %s',
+  async (order) => {
     const s = storage();
     const original = preparePurchaseAttempt(input(s));
     const first = deferredSend();
-    const firstTask = runPurchaseAttempt({ attempt: original, storage: s, send: first.send });
     const retry = deferredSend();
+    const firstTask = runPurchaseAttempt({ attempt: original, storage: s, send: first.send });
     const retryTask = runPurchaseAttempt({
       attempt: readPurchaseAttempt({ merchantId: 'm', storage: s }),
       storage: s,
       send: retry.send,
     });
-    first.reject(Object.assign(new Error('invalid'), { status: 422 }));
-    await firstTask;
-    const before = readPurchaseAttempt({ merchantId: 'm', storage: s });
-    if (outcome === 'success') retry.resolve({ supplierInvoice: { id: 'late' } });
-    else retry.reject(Object.assign(new Error('unavailable'), { status: 503 }));
-    const lateResult = await retryTask;
-    expect(before.state).toBe('rejected');
-    expect(readPurchaseAttempt({ merchantId: 'm', storage: s })).toEqual(before);
-    expect(lateResult).toEqual(before);
+    const refuse = () =>
+      first.reject(
+        Object.assign(new Error('permission'), {
+          status: 403,
+          code: 'PERMISSION_DENIED',
+        }),
+      );
+    if (order === 'refusal-first') {
+      refuse();
+      await firstTask;
+      expect(() => clearPurchaseAttempt({ merchantId: 'm', storage: s })).toThrow();
+      expect(() => preparePurchaseAttempt(input(s))).toThrow();
+      retry.reject(new Error('response lost'));
+      await retryTask;
+    } else {
+      retry.reject(new Error('response lost'));
+      await retryTask;
+      refuse();
+      await firstTask;
+    }
+    const recovered = readPurchaseAttempt({ merchantId: 'm', storage: s });
+    expect(recovered.state).toBe('ambiguous');
+    expect(recovered.commandId).toBe(original.commandId);
+    expect(recovered.envelope).toEqual(original.envelope);
+    expect(() => clearPurchaseAttempt({ merchantId: 'm', storage: s })).toThrow();
+    expect(() => preparePurchaseAttempt(input(s))).toThrow();
+    let sent;
+    const settled = await runPurchaseAttempt({
+      attempt: recovered,
+      storage: s,
+      send: async (merchant, envelope) => {
+        sent = [merchant, envelope];
+        return { supplierInvoice: { id: 'recovered' } };
+      },
+    });
+    expect(sent).toEqual(['m', original.envelope]);
+    expect(settled.state).toBe('succeeded');
   },
 );
