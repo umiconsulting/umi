@@ -32,7 +32,7 @@ export class PurchaseEntryService {
     const parsed = RecordInventoryPurchaseRequest.safeParse(dto);
     if (!parsed.success) throw new BadRequestException({ code: 'VALIDATION_FAILED' });
     const artifact =
-      dto.artifactBase64 === undefined
+      dto.artifactBase64 === undefined || dto.artifactBase64 === null
         ? null
         : decodeInvoiceArtifact(dto.artifactBase64, 700 * 1024);
     return this.execute(

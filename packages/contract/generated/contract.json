@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "b2b3828c214221d537efac8ca3713282a8d00dd413f4e0496daea52c5a2985da",
+  "contentHash": "36a332a26d2bdd1713e708fb567ca11d73ecd2265a40b086714b5bacabc2784c",
   "contractVersion": "2.54.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -80119,9 +80119,16 @@
       "additionalProperties": false,
       "properties": {
         "artifactBase64": {
-          "maxLength": 960000,
-          "minLength": 1,
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 960000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "commandId": {
           "format": "uuid",

@@ -25,6 +25,12 @@ test('manual purchase accepts no supplier or artifact', () => {
     true,
   );
 });
+test('manual purchase treats an explicit null photo as no artifact', () => {
+  assert.equal(
+    contract.RecordInventoryPurchaseRequest.safeParse({ ...input, artifactBase64: null }).success,
+    true,
+  );
+});
 test('purchase refuses more than 100 rows, invalid dates and unsafe amounts', () => {
   assert.ok(contract.RecordInventoryPurchaseRequest, 'purchase schema exists');
   for (const invalid of [

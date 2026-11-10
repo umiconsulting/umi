@@ -576,7 +576,7 @@ export const RecordInventoryPurchaseRequest = z
     folio: z.string().trim().min(1).max(80).nullable().optional(),
     note: z.string().trim().max(240).nullable().optional(),
     lines: z.array(RecordInventoryPurchaseLine).min(1).max(100),
-    artifactBase64: z.string().min(1).max(960_000).optional(),
+    artifactBase64: z.string().min(1).max(960_000).nullable().optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -587,7 +587,7 @@ export const RecordInventoryPurchaseRequest = z
         path: ['issuedOn'],
         message: 'Invalid calendar date.',
       });
-    if (value.artifactBase64 !== undefined) {
+    if (value.artifactBase64 !== undefined && value.artifactBase64 !== null) {
       const encoded = value.artifactBase64.replace(/^data:[^;,]*;base64,/, '').replace(/\s+/g, '');
       const bytes =
         Math.floor((encoded.length * 3) / 4) -

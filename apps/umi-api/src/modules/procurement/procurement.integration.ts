@@ -1988,6 +1988,28 @@ describe('purchasing · send, receive, cancel, and the stock they move', () => {
       ]);
     });
 
+    it('records an explicit null artifact as a manual purchase without a photo', async () => {
+      const result = (await command('inventory.purchase.record', randomUUID(), {
+        locationId: INVOICE_LOCATION,
+        inventoryLocationId: INVOICE_STOCK_ROOM,
+        issuedOn: '2026-11-03',
+        currency: 'MXN',
+        artifactBase64: null,
+        lines: [
+          {
+            inventoryItemId: ITEM_INVOICE_PHOTO,
+            quantity: { value: 1, scale: 0, unit: 'unit' },
+            unitCostMinor: 100,
+          },
+        ],
+      })) as { supplierInvoice: unknown };
+      expect(SupplierInvoice.parse(result.supplierInvoice)).toMatchObject({
+        source: 'manual',
+        hasArtifact: false,
+        status: 'committed',
+      });
+    });
+
     it('stores a direct photo privately and omits its bytes from both journals', async () => {
       const invoiceId = randomUUID();
       const keys = { commandId: randomUUID(), idempotencyKey: randomUUID() };
