@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - One new PR from `feat/inventory-purchase-entry` directly to `staging`; atomic commits; leave open for approval.
-- Base is current `origin/staging`, initially `91aad948`. Preserve other worktrees, test environments, credentials, and production/staging data.
+- Base is current `origin/staging` at `b4ba45fc`. Preserve other worktrees, test environments, credentials, and production/staging data.
 - Backend owns writes, merchant/location authority, audit, versions, ledger and idempotency. No client-generated stock adjustments.
 - One transaction records the complete purchase or nothing. Reuse existing receipt posting and cost evidence.
 - Supplier is optional only for `direct_purchase`; ordinary orders retain their active-supplier requirement.
@@ -27,7 +27,7 @@
 ## Ownership
 
 - Contract schemas, operation enum, route table, generated SDK/checksum, and version belong to `packages/contract`.
-- The nullable-supplier/origin change is a new `db/migrations/062_inventory_direct_purchase.sql`; do not edit applied SQL.
+- The nullable-supplier/origin change is a new `db/migrations/065_inventory_direct_purchase.sql`; do not edit applied SQL.
 - `procurement.repository.ts` keeps shared order persistence and posting. Use focused `purchase-entry.repository.ts` and `purchase-entry.service.ts` for the new orchestration.
 - `invoice-artifact.ts` may hold the existing bounded decoder shared by upload and purchase entry.
 - Dashboard entry form, pure amount/model logic, image handling and attempt persistence live in focused purchase files beside the invoice screen.
@@ -38,7 +38,7 @@
 **Files:**
 
 - Modify: `packages/contract/src/procurement.ts`, `dashboard-operations.ts`, `route-table.ts`, generated contract artifacts and package version as required by repository conventions.
-- Add: `db/migrations/062_inventory_direct_purchase.sql`.
+- Add: `db/migrations/065_inventory_direct_purchase.sql`.
 - Create: `apps/umi-api/src/modules/procurement/purchase-entry.{service,repository}.ts`, focused tests, optional `invoice-artifact.ts`.
 - Modify: `procurement.repository.ts`, `.controller.ts`, `.module.ts`, `.service.ts`; administrative execution/policy and their relevant tests.
 
