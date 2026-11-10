@@ -14,7 +14,7 @@ Compras ofrece `Registrar compra` y conserva `Subir factura XML`.
 El formulario incluye fecha de compra, lugar donde entra el inventario y filas de artículos.
 Cada fila tiene artículo, cantidad, unidad del artículo y costo por unidad.
 El proveedor, la referencia, la nota y la foto son opcionales.
-El formulario permite agregar y quitar filas. Rechaza artículos repetidos.
+El formulario permite agregar y quitar filas. Conserva las líneas separadas de un mismo artículo.
 Muestra el importe por fila y el total antes de confirmar.
 `Revisar compra` precede a `Guardar compra`. `Cancelar` antes de guardar no escribe nada.
 Al guardar, la compra aparece en la lista y las existencias y costos se actualizan.
@@ -82,7 +82,9 @@ Una factura ajena o sin comprobante responde sin revelar datos de otro negocio.
 
 ## Límites y exactitud
 
-- Máximo 100 artículos por compra; todos activos y distintos.
+- Captura manual: máximo 100 filas, con artículos activos. Un artículo puede aparecer en varias líneas con sus propios precios y cantidades.
+- XML directo: conserva hasta 1000 líneas y 100 artículos activos distintos. Un artículo puede aparecer en varias líneas.
+- Las líneas repetidas del XML conservan sus cantidades, precios y vínculos individuales; no se agrupan ni se omiten.
 - Cantidad positiva, en la unidad base y con la escala exacta del artículo, hasta seis decimales.
 - Costos no negativos en centavos enteros seguros. Los importes escritos admiten hasta dos decimales con punto.
 - Se rechazan comas, exponentes, pérdida de precisión y desbordamientos.

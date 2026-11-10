@@ -18,7 +18,7 @@
 - One transaction records the complete purchase or nothing. Reuse existing receipt posting and cost evidence.
 - Supplier is optional only for `direct_purchase`; ordinary orders retain their active-supplier requirement.
 - Date is document `issued_on`; preserve capture time and the existing receipt business-day rule.
-- Max 100 distinct active items; positive exact quantities; safe integer cent amounts; point-only input; existing half-up line-total rule.
+- Manual entry: max 100 rows with active items; repeated priced lines remain separate. Direct XML: max 1000 stored lines and 100 distinct active items, preserving repeated lines. Positive exact quantities, safe integer cent amounts, point-only input and existing half-up line-total rule.
 - Original photo <=12 MiB, final photo <=700 KiB, complete UTF-8 request <=1 MiB. Keep the global HTTP limit unchanged.
 - Image types: JPEG, PNG, WebP; server sniffing; authenticated merchant-scoped retrieval; no bytes in invoice lists or journal results.
 - Freeze and persist exact request/identities in sessionStorage before sending. Ambiguous results never allocate another identity.
@@ -52,7 +52,7 @@
 - `procurement.supplierInvoiceArtifact` GET `/api/merchants/:merchantId/supplier-invoices/:supplierInvoiceId/artifact` returns `{contentType,dataBase64,correlationId}` under the invoice read guards. UUID validation and merchant scope precede byte access.
 - `SupplierInvoice.hasArtifact: boolean`; `PurchaseOrder.origin: 'order'|'direct_purchase'`; order supplier identity/name/reference become nullable in the read model only.
 
-- [ ] Write RED contract tests for valid manual/no-photo input, optional supplier, photo size, 100-line limit, duplicate IDs, invalid dates/amounts and direct XML request shape.
+- [ ] Write RED contract tests for valid manual/no-photo input, optional supplier, photo size, 100-line limit, repeated priced lines, invalid dates/amounts and direct XML request shape.
 
 ```ts
 expect(RecordInventoryPurchaseRequest.safeParse({ ...identity, locationId, inventoryLocationId,
@@ -64,7 +64,7 @@ expect(RecordInventoryPurchaseRequest.safeParse({ ...identity, locationId, inven
 - [ ] Adapt shared order validation/reads for the internal direct origin, retaining the ordinary API's required active supplier. Add no invented supplier row.
 - [ ] Implement the focused orchestration. Record manual invoice metadata/lines with exact selected items. Create an internal direct order, send it, then reuse commit/receive with all line links and the same outer command/fingerprint. Entry type separates ordered/received ledger facts. No nested transaction or external send.
 - [ ] For direct XML receiving, lock/load the existing invoice and use every stored matched line. Reject empty/unmatched/already committed invoices, unsupported quantity conversions and wrong scope before receipt posting. Do not replace parsed XML amounts with client values.
-- [ ] Validate safe totals with existing domain functions. Enforce current user/location authority, active destination and items, duplicate lines, precision, supplier ownership and archive state. Any late refusal must roll back all writes.
+- [ ] Validate safe totals with existing domain functions. Enforce current user/location authority, active destination and items, preservation of repeated priced lines, precision, supplier ownership and archive state. Any late refusal must roll back all writes.
 - [ ] Share the existing artifact byte decoder without weakening XML/legacy photo handling. New purchase input enforces <=700 KiB final bytes and complete request size <=1 MiB. Return only hasArtifact in projections/results.
 - [ ] Add pure context read using merchant timezone AND business_day_start calculation from PosInventoryRepository.currentBusinessDate, currency from merchant, and active scoped inventory_location rows. Do not call overview with reservation side effects.
 - [ ] Add authenticated artifact read and privacy tests (no artifact/other merchant/unauthorized). Never log base64.
@@ -98,7 +98,7 @@ expect(await receiptsFor(first.supplierInvoice.id)).toHaveLength(1);
 - `preparePurchaseAttempt({merchantId,locationId,operation,targetId,parameters,storage})` persists exact envelope once; `readPurchaseAttempt`, `runPurchaseAttempt` and explicit clear validate shape, scope and outcome.
 - Photo preparation accepts a File and returns allowed image base64/preview <=700 KiB. Keep a <=700 KiB source file when valid; adjust larger supported images with native image/canvas APIs. White background for JPEG conversion, bound resize/quality attempts, abort on dialog/context change, revoke temporary object URLs. No new dependency.
 
-- [ ] Write RED pure model tests for scale 0/3/6, zero cost, decimals, line totals, totals overflow, repeated/archived/foreign items, missing destination, invalid selected supplier, and blank optional fields.
+- [ ] Write RED pure model tests for scale 0/3/6, zero cost, decimals, line totals, totals overflow, repeated priced lines, archived/foreign items, missing destination, invalid selected supplier, and blank optional fields.
 
 ```js
 const result=buildPurchaseEntry({draft: validDraftWith('1.250','12.50'), snapshot});
