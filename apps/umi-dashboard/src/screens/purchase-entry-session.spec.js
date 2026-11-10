@@ -196,3 +196,130 @@ it('retains a prior ambiguous request after a later known business refusal', asy
   expect(result.state).toBe('ambiguous');
   expect(result.envelope).toEqual(a.envelope);
 });
+
+function deferredSend() {
+  let resolve;
+  let reject;
+  const promise = new Promise((finish, fail) => {
+    resolve = finish;
+    reject = fail;
+  });
+  return { send: () => promise, resolve, reject };
+}
+
+it.each(['success', 'failure'])(
+  'preserves a newer pending journal after the old request has a late %s',
+  async (outcome) => {
+    const s = storage();
+    const original = preparePurchaseAttempt(input(s));
+    const first = deferredSend();
+    const firstTask = runPurchaseAttempt({ attempt: original, storage: s, send: first.send });
+    const retry = deferredSend();
+    const retryTask = runPurchaseAttempt({
+      attempt: readPurchaseAttempt({ merchantId: 'm', storage: s }),
+      storage: s,
+      send: retry.send,
+    });
+    retry.resolve({ supplierInvoice: { id: 'old-purchase' } });
+    await retryTask;
+    clearPurchaseAttempt({ merchantId: 'm', storage: s });
+    const newer = preparePurchaseAttempt(input(s));
+    const next = deferredSend();
+    const nextTask = runPurchaseAttempt({ attempt: newer, storage: s, send: next.send });
+    const before = readPurchaseAttempt({ merchantId: 'm', storage: s });
+    if (outcome === 'success') first.resolve({ supplierInvoice: { id: 'old-purchase' } });
+    else first.reject(Object.assign(new Error('unavailable'), { status: 503 }));
+    await firstTask;
+    const after = readPurchaseAttempt({ merchantId: 'm', storage: s });
+    next.resolve({ supplierInvoice: { id: 'new-purchase' } });
+    await nextTask;
+    expect(before.state).toBe('pending');
+    expect(before.commandId).toBe(newer.commandId);
+    expect(after).toEqual(before);
+    expect(readPurchaseAttempt({ merchantId: 'm', storage: s })).toMatchObject({
+      commandId: newer.commandId,
+      state: 'succeeded',
+      invoiceId: 'new-purchase',
+    });
+  },
+);
+
+it.each(['original', 'retry'])(
+  'keeps success terminal when the %s call succeeds before the other call fails',
+  async (winner) => {
+    const s = storage();
+    const original = preparePurchaseAttempt({
+      ...input(s),
+      parameters: { ...input(s).parameters, artifactBase64: 'abc' },
+    });
+    const first = deferredSend();
+    const firstTask = runPurchaseAttempt({ attempt: original, storage: s, send: first.send });
+    const retry = deferredSend();
+    const retryTask = runPurchaseAttempt({
+      attempt: readPurchaseAttempt({ merchantId: 'm', storage: s }),
+      storage: s,
+      send: retry.send,
+    });
+    const successful = winner === 'original' ? first : retry;
+    const successfulTask = winner === 'original' ? firstTask : retryTask;
+    const failing = winner === 'original' ? retry : first;
+    const failingTask = winner === 'original' ? retryTask : firstTask;
+    successful.resolve({ supplierInvoice: { id: 'committed' } });
+    await successfulTask;
+    const before = readPurchaseAttempt({ merchantId: 'm', storage: s });
+    failing.reject(Object.assign(new Error('unavailable'), { status: 503 }));
+    const lateResult = await failingTask;
+    expect(readPurchaseAttempt({ merchantId: 'm', storage: s })).toEqual(before);
+    expect(lateResult).toEqual(before);
+    expect(before.state).toBe('succeeded');
+    expect(before.envelope).toBeUndefined();
+  },
+);
+
+it.each(['success', 'failure'])(
+  'does not resurrect a cleared journal after a late %s',
+  async (outcome) => {
+    const s = storage();
+    const original = preparePurchaseAttempt(input(s));
+    const first = deferredSend();
+    const firstTask = runPurchaseAttempt({ attempt: original, storage: s, send: first.send });
+    const retry = deferredSend();
+    const retryTask = runPurchaseAttempt({
+      attempt: readPurchaseAttempt({ merchantId: 'm', storage: s }),
+      storage: s,
+      send: retry.send,
+    });
+    retry.resolve({ supplierInvoice: { id: 'committed' } });
+    await retryTask;
+    clearPurchaseAttempt({ merchantId: 'm', storage: s });
+    if (outcome === 'success') first.resolve({ supplierInvoice: { id: 'committed' } });
+    else first.reject(Object.assign(new Error('unavailable'), { status: 503 }));
+    await firstTask;
+    expect(readPurchaseAttempt({ merchantId: 'm', storage: s })).toBeNull();
+  },
+);
+
+it.each(['success', 'failure'])(
+  'keeps a definitive refusal terminal after the overlapping retry has a late %s',
+  async (outcome) => {
+    const s = storage();
+    const original = preparePurchaseAttempt(input(s));
+    const first = deferredSend();
+    const firstTask = runPurchaseAttempt({ attempt: original, storage: s, send: first.send });
+    const retry = deferredSend();
+    const retryTask = runPurchaseAttempt({
+      attempt: readPurchaseAttempt({ merchantId: 'm', storage: s }),
+      storage: s,
+      send: retry.send,
+    });
+    first.reject(Object.assign(new Error('invalid'), { status: 422 }));
+    await firstTask;
+    const before = readPurchaseAttempt({ merchantId: 'm', storage: s });
+    if (outcome === 'success') retry.resolve({ supplierInvoice: { id: 'late' } });
+    else retry.reject(Object.assign(new Error('unavailable'), { status: 503 }));
+    const lateResult = await retryTask;
+    expect(before.state).toBe('rejected');
+    expect(readPurchaseAttempt({ merchantId: 'm', storage: s })).toEqual(before);
+    expect(lateResult).toEqual(before);
+  },
+);

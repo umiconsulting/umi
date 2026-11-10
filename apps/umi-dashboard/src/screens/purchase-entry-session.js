@@ -60,6 +60,12 @@ function persist(a, storage) {
   storage.setItem(key(a.merchantId), JSON.stringify(a));
   return a;
 }
+function persistOutcome(next, storage) {
+  const owner = readPurchaseAttempt({ merchantId: next.merchantId, storage });
+  if (!owner || owner.commandId !== next.commandId) return next;
+  if (['succeeded', 'rejected'].includes(owner.state)) return owner;
+  return persist(next, storage);
+}
 export function preparePurchaseAttempt({
   merchantId,
   locationId,
@@ -130,8 +136,8 @@ export async function runPurchaseAttempt({ attempt, storage, send }) {
           state: 'rejected',
         }
       : { ...pending, state: 'ambiguous' };
-    persist(next, storage);
-    return { ...next, error };
+    const settled = persistOutcome(next, storage);
+    return settled === next ? { ...next, error } : settled;
   }
   const done = {
     version: 1,
@@ -141,6 +147,5 @@ export async function runPurchaseAttempt({ attempt, storage, send }) {
     state: 'succeeded',
     invoiceId: response?.supplierInvoice?.id || response?.result?.supplierInvoice?.id,
   };
-  persist(done, storage);
-  return done;
+  return persistOutcome(done, storage);
 }
