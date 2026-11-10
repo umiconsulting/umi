@@ -123,3 +123,76 @@ it('retains an unresolved original after a later permission refusal', async () =
   });
   expect(readPurchaseAttempt({ merchantId: 'm', storage: s }).state).toBe('ambiguous');
 });
+it('sends zero requests when the pending storage write fails', async () => {
+  const s = storage();
+  const a = preparePurchaseAttempt(input(s));
+  s.setItem = () => {
+    throw new Error('quota');
+  };
+  let sends = 0;
+  await expect(
+    runPurchaseAttempt({
+      attempt: a,
+      storage: s,
+      send: async () => {
+        sends++;
+      },
+    }),
+  ).rejects.toThrow();
+  expect(sends).toBe(0);
+});
+it.each(['INVENTORY_QUANTITY_NOT_EXACT', 'SUPPLIER_ARCHIVED', 'SUPPLIER_INVOICE_UNMATCHED_LINES'])(
+  'permits correction for a definitive first business refusal %s',
+  async (code) => {
+    const s = storage();
+    const a = preparePurchaseAttempt(input(s));
+    const result = await runPurchaseAttempt({
+      attempt: a,
+      storage: s,
+      send: async () => {
+        throw Object.assign(new Error(), { status: 409, code });
+      },
+    });
+    expect(result.state).toBe('rejected');
+    clearPurchaseAttempt({ merchantId: 'm', storage: s });
+    expect(preparePurchaseAttempt(input(s)).envelope.commandId).not.toBe(a.envelope.commandId);
+  },
+);
+it.each([
+  'ADMINISTRATIVE_COMMAND_RECOVERY_REQUIRED',
+  'ADMINISTRATIVE_COMMAND_FINGERPRINT_CONFLICT',
+  'IDEMPOTENCY_CONFLICT',
+])('retains an unresolved identity for %s', async (code) => {
+  const s = storage();
+  const a = preparePurchaseAttempt(input(s));
+  const result = await runPurchaseAttempt({
+    attempt: a,
+    storage: s,
+    send: async () => {
+      throw Object.assign(new Error(), { status: 409, code });
+    },
+  });
+  expect(result.state).toBe('ambiguous');
+  expect(result.envelope).toEqual(a.envelope);
+});
+it('retains a prior ambiguous request after a later known business refusal', async () => {
+  const s = storage();
+  const a = preparePurchaseAttempt(input(s));
+  await runPurchaseAttempt({
+    attempt: a,
+    storage: s,
+    send: async () => {
+      throw new Error('lost');
+    },
+  });
+  const prior = readPurchaseAttempt({ merchantId: 'm', storage: s });
+  const result = await runPurchaseAttempt({
+    attempt: prior,
+    storage: s,
+    send: async () => {
+      throw Object.assign(new Error(), { status: 409, code: 'SUPPLIER_ARCHIVED' });
+    },
+  });
+  expect(result.state).toBe('ambiguous');
+  expect(result.envelope).toEqual(a.envelope);
+});

@@ -27,14 +27,16 @@ export function buildPurchaseEntry({ draft, snapshot }) {
     errors.push(msg`Elige una fecha válida.`);
   if (
     draft.supplierId &&
-    !snapshot?.suppliers?.some((s) => s.id === draft.supplierId && !s.isArchived && !s.archivedAt)
+    !snapshot?.suppliers?.some(
+      (s) => s.id === draft.supplierId && s.active !== false && !s.isArchived && !s.archivedAt,
+    )
   )
     errors.push(msg`Elige un proveedor activo.`);
   if (!draft.lines?.length || draft.lines.length > 100)
     errors.push(msg`Agrega entre 1 y 100 filas.`);
   for (const row of draft.lines || []) {
     const item = snapshot?.items?.find(
-      (i) => i.id === row.inventoryItemId && !i.isArchived && !i.archivedAt,
+      (i) => i.id === row.inventoryItemId && i.active !== false && !i.isArchived && !i.archivedAt,
     );
     if (
       !item ||
@@ -85,4 +87,19 @@ export function buildPurchaseEntry({ draft, snapshot }) {
     errors,
     totalMinor: total <= MAX ? Number(total) : null,
   };
+}
+export function formatPurchaseMoney(minor, currency, locale) {
+  if (!Number.isSafeInteger(minor) || minor < 0) return '—';
+  const amount = BigInt(minor);
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+    .formatToParts(amount / 100n)
+    .map((part) =>
+      part.type === 'fraction' ? (amount % 100n).toString().padStart(2, '0') : part.value,
+    )
+    .join('');
 }

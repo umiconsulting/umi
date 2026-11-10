@@ -71,3 +71,27 @@ describe('exact purchase entry', () => {
     },
   );
 });
+it('rejects inactive references even without archive metadata', () => {
+  const d = draft();
+  d.supplierId = 's';
+  expect(
+    buildPurchaseEntry({
+      draft: d,
+      snapshot: { ...snapshot, suppliers: [{ id: 's', active: false }] },
+    }).errors.length,
+  ).toBeGreaterThan(0);
+  expect(
+    buildPurchaseEntry({
+      draft: draft(),
+      snapshot: { ...snapshot, items: [{ ...snapshot.items[0], active: false }] },
+    }).errors.length,
+  ).toBeGreaterThan(0);
+});
+it('prints exact cents at the safe integer limit', async () => {
+  const { formatPurchaseMoney } = await import('./purchase-entry-model.js');
+  expect(formatPurchaseMoney(Number.MAX_SAFE_INTEGER, 'MXN', 'es-MX')).toContain(
+    '90,071,992,547,409.91',
+  );
+  expect(formatPurchaseMoney(0, 'MXN', 'es-MX')).toContain('0.00');
+  expect(formatPurchaseMoney(1, 'USD', 'en-US')).toBe('$0.01');
+});

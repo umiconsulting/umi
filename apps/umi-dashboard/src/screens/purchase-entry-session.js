@@ -1,6 +1,23 @@
 import { t } from '@lingui/core/macro';
 import { validatePurchaseEnvelope } from './purchase-entry-photo.js';
 const key = (id) => `umi-purchase-attempt:${id}`;
+const definitiveBusinessRefusals = new Set([
+  'INVENTORY_QUANTITY_NOT_EXACT',
+  'INVENTORY_UNIT_CONVERSION_REQUIRED',
+  'INVENTORY_PURCHASE_ITEM_LIMIT',
+  'SUPPLIER_ARCHIVED',
+  'SUPPLIER_NOT_FOUND',
+  'SUPPLIER_INVOICE_REJECTED',
+  'SUPPLIER_INVOICE_HAS_NO_LINES',
+  'SUPPLIER_INVOICE_UNMATCHED_LINES',
+  'SUPPLIER_INVOICE_ALREADY_COMMITTED',
+  'INVENTORY_ITEM_ARCHIVED',
+  'STOCK_ITEM_ARCHIVED',
+  'INVENTORY_LOCATION_CHANGED',
+  'INVENTORY_LOCATION_SCOPE',
+  'PURCHASE_ORDER_LINE_TOTAL_MISMATCH',
+  'VALIDATION_FAILED',
+]);
 const states = ['prepared', 'pending', 'ambiguous', 'succeeded', 'rejected'];
 function invalid() {
   throw new Error(t`No se pudo recuperar la compra. Conserva esta pestaña y pide ayuda.`);
@@ -101,7 +118,9 @@ export async function runPurchaseAttempt({ attempt, storage, send }) {
     response = await send(pending.merchantId, structuredClone(pending.envelope));
   } catch (error) {
     const definitive =
-      current.state === 'prepared' && [400, 403, 404, 413, 422].includes(error?.status);
+      current.state === 'prepared' &&
+      ([400, 403, 404, 413, 422].includes(error?.status) ||
+        (error?.status === 409 && definitiveBusinessRefusals.has(error?.code)));
     const next = definitive
       ? {
           version: 1,
