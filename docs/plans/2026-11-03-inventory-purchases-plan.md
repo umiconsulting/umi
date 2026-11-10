@@ -118,7 +118,7 @@ expect(result.totalMinor).toBe(1563);
 
 ### Task 3: Integrated purchase verification and delivery evidence
 
-**Files:** durable API/browser tests and sanitized `docs/verification/2026-11-03-inventory-purchases/` evidence. Credentials and fixture scripts stay private under `/private/tmp`.
+**Files:** durable API/browser tests and sanitized `docs/verification/2026-11-03-inventory-purchases/` evidence. Credentials, fixture scripts and private logs stay under `/Users/moon/umi-purchase-recovery-20261104/test-stack`; sanitized review evidence is committed under `docs/verification/2026-11-03-inventory-purchases/`.
 
 - [ ] Read current LOCAL_VERIFICATION_PLAYBOOK. Use a new isolated PostgreSQL database, API/dashboard ports 4092/4093, and a dedicated headed CDP context/port 9227. Preserve all previous test services and databases.
 - [ ] Seed owner/approver, capture-only/restricted actor, second merchant, two branches, stock areas, quantity-scale 0/3/6 items, supplier and a reviewed XML fixture. Do not enable outbox/notifications.
