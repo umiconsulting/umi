@@ -1,7 +1,11 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { InventoryAuthoringItemUpdateRequest, ProductionRecord } from '../dist/index.js';
+import {
+  InventoryAuthoringItemUpdateRequest,
+  ProductionRecord,
+  RecordInventoryPurchaseRequest,
+} from '../dist/index.js';
 
 const result = spawnSync(
   process.env.DART_BIN ?? 'dart',
@@ -45,3 +49,23 @@ assert.deepEqual(productionPayloads.legacy, productionPayloads.legacyRoundTrip);
 assert.deepEqual(productionPayloads.planned, productionPayloads.plannedRoundTrip);
 assert.deepEqual(productionPayloads.null, productionPayloads.nullRoundTrip);
 console.log('Dart production plan constructors and round trips passed the server contract.');
+
+const purchase = spawnSync(
+  process.env.DART_BIN ?? 'dart',
+  [fileURLToPath(new URL('../test/dart/purchase_entry_test.dart', import.meta.url))],
+  { encoding: 'utf8' },
+);
+if (purchase.error) throw purchase.error;
+assert.equal(purchase.status, 0, purchase.stderr);
+const purchasePayloads = JSON.parse(purchase.stdout);
+assert.equal(Object.hasOwn(purchasePayloads.omitted, 'artifactBase64'), false);
+assert.equal(Object.hasOwn(purchasePayloads.null, 'artifactBase64'), true);
+assert.equal(purchasePayloads.null.artifactBase64, null);
+assert.equal(purchasePayloads.photo.artifactBase64, 'iVBORw0KGgo=');
+for (const payload of Object.values(purchasePayloads))
+  RecordInventoryPurchaseRequest.parse(payload);
+assert.deepEqual(purchasePayloads.omitted, purchasePayloads.omittedRoundTrip);
+assert.deepEqual(purchasePayloads.null, purchasePayloads.nullRoundTrip);
+console.log(
+  'Dart purchase omission, explicit null, photo and round trips passed the server contract.',
+);

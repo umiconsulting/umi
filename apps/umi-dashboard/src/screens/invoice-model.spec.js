@@ -59,7 +59,7 @@ describe('el estado del cotejo de una linea', () => {
     expect(i18n._(matchMethodLabel('history'))).toBe('Historial de líneas');
     expect(i18n._(matchMethodLabel('fuzzy'))).toBe('Nombre parecido');
     expect(i18n._(matchMethodLabel('manual'))).toBe('Cotejo manual');
-    expect(i18n._(matchMethodLabel('unmatched'))).toBe('Sin casar');
+    expect(i18n._(matchMethodLabel('unmatched'))).toBe('Sin artículo asignado');
   });
 
   it('no inventa una etiqueta para un metodo desconocido', () => {

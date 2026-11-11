@@ -162,6 +162,8 @@ export const DashboardAdministrativeOperation = z.enum([
   'inventory.invoice.upload',
   'inventory.invoice.match',
   'inventory.invoice.commit',
+  'inventory.purchase.record',
+  'inventory.invoice.receive_direct',
   'recovery.query_original',
 ]);
 

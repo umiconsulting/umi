@@ -1,0 +1,7 @@
+
+> @umi/contract@0.1.0 test:dart /Users/moon/Documents/umi-worktrees/inventory-purchases-20261104/packages/contract
+> node scripts/test-dart.mjs
+
+Dart scalar and collection constructors and round trips passed; all four payloads passed the server contract.
+Dart production plan constructors and round trips passed the server contract.
+Dart purchase omission, explicit null, photo and round trips passed the server contract.

@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "8753b02375fdd1fc114dc310022af6e2d64ac7fe84cf5b53dd2e66ec330ebc8d",
-  "contractVersion": "2.53.0",
+  "contentHash": "ae6b6095cbccb8d0da5579ccc406c44a2c2fcba40fef0bd31692ca32b8216df9",
+  "contractVersion": "2.54.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -916,6 +916,9 @@
             "SUPPLIER_INVOICE_UNMATCHED_LINES",
             "SUPPLIER_INVOICE_PARSE_FAILED",
             "SUPPLIER_INVOICE_ALREADY_COMMITTED",
+            "SUPPLIER_INVOICE_REJECTED",
+            "SUPPLIER_INVOICE_ARTIFACT_NOT_FOUND",
+            "INVENTORY_PURCHASE_ITEM_LIMIT",
             "SUPPLIER_INVOICE_ARTIFACT_TOO_LARGE",
             "SUPPLIER_INVOICE_ARTIFACT_UNSUPPORTED",
             "SUPPLIER_INVOICE_HAS_NO_LINES",
@@ -1156,6 +1159,9 @@
                 "SUPPLIER_INVOICE_UNMATCHED_LINES",
                 "SUPPLIER_INVOICE_PARSE_FAILED",
                 "SUPPLIER_INVOICE_ALREADY_COMMITTED",
+                "SUPPLIER_INVOICE_REJECTED",
+                "SUPPLIER_INVOICE_ARTIFACT_NOT_FOUND",
+                "INVENTORY_PURCHASE_ITEM_LIMIT",
                 "SUPPLIER_INVOICE_ARTIFACT_TOO_LARGE",
                 "SUPPLIER_INVOICE_ARTIFACT_UNSUPPORTED",
                 "SUPPLIER_INVOICE_HAS_NO_LINES",
@@ -31023,6 +31029,8 @@
             "inventory.invoice.upload",
             "inventory.invoice.match",
             "inventory.invoice.commit",
+            "inventory.purchase.record",
+            "inventory.invoice.receive_direct",
             "recovery.query_original"
           ],
           "type": "string"
@@ -31124,6 +31132,8 @@
         "inventory.invoice.upload",
         "inventory.invoice.match",
         "inventory.invoice.commit",
+        "inventory.purchase.record",
+        "inventory.invoice.receive_direct",
         "recovery.query_original"
       ],
       "type": "string"
@@ -74771,6 +74781,63 @@
       ],
       "type": "object"
     },
+    "PurchaseEntryContext": {
+      "additionalProperties": false,
+      "properties": {
+        "businessDate": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "inventoryLocations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "displayName": {
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "displayName"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "currency",
+        "businessDate",
+        "inventoryLocations"
+      ],
+      "type": "object"
+    },
+    "PurchaseEntryContextQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId"
+      ],
+      "type": "object"
+    },
     "PurchaseOrder": {
       "additionalProperties": false,
       "properties": {
@@ -74966,6 +75033,13 @@
           "minimum": -9007199254740991,
           "type": "integer"
         },
+        "origin": {
+          "enum": [
+            "order",
+            "direct_purchase"
+          ],
+          "type": "string"
+        },
         "publicReference": {
           "maxLength": 80,
           "minLength": 1,
@@ -75078,7 +75152,7 @@
                   ],
                   "type": "object"
                 },
-                "maxItems": 500,
+                "maxItems": 1000,
                 "type": "array"
               },
               "note": {
@@ -75149,18 +75223,39 @@
           "type": "string"
         },
         "supplierId": {
-          "format": "uuid",
-          "type": "string"
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "supplierName": {
-          "maxLength": 160,
-          "minLength": 1,
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "supplierReference": {
-          "maxLength": 80,
-          "minLength": 1,
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "updatedAt": {
           "format": "date-time",
@@ -75179,6 +75274,7 @@
         "supplierId",
         "supplierReference",
         "supplierName",
+        "origin",
         "publicReference",
         "status",
         "currency",
@@ -75547,6 +75643,13 @@
                 "minimum": -9007199254740991,
                 "type": "integer"
               },
+              "origin": {
+                "enum": [
+                  "order",
+                  "direct_purchase"
+                ],
+                "type": "string"
+              },
               "publicReference": {
                 "maxLength": 80,
                 "minLength": 1,
@@ -75659,7 +75762,7 @@
                         ],
                         "type": "object"
                       },
-                      "maxItems": 500,
+                      "maxItems": 1000,
                       "type": "array"
                     },
                     "note": {
@@ -75730,18 +75833,39 @@
                 "type": "string"
               },
               "supplierId": {
-                "format": "uuid",
-                "type": "string"
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "supplierName": {
-                "maxLength": 160,
-                "minLength": 1,
-                "type": "string"
+                "anyOf": [
+                  {
+                    "maxLength": 160,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "supplierReference": {
-                "maxLength": 80,
-                "minLength": 1,
-                "type": "string"
+                "anyOf": [
+                  {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "updatedAt": {
                 "format": "date-time",
@@ -75760,6 +75884,7 @@
               "supplierId",
               "supplierReference",
               "supplierName",
+              "origin",
               "publicReference",
               "status",
               "currency",
@@ -75930,7 +76055,7 @@
             ],
             "type": "object"
           },
-          "maxItems": 500,
+          "maxItems": 1000,
           "type": "array"
         },
         "note": {
@@ -76259,6 +76384,13 @@
               "minimum": -9007199254740991,
               "type": "integer"
             },
+            "origin": {
+              "enum": [
+                "order",
+                "direct_purchase"
+              ],
+              "type": "string"
+            },
             "publicReference": {
               "maxLength": 80,
               "minLength": 1,
@@ -76371,7 +76503,7 @@
                       ],
                       "type": "object"
                     },
-                    "maxItems": 500,
+                    "maxItems": 1000,
                     "type": "array"
                   },
                   "note": {
@@ -76442,18 +76574,39 @@
               "type": "string"
             },
             "supplierId": {
-              "format": "uuid",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "supplierName": {
-              "maxLength": 160,
-              "minLength": 1,
-              "type": "string"
+              "anyOf": [
+                {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "supplierReference": {
-              "maxLength": 80,
-              "minLength": 1,
-              "type": "string"
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "updatedAt": {
               "format": "date-time",
@@ -76472,6 +76625,7 @@
             "supplierId",
             "supplierReference",
             "supplierName",
+            "origin",
             "publicReference",
             "status",
             "currency",
@@ -77874,6 +78028,50 @@
         "expectedVersion",
         "purchaseOrderId",
         "lines"
+      ],
+      "type": "object"
+    },
+    "ReceiveSupplierInvoiceDirectRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "inventoryLocationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "supplierInvoiceId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "commandId",
+        "idempotencyKey",
+        "supplierInvoiceId",
+        "locationId",
+        "inventoryLocationId"
       ],
       "type": "object"
     },
@@ -79860,6 +80058,204 @@
         "conflicts",
         "provisionalMappings",
         "reconciliationRequired"
+      ],
+      "type": "object"
+    },
+    "RecordInventoryPurchaseLine": {
+      "additionalProperties": false,
+      "properties": {
+        "inventoryItemId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "quantity": {
+          "additionalProperties": false,
+          "properties": {
+            "scale": {
+              "maximum": 6,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "unit": {
+              "enum": [
+                "unit",
+                "gram",
+                "kilogram",
+                "milliliter",
+                "liter",
+                "portion",
+                "package",
+                "box"
+              ],
+              "type": "string"
+            },
+            "value": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "value",
+            "scale",
+            "unit"
+          ],
+          "type": "object"
+        },
+        "unitCostMinor": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "inventoryItemId",
+        "quantity",
+        "unitCostMinor"
+      ],
+      "type": "object"
+    },
+    "RecordInventoryPurchaseRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactBase64": {
+          "anyOf": [
+            {
+              "maxLength": 960000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "folio": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "inventoryLocationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "issuedOn": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "lines": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "inventoryItemId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "quantity": {
+                "additionalProperties": false,
+                "properties": {
+                  "scale": {
+                    "maximum": 6,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "unit": {
+                    "enum": [
+                      "unit",
+                      "gram",
+                      "kilogram",
+                      "milliliter",
+                      "liter",
+                      "portion",
+                      "package",
+                      "box"
+                    ],
+                    "type": "string"
+                  },
+                  "value": {
+                    "maximum": 9007199254740991,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "value",
+                  "scale",
+                  "unit"
+                ],
+                "type": "object"
+              },
+              "unitCostMinor": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "inventoryItemId",
+              "quantity",
+              "unitCostMinor"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "type": "array"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "supplierId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "commandId",
+        "idempotencyKey",
+        "locationId",
+        "inventoryLocationId",
+        "issuedOn",
+        "currency",
+        "lines"
       ],
       "type": "object"
     },
@@ -99049,6 +99445,9 @@
             }
           ]
         },
+        "hasArtifact": {
+          "type": "boolean"
+        },
         "id": {
           "format": "uuid",
           "type": "string"
@@ -99296,7 +99695,34 @@
         "totalMinor",
         "source",
         "status",
+        "hasArtifact",
         "lines",
+        "correlationId"
+      ],
+      "type": "object"
+    },
+    "SupplierInvoiceArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "contentType": {
+          "enum": [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+          ],
+          "type": "string"
+        },
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "dataBase64": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contentType",
+        "dataBase64",
         "correlationId"
       ],
       "type": "object"
@@ -99704,6 +100130,9 @@
                   }
                 ]
               },
+              "hasArtifact": {
+                "type": "boolean"
+              },
               "id": {
                 "format": "uuid",
                 "type": "string"
@@ -99951,6 +100380,7 @@
               "totalMinor",
               "source",
               "status",
+              "hasArtifact",
               "lines",
               "correlationId"
             ],
@@ -106649,6 +107079,10 @@
       "public": true,
       "retryable": false
     },
+    "INVENTORY_PURCHASE_ITEM_LIMIT": {
+      "public": true,
+      "retryable": false
+    },
     "INVENTORY_QUANTITY_NOT_EXACT": {
       "public": true,
       "retryable": false
@@ -106949,6 +107383,10 @@
       "public": true,
       "retryable": false
     },
+    "SUPPLIER_INVOICE_ARTIFACT_NOT_FOUND": {
+      "public": true,
+      "retryable": false
+    },
     "SUPPLIER_INVOICE_ARTIFACT_TOO_LARGE": {
       "public": true,
       "retryable": false
@@ -106978,6 +107416,10 @@
       "retryable": false
     },
     "SUPPLIER_INVOICE_PARSE_FAILED": {
+      "public": true,
+      "retryable": false
+    },
+    "SUPPLIER_INVOICE_REJECTED": {
       "public": true,
       "retryable": false
     },
@@ -107522,6 +107964,22 @@
       "request": "PrepListQuery",
       "response": null
     },
+    "GET /api/merchants/:merchantId/purchase-entry-context": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "VALIDATION_FAILED"
+      ],
+      "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "merchant.manage",
+      "pin": false,
+      "request": "PurchaseEntryContextQuery",
+      "response": "PurchaseEntryContext"
+    },
     "GET /api/merchants/:merchantId/purchase-orders": {
       "approval": false,
       "auth": "session",
@@ -107633,6 +108091,23 @@
       "pin": false,
       "request": "SupplierInvoiceQuery",
       "response": "SupplierInvoiceList"
+    },
+    "GET /api/merchants/:merchantId/supplier-invoices/:supplierInvoiceId/artifact": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "VALIDATION_FAILED",
+        "SUPPLIER_INVOICE_ARTIFACT_NOT_FOUND"
+      ],
+      "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "merchant.manage",
+      "pin": false,
+      "request": null,
+      "response": "SupplierInvoiceArtifact"
     },
     "GET /api/merchants/:merchantId/suppliers": {
       "approval": false,

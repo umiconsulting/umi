@@ -699,6 +699,9 @@ export const API_ERROR_CODES = [
   // the wire by the generic code for its status, so an operator who needed to read
   // "this line has no match" would have been shown "conflict" instead.
   'SUPPLIER_INVOICE_ALREADY_COMMITTED',
+  'SUPPLIER_INVOICE_REJECTED',
+  'SUPPLIER_INVOICE_ARTIFACT_NOT_FOUND',
+  'INVENTORY_PURCHASE_ITEM_LIMIT',
   'SUPPLIER_INVOICE_ARTIFACT_TOO_LARGE',
   'SUPPLIER_INVOICE_ARTIFACT_UNSUPPORTED',
   'SUPPLIER_INVOICE_HAS_NO_LINES',

@@ -1,0 +1,100 @@
+TAP version 13
+# Subtest: manual purchase accepts no supplier or artifact
+ok 1 - manual purchase accepts no supplier or artifact
+  ---
+  duration_ms: 1.894042
+  type: 'test'
+  ...
+# Subtest: manual purchase treats an explicit null photo as no artifact
+ok 2 - manual purchase treats an explicit null photo as no artifact
+  ---
+  duration_ms: 0.122209
+  type: 'test'
+  ...
+# Subtest: purchase refuses more than 100 rows, invalid dates and unsafe amounts
+ok 3 - purchase refuses more than 100 rows, invalid dates and unsafe amounts
+  ---
+  duration_ms: 1.315167
+  type: 'test'
+  ...
+# Subtest: purchase artifact enforces the final photo byte limit
+ok 4 - purchase artifact enforces the final photo byte limit
+  ---
+  duration_ms: 4.383834
+  type: 'test'
+  ...
+# Subtest: direct receive accepts identity and destination, refuses client replacement lines
+ok 5 - direct receive accepts identity and destination, refuses client replacement lines
+  ---
+  duration_ms: 0.082083
+  type: 'test'
+  ...
+# Subtest: manual purchase preserves repeated items with separate prices
+ok 6 - manual purchase preserves repeated items with separate prices
+  ---
+  duration_ms: 0.258834
+  type: 'test'
+  ...
+# Subtest: ordinary orders still require a supplier
+ok 7 - ordinary orders still require a supplier
+  ---
+  duration_ms: 0.113583
+  type: 'test'
+  ...
+# Subtest: RecordInventoryPurchaseLine publishes positive quantity and nonnegative cost bounds
+not ok 8 - RecordInventoryPurchaseLine publishes positive quantity and nonnegative cost bounds
+  ---
+  duration_ms: 10.265583
+  type: 'test'
+  location: '/Users/moon/Documents/umi-worktrees/inventory-purchases-20261104/packages/contract/test/purchase-entry.test.mjs:108:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + -9007199254740991
+    - 1
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: -9007199254740991
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/moon/Documents/umi-worktrees/inventory-purchases-20261104/packages/contract/test/purchase-entry.test.mjs:112:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: RecordInventoryPurchaseRequest publishes positive quantity and nonnegative cost bounds
+not ok 9 - RecordInventoryPurchaseRequest publishes positive quantity and nonnegative cost bounds
+  ---
+  duration_ms: 8.769583
+  type: 'test'
+  location: '/Users/moon/Documents/umi-worktrees/inventory-purchases-20261104/packages/contract/test/purchase-entry.test.mjs:108:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + -9007199254740991
+    - 1
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: -9007199254740991
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/moon/Documents/umi-worktrees/inventory-purchases-20261104/packages/contract/test/purchase-entry.test.mjs:112:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 7
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 87.101208

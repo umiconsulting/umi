@@ -3,6 +3,7 @@ import {
   CancelPurchaseOrderRequest,
   CreatePurchaseOrderRequest,
   CreateSupplierRequest,
+  PurchaseEntryContextQuery,
   PurchaseOrderQuery,
   PurchaseOrderScopeQuery,
   ReceivePurchaseOrderRequest,
@@ -167,5 +168,26 @@ export class SupplierInvoiceController {
     @Query(new ZodValidationPipe(SupplierInvoiceQuery)) query: SupplierInvoiceQuery,
   ) {
     return this.procurement.listSupplierInvoices(access, query);
+  }
+
+  @Get(':supplierInvoiceId/artifact')
+  artifact(@Merchant() access: MerchantAccess, @Param('supplierInvoiceId') invoiceId: string) {
+    return this.procurement.supplierInvoiceArtifact(access, invoiceId);
+  }
+}
+
+@RequireProduct('dashboard')
+@RequirePermission('merchant.manage')
+@UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard)
+@Controller('api/merchants/:merchantId/purchase-entry-context')
+export class PurchaseEntryContextController {
+  constructor(private readonly procurement: ProcurementService) {}
+
+  @Get()
+  context(
+    @Merchant() access: MerchantAccess,
+    @Query(new ZodValidationPipe(PurchaseEntryContextQuery)) query: PurchaseEntryContextQuery,
+  ) {
+    return this.procurement.purchaseEntryContext(access, query);
   }
 }

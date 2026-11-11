@@ -26,6 +26,8 @@ import {
   RefundPreviewRequest,
   SaleExceptionCommand,
   SubmitInventoryCountRequest,
+  RecordInventoryPurchaseRequest,
+  ReceiveSupplierInvoiceDirectRequest,
   SupplierInvoiceCommitRequest,
   SupplierInvoiceMatchRequest,
   SupplierInvoiceUploadRequest,
@@ -34,6 +36,7 @@ import {
 } from '@umi/contract';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { ProcurementService } from '../procurement/procurement.service';
+import { PurchaseEntryService } from '../procurement/purchase-entry.service';
 import { PosEntryService } from '../pos-entry/pos-entry.service';
 import {
   exceptionCommandFingerprint,
@@ -68,6 +71,7 @@ export class AdministrativeCommandExecutionService {
      * which exports it application-wide for exactly this door.
      */
     private readonly procurement?: ProcurementService,
+    private readonly purchaseEntry?: PurchaseEntryService,
   ) {}
 
   async execute(
@@ -566,6 +570,32 @@ export class AdministrativeCommandExecutionService {
           // `commandId`/`idempotencyKey` in `parameters`, the way the contract's
           // `SupplierInvoice*Request` models define them, so the target aggregate and
           // the version are injected from the COMMAND exactly as the authoring cases do.
+          case 'inventory.purchase.record': {
+            if (!this.purchaseEntry) throw new Error('purchase_entry_service_unavailable');
+            return this.purchaseEntry.recordPurchase(
+              user,
+              access,
+              persisted ?? context,
+              this.authoringDto<RecordInventoryPurchaseRequest>(
+                RecordInventoryPurchaseRequest,
+                request,
+                {},
+              ),
+            );
+          }
+          case 'inventory.invoice.receive_direct': {
+            if (!this.purchaseEntry) throw new Error('purchase_entry_service_unavailable');
+            return this.purchaseEntry.receiveInvoiceDirect(
+              user,
+              access,
+              persisted ?? context,
+              this.authoringDto<ReceiveSupplierInvoiceDirectRequest>(
+                ReceiveSupplierInvoiceDirectRequest,
+                request,
+                { supplierInvoiceId: request.targetAggregateId },
+              ),
+            );
+          }
           case 'inventory.invoice.upload': {
             const service = this.invoiceService();
             return service.uploadSupplierInvoice(

@@ -195,6 +195,8 @@ export const ADMINISTRATIVE_COMMAND_POLICIES: readonly AdministrativeCommandPoli
   policy('inventory.invoice.upload', DASHBOARD, 'inventory.invoice.capture'),
   policy('inventory.invoice.match', DASHBOARD, 'inventory.invoice.capture'),
   policy('inventory.invoice.commit', DASHBOARD, 'inventory.invoice.approve'),
+  policy('inventory.purchase.record', DASHBOARD, 'inventory.invoice.approve'),
+  policy('inventory.invoice.receive_direct', DASHBOARD, 'inventory.invoice.approve'),
   policy('recovery.query_original', DASHBOARD_AND_POS, 'audit.read'),
 ] as const;
 

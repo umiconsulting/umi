@@ -31,3 +31,15 @@ describe('administrative command policy', () => {
     expect(administrativeCommandPolicy('refund.approval')).toMatchObject({ stepUp: true });
   });
 });
+
+describe('purchase entry authority', () => {
+  it.each(['inventory.purchase.record', 'inventory.invoice.receive_direct'])(
+    '%s requires invoice approval in dashboard context',
+    (operation) => {
+      expect(administrativeCommandPolicy(operation)).toMatchObject({
+        permission: 'inventory.invoice.approve',
+        contexts: ['dashboard_administrative'],
+      });
+    },
+  );
+});

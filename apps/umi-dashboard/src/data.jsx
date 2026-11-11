@@ -2801,3 +2801,45 @@ export function useSupplierInvoiceInbox(options, refresh) {
     EMPTY_SUPPLIER_INVOICE_INBOX,
   );
 }
+
+// eslint-disable-next-line react-refresh/only-export-components
+export async function fetchPurchaseEntrySnapshot(merchantId, locationId) {
+  if (!merchantId || !locationId) throw new Error(t`Elige una sucursal para registrar la compra.`);
+  const [context, items, suppliers] = await Promise.all([
+    _apiFetch(
+      `${buildPath('procurement.purchaseEntryContext', { merchantId })}?${new URLSearchParams({ locationId })}`,
+    ),
+    loadPreparationPages((cursor) => {
+      const query = new URLSearchParams({
+        limit: '100',
+
+        includeItemsWithoutCost: 'true',
+      });
+      if (cursor) query.set('cursor', cursor);
+      return _apiFetch(`${routes.inventory.items(merchantId)}?${query}`);
+    }, 'items'),
+    loadPreparationPages((cursor) => {
+      const query = new URLSearchParams({ limit: '100' });
+      if (cursor) query.set('cursor', cursor);
+      return _apiFetch(`${buildPath('procurement.supplierList', { merchantId })}?${query}`);
+    }, 'suppliers'),
+  ]);
+  if (context.locationId !== locationId)
+    throw new Error(t`La sucursal cambió. Abre la compra de nuevo.`);
+  return { merchantId, context, items, suppliers };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export async function fetchSupplierInvoiceArtifact(merchantId, supplierInvoiceId) {
+  return _apiFetch(
+    buildPath('procurement.supplierInvoiceArtifact', { merchantId, supplierInvoiceId }),
+  );
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export async function sendPurchaseEntryAttempt(merchantId, envelope) {
+  return _apiFetch(routes.merchants.administrativeCommands(merchantId), {
+    method: 'POST',
+    body: JSON.stringify(envelope),
+  });
+}

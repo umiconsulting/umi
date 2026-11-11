@@ -3,12 +3,15 @@ import { OperationsModule } from '../../shared/operations/operations.module';
 import { AuthModule } from '../auth/auth.module';
 import { IntegrityModule } from '../integrity/integrity.module';
 import {
+  PurchaseEntryContextController,
   PurchaseOrderController,
   SupplierController,
   SupplierInvoiceController,
 } from './procurement.controller';
 import { ProcurementRepository } from './procurement.repository';
 import { ProcurementService } from './procurement.service';
+import { PurchaseEntryRepository } from './purchase-entry.repository';
+import { PurchaseEntryService } from './purchase-entry.service';
 
 /**
  * Purchasing (plan §8E step 3, and the supplier invoice of plan §10). The controllers
@@ -28,8 +31,18 @@ import { ProcurementService } from './procurement.service';
   // Named here for the reason `tender.module.ts` gives: the module's own graph must
   // carry the metric registry, not rely on a global registration elsewhere.
   imports: [AuthModule, IntegrityModule, OperationsModule],
-  controllers: [SupplierController, PurchaseOrderController, SupplierInvoiceController],
-  providers: [ProcurementRepository, ProcurementService],
-  exports: [ProcurementRepository, ProcurementService],
+  controllers: [
+    PurchaseEntryContextController,
+    SupplierController,
+    PurchaseOrderController,
+    SupplierInvoiceController,
+  ],
+  providers: [
+    ProcurementRepository,
+    ProcurementService,
+    PurchaseEntryRepository,
+    PurchaseEntryService,
+  ],
+  exports: [ProcurementRepository, ProcurementService, PurchaseEntryService],
 })
 export class ProcurementModule {}

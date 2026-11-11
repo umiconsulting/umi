@@ -187,6 +187,14 @@ msgstr "Could not read the cost"
 msgid "No se pudieron cargar todos los productos. Vuelve a intentar."
 msgstr "Could not load all products. Try again."
 
+#: src/data.jsx
+msgid "Elige una sucursal para registrar la compra."
+msgstr "Choose a branch to record the purchase."
+
+#: src/data.jsx
+msgid "La sucursal cambió. Abre la compra de nuevo."
+msgstr "The branch changed. Open the purchase again."
+
 #: src/lib/auth.jsx
 msgid "Credenciales incorrectas"
 msgstr "Incorrect credentials"
@@ -829,6 +837,7 @@ msgstr "Open café"
 #: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/orders.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recibos.jsx
 #: src/screens/recipe-workspace.jsx
 #: src/screens/settings.jsx
@@ -907,6 +916,7 @@ msgstr "Password · 8 characters or more"
 #: src/screens/inventory-production.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/members.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 #: src/screens/sales-analysis-groups.jsx
 #: src/screens/settings.jsx
@@ -1178,6 +1188,7 @@ msgstr "Enter a CLABE or account number. You can save both."
 #: src/screens/caja-turnos.jsx
 #: src/screens/devices.jsx
 #: src/screens/hours.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/reset-password.jsx
 #: src/screens/sales-analysis-groups.jsx
 #: src/screens/settings.jsx
@@ -1290,6 +1301,7 @@ msgstr "No shift matches the filter."
 #: src/screens/category-sales.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/orders.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recibos.jsx
 #: src/screens/ventas-report.jsx
 msgid "Total"
@@ -2265,6 +2277,7 @@ msgid "Sellos (1–{maxSeals})"
 msgstr "Stamps (1–{maxSeals})"
 
 #: src/screens/customers.jsx
+#: src/screens/purchase-entry-dialog.jsx
 msgid "Nota (opcional)"
 msgstr "Note (optional)"
 
@@ -2574,6 +2587,7 @@ msgstr "No location"
 #: src/screens/device-utils.js
 #: src/screens/devices.jsx
 #: src/screens/inventory-count.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/staff.jsx
 #: src/shell.jsx
@@ -4288,6 +4302,7 @@ msgid "Pueden hacer pedidos de prueba aunque el negocio esté cerrado o en pausa
 msgstr "They can place test orders even when the business is closed or paused."
 
 #: src/screens/hours.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/settings.jsx
 msgid "Quitar"
 msgstr "Remove"
@@ -4400,6 +4415,7 @@ msgstr "Save adjustment"
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 #: src/screens/variance.jsx
 msgid "pza"
@@ -4409,6 +4425,7 @@ msgstr "ea"
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 #: src/screens/variance.jsx
 msgid "g"
@@ -4418,6 +4435,7 @@ msgstr "g"
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 #: src/screens/variance.jsx
 msgid "kg"
@@ -4427,6 +4445,7 @@ msgstr "kg"
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 #: src/screens/variance.jsx
 msgid "ml"
@@ -4436,6 +4455,7 @@ msgstr "ml"
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 #: src/screens/variance.jsx
 msgid "L"
@@ -4445,6 +4465,7 @@ msgstr "L"
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 #: src/screens/variance.jsx
 msgid "porción"
@@ -4454,6 +4475,7 @@ msgstr "portion"
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 #: src/screens/variance.jsx
 msgid "paquete"
@@ -4463,6 +4485,7 @@ msgstr "pack"
 #: src/screens/inventory-costing.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 #: src/screens/variance.jsx
 msgid "caja"
@@ -4981,6 +5004,7 @@ msgstr "The cost uses the weighted average of received purchases. With no purcha
 
 #: src/screens/inventory-costing.jsx
 #: src/screens/prep-list.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 msgid "Artículo"
 msgstr "Item"
@@ -5502,7 +5526,9 @@ msgid "Nombre y código"
 msgstr "Name and code"
 
 #. placeholder {0}: error.rowNumber
+#. placeholder {0}: index + 1
 #: src/screens/inventory-import-table.jsx
+#: src/screens/purchase-entry-dialog.jsx
 msgid "Fila {0}"
 msgstr "Row {0}"
 
@@ -6060,6 +6086,7 @@ msgstr "Item to prepare"
 
 #: src/screens/inventory-production.jsx
 #: src/screens/invoice-inbox.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 msgid "Elige un artículo"
 msgstr "Choose an item"
@@ -6324,8 +6351,48 @@ msgid "Sin resultados"
 msgstr "No results"
 
 #: src/screens/invoice-inbox.jsx
-msgid "La factura tiene líneas sin casar. Casa cada línea marcada antes de registrar la entrada."
-msgstr "The invoice has lines with no match. Match every marked line before you register the receipt."
+#~ msgid "Proveedor sin identificar"
+#~ msgstr "Unidentified supplier"
+
+#: src/screens/invoice-inbox.jsx
+#~ msgid "Esta línea no está casada. Casa la línea antes de registrar la entrada."
+#~ msgstr "This line has no match. Match the line before you register the receipt."
+
+#: src/screens/invoice-inbox.jsx
+#~ msgid "Casa cada línea antes de registrar la entrada."
+#~ msgstr "Match every line before you register the receipt."
+
+#: src/screens/invoice-inbox.jsx
+#~ msgid "La factura tiene líneas sin casar. Casa cada línea marcada antes de registrar la entrada."
+#~ msgstr "The invoice has lines with no match. Match every marked line before you register the receipt."
+
+#. placeholder {0}: line.lineNumber
+#: src/screens/invoice-inbox.jsx
+#~ msgid "Casar la línea {0}"
+#~ msgstr "Match line {0}"
+
+#: src/screens/invoice-inbox.jsx
+#~ msgid "Esta línea no está casada. Asigna un artículo antes de registrar la entrada."
+#~ msgstr "Assign an item to this line before recording the receipt."
+
+#. placeholder {0}: tally.unmatched
+#: src/screens/invoice-inbox.jsx
+#~ msgid "{0, plural, one {# línea sin casar} other {# líneas sin casar}}"
+#~ msgstr "{0, plural, one {# unmatched line} other {# unmatched lines}}"
+
+#. placeholder {0}: tally.matched
+#: src/screens/invoice-inbox.jsx
+#~ msgid "{0, plural, one {# línea casada} other {# líneas casadas}}"
+#~ msgstr "{0, plural, one {# matched line} other {# matched lines}}"
+
+#: src/screens/invoice-inbox.jsx
+#: src/screens/invoice-model.js
+#~ msgid "Sin casar"
+#~ msgstr "Unmatched"
+
+#: src/screens/invoice-inbox.jsx
+msgid "La factura tiene líneas sin artículo asignado. Asigna un artículo a cada línea marcada antes de registrar la entrada."
+msgstr "The invoice has lines with no assigned item. Assign an item to each marked line before you register the receipt."
 
 #: src/screens/invoice-inbox.jsx
 msgid "La factura ya no existe. Recarga la lista."
@@ -6354,8 +6421,8 @@ msgstr "You cannot manage the invoices."
 
 #. placeholder {0}: line.lineNumber
 #: src/screens/invoice-inbox.jsx
-msgid "Casar la línea {0}"
-msgstr "Match line {0}"
+msgid "Asignar artículo a la línea {0}"
+msgstr "Assign an item to line {0}"
 
 #: src/screens/invoice-inbox.jsx
 msgid "Descripción del proveedor"
@@ -6395,8 +6462,9 @@ msgid "Sin folio"
 msgstr "No folio"
 
 #: src/screens/invoice-inbox.jsx
-msgid "Proveedor sin identificar"
-msgstr "Unidentified supplier"
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Sin proveedor"
+msgstr "No supplier"
 
 #: src/screens/invoice-inbox.jsx
 msgid "Pedido de compra"
@@ -6407,8 +6475,8 @@ msgid "Elige un pedido"
 msgstr "Choose an order"
 
 #: src/screens/invoice-inbox.jsx
-msgid "Esta línea no está casada. Casa la línea antes de registrar la entrada."
-msgstr "This line has no match. Match the line before you register the receipt."
+msgid "Esta línea no tiene artículo asignado. Asigna un artículo antes de registrar la entrada."
+msgstr "This line has no assigned item. Assign an item before you register the receipt."
 
 #: src/screens/invoice-inbox.jsx
 msgid "El pedido no tiene una línea para este artículo."
@@ -6434,12 +6502,29 @@ msgstr "Received quantity of line {0}"
 
 #. placeholder {0}: tally.unmatched
 #: src/screens/invoice-inbox.jsx
-msgid "{0, plural, one {# línea sin casar} other {# líneas sin casar}}"
-msgstr "{0, plural, one {# unmatched line} other {# unmatched lines}}"
+msgid "{0, plural, one {# línea sin artículo asignado} other {# líneas sin artículo asignado}}"
+msgstr "{0, plural, one {# line with no assigned item} other {# lines with no assigned item}}"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Comprobante de la compra"
+msgstr "Purchase receipt"
+
+#: src/screens/invoice-inbox.jsx
+msgid "No se pudo abrir el comprobante. Cierra y vuelve a intentar."
+msgstr "Could not open the receipt. Close and try again."
+
+#: src/screens/invoice-inbox.jsx
+msgid "Cargando comprobante…"
+msgstr "Loading receipt…"
 
 #: src/screens/invoice-inbox.jsx
 msgid "Cargando las facturas…"
 msgstr "Loading the invoices…"
+
+#: src/screens/invoice-inbox.jsx
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Registrar compra"
+msgstr "Record purchase"
 
 #: src/screens/invoice-inbox.jsx
 msgid "Subir factura XML"
@@ -6491,8 +6576,8 @@ msgstr "Tax {0}"
 
 #. placeholder {0}: tally.matched
 #: src/screens/invoice-inbox.jsx
-msgid "{0, plural, one {# línea casada} other {# líneas casadas}}"
-msgstr "{0, plural, one {# matched line} other {# matched lines}}"
+msgid "{0, plural, one {# línea con artículo asignado} other {# líneas con artículo asignado}}"
+msgstr "{0, plural, one {# line with an assigned item} other {# lines with an assigned item}}"
 
 #. placeholder {0}: tally.priceChanged
 #: src/screens/invoice-inbox.jsx
@@ -6510,6 +6595,7 @@ msgstr "No."
 
 #: src/screens/invoice-inbox.jsx
 #: src/screens/operations-workspace.jsx
+#: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 msgid "Cantidad"
 msgstr "Quantity"
@@ -6531,8 +6617,8 @@ msgstr "SKU {0}"
 
 #: src/screens/invoice-inbox.jsx
 #: src/screens/invoice-model.js
-msgid "Sin casar"
-msgstr "Unmatched"
+msgid "Sin artículo asignado"
+msgstr "No assigned item"
 
 #: src/screens/invoice-inbox.jsx
 msgid "Cambió el precio"
@@ -6548,8 +6634,25 @@ msgid "Artículo sin nombre en la respuesta"
 msgstr "Item with no name in the response"
 
 #: src/screens/invoice-inbox.jsx
-msgid "Casa cada línea antes de registrar la entrada."
-msgstr "Match every line before you register the receipt."
+msgid "Ver comprobante"
+msgstr "View receipt"
+
+#: src/screens/invoice-inbox.jsx
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Registrar compra del XML"
+msgstr "Record XML purchase"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Recibir contra un pedido"
+msgstr "Receive against an order"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Asigna un artículo a cada línea antes de registrar la entrada."
+msgstr "Assign an item to each line before recording the receipt."
+
+#: src/screens/invoice-model.js
+#~ msgid "Casada"
+#~ msgstr "Matched"
 
 #: src/screens/invoice-model.js
 msgid "Cotejo recordado"
@@ -6576,8 +6679,8 @@ msgid "Leída"
 msgstr "Read"
 
 #: src/screens/invoice-model.js
-msgid "Casada"
-msgstr "Matched"
+msgid "Artículos asignados"
+msgstr "Items assigned"
 
 #: src/screens/invoice-model.js
 msgid "Registrada"
@@ -9174,6 +9277,257 @@ msgstr "Sign-in method"
 msgid "La sesión se renueva"
 msgstr "Session renews"
 
+#: src/screens/purchase-entry-dialog.jsx
+#: src/screens/purchase-entry-session.js
+msgid "No se pudo recuperar la compra. Conserva esta pestaña y pide ayuda."
+msgstr "Could not recover the purchase. Keep this tab open and ask for help."
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "No se pudieron cargar los artículos, proveedores o destinos. Cierra y vuelve a intentar."
+msgstr "Could not load the items, suppliers or destinations. Close and try again."
+
+#: src/screens/purchase-entry-dialog.jsx
+#: src/screens/purchase-entry-model.js
+msgid "Elige dónde entra el inventario."
+msgstr "Choose where to receive the inventory."
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Asigna un artículo activo a cada línea antes de registrar la compra."
+msgstr "Assign an active item to each line before recording the purchase."
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Sucursal original"
+msgstr "Original branch"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "No se pudo confirmar el resultado. Reintenta esta misma compra."
+msgstr "Could not confirm the result. Retry this same purchase."
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "No se pudo guardar la compra. Revisa los datos y los permisos antes de corregirla."
+msgstr "Could not save the purchase. Check the details and permissions before correcting it."
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "No se pudo conservar o enviar la compra. Conserva esta pestaña y vuelve a intentar."
+msgstr "Could not retain or send the purchase. Keep this tab open and try again."
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Reintenta la compra pendiente antes de continuar."
+msgstr "Retry the pending purchase before continuing."
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Compra pendiente"
+msgstr "Pending purchase"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "La compra quedó registrada."
+msgstr "The purchase was recorded."
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "La compra no se guardó. Puedes corregir los datos."
+msgstr "The purchase was not saved. You can correct the details."
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Hay una compra pendiente en esta pestaña. Revisa sus datos antes de continuar."
+msgstr "There is a pending purchase in this tab. Check its details before continuing."
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Destino"
+msgstr "Destination"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Destino original"
+msgstr "Original destination"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "filas"
+msgstr "rows"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Artículo de la compra original"
+msgstr "Item from the original purchase"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Comprobante de la compra pendiente"
+msgstr "Pending purchase receipt"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Reintentar la misma compra"
+msgstr "Retry the same purchase"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Descartar compra sin enviar"
+msgstr "Discard unsent purchase"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Cerrar compra"
+msgstr "Close purchase"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Corregir compra"
+msgstr "Correct purchase"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Cargando artículos, proveedores y destinos…"
+msgstr "Loading items, suppliers and destinations…"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Fecha de compra"
+msgstr "Purchase date"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Dónde entra el inventario"
+msgstr "Where to receive inventory"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Elige un destino"
+msgstr "Choose a destination"
+
+#. placeholder {0}: index + 1
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Artículo {0}"
+msgstr "Item {0}"
+
+#. placeholder {0}: index + 1
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Cantidad {0}"
+msgstr "Quantity {0}"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Unidad del artículo"
+msgstr "Item unit"
+
+#: src/screens/purchase-entry-dialog.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Costo por unidad"
+msgstr "Cost per unit"
+
+#. placeholder {0}: index + 1
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Costo por unidad {0}"
+msgstr "Unit cost {0}"
+
+#. placeholder {0}: index + 1
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Quitar fila {0}"
+msgstr "Remove row {0}"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Agregar fila"
+msgstr "Add row"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Proveedor (opcional)"
+msgstr "Supplier (optional)"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Referencia (opcional)"
+msgstr "Reference (optional)"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Foto del comprobante (opcional)"
+msgstr "Receipt photo (optional)"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Preparando la foto…"
+msgstr "Preparing photo…"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Vista previa del comprobante"
+msgstr "Receipt preview"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Revisa que la foto se pueda leer antes de guardar."
+msgstr "Check that the photo is readable before saving."
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Quitar foto"
+msgstr "Remove photo"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Revisa la fecha, el destino, los artículos y el total. Guarda para registrar la entrada."
+msgstr "Check the date, destination, items and total. Save to record the receipt."
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Editar compra"
+msgstr "Edit purchase"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Guardar compra"
+msgstr "Save purchase"
+
+#: src/screens/purchase-entry-dialog.jsx
+msgid "Revisar compra"
+msgstr "Review purchase"
+
+#: src/screens/purchase-entry-model.js
+msgid "Elige una fecha válida."
+msgstr "Choose a valid date."
+
+#: src/screens/purchase-entry-model.js
+msgid "Elige un proveedor activo."
+msgstr "Choose an active supplier."
+
+#: src/screens/purchase-entry-model.js
+msgid "Agrega entre 1 y 100 filas."
+msgstr "Add between 1 and 100 rows."
+
+#: src/screens/purchase-entry-model.js
+msgid "Elige un artículo activo en cada fila."
+msgstr "Choose an active item in each row."
+
+#: src/screens/purchase-entry-model.js
+msgid "Revisa la cantidad y el costo. Usa punto para los decimales."
+msgstr "Check the quantity and cost. Use a period for decimals."
+
+#: src/screens/purchase-entry-model.js
+msgid "El importe es demasiado grande."
+msgstr "The amount is too large."
+
+#: src/screens/purchase-entry-model.js
+msgid "El total es demasiado grande."
+msgstr "The total is too large."
+
+#: src/screens/purchase-entry-model.js
+msgid "Acorta la referencia o la nota."
+msgstr "Shorten the reference or note."
+
+#: src/screens/purchase-entry-photo.js
+msgid "Elige una foto JPEG, PNG o WebP."
+msgstr "Choose a JPEG, PNG or WebP photo."
+
+#: src/screens/purchase-entry-photo.js
+msgid "La foto debe pesar hasta 12 MiB."
+msgstr "The photo must be no larger than 12 MiB."
+
+#: src/screens/purchase-entry-photo.js
+msgid "La compra ocupa demasiado espacio. Quita la foto o usa una más pequeña."
+msgstr "The purchase is too large. Remove the photo or use a smaller one."
+
+#: src/screens/purchase-entry-photo.js
+msgid "No se pudo leer la foto. Elige otra foto o quítala."
+msgstr "Could not read the photo. Choose another photo or remove it."
+
+#: src/screens/purchase-entry-photo.js
+msgid "No se pudo abrir la foto. Elige otra foto o quítala."
+msgstr "Could not open the photo. Choose another photo or remove it."
+
+#: src/screens/purchase-entry-photo.js
+msgid "La foto sigue muy grande. Elige otra foto o quítala."
+msgstr "The photo is still too large. Choose another photo or remove it."
+
+#: src/screens/purchase-entry-session.js
+msgid "Resuelve la compra pendiente antes de registrar otra."
+msgstr "Resolve the pending purchase before recording another one."
+
+#: src/screens/purchase-entry-session.js
+msgid "La compra aún no tiene un resultado. Reintenta la misma compra."
+msgstr "The purchase result is still unknown. Retry the same purchase."
+
+#: src/screens/purchase-entry-session.js
+msgid "Este intento ya terminó o cambió. Revisa la compra pendiente."
+msgstr "This attempt has ended or changed. Check the pending purchase."
+
 #: src/screens/recibos.jsx
 #: src/screens/ventas-report.jsx
 msgid "Terminal manual"
@@ -9425,10 +9779,6 @@ msgstr "Yield"
 #: src/screens/recipe-workspace.jsx
 msgid "Versión"
 msgstr "Version"
-
-#: src/screens/recipe-workspace.jsx
-msgid "Costo por unidad"
-msgstr "Cost per unit"
 
 #: src/screens/recipe-workspace.jsx
 msgid "Retirada"

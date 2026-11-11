@@ -1,0 +1,90 @@
+{
+  "reusedActualUiPurchases": [
+    {
+      "kind": "manual",
+      "date": "2026-11-10",
+      "source": "manual",
+      "supplier": null,
+      "artifactBytes": null,
+      "origin": "direct_purchase",
+      "receipts": 1,
+      "links": [
+        {
+          "line_number": 1,
+          "quantity": "1250",
+          "scale": 3,
+          "cost": "1250",
+          "total": "1563",
+          "entry_type": "purchase_received"
+        },
+        {
+          "line_number": 2,
+          "quantity": "750",
+          "scale": 3,
+          "cost": "2000",
+          "total": "1500",
+          "entry_type": "purchase_received"
+        }
+      ]
+    },
+    {
+      "kind": "photo",
+      "date": "2026-11-10",
+      "source": "photo",
+      "supplier": "selected fixture supplier",
+      "artifactBytes": 487413,
+      "origin": "direct_purchase",
+      "receipts": 1,
+      "links": [
+        {
+          "line_number": 1,
+          "quantity": "2",
+          "scale": 0,
+          "cost": "0",
+          "total": "0",
+          "entry_type": "purchase_received"
+        }
+      ]
+    },
+    {
+      "kind": "xml",
+      "date": "2026-11-03",
+      "source": "cfdi_xml",
+      "supplier": null,
+      "artifactBytes": null,
+      "origin": "direct_purchase",
+      "receipts": 1,
+      "links": [
+        {
+          "line_number": 1,
+          "quantity": "1250",
+          "scale": 3,
+          "cost": "1250",
+          "total": "1563",
+          "entry_type": "purchase_received"
+        },
+        {
+          "line_number": 2,
+          "quantity": "750",
+          "scale": 3,
+          "cost": "2000",
+          "total": "1500",
+          "entry_type": "purchase_received"
+        }
+      ]
+    }
+  ],
+  "task3FinalDelta": {
+    "invoices": 4,
+    "internalOrders": 4,
+    "receipts": 4,
+    "receiptLines": 4,
+    "ledgerEntries": 8,
+    "onHand": {
+      "scale6Milk": "1234567",
+      "scale0Napkins": "3"
+    },
+    "netTransit": "0"
+  },
+  "allDatesSourcesSuppliersReceiptLinksAndCostsVerified": true
+}

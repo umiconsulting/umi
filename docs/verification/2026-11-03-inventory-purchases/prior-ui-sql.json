@@ -1,0 +1,234 @@
+{
+  "before": {
+    "counts": {
+      "supplier_invoice": 8,
+      "purchase_order": 7,
+      "purchase_order_receipt": 7,
+      "purchase_order_receipt_line": 11,
+      "stock_ledger_entry": 22
+    },
+    "stocks": [
+      {
+        "item": "items-1",
+        "destination": "inventoryLocations-1",
+        "hand": "6",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-2",
+        "hand": "2000",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-1",
+        "hand": "6000",
+        "transit": "0"
+      }
+    ]
+  },
+  "canceled": {
+    "counts": {
+      "supplier_invoice": 8,
+      "purchase_order": 7,
+      "purchase_order_receipt": 7,
+      "purchase_order_receipt_line": 11,
+      "stock_ledger_entry": 22
+    },
+    "stocks": [
+      {
+        "item": "items-1",
+        "destination": "inventoryLocations-1",
+        "hand": "6",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-2",
+        "hand": "2000",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-1",
+        "hand": "6000",
+        "transit": "0"
+      }
+    ]
+  },
+  "photos-canceled": {
+    "counts": {
+      "supplier_invoice": 8,
+      "purchase_order": 7,
+      "purchase_order_receipt": 7,
+      "purchase_order_receipt_line": 11,
+      "stock_ledger_entry": 22
+    },
+    "stocks": [
+      {
+        "item": "items-1",
+        "destination": "inventoryLocations-1",
+        "hand": "6",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-2",
+        "hand": "2000",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-1",
+        "hand": "6000",
+        "transit": "0"
+      }
+    ]
+  },
+  "manual-saved": {
+    "counts": {
+      "supplier_invoice": 9,
+      "purchase_order": 8,
+      "purchase_order_receipt": 8,
+      "purchase_order_receipt_line": 13,
+      "stock_ledger_entry": 26
+    },
+    "stocks": [
+      {
+        "item": "items-1",
+        "destination": "inventoryLocations-1",
+        "hand": "6",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-2",
+        "hand": "2000",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-1",
+        "hand": "8000",
+        "transit": "0"
+      }
+    ]
+  },
+  "photo-response-lost": {
+    "counts": {
+      "supplier_invoice": 10,
+      "purchase_order": 9,
+      "purchase_order_receipt": 9,
+      "purchase_order_receipt_line": 14,
+      "stock_ledger_entry": 28
+    },
+    "stocks": [
+      {
+        "item": "items-1",
+        "destination": "inventoryLocations-1",
+        "hand": "8",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-2",
+        "hand": "2000",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-1",
+        "hand": "8000",
+        "transit": "0"
+      }
+    ]
+  },
+  "photo-retried": {
+    "counts": {
+      "supplier_invoice": 10,
+      "purchase_order": 9,
+      "purchase_order_receipt": 9,
+      "purchase_order_receipt_line": 14,
+      "stock_ledger_entry": 28
+    },
+    "stocks": [
+      {
+        "item": "items-1",
+        "destination": "inventoryLocations-1",
+        "hand": "8",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-2",
+        "hand": "2000",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-1",
+        "hand": "8000",
+        "transit": "0"
+      }
+    ]
+  },
+  "xml-direct-saved": {
+    "counts": {
+      "supplier_invoice": 11,
+      "purchase_order": 10,
+      "purchase_order_receipt": 10,
+      "purchase_order_receipt_line": 16,
+      "stock_ledger_entry": 32
+    },
+    "stocks": [
+      {
+        "item": "items-1",
+        "destination": "inventoryLocations-1",
+        "hand": "8",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-2",
+        "hand": "4000",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-1",
+        "hand": "8000",
+        "transit": "0"
+      }
+    ]
+  },
+  "mobile-canceled": {
+    "counts": {
+      "supplier_invoice": 11,
+      "purchase_order": 10,
+      "purchase_order_receipt": 10,
+      "purchase_order_receipt_line": 16,
+      "stock_ledger_entry": 32
+    },
+    "stocks": [
+      {
+        "item": "items-1",
+        "destination": "inventoryLocations-1",
+        "hand": "8",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-2",
+        "hand": "4000",
+        "transit": "0"
+      },
+      {
+        "item": "items-2",
+        "destination": "inventoryLocations-1",
+        "hand": "8000",
+        "transit": "0"
+      }
+    ]
+  }
+}

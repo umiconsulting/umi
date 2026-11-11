@@ -1,0 +1,65 @@
+
+ RUN  v2.1.9 /Users/moon/Documents/umi-worktrees/inventory-purchases-20261104/apps/umi-dashboard
+
+ ❯ src/screens/purchase-entry-session.spec.js (27 tests | 3 failed) 11ms
+   × retains the committed retry after a delayed initial permission refusal: refusal-first 3ms
+     → expected 'rejected' to be 'ambiguous' // Object.is equality
+   × retains exact recovery after an overlapping retry fails: refusal-first 1ms
+     → expected [Function] to throw an error
+   × retains exact recovery after an overlapping retry fails: retry-failure-first 0ms
+     → expected 'rejected' to be 'ambiguous' // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/screens/purchase-entry-session.spec.js > retains the committed retry after a delayed initial permission refusal: refusal-first
+AssertionError: expected 'rejected' to be 'ambiguous' // Object.is equality
+
+Expected: "ambiguous"
+Received: "rejected"
+
+ ❯ src/screens/purchase-entry-session.spec.js:330:28
+    328|       const result = await firstTask;
+    329|       const recovered = readPurchaseAttempt({ merchantId: 'm', storage…
+    330|       expect(result.state).toBe('ambiguous');
+       |                            ^
+    331|       expect(recovered.envelope).toEqual(original.envelope);
+    332|       expect(recovered.commandId).toBe(original.commandId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/screens/purchase-entry-session.spec.js > retains exact recovery after an overlapping retry fails: refusal-first
+AssertionError: expected [Function] to throw an error
+ ❯ src/screens/purchase-entry-session.spec.js:368:75
+    366|       refuse();
+    367|       await firstTask;
+    368|       expect(() => clearPurchaseAttempt({ merchantId: 'm', storage: s …
+       |                                                                           ^
+    369|       expect(() => preparePurchaseAttempt(input(s))).toThrow();
+    370|       retry.reject(new Error('response lost'));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/screens/purchase-entry-session.spec.js > retains exact recovery after an overlapping retry fails: retry-failure-first
+AssertionError: expected 'rejected' to be 'ambiguous' // Object.is equality
+
+Expected: "ambiguous"
+Received: "rejected"
+
+ ❯ src/screens/purchase-entry-session.spec.js:379:29
+    377|     }
+    378|     const recovered = readPurchaseAttempt({ merchantId: 'm', storage: …
+    379|     expect(recovered.state).toBe('ambiguous');
+       |                             ^
+    380|     expect(recovered.commandId).toBe(original.commandId);
+    381|     expect(recovered.envelope).toEqual(original.envelope);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 24 passed (27)
+   Start at  15:28:30
+   Duration  365ms (transform 211ms, setup 0ms, collect 219ms, tests 11ms, environment 0ms, prepare 32ms)
+
+undefined
+/Users/moon/Documents/umi-worktrees/inventory-purchases-20261104/apps/umi-dashboard:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/screens/purchase-entry-session.spec.js

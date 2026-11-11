@@ -93,9 +93,10 @@ type OrderRow = {
   merchant_id: string;
   location_id: string;
   inventory_location_id: string;
-  supplier_id: string;
-  supplier_reference: string;
-  supplier_name: string;
+  supplier_id: string | null;
+  supplier_reference: string | null;
+  supplier_name: string | null;
+  origin: PurchaseOrder['origin'];
   public_reference: string;
   status: PurchaseOrder['status'];
   currency: string;
@@ -238,6 +239,7 @@ type InvoiceRow = {
   total_minor: string;
   source: SupplierInvoice['source'];
   status: SupplierInvoice['status'];
+  has_artifact: boolean;
   correlation_id: string | null;
 };
 
@@ -307,6 +309,43 @@ function supplierInvoiceReference(now: Date = new Date()): string {
 @Injectable()
 export class ProcurementRepository {
   constructor(private readonly pg: PgService) {}
+
+  purchaseEntryContext(merchantId: string, locationId: string) {
+    return this.pg.runWithMerchant(
+      merchantId,
+      null,
+      async (client) => {
+        const merchant = await client.query<{ currency: string; businessDate: string }>(
+          `SELECT m.currency,
+                ((now() AT TIME ZONE m.timezone) - m.business_day_start::interval)::date::text AS "businessDate"
+           FROM merchant.merchant m
+           JOIN merchant.location l ON l.merchant_id=m.id AND l.id=$2::uuid
+          WHERE m.id=$1::uuid`,
+          [merchantId, locationId],
+        );
+        if (!merchant.rows[0]) throw new NotFoundException({ code: 'INVENTORY_LOCATION_CHANGED' });
+        const locations = await client.query<{ id: string; displayName: string }>(
+          `SELECT id::text AS id,display_name AS "displayName" FROM merchant.inventory_location
+          WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND active ORDER BY display_name,id`,
+          [merchantId, locationId],
+        );
+        return { locationId, ...merchant.rows[0], inventoryLocations: locations.rows };
+      },
+      locationId,
+    );
+  }
+
+  supplierInvoiceArtifact(merchantId: string, invoiceId: string) {
+    return this.pg.runWithMerchant(merchantId, null, async (client) => {
+      const result = await client.query<{ bytes: Buffer; contentType: string }>(
+        `SELECT artifact_bytes AS bytes,artifact_content_type AS "contentType"
+           FROM merchant.supplier_invoice
+          WHERE merchant_id=$1::uuid AND id=$2::uuid AND artifact_bytes IS NOT NULL`,
+        [merchantId, invoiceId],
+      );
+      return result.rows[0] ?? null;
+    });
+  }
 
   // ── Suppliers ────────────────────────────────────────────────────────────
 
@@ -414,6 +453,20 @@ export class ProcurementRepository {
 
   // ── Purchase orders ──────────────────────────────────────────────────────
 
+  async assertActiveSupplier(
+    client: PoolClient,
+    merchantId: string,
+    supplierId: string,
+  ): Promise<void> {
+    const supplier = await client.query<{ active: boolean; archived_at: Date | null }>(
+      `SELECT active,archived_at FROM merchant.supplier WHERE merchant_id=$1::uuid AND id=$2::uuid FOR SHARE`,
+      [merchantId, supplierId],
+    );
+    if (!supplier.rows[0]) throw new NotFoundException({ code: 'SUPPLIER_NOT_FOUND' });
+    if (!supplier.rows[0].active || supplier.rows[0].archived_at !== null)
+      throw new ConflictException({ code: 'SUPPLIER_ARCHIVED' });
+  }
+
   /**
    * Create an order, its lines and its money, in one transaction.
    *
@@ -428,15 +481,13 @@ export class ProcurementRepository {
     client: PoolClient,
     merchantId: string,
     userId: string,
-    dto: CreatePurchaseOrderRequest,
+    dto: Omit<CreatePurchaseOrderRequest, 'supplierId'> & { supplierId: string | null },
+    origin: PurchaseOrder['origin'] = 'order',
   ): Promise<PurchaseOrder> {
-    const supplier = await client.query<{ id: string; active: boolean }>(
-      `SELECT id::text AS id, active FROM merchant.supplier
-        WHERE merchant_id=$1::uuid AND id=$2::uuid`,
-      [merchantId, dto.supplierId],
-    );
-    if (!supplier.rows[0]) throw new NotFoundException({ code: 'SUPPLIER_NOT_FOUND' });
-    if (!supplier.rows[0].active) throw new ConflictException({ code: 'SUPPLIER_ARCHIVED' });
+    if (dto.supplierId === null && origin !== 'direct_purchase')
+      throw new NotFoundException({ code: 'SUPPLIER_NOT_FOUND' });
+    if (dto.supplierId !== null)
+      await this.assertActiveSupplier(client, merchantId, dto.supplierId);
 
     const stockLocation = await client.query<{ id: string }>(
       `SELECT id::text AS id FROM merchant.inventory_location
@@ -481,7 +532,7 @@ export class ProcurementRepository {
         });
       return { ...line, quantity, lineNumber: index + 1 };
     });
-    const orderedTotal = lines.reduce((total, line) => total + line.lineTotalMinor, 0);
+    const orderedTotal = receiptTotalMinor(lines);
 
     // The reference is generated, and a collision is retried once rather than
     // returned: the caller never chose it, so making them choose another would be
@@ -491,8 +542,8 @@ export class ProcurementRepository {
       const inserted = await client.query<{ id: string }>(
         `INSERT INTO merchant.purchase_order
            (merchant_id,location_id,inventory_location_id,supplier_id,public_reference,currency,
-            expected_on,ordered_total_minor,raised_by,note)
-         VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7::date,$8,$9::uuid,$10)
+            expected_on,ordered_total_minor,raised_by,note,origin)
+         VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7::date,$8,$9::uuid,$10,$11)
          ON CONFLICT (merchant_id,public_reference) DO NOTHING
          RETURNING id::text AS id`,
         [
@@ -506,6 +557,7 @@ export class ProcurementRepository {
           orderedTotal,
           userId,
           dto.note,
+          origin,
         ],
       );
       const orderId = inserted.rows[0]?.id;
@@ -609,13 +661,13 @@ export class ProcurementRepository {
       `SELECT po.id::text AS id,po.merchant_id::text AS merchant_id,po.location_id::text AS location_id,
               po.inventory_location_id::text AS inventory_location_id,
               po.supplier_id::text AS supplier_id,s.public_reference AS supplier_reference,
-              s.display_name AS supplier_name,po.public_reference,po.status,po.currency,
+              s.display_name AS supplier_name,po.origin,po.public_reference,po.status,po.currency,
               po.expected_on::text AS expected_on,po.ordered_total_minor::text AS ordered_total_minor,
               po.received_total_minor::text AS received_total_minor,po.version,
               po.raised_by::text AS raised_by,po.note,po.created_at,po.updated_at,po.sent_at,
               po.completed_at,po.cancelled_at
          FROM merchant.purchase_order po
-         JOIN merchant.supplier s ON s.merchant_id=po.merchant_id AND s.id=po.supplier_id
+         LEFT JOIN merchant.supplier s ON s.merchant_id=po.merchant_id AND s.id=po.supplier_id
         WHERE po.merchant_id=$1::uuid AND po.id=ANY($2::uuid[])
         ORDER BY po.created_at DESC,po.id DESC
         ${lock ? 'FOR UPDATE OF po' : ''}`,
@@ -697,6 +749,7 @@ export class ProcurementRepository {
       locationId: row.location_id,
       inventoryLocationId: row.inventory_location_id,
       supplierId: row.supplier_id,
+      origin: row.origin,
       supplierReference: row.supplier_reference,
       supplierName: row.supplier_name,
       publicReference: row.public_reference,
@@ -870,6 +923,7 @@ export class ProcurementRepository {
         });
       return {
         ...line,
+        inventoryItemId: onOrder.inventory_item_id,
         quantity: normalizeQuantity(line.quantity, onOrder.unit, onOrder.quantity_scale),
       };
     });
@@ -934,12 +988,14 @@ export class ProcurementRepository {
     );
     const receiptId = receipt.rows[0].id;
     const businessDate = receipt.rows[0].business_date;
-    for (const line of lines) {
-      const onOrder = byId.get(line.purchaseOrderLineId);
-      // Unreachable: `overReceivedLine` refused an unknown line above. Kept as a
-      // hard failure rather than a `!` so a future edit cannot silently skip a line.
-      if (!onOrder) throw new ConflictException({ code: 'PURCHASE_ORDER_LINE_NOT_FOUND' });
-
+    // Every order has one destination. Sort stock posts by item and line identity across all purchasing writers.
+    const postingLines = [...lines].sort(
+      (left, right) =>
+        left.inventoryItemId.localeCompare(right.inventoryItemId) ||
+        left.purchaseOrderLineId.localeCompare(right.purchaseOrderLineId),
+    );
+    const ledgerIds = new Map<string, string>();
+    for (const line of postingLines) {
       /*
        * THE LEDGER FIRST, THE RECEIPT LINE SECOND, AND THE ORDER MATTERS.
        *
@@ -962,7 +1018,7 @@ export class ProcurementRepository {
       const ledger = await this.postLedger(client, merchantId, {
         locationId: dto.locationId,
         inventoryLocationId: order.inventory_location_id,
-        inventoryItemId: onOrder.inventory_item_id,
+        inventoryItemId: line.inventoryItemId,
         entryType: 'purchase_received',
         quantity: quantity.value,
         commandId: dto.commandId,
@@ -979,6 +1035,13 @@ export class ProcurementRepository {
           receiptId,
         },
       });
+      ledgerIds.set(line.purchaseOrderLineId, ledger.id);
+    }
+    // Keep receipt insertion in the original document order, with the posted fact for each line.
+    for (const line of lines) {
+      const quantity = line.quantity;
+      const ledgerId = ledgerIds.get(line.purchaseOrderLineId);
+      if (!ledgerId) throw new Error('purchase_receipt_ledger_missing');
       await client.query(
         `INSERT INTO merchant.purchase_order_receipt_line
            (merchant_id,receipt_id,purchase_order_id,purchase_order_line_id,inventory_item_id,
@@ -990,8 +1053,8 @@ export class ProcurementRepository {
           receiptId,
           dto.purchaseOrderId,
           line.purchaseOrderLineId,
-          onOrder.inventory_item_id,
-          ledger.id,
+          line.inventoryItemId,
+          ledgerId,
           quantity.value,
           quantity.scale,
           quantity.unit,
@@ -1133,9 +1196,8 @@ export class ProcurementRepository {
 
   /**
    * The lines as the database holds them, with the two quantities a posting needs.
-   * Ordered by `line_number` so a ledger entry's order is the document's order —
-   * the balance projection only accepts a strictly increasing `sequence`, and a
-   * shuffled set of entries would make its replay non-deterministic.
+   * Each order has one destination. Shared send and cancel paths lock stock in item order.
+   * Line IDs break ties without changing stored document ordinals or invoice links.
    */
   private async orderLinesForPosting(
     client: PoolClient,
@@ -1168,7 +1230,7 @@ export class ProcurementRepository {
          FROM merchant.purchase_order_line l
          JOIN merchant.inventory_item i ON i.merchant_id=l.merchant_id AND i.id=l.inventory_item_id
         WHERE l.merchant_id=$1::uuid AND l.purchase_order_id=$2::uuid
-        ORDER BY l.line_number FOR UPDATE OF l`,
+        ORDER BY l.inventory_item_id,l.id FOR UPDATE OF l`,
       [merchantId, purchaseOrderId],
     );
     for (const line of result.rows) {
@@ -1557,6 +1619,7 @@ export class ProcurementRepository {
         purchaseOrderLineId: string;
         receivedQuantity: { value: number; scale: number; unit: string };
         unitCostMinor: number;
+        lineTotalMinor?: number;
       }>;
       note: string | null;
       commandId: string;
@@ -1610,11 +1673,13 @@ export class ProcurementRepository {
       purchaseOrderLineId: line.purchaseOrderLineId,
       quantity: line.receivedQuantity,
       actualUnitCostMinor: line.unitCostMinor,
-      lineTotalMinor: extendedLineTotalMinor({
-        value: line.receivedQuantity.value,
-        scale: line.receivedQuantity.scale,
-        unitCostMinor: line.unitCostMinor,
-      }),
+      lineTotalMinor:
+        line.lineTotalMinor ??
+        extendedLineTotalMinor({
+          value: line.receivedQuantity.value,
+          scale: line.receivedQuantity.scale,
+          unitCostMinor: line.unitCostMinor,
+        }),
       invoiceLineId: line.lineId,
     }));
 
@@ -1883,7 +1948,8 @@ export class ProcurementRepository {
               s.display_name AS supplier_name,si.folio,si.cfdi_uuid::text AS cfdi_uuid,
               si.issued_on::text AS issued_on,si.currency,
               si.subtotal_minor::text AS subtotal_minor,si.tax_minor::text AS tax_minor,
-              si.total_minor::text AS total_minor,si.source,si.status,bc.correlation_id
+              si.total_minor::text AS total_minor,si.source,si.status,
+              (si.artifact_bytes IS NOT NULL) AS has_artifact,bc.correlation_id
          FROM merchant.supplier_invoice si
          LEFT JOIN merchant.supplier s
            ON s.merchant_id=si.merchant_id AND s.id=si.supplier_id
@@ -1967,6 +2033,7 @@ export class ProcurementRepository {
       totalMinor: int(row.total_minor),
       source: row.source,
       status: row.status,
+      hasArtifact: row.has_artifact,
       lines: linesByInvoice.get(row.id) ?? [],
       correlationId: row.correlation_id ?? correlationId,
     }));

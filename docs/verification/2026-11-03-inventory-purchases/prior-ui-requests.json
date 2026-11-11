@@ -1,0 +1,113 @@
+{
+  "attempts": [
+    {
+      "merchantId": "merchants-1",
+      "operation": "inventory.purchase.record",
+      "commandId": "generated-identity-29",
+      "targetAggregateId": "generated-identity-30",
+      "locationId": "locations-1",
+      "parameters": {
+        "locationId": "locations-1",
+        "inventoryLocationId": "inventoryLocations-1",
+        "issuedOn": "2026-11-10",
+        "currency": "MXN",
+        "supplierId": null,
+        "folio": "UI manual 1794347726665",
+        "note": null,
+        "lines": [
+          {
+            "inventoryItemId": "items-2",
+            "quantity": {
+              "value": 1250,
+              "scale": 3,
+              "unit": "kilogram"
+            },
+            "unitCostMinor": 1250
+          },
+          {
+            "inventoryItemId": "items-2",
+            "quantity": {
+              "value": 750,
+              "scale": 3,
+              "unit": "kilogram"
+            },
+            "unitCostMinor": 2000
+          }
+        ]
+      },
+      "utf8Bytes": 808
+    },
+    {
+      "merchantId": "merchants-1",
+      "operation": "inventory.purchase.record",
+      "commandId": "generated-identity-31",
+      "targetAggregateId": "generated-identity-32",
+      "locationId": "locations-1",
+      "parameters": {
+        "locationId": "locations-1",
+        "inventoryLocationId": "inventoryLocations-1",
+        "issuedOn": "2026-11-10",
+        "currency": "MXN",
+        "supplierId": "suppliers-1",
+        "folio": "UI photo 1794347726960",
+        "note": null,
+        "lines": [
+          {
+            "inventoryItemId": "items-1",
+            "quantity": {
+              "value": 2,
+              "scale": 0,
+              "unit": "unit"
+            },
+            "unitCostMinor": 0
+          }
+        ],
+        "artifactBytes": 487413
+      },
+      "utf8Bytes": 650602
+    },
+    {
+      "merchantId": "merchants-1",
+      "operation": "inventory.purchase.record",
+      "commandId": "generated-identity-31",
+      "targetAggregateId": "generated-identity-32",
+      "locationId": "locations-1",
+      "parameters": {
+        "locationId": "locations-1",
+        "inventoryLocationId": "inventoryLocations-1",
+        "issuedOn": "2026-11-10",
+        "currency": "MXN",
+        "supplierId": "suppliers-1",
+        "folio": "UI photo 1794347726960",
+        "note": null,
+        "lines": [
+          {
+            "inventoryItemId": "items-1",
+            "quantity": {
+              "value": 2,
+              "scale": 0,
+              "unit": "unit"
+            },
+            "unitCostMinor": 0
+          }
+        ],
+        "artifactBytes": 487413
+      },
+      "utf8Bytes": 650602
+    },
+    {
+      "merchantId": "merchants-1",
+      "operation": "inventory.invoice.receive_direct",
+      "commandId": "generated-identity-33",
+      "targetAggregateId": "generated-identity-34",
+      "locationId": "locations-1",
+      "parameters": {
+        "locationId": "locations-1",
+        "inventoryLocationId": "inventoryLocations-2",
+        "note": null
+      },
+      "utf8Bytes": 445
+    }
+  ],
+  "artifactRequests": 1
+}

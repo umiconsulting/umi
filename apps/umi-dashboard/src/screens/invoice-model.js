@@ -37,7 +37,7 @@ export const MATCH_METHOD_LABEL = {
   history: msg`Historial de líneas`,
   fuzzy: msg`Nombre parecido`,
   manual: msg`Cotejo manual`,
-  unmatched: msg`Sin casar`,
+  unmatched: msg`Sin artículo asignado`,
 };
 
 /** The label for one match method, or null for a method this build does not know. */
@@ -49,7 +49,7 @@ export function matchMethodLabel(matchMethod) {
 export const INVOICE_STATUS_LABEL = {
   uploaded: msg`Recibida`,
   extracted: msg`Leída`,
-  matched: msg`Casada`,
+  matched: msg`Artículos asignados`,
   committed: msg`Registrada`,
   rejected: msg`Rechazada`,
 };

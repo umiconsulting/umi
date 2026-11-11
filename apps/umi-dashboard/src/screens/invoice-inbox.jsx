@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
@@ -6,7 +6,12 @@ import { Select } from '@/components/select.jsx';
 import { useAdministrativeCommand } from '@/lib/administrative-command.jsx';
 import { hasRequiredPermission } from '@/lib/module-registry.js';
 import { useMerchant } from '@/lib/merchant-context.jsx';
-import { useInventoryItems, useSupplierInvoiceInbox } from '@/data.jsx';
+import {
+  fetchSupplierInvoiceArtifact,
+  useInventoryItems,
+  useSupplierInvoiceInbox,
+} from '@/data.jsx';
+import PurchaseEntryDialog from './purchase-entry-dialog.jsx';
 import { formatMoney } from '@/lib/format.js';
 import {
   INVOICE_STATUS_LABEL,
@@ -80,7 +85,7 @@ const UNIT_LABEL = {
 };
 
 const INVOICE_ERROR_COPY = {
-  SUPPLIER_INVOICE_UNMATCHED_LINES: msg`La factura tiene líneas sin casar. Casa cada línea marcada antes de registrar la entrada.`,
+  SUPPLIER_INVOICE_UNMATCHED_LINES: msg`La factura tiene líneas sin artículo asignado. Asigna un artículo a cada línea marcada antes de registrar la entrada.`,
   SUPPLIER_INVOICE_NOT_FOUND: msg`La factura ya no existe. Recarga la lista.`,
   SUPPLIER_INVOICE_ALREADY_COMMITTED: msg`La factura ya tiene su entrada registrada.`,
   PURCHASE_ORDER_NOT_FOUND: msg`El pedido ya no existe. Recarga la lista.`,
@@ -200,12 +205,12 @@ function MatchLineDialog({ invoice, line, items, onClose, onMatched }) {
         className="card modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label={t`Casar la línea ${line.lineNumber}`}
+        aria-label={t`Asignar artículo a la línea ${line.lineNumber}`}
         style={{ width: 'min(560px, 94vw)', display: 'grid', gap: 16 }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <h3 style={{ margin: 0 }}>
-            <Trans>Casar la línea {line.lineNumber}</Trans>
+            <Trans>Asignar artículo a la línea {line.lineNumber}</Trans>
           </h3>
           <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             <I.X size={16} />
@@ -340,9 +345,7 @@ function CommitInvoiceDialog({ invoice, orders, onClose, onCommitted }) {
 
         <p style={{ margin: 0, fontSize: 12.5 }}>
           <strong>{invoice.folio || <Trans>Sin folio</Trans>}</strong>{' '}
-          <span className="muted">
-            {invoice.supplierName || <Trans>Proveedor sin identificar</Trans>}
-          </span>
+          <span className="muted">{invoice.supplierName || <Trans>Sin proveedor</Trans>}</span>
         </p>
 
         <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
@@ -398,7 +401,8 @@ function CommitInvoiceDialog({ invoice, orders, onClose, onCommitted }) {
                 {isUnmatched ? (
                   <p style={{ margin: 0, color: 'var(--warning)', fontSize: 12.5 }}>
                     <Trans>
-                      Esta línea no está casada. Casa la línea antes de registrar la entrada.
+                      Esta línea no tiene artículo asignado. Asigna un artículo antes de registrar
+                      la entrada.
                     </Trans>
                   </p>
                 ) : candidates.length === 0 ? (
@@ -454,7 +458,11 @@ function CommitInvoiceDialog({ invoice, orders, onClose, onCommitted }) {
         {tally.unmatched > 0 ? (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <Pill tone="warning">
-              <Plural value={tally.unmatched} one="# línea sin casar" other="# líneas sin casar" />
+              <Plural
+                value={tally.unmatched}
+                one="# línea sin artículo asignado"
+                other="# líneas sin artículo asignado"
+              />
             </Pill>
             <span className="muted" style={{ fontSize: 11.5 }}>
               {tally.unmatchedLines
@@ -484,6 +492,69 @@ function CommitInvoiceDialog({ invoice, orders, onClose, onCommitted }) {
   );
 }
 
+function InvoiceArtifactDialog({ merchantId, invoiceId, onClose }) {
+  const { t } = useLingui();
+  const dialog = useRef(null);
+  const [artifact, setArtifact] = useState(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const node = dialog.current;
+    const previous = document.activeElement;
+    node.showModal();
+    let canceled = false;
+    Promise.resolve()
+      .then(() => (canceled ? null : fetchSupplierInvoiceArtifact(merchantId, invoiceId)))
+      .then(
+        (value) => {
+          if (!canceled && ['image/jpeg', 'image/png', 'image/webp'].includes(value?.contentType))
+            setArtifact(value);
+          else if (!canceled) setFailed(true);
+        },
+        () => {
+          if (!canceled) setFailed(true);
+        },
+      );
+    return () => {
+      canceled = true;
+      node.close();
+      previous?.focus();
+    };
+  }, [merchantId, invoiceId]);
+  return (
+    <dialog
+      ref={dialog}
+      className="purchase-entry card"
+      aria-label={t`Comprobante de la compra`}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <h2>
+        <Trans>Comprobante de la compra</Trans>
+      </h2>
+      {artifact ? (
+        <img
+          className="purchase-entry-photo"
+          alt={t`Comprobante de la compra`}
+          src={`data:${artifact.contentType};base64,${artifact.dataBase64}`}
+        />
+      ) : failed ? (
+        <p role="alert">
+          <Trans>No se pudo abrir el comprobante. Cierra y vuelve a intentar.</Trans>
+        </p>
+      ) : (
+        <p>
+          <Trans>Cargando comprobante…</Trans>
+        </p>
+      )}
+      <button className="btn btn-secondary" type="button" onClick={onClose}>
+        <Trans>Cerrar</Trans>
+      </button>
+    </dialog>
+  );
+}
+
 export default function InvoiceInbox() {
   const { t, i18n } = useLingui();
   const merchant = useMerchant();
@@ -498,8 +569,19 @@ export default function InvoiceInbox() {
   const [reading, setReading] = useState({ pending: false, error: null });
   const [matching, setMatching] = useState(null);
   const [committing, setCommitting] = useState(null);
+  const [purchase, setPurchase] = useState(null);
+  const [artifact, setArtifact] = useState(null);
 
   const locationId = merchant?.selectedLocationId || merchant?.selectedLocation?.id || null;
+  const scope = `${merchant?.selectedMerchantId}:${locationId}`;
+  const currentScope = useRef(scope);
+  useLayoutEffect(() => {
+    currentScope.current = scope;
+  }, [scope]);
+  function purchaseSaved(original) {
+    if (currentScope.current === `${original.merchantId}:${original.locationId}`)
+      setRefresh((value) => value + 1);
+  }
   const inbox = useSupplierInvoiceInbox({ status: status || null }, refresh);
   const itemsState = useInventoryItems({ includeArchived: false }, refresh);
   const invoices = inbox.data.invoices || [];
@@ -527,6 +609,8 @@ export default function InvoiceInbox() {
   async function reload() {
     setMatching(null);
     setCommitting(null);
+    setPurchase(null);
+    setArtifact(null);
     setRefresh((value) => value + 1);
   }
 
@@ -558,15 +642,27 @@ export default function InvoiceInbox() {
             style={{ display: 'none' }}
             onChange={pickFile}
           />
-          <button
-            className="btn btn-primary"
-            type="button"
-            onClick={() => fileRef.current && fileRef.current.click()}
-            disabled={reading.pending}
-          >
-            <I.Receipt size={16} />
-            <Trans>Subir factura XML</Trans>
-          </button>
+          {canApprove ? (
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() => setPurchase({ scope, invoice: null })}
+            >
+              <I.Plus size={16} />
+              <Trans>Registrar compra</Trans>
+            </button>
+          ) : null}
+          {canCapture ? (
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => fileRef.current && fileRef.current.click()}
+              disabled={reading.pending}
+            >
+              <I.Receipt size={16} />
+              <Trans>Subir factura XML</Trans>
+            </button>
+          ) : null}
           <span className="muted" style={{ fontSize: 11.5 }}>
             <Trans>Solo archivos XML (CFDI).</Trans>
           </span>
@@ -656,7 +752,7 @@ export default function InvoiceInbox() {
                     </Pill>
                   </span>
                   <span className="muted" style={{ fontSize: 11.5 }}>
-                    {invoice.supplierName || <Trans>Proveedor sin identificar</Trans>}
+                    {invoice.supplierName || <Trans>Sin proveedor</Trans>}
                   </span>
                   <span className="muted" style={{ fontSize: 11.5 }}>
                     {invoice.issuedOn ? (
@@ -681,14 +777,18 @@ export default function InvoiceInbox() {
 
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Pill tone="ok">
-                  <Plural value={tally.matched} one="# línea casada" other="# líneas casadas" />
+                  <Plural
+                    value={tally.matched}
+                    one="# línea con artículo asignado"
+                    other="# líneas con artículo asignado"
+                  />
                 </Pill>
                 {tally.unmatched > 0 ? (
                   <Pill tone="warning">
                     <Plural
                       value={tally.unmatched}
-                      one="# línea sin casar"
-                      other="# líneas sin casar"
+                      one="# línea sin artículo asignado"
+                      other="# líneas sin artículo asignado"
                     />
                   </Pill>
                 ) : null}
@@ -760,7 +860,7 @@ export default function InvoiceInbox() {
                                 ) : null}
                                 {matched ? null : (
                                   <Pill tone="warning">
-                                    <Trans>Sin casar</Trans>
+                                    <Trans>Sin artículo asignado</Trans>
                                   </Pill>
                                 )}
                                 {line.priceChanged ? (
@@ -809,7 +909,7 @@ export default function InvoiceInbox() {
                               </div>
                             ) : (
                               <Pill tone="warning">
-                                <Trans>Sin casar</Trans>
+                                <Trans>Sin artículo asignado</Trans>
                               </Pill>
                             )}
                           </td>
@@ -818,8 +918,8 @@ export default function InvoiceInbox() {
                               <button
                                 className="btn-icon"
                                 type="button"
-                                aria-label={t`Casar la línea ${line.lineNumber}`}
-                                title={t`Casar la línea ${line.lineNumber}`}
+                                aria-label={t`Asignar artículo a la línea ${line.lineNumber}`}
+                                title={t`Asignar artículo a la línea ${line.lineNumber}`}
                                 onClick={() => setMatching({ invoice, line })}
                               >
                                 <I.Edit size={15} />
@@ -833,19 +933,42 @@ export default function InvoiceInbox() {
                 </table>
               </div>
 
-              {canApprove && !committed ? (
+              {invoice.hasArtifact ? (
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={() =>
+                    setArtifact({
+                      scope,
+                      invoiceId: invoice.id,
+                      merchantId: merchant.selectedMerchantId,
+                    })
+                  }
+                >
+                  <Trans>Ver comprobante</Trans>
+                </button>
+              ) : null}
+              {canApprove && !committed && invoice.status !== 'rejected' ? (
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    disabled={!check.ready}
+                    onClick={() => setPurchase({ scope, invoice })}
+                  >
+                    <Trans>Registrar compra del XML</Trans>
+                  </button>
                   <button
                     className="btn btn-secondary"
                     type="button"
                     onClick={() => setCommitting({ invoice })}
                   >
                     <I.Check size={16} />
-                    <Trans>Registrar la entrada</Trans>
+                    <Trans>Recibir contra un pedido</Trans>
                   </button>
                   {check.ready ? null : (
                     <span className="muted" style={{ fontSize: 11.5 }}>
-                      <Trans>Casa cada línea antes de registrar la entrada.</Trans>
+                      <Trans>Asigna un artículo a cada línea antes de registrar la entrada.</Trans>
                     </span>
                   )}
                 </div>
@@ -855,6 +978,22 @@ export default function InvoiceInbox() {
         })
       )}
 
+      {purchase?.scope === scope ? (
+        <PurchaseEntryDialog
+          key={scope}
+          invoice={purchase.invoice}
+          onClose={() => setPurchase(null)}
+          onSaved={purchaseSaved}
+        />
+      ) : null}
+      {artifact?.scope === scope ? (
+        <InvoiceArtifactDialog
+          key={scope}
+          merchantId={artifact.merchantId}
+          invoiceId={artifact.invoiceId}
+          onClose={() => setArtifact(null)}
+        />
+      ) : null}
       {matching ? (
         <MatchLineDialog
           invoice={matching.invoice}

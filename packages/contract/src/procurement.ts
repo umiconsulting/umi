@@ -218,7 +218,7 @@ export const PurchaseOrderReceipt = z
     totalMinor: MinorUnits,
     note: z.string().max(240).nullable(),
     createdAt: IsoTimestamp,
-    lines: z.array(PurchaseOrderReceiptLine).max(500),
+    lines: z.array(PurchaseOrderReceiptLine).max(1000),
   })
   .strict();
 export type PurchaseOrderReceipt = z.infer<typeof PurchaseOrderReceipt>;
@@ -229,9 +229,10 @@ export const PurchaseOrder = z
     merchantId: Uuid,
     locationId: Uuid,
     inventoryLocationId: Uuid,
-    supplierId: Uuid,
-    supplierReference: z.string().min(1).max(80),
-    supplierName: z.string().min(1).max(160),
+    supplierId: Uuid.nullable(),
+    supplierReference: z.string().min(1).max(80).nullable(),
+    supplierName: z.string().min(1).max(160).nullable(),
+    origin: z.enum(['order', 'direct_purchase']),
     publicReference: z.string().min(1).max(80),
     status: PurchaseOrderStatus,
     currency: CurrencyCode,
@@ -455,6 +456,7 @@ export const SupplierInvoice = z
     totalMinor: MinorUnits,
     source: SupplierInvoiceSource,
     status: SupplierInvoiceStatus,
+    hasArtifact: z.boolean(),
     lines: z.array(SupplierInvoiceLine).max(1000),
     correlationId: CorrelationId,
   })
@@ -555,7 +557,91 @@ export const SupplierInvoiceCommitRequest = z
   .strict();
 export type SupplierInvoiceCommitRequest = z.infer<typeof SupplierInvoiceCommitRequest>;
 
+/** Direct purchases retain the exact item quantities and document date. */
+export const RecordInventoryPurchaseLine = z
+  .object({
+    inventoryItemId: Uuid,
+    quantity: PurchaseQuantity.extend({ value: z.number().int().safe().min(1) }),
+    unitCostMinor: z.number().int().safe().min(0),
+  })
+  .strict();
+export const RecordInventoryPurchaseRequest = z
+  .object({
+    ...invoiceCommandShape,
+    locationId: Uuid,
+    inventoryLocationId: Uuid,
+    issuedOn: MerchantDate,
+    currency: CurrencyCode,
+    supplierId: Uuid.nullable().optional(),
+    folio: z.string().trim().min(1).max(80).nullable().optional(),
+    note: z.string().trim().max(240).nullable().optional(),
+    lines: z.array(RecordInventoryPurchaseLine).min(1).max(100),
+    artifactBase64: z.string().min(1).max(960_000).nullable().optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const date = new Date(value.issuedOn + 'T00:00:00Z');
+    if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value.issuedOn)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['issuedOn'],
+        message: 'Invalid calendar date.',
+      });
+    if (value.artifactBase64 !== undefined && value.artifactBase64 !== null) {
+      const encoded = value.artifactBase64.replace(/^data:[^;,]*;base64,/, '').replace(/\s+/g, '');
+      const bytes =
+        Math.floor((encoded.length * 3) / 4) -
+        (encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0);
+      if (bytes > 700 * 1024)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['artifactBase64'],
+          message: 'Photo exceeds 700 KiB.',
+        });
+    }
+    if (new TextEncoder().encode(JSON.stringify(value)).length > 1024 * 1024)
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Purchase exceeds 1 MiB.' });
+  });
+export type RecordInventoryPurchaseRequest = z.infer<typeof RecordInventoryPurchaseRequest>;
+
+export const ReceiveSupplierInvoiceDirectRequest = z
+  .object({
+    ...invoiceCommandShape,
+    supplierInvoiceId: Uuid,
+    locationId: Uuid,
+    inventoryLocationId: Uuid,
+    note: z.string().trim().max(240).nullable().optional(),
+  })
+  .strict();
+export type ReceiveSupplierInvoiceDirectRequest = z.infer<
+  typeof ReceiveSupplierInvoiceDirectRequest
+>;
+
+export const PurchaseEntryContextQuery = z.object({ locationId: Uuid }).strict();
+export type PurchaseEntryContextQuery = z.infer<typeof PurchaseEntryContextQuery>;
+export const PurchaseEntryContext = z
+  .object({
+    locationId: Uuid,
+    currency: CurrencyCode,
+    businessDate: MerchantDate,
+    inventoryLocations: z.array(z.object({ id: Uuid, displayName: z.string() })),
+  })
+  .strict();
+export const SupplierInvoiceArtifact = z
+  .object({
+    contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    dataBase64: z.string(),
+    correlationId: CorrelationId,
+  })
+  .strict();
+
 export const procurementModels = {
+  RecordInventoryPurchaseLine,
+  RecordInventoryPurchaseRequest,
+  ReceiveSupplierInvoiceDirectRequest,
+  PurchaseEntryContextQuery,
+  PurchaseEntryContext,
+  SupplierInvoiceArtifact,
   PurchaseOrderStatus,
   PurchaseQuantity,
   ProcurementCommand,

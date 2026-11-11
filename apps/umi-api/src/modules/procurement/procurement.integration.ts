@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ConfigService } from '@nestjs/config';
 import {
+  PurchaseOrder,
   SupplierInvoice,
   SupplierInvoiceList,
   type CreatePurchaseOrderRequest,
@@ -19,6 +20,9 @@ import { IntegrityRepository } from '../integrity/integrity.repository';
 import { IntegrityService } from '../integrity/integrity.service';
 import { ProcurementRepository } from './procurement.repository';
 import { ProcurementService } from './procurement.service';
+import { PurchaseEntryRepository } from './purchase-entry.repository';
+import { PurchaseEntryService } from './purchase-entry.service';
+import { PurchasingPostingGate } from '../../../test/integration/purchasing-posting-gate';
 
 /**
  * WORKSTREAM E, STEP 3 — "Add purchase orders, suppliers, and receiving", against
@@ -391,6 +395,7 @@ describe('purchasing · send, receive, cancel, and the stock they move', () => {
       {} as never,
       {} as never,
       procurement,
+      new PurchaseEntryService(new PurchaseEntryRepository(repo), integrity),
     );
 
     await pg.query(
@@ -1370,7 +1375,11 @@ describe('purchasing · send, receive, cancel, and the stock they move', () => {
     };
 
     type InvoiceOperation =
-      'inventory.invoice.upload' | 'inventory.invoice.match' | 'inventory.invoice.commit';
+      | 'inventory.invoice.upload'
+      | 'inventory.invoice.match'
+      | 'inventory.invoice.commit'
+      | 'inventory.purchase.record'
+      | 'inventory.invoice.receive_direct';
 
     const command = (
       operation: InvoiceOperation,
@@ -1918,6 +1927,695 @@ describe('purchasing · send, receive, cancel, and the stock they move', () => {
       expect(inbox?.lines[0].priceChanged).toBe(true);
       expect(inbox?.lines[0].previousUnitCostMinor).toBe(PRICE_BEFORE_MINOR);
       expect(inbox?.lines[0].purchaseOrderUnitCostMinor).toBe(PRICE_BEFORE_MINOR);
+    });
+
+    it('records a direct purchase without supplier, replays it once, and preserves costs and transit', async () => {
+      const invoiceId = randomUUID();
+      const keys = { commandId: randomUUID(), idempotencyKey: randomUUID() };
+      const before = await invoiceBalance(ITEM_INVOICE);
+      const parameters = {
+        locationId: INVOICE_LOCATION,
+        inventoryLocationId: INVOICE_STOCK_ROOM,
+        issuedOn: '2026-11-03',
+        currency: 'MXN',
+        lines: [
+          {
+            inventoryItemId: ITEM_INVOICE,
+            quantity: { value: 1250, scale: 3, unit: 'kilogram' },
+            unitCostMinor: 1250,
+          },
+        ],
+      };
+      const result = (await command('inventory.purchase.record', invoiceId, parameters, keys)) as {
+        supplierInvoice: unknown;
+      };
+      expect(await command('inventory.purchase.record', invoiceId, parameters, keys)).toEqual(
+        result,
+      );
+      const invoice = SupplierInvoice.parse(result.supplierInvoice);
+      expect(invoice).toMatchObject({
+        id: invoiceId,
+        status: 'committed',
+        source: 'manual',
+        supplierId: null,
+        issuedOn: '2026-11-03',
+        totalMinor: 1563,
+        hasArtifact: false,
+      });
+      expect(invoice.lines[0]).toMatchObject({ matchMethod: 'manual', matchConfidence: 100 });
+      expect(
+        (await refusal(() => procurement.supplierInvoiceArtifact(invoiceAccess, invoiceId))).code,
+      ).toBe('SUPPLIER_INVOICE_ARTIFACT_NOT_FOUND');
+      const after = await invoiceBalance(ITEM_INVOICE);
+      expect(after.onHand - before.onHand).toBe(1250);
+      expect(after.inTransit).toBe(before.inTransit);
+      const facts = await pg.tquery<{
+        origin: string;
+        supplier_id: string | null;
+        amount: string;
+        receipts: string;
+      }>(
+        INVOICE_MERCHANT,
+        `SELECT po.origin,po.supplier_id::text AS supplier_id,rl.line_total_minor::text AS amount,
+          (SELECT count(*) FROM merchant.purchase_order_receipt r WHERE r.merchant_id=po.merchant_id AND r.purchase_order_id=po.id)::text AS receipts
+          FROM merchant.supplier_invoice_line il
+          JOIN merchant.purchase_order_receipt_line rl ON rl.merchant_id=il.merchant_id AND rl.invoice_line_id=il.id
+          JOIN merchant.purchase_order po ON po.merchant_id=rl.merchant_id AND po.id=rl.purchase_order_id
+          WHERE il.merchant_id=$1::uuid AND il.supplier_invoice_id=$2::uuid`,
+        [INVOICE_MERCHANT, invoiceId],
+      );
+      expect(facts.rows).toEqual([
+        { origin: 'direct_purchase', supplier_id: null, amount: '1563', receipts: '1' },
+      ]);
+    });
+
+    it('records an explicit null artifact as a manual purchase without a photo', async () => {
+      const result = (await command('inventory.purchase.record', randomUUID(), {
+        locationId: INVOICE_LOCATION,
+        inventoryLocationId: INVOICE_STOCK_ROOM,
+        issuedOn: '2026-11-03',
+        currency: 'MXN',
+        artifactBase64: null,
+        lines: [
+          {
+            inventoryItemId: ITEM_INVOICE_PHOTO,
+            quantity: { value: 1, scale: 0, unit: 'unit' },
+            unitCostMinor: 100,
+          },
+        ],
+      })) as { supplierInvoice: unknown };
+      expect(SupplierInvoice.parse(result.supplierInvoice)).toMatchObject({
+        source: 'manual',
+        hasArtifact: false,
+        status: 'committed',
+      });
+    });
+
+    it('stores a direct photo privately and omits its bytes from both journals', async () => {
+      const invoiceId = randomUUID();
+      const keys = { commandId: randomUUID(), idempotencyKey: randomUUID() };
+      const result = (await command(
+        'inventory.purchase.record',
+        invoiceId,
+        {
+          locationId: INVOICE_LOCATION,
+          inventoryLocationId: INVOICE_STOCK_ROOM,
+          issuedOn: '2026-11-02',
+          currency: 'MXN',
+          artifactBase64: ONE_PIXEL_PNG_BASE64,
+          lines: [
+            {
+              inventoryItemId: ITEM_INVOICE_PHOTO,
+              quantity: { value: 2, scale: 0, unit: 'unit' },
+              unitCostMinor: 101,
+            },
+          ],
+        },
+        keys,
+      )) as { supplierInvoice: unknown };
+      expect(SupplierInvoice.parse(result.supplierInvoice)).toMatchObject({
+        source: 'photo',
+        hasArtifact: true,
+        totalMinor: 202,
+      });
+      const artifact = await procurement.supplierInvoiceArtifact(invoiceAccess, invoiceId);
+      expect(artifact).toMatchObject({
+        contentType: 'image/png',
+        dataBase64: ONE_PIXEL_PNG_BASE64,
+      });
+      const journals = await pg.tquery<{ business: unknown; administrative: unknown }>(
+        INVOICE_MERCHANT,
+        `SELECT b.response_data AS business,a.result AS administrative FROM merchant.business_command b
+         JOIN merchant.administrative_command a ON a.merchant_id=b.merchant_id AND a.command_id=b.command_id
+         WHERE b.merchant_id=$1::uuid AND b.command_id=$2::uuid`,
+        [INVOICE_MERCHANT, keys.commandId],
+      );
+      expect(JSON.stringify(journals.rows)).not.toContain(ONE_PIXEL_PNG_BASE64);
+      expect(
+        (await refusal(() => procurement.supplierInvoiceArtifact(neighbourAccess, invoiceId))).code,
+      ).toBe('SUPPLIER_INVOICE_ARTIFACT_NOT_FOUND');
+    });
+
+    it('rolls back a direct purchase when its second item is foreign', async () => {
+      const invoiceId = randomUUID();
+      const before = await invoiceBalance(ITEM_INVOICE);
+      expect(
+        (
+          await refusal(() =>
+            command('inventory.purchase.record', invoiceId, {
+              locationId: INVOICE_LOCATION,
+              inventoryLocationId: INVOICE_STOCK_ROOM,
+              issuedOn: '2026-11-03',
+              currency: 'MXN',
+              lines: [
+                {
+                  inventoryItemId: ITEM_INVOICE,
+                  quantity: { value: 1000, scale: 3, unit: 'kilogram' },
+                  unitCostMinor: 100,
+                },
+                {
+                  inventoryItemId: ITEM_NEIGHBOUR,
+                  quantity: { value: 1000, scale: 3, unit: 'kilogram' },
+                  unitCostMinor: 100,
+                },
+              ],
+            }),
+          )
+        ).code,
+      ).toBe('INVENTORY_ITEM_ARCHIVED');
+      expect(await invoiceBalance(ITEM_INVOICE)).toEqual(before);
+      const written = await pg.tquery(
+        INVOICE_MERCHANT,
+        'SELECT id FROM merchant.supplier_invoice WHERE id=$1::uuid',
+        [invoiceId],
+      );
+      expect(written.rows).toEqual([]);
+    });
+
+    it('receives all matched XML lines directly from their persisted amounts', async () => {
+      const invoiceId = randomUUID();
+      const uploaded = await uploadXml(
+        invoiceId,
+        cfdiWithOneConcept({
+          uuid: randomUUID(),
+          folio: 'DIRECT',
+          description: 'Direct XML',
+          sku: null,
+          cantidad: '1.25',
+          valorUnitario: '12.50',
+          importe: '15.63',
+        }),
+      );
+      await command('inventory.invoice.match', invoiceId, {
+        lines: [
+          {
+            lineId: uploaded.invoice.lines[0].id,
+            inventoryItemId: ITEM_INVOICE,
+            supplierSku: null,
+          },
+        ],
+      });
+      const before = await invoiceBalance(ITEM_INVOICE);
+      const result = (await command('inventory.invoice.receive_direct', invoiceId, {
+        locationId: INVOICE_LOCATION,
+        inventoryLocationId: INVOICE_STOCK_ROOM,
+      })) as { supplierInvoice: unknown };
+      expect(SupplierInvoice.parse(result.supplierInvoice)).toMatchObject({
+        source: 'cfdi_xml',
+        status: 'committed',
+        totalMinor: 1563,
+      });
+      const after = await invoiceBalance(ITEM_INVOICE);
+      expect(after.onHand - before.onHand).toBe(1250);
+      expect(after.inTransit).toBe(before.inTransit);
+    });
+
+    it('completes distinct reversed-item purchases once without a stock lock cycle', async () => {
+      const itemA = randomUUID();
+      const itemB = randomUUID();
+      await pg.tquery(
+        INVOICE_MERCHANT,
+        `INSERT INTO merchant.inventory_item(id,merchant_id,public_reference,display_name,item_type,base_unit,quantity_scale)
+         VALUES ($1::uuid,$3::uuid,$1::text,'Lock A','ingredient','unit',0),
+                ($2::uuid,$3::uuid,$2::text,'Lock B','ingredient','unit',0)`,
+        [itemA, itemB, INVOICE_MERCHANT],
+      );
+      const row = (inventoryItemId: string, value: number, unitCostMinor: number) => ({
+        inventoryItemId,
+        quantity: { value, scale: 0, unit: 'unit' },
+        unitCostMinor,
+      });
+      const base = {
+        locationId: INVOICE_LOCATION,
+        inventoryLocationId: INVOICE_STOCK_ROOM,
+        issuedOn: '2026-11-03',
+        currency: 'MXN',
+      };
+      await command('inventory.purchase.record', randomUUID(), {
+        ...base,
+        lines: [row(itemA, 1, 1), row(itemB, 1, 1)],
+      });
+      const beforeA = await invoiceBalance(itemA);
+      const beforeB = await invoiceBalance(itemB);
+      const attempts = [
+        {
+          invoiceId: randomUUID(),
+          commandId: randomUUID(),
+          idempotencyKey: randomUUID(),
+          lines: [row(itemA, 1, 101), row(itemB, 2, 202)],
+        },
+        {
+          invoiceId: randomUUID(),
+          commandId: randomUUID(),
+          idempotencyKey: randomUUID(),
+          lines: [row(itemB, 3, 303), row(itemA, 4, 404)],
+        },
+      ];
+      const gate = await PurchasingPostingGate.open(
+        pg,
+        attempts.map((attempt) => attempt.commandId),
+      );
+      const controlled = new AdministrativeCommandExecutionService(
+        new AdministrativeCommandContextService(new AdministrativeCommandRepository(pg)),
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        procurement,
+        new PurchaseEntryService(
+          new PurchaseEntryRepository(gate),
+          new IntegrityService(new IntegrityRepository(pg)),
+        ),
+      );
+      const execute = (attempt: (typeof attempts)[number]) =>
+        scoped(
+          () =>
+            controlled.execute(consoleUser, invoiceAccess, {
+              operation: 'inventory.purchase.record',
+              locationId: INVOICE_LOCATION,
+              targetAggregateId: attempt.invoiceId,
+              targetVersion: null,
+              commandId: attempt.commandId,
+              idempotencyKey: attempt.idempotencyKey,
+              parameters: { ...base, lines: attempt.lines },
+              approvalId: null,
+            }),
+          INVOICE_MERCHANT,
+          INVOICE_LOCATION,
+        );
+      const completed = Promise.allSettled(attempts.map(execute));
+      let waits: string[] = [];
+      let schedulingError: unknown;
+      try {
+        waits = await gate.waitForBothBlocked();
+      } catch (error) {
+        schedulingError = error;
+      } finally {
+        await gate.release();
+      }
+      const outcomes = await completed;
+      expect(schedulingError).toBeUndefined();
+      expect(waits).toHaveLength(2);
+      for (const [index, outcome] of outcomes.entries()) {
+        if (outcome.status !== 'rejected') continue;
+        // Confirm the original deadlock rollback and retained-identity refusal before the final assertion fails.
+        expect(outcome.reason).toMatchObject({ code: '40P01' });
+        const attempt = attempts[index];
+        const failed = await pg.tquery<{ status: string }>(
+          INVOICE_MERCHANT,
+          'SELECT status FROM merchant.administrative_command WHERE merchant_id=$1::uuid AND command_id=$2::uuid',
+          [INVOICE_MERCHANT, attempt.commandId],
+        );
+        expect(failed.rows[0].status).toBe('failed');
+        expect(
+          (
+            await pg.tquery(
+              INVOICE_MERCHANT,
+              'SELECT id FROM merchant.supplier_invoice WHERE id=$1::uuid',
+              [attempt.invoiceId],
+            )
+          ).rows,
+        ).toEqual([]);
+        expect((await refusal(() => execute(attempt))).code).toBe('ADMINISTRATIVE_COMMAND_FAILED');
+      }
+      expect(outcomes.map((outcome) => outcome.status)).toEqual(['fulfilled', 'fulfilled']);
+      for (const [index, attempt] of attempts.entries()) {
+        expect(await execute(attempt)).toEqual(
+          (outcomes[index] as PromiseFulfilledResult<unknown>).value,
+        );
+        const links = await pg.tquery<{
+          item: string;
+          quantity: string;
+          price: string;
+          amount: string;
+        }>(
+          INVOICE_MERCHANT,
+          `SELECT rl.inventory_item_id::text AS item,rl.received_quantity::text AS quantity,
+             rl.actual_unit_cost_minor::text AS price,rl.line_total_minor::text AS amount
+           FROM merchant.supplier_invoice_line il JOIN merchant.purchase_order_receipt_line rl
+             ON rl.merchant_id=il.merchant_id AND rl.invoice_line_id=il.id
+           WHERE il.merchant_id=$1::uuid AND il.supplier_invoice_id=$2::uuid ORDER BY il.line_number`,
+          [INVOICE_MERCHANT, attempt.invoiceId],
+        );
+        expect(links.rows).toEqual(
+          index === 0
+            ? [
+                { item: itemA, quantity: '1', price: '101', amount: '101' },
+                { item: itemB, quantity: '2', price: '202', amount: '404' },
+              ]
+            : [
+                { item: itemB, quantity: '3', price: '303', amount: '909' },
+                { item: itemA, quantity: '4', price: '404', amount: '1616' },
+              ],
+        );
+        const receipts = await pg.tquery<{ count: string }>(
+          INVOICE_MERCHANT,
+          'SELECT count(*)::text AS count FROM merchant.purchase_order_receipt WHERE merchant_id=$1::uuid AND command_id=$2::uuid',
+          [INVOICE_MERCHANT, attempt.commandId],
+        );
+        expect(receipts.rows[0].count).toBe('1');
+      }
+      const afterA = await invoiceBalance(itemA);
+      const afterB = await invoiceBalance(itemB);
+      expect(afterA.onHand - beforeA.onHand).toBe(5);
+      expect(afterB.onHand - beforeB.onHand).toBe(5);
+      expect(afterA.inTransit).toBe(beforeA.inTransit);
+      expect(afterB.inTransit).toBe(beforeB.inTransit);
+    });
+
+    it('posts one direct receipt under concurrent requests with the same identity', async () => {
+      const invoiceId = randomUUID();
+      const keys = { commandId: randomUUID(), idempotencyKey: randomUUID() };
+      const parameters = {
+        locationId: INVOICE_LOCATION,
+        inventoryLocationId: INVOICE_STOCK_ROOM,
+        issuedOn: '2026-11-03',
+        currency: 'MXN',
+        lines: [
+          {
+            inventoryItemId: ITEM_INVOICE_PHOTO,
+            quantity: { value: 3, scale: 0, unit: 'unit' },
+            unitCostMinor: 75,
+          },
+        ],
+      };
+      const before = await invoiceBalance(ITEM_INVOICE_PHOTO);
+      const attempts = await Promise.allSettled([
+        command('inventory.purchase.record', invoiceId, parameters, keys),
+        command('inventory.purchase.record', invoiceId, parameters, keys),
+      ]);
+      expect(attempts.some((attempt) => attempt.status === 'fulfilled')).toBe(true);
+      await command('inventory.purchase.record', invoiceId, parameters, keys);
+      const after = await invoiceBalance(ITEM_INVOICE_PHOTO);
+      expect(after.onHand - before.onHand).toBe(3);
+      expect(after.inTransit).toBe(before.inTransit);
+      const posted = await pg.tquery<{ count: string }>(
+        INVOICE_MERCHANT,
+        `SELECT count(*)::text AS count FROM merchant.purchase_order_receipt WHERE merchant_id=$1::uuid AND command_id=$2::uuid`,
+        [INVOICE_MERCHANT, keys.commandId],
+      );
+      expect(posted.rows[0].count).toBe('1');
+    });
+
+    it('refuses unmatched XML, foreign destinations and archived suppliers without purchase facts', async () => {
+      const invoiceId = randomUUID();
+      const unmatched = await uploadXml(
+        invoiceId,
+        cfdiWithOneConcept({
+          uuid: randomUUID(),
+          folio: 'UNMATCHED-DIRECT',
+          description: randomUUID(),
+          sku: null,
+          cantidad: '1',
+          valorUnitario: '1.00',
+          importe: '1.00',
+        }),
+      );
+      expect(unmatched.invoice.lines[0].matchMethod).toBe('unmatched');
+      expect(
+        (
+          await refusal(() =>
+            command('inventory.invoice.receive_direct', invoiceId, {
+              locationId: INVOICE_LOCATION,
+              inventoryLocationId: INVOICE_STOCK_ROOM,
+            }),
+          )
+        ).code,
+      ).toBe('SUPPLIER_INVOICE_UNMATCHED_LINES');
+      const base = {
+        locationId: INVOICE_LOCATION,
+        inventoryLocationId: INVOICE_STOCK_ROOM,
+        issuedOn: '2026-11-03',
+        currency: 'MXN',
+        lines: [
+          {
+            inventoryItemId: ITEM_INVOICE_PHOTO,
+            quantity: { value: 1, scale: 0, unit: 'unit' },
+            unitCostMinor: 100,
+          },
+        ],
+      };
+      const archivedId = randomUUID();
+      await pg.tquery(
+        INVOICE_MERCHANT,
+        `INSERT INTO merchant.supplier(id,merchant_id,public_reference,display_name,active,archived_at)
+         VALUES ($1::uuid,$2::uuid,$1::text,'Archived direct test',false,clock_timestamp())`,
+        [archivedId, INVOICE_MERCHANT],
+      );
+      for (const [parameters, code] of [
+        [{ ...base, inventoryLocationId: NEIGHBOUR_STOCK_ROOM }, 'INVENTORY_LOCATION_CHANGED'],
+        [{ ...base, supplierId: NEIGHBOUR_SUPPLIER }, 'SUPPLIER_NOT_FOUND'],
+        [{ ...base, supplierId: archivedId }, 'SUPPLIER_ARCHIVED'],
+      ] as const) {
+        const id = randomUUID();
+        expect(
+          (await refusal(() => command('inventory.purchase.record', id, parameters))).code,
+        ).toBe(code);
+        expect(
+          (
+            await pg.tquery(
+              INVOICE_MERCHANT,
+              'SELECT id FROM merchant.supplier_invoice WHERE id=$1::uuid',
+              [id],
+            )
+          ).rows,
+        ).toEqual([]);
+      }
+    });
+
+    it('preserves repeated matched XML items as separate receipt lines with their prices', async () => {
+      const invoiceId = randomUUID();
+      const xml = cfdiWithOneConcept({
+        uuid: randomUUID(),
+        folio: 'REPEATED-DIRECT',
+        description: UNMATCHABLE,
+        sku: null,
+        cantidad: '1.25',
+        valorUnitario: '12.50',
+        importe: '15.63',
+      })
+        .replace('SubTotal="15.63"', 'SubTotal="30.63"')
+        .replace('Total="15.63"', 'Total="30.63"')
+        .replace(
+          '</cfdi:Conceptos>',
+          `<cfdi:Concepto ClaveProdServ="50202300" Cantidad="0.75" ClaveUnidad="KGM"
+          Unidad="Kilogramo" Descripcion="Segundo precio" ValorUnitario="20.00" Importe="15.00" ObjetoImp="01"/></cfdi:Conceptos>`,
+        );
+      const uploaded = await uploadXml(invoiceId, xml);
+      await command('inventory.invoice.match', invoiceId, {
+        lines: uploaded.invoice.lines.map((line) => ({
+          lineId: line.id,
+          inventoryItemId: ITEM_INVOICE,
+          supplierSku: null,
+        })),
+      });
+      const before = await invoiceBalance(ITEM_INVOICE);
+      const result = (await command('inventory.invoice.receive_direct', invoiceId, {
+        locationId: INVOICE_LOCATION,
+        inventoryLocationId: INVOICE_STOCK_ROOM,
+      })) as { supplierInvoice: unknown };
+      expect(SupplierInvoice.parse(result.supplierInvoice).lines).toHaveLength(2);
+      const after = await invoiceBalance(ITEM_INVOICE);
+      expect(after.onHand - before.onHand).toBe(2000);
+      expect(after.inTransit).toBe(before.inTransit);
+      const links = await pg.tquery<{ price: string; quantity: string; amount: string }>(
+        INVOICE_MERCHANT,
+        `SELECT rl.actual_unit_cost_minor::text AS price,rl.received_quantity::text AS quantity,rl.line_total_minor::text AS amount
+         FROM merchant.supplier_invoice_line il JOIN merchant.purchase_order_receipt_line rl
+         ON rl.merchant_id=il.merchant_id AND rl.invoice_line_id=il.id
+         WHERE il.merchant_id=$1::uuid AND il.supplier_invoice_id=$2::uuid ORDER BY il.line_number`,
+        [INVOICE_MERCHANT, invoiceId],
+      );
+      expect(links.rows).toEqual([
+        { price: '1250', quantity: '1250', amount: '1563' },
+        { price: '2000', quantity: '750', amount: '1500' },
+      ]);
+    });
+
+    it('preserves repeated manual item rows with separately priced receipt links', async () => {
+      const invoiceId = randomUUID();
+      const before = await invoiceBalance(ITEM_INVOICE);
+      const result = (await command('inventory.purchase.record', invoiceId, {
+        locationId: INVOICE_LOCATION,
+        inventoryLocationId: INVOICE_STOCK_ROOM,
+        issuedOn: '2026-11-03',
+        currency: 'MXN',
+        lines: [
+          {
+            inventoryItemId: ITEM_INVOICE,
+            quantity: { value: 1000, scale: 3, unit: 'kilogram' },
+            unitCostMinor: 1000,
+          },
+          {
+            inventoryItemId: ITEM_INVOICE,
+            quantity: { value: 1000, scale: 3, unit: 'kilogram' },
+            unitCostMinor: 1001,
+          },
+        ],
+      })) as { supplierInvoice: unknown };
+      expect(SupplierInvoice.parse(result.supplierInvoice)).toMatchObject({
+        status: 'committed',
+        totalMinor: 2001,
+      });
+      const after = await invoiceBalance(ITEM_INVOICE);
+      expect(after.onHand - before.onHand).toBe(2000);
+      expect(after.inTransit).toBe(before.inTransit);
+      const links = await pg.tquery<{ price: string; amount: string; entry_type: string }>(
+        INVOICE_MERCHANT,
+        `SELECT rl.actual_unit_cost_minor::text AS price,rl.line_total_minor::text AS amount,e.entry_type
+         FROM merchant.supplier_invoice_line il JOIN merchant.purchase_order_receipt_line rl
+           ON rl.merchant_id=il.merchant_id AND rl.invoice_line_id=il.id
+         JOIN merchant.stock_ledger_entry e ON e.merchant_id=rl.merchant_id AND e.id=rl.stock_ledger_entry_id
+         WHERE il.merchant_id=$1::uuid AND il.supplier_invoice_id=$2::uuid ORDER BY il.line_number`,
+        [INVOICE_MERCHANT, invoiceId],
+      );
+      expect(links.rows).toEqual([
+        { price: '1000', amount: '1000', entry_type: 'purchase_received' },
+        { price: '1001', amount: '1001', entry_type: 'purchase_received' },
+      ]);
+    });
+
+    it('keeps the stored XML line total when the document rounded one cent differently', async () => {
+      const invoiceId = randomUUID();
+      const uploaded = await uploadXml(
+        invoiceId,
+        cfdiWithOneConcept({
+          uuid: randomUUID(),
+          folio: 'ROUND-DIRECT',
+          description: randomUUID(),
+          sku: null,
+          cantidad: '1',
+          valorUnitario: '10.00',
+          importe: '10.01',
+        }),
+      );
+      await command('inventory.invoice.match', invoiceId, {
+        lines: [
+          {
+            lineId: uploaded.invoice.lines[0].id,
+            inventoryItemId: ITEM_INVOICE,
+            supplierSku: null,
+          },
+        ],
+      });
+      await command('inventory.invoice.receive_direct', invoiceId, {
+        locationId: INVOICE_LOCATION,
+        inventoryLocationId: INVOICE_STOCK_ROOM,
+      });
+      const amount = await pg.tquery<{ amount: string }>(
+        INVOICE_MERCHANT,
+        `SELECT rl.line_total_minor::text AS amount FROM merchant.purchase_order_receipt_line rl
+         JOIN merchant.supplier_invoice_line il ON il.merchant_id=rl.merchant_id AND il.id=rl.invoice_line_id
+         WHERE il.merchant_id=$1::uuid AND il.supplier_invoice_id=$2::uuid`,
+        [INVOICE_MERCHANT, invoiceId],
+      );
+      expect(amount.rows).toEqual([{ amount: '1001' }]);
+    });
+
+    it('receives more than 500 repeated XML lines and keeps the order read valid', async () => {
+      const invoiceId = randomUUID();
+      const count = 501;
+      const concept = `<cfdi:Concepto ClaveProdServ="50202300" Cantidad="1" ClaveUnidad="KGM" Unidad="Kilogramo"
+        Descripcion="Multi line direct" ValorUnitario="0.01" Importe="0.01" ObjetoImp="01"/>`;
+      const xml = cfdiWithOneConcept({
+        uuid: randomUUID(),
+        folio: 'MANY-DIRECT',
+        description: randomUUID(),
+        sku: null,
+        cantidad: '1',
+        valorUnitario: '0.01',
+        importe: '0.01',
+      })
+        .replace('SubTotal="0.01"', 'SubTotal="5.01"')
+        .replace('Total="0.01"', 'Total="5.01"')
+        .replace(
+          /<cfdi:Conceptos>[\s\S]*?<\/cfdi:Conceptos>/,
+          `<cfdi:Conceptos>${concept.repeat(count)}</cfdi:Conceptos>`,
+        );
+      const uploaded = await uploadXml(invoiceId, xml);
+      await command('inventory.invoice.match', invoiceId, {
+        lines: uploaded.invoice.lines.map((line) => ({
+          lineId: line.id,
+          inventoryItemId: ITEM_INVOICE,
+          supplierSku: null,
+        })),
+      });
+      await command('inventory.invoice.receive_direct', invoiceId, {
+        locationId: INVOICE_LOCATION,
+        inventoryLocationId: INVOICE_STOCK_ROOM,
+      });
+      const stored = await pg.tquery<{ id: string }>(
+        INVOICE_MERCHANT,
+        `SELECT r.purchase_order_id::text AS id FROM merchant.purchase_order_receipt r
+         JOIN merchant.purchase_order_receipt_line rl ON rl.merchant_id=r.merchant_id AND rl.receipt_id=r.id
+         JOIN merchant.supplier_invoice_line il ON il.merchant_id=rl.merchant_id AND il.id=rl.invoice_line_id
+         WHERE il.merchant_id=$1::uuid AND il.supplier_invoice_id=$2::uuid LIMIT 1`,
+        [INVOICE_MERCHANT, invoiceId],
+      );
+      const read = await scoped(
+        () =>
+          procurement.getPurchaseOrder(
+            invoiceAccess,
+            { locationId: INVOICE_LOCATION },
+            stored.rows[0].id,
+          ),
+        INVOICE_MERCHANT,
+        INVOICE_LOCATION,
+      );
+      expect(PurchaseOrder.parse(read).receipts[0].lines).toHaveLength(count);
+    });
+
+    it('reads purchase context with the merchant timezone, day start and active scoped destinations', async () => {
+      const previous = await pg.tquery<{
+        timezone: string;
+        business_day_start: string;
+        currency: string;
+      }>(
+        INVOICE_MERCHANT,
+        `SELECT timezone,business_day_start::text AS business_day_start,currency FROM merchant.merchant WHERE id=$1::uuid`,
+        [INVOICE_MERCHANT],
+      );
+      try {
+        await pg.tquery(
+          INVOICE_MERCHANT,
+          `UPDATE merchant.merchant SET timezone='Pacific/Kiritimati',business_day_start='23:59:59',currency='USD' WHERE id=$1::uuid`,
+          [INVOICE_MERCHANT],
+        );
+        const context = await procurement.purchaseEntryContext(invoiceAccess, {
+          locationId: INVOICE_LOCATION,
+        });
+        expect(context).toEqual({
+          locationId: INVOICE_LOCATION,
+          currency: 'USD',
+          businessDate: new Date(Date.now() + (14 * 3600 - 86399) * 1000)
+            .toISOString()
+            .slice(0, 10),
+          inventoryLocations: [{ id: INVOICE_STOCK_ROOM, displayName: 'Almacén' }],
+        });
+      } finally {
+        const saved = previous.rows[0];
+        await pg.tquery(
+          INVOICE_MERCHANT,
+          `UPDATE merchant.merchant SET timezone=$2,business_day_start=$3::time,currency=$4 WHERE id=$1::uuid`,
+          [INVOICE_MERCHANT, saved.timezone, saved.business_day_start, saved.currency],
+        );
+      }
+    });
+
+    it('keeps ordinary orders supplier-required at the database boundary', async () => {
+      await expect(
+        pg.tquery(
+          INVOICE_MERCHANT,
+          `INSERT INTO merchant.purchase_order(merchant_id,location_id,inventory_location_id,supplier_id,public_reference,raised_by)
+         VALUES ($1::uuid,$2::uuid,$3::uuid,NULL,$4,$5::uuid)`,
+          [INVOICE_MERCHANT, INVOICE_LOCATION, INVOICE_STOCK_ROOM, randomUUID(), USER],
+        ),
+      ).rejects.toMatchObject({ code: '23514', constraint: 'purchase_order_origin_supplier_ck' });
     });
 
     it('stores a photo and nothing else, and refuses to commit an invoice nobody confirmed', async () => {
