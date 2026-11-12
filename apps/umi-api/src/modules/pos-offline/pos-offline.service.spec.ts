@@ -559,18 +559,11 @@ describe('PosOfflineService', () => {
     });
 
     expect(result.stopped).toBe(false);
-    // A refused table step is settled as an accepted no-op so installed tills
-    // never stop the whole queue on it; the refusal travels in the audit.
-    expect(result.results.map((item) => item.status)).toEqual(['accepted', 'accepted']);
-    expect(replay).toHaveBeenCalledWith(
-      first,
-      null,
-      null,
-      uid(6),
-      expect.any(String),
-      expect.stringContaining('table_unavailable'),
-    );
-    expect(recordStreamConflict).not.toHaveBeenCalled();
+    expect(result.results.map((item) => item.status)).toEqual(['conflict', 'accepted']);
+    expect(result.results[0].failure).toMatchObject({
+      classification: 'table_unavailable',
+      blocksFollowing: false,
+    });
     expect(openTable).toHaveBeenCalledTimes(2);
     expect(result.cursor).toMatchObject({
       lastAcceptedSequence: 2,
@@ -578,7 +571,7 @@ describe('PosOfflineService', () => {
     });
   });
 
-  it('settles every refused step of the same account as a no-op instead of blocking it', async () => {
+  it('blocks only the same account after its earlier command needs action', async () => {
     const first = commandGroup(1, 2, uid(40), uid(42));
     const second = commandGroup(2, 3, uid(40), uid(43));
     const openTable = vi.fn(async () => {
@@ -657,10 +650,15 @@ describe('PosOfflineService', () => {
     });
 
     expect(result.stopped).toBe(false);
-    expect(result.results.map((item) => item.status)).toEqual(['accepted', 'accepted']);
-    expect(openTable).toHaveBeenCalledTimes(2);
+    expect(result.results.map((item) => item.status)).toEqual(['conflict', 'conflict']);
+    expect(result.results[1].failure).toMatchObject({
+      classification: 'stream_blocked',
+      retryable: true,
+      blocksFollowing: false,
+    });
+    expect(openTable).toHaveBeenCalledOnce();
     expect(result.cursor.lastProcessedSequence).toBe(2);
-    expect(result.cursor.lastAcceptedSequence).toBe(2);
+    expect(result.cursor.lastAcceptedSequence).toBe(0);
   });
 
   it('resolves a provisional cart from an earlier replay batch', async () => {
@@ -705,7 +703,7 @@ describe('PosOfflineService', () => {
     expect(result.results[0].status).toBe('accepted');
   });
 
-  it('never applies a command group with more than one effect and settles it as a no-op', async () => {
+  it('refuses a command group with more than one effect without applying it', async () => {
     const group = commandGroup(1);
     const twoEffects = {
       ...group,
@@ -778,17 +776,11 @@ describe('PosOfflineService', () => {
     });
 
     expect(openTable).not.toHaveBeenCalled();
-    expect(conflict).not.toHaveBeenCalled();
-    expect(result.results[0].status).toBe('accepted');
-    expect(repo.replay).toHaveBeenCalledWith(
-      invalid,
-      null,
-      null,
-      uid(6),
-      expect.anything(),
-      expect.stringContaining('server_validation_failed'),
-    );
-    expect(result.stopped).toBe(false);
+    expect(result.results[0]).toMatchObject({
+      status: 'conflict',
+      failure: { classification: 'server_validation_failed' },
+    });
+    expect(result.stopped).toBe(true);
   });
 
   it('settles a table assignment that had already landed as accepted', async () => {
