@@ -350,7 +350,7 @@ export class PosOfflineRepository {
        WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid AND c.device_id=$3::uuid
         AND c.command_type='pos.checkout.cash'
         AND c.payload->>'policyFingerprint'=$4
-        AND c.replayed_at >= COALESCE(
+        AND c.accepted_at >= COALESCE(
           (
             SELECT s.opened_at
             FROM merchant.cash_shift s

@@ -412,14 +412,17 @@ export class PosOfflineService {
             streamKey,
           )) === true
         ) {
-          if (
-            !(await refuseAndContinue(
+          results.push(
+            await this.repo.recordStreamConflict(
               command,
               'stream_blocked',
+              streamKey,
               'earlier_account_command_needs_action',
-            ))
-          )
-            break;
+              true,
+            ),
+          );
+          expectedSequence = Math.max(expectedSequence, command.deviceSequence + 1);
+          lastProcessed = Math.max(lastProcessed, command.deviceSequence);
           continue;
         }
         let officialCommit: OfficialCommitResult | null = null;
@@ -1273,10 +1276,8 @@ export class PosOfflineService {
 
   private isNonFinancialReplayCommand(commandType: string): boolean {
     return (
-      this.isOrderCommand(commandType) ||
       commandType === 'pos.kds.command' ||
-      commandType === 'pos.table.command' ||
-      commandType === 'pos.command.group'
+      (this.isOrderCommand(commandType) && commandType !== 'pos.cart.open')
     );
   }
 
