@@ -53,8 +53,10 @@ final class KitchenAlertTracker {
     bool muted = false,
   }) {
     final sounds = <String>[];
+    final activeKeys = <String>{};
     for (final order in orders) {
       final key = '${order.id}:${order.stationId}';
+      activeKeys.add(key);
       final arrived = _seen.add(key);
       final late = kitchenOrderOverdue(order, now) && _overdue.add(key);
       if (!_initialized ||
@@ -66,6 +68,10 @@ final class KitchenAlertTracker {
       }
       if (arrived) sounds.add(order.arrivalSound ?? 'arrival');
       if (late) sounds.add(order.overdueSound ?? 'overdue');
+    }
+    if (_seen.length > 512) {
+      _seen.retainAll(activeKeys);
+      _overdue.retainAll(activeKeys);
     }
     _initialized = true;
     return sounds.toSet().toList();
