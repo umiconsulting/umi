@@ -19,6 +19,7 @@ export default function Footer() {
           <span>Hablemos</span>
           <a href="mailto:hola@umiconsulting.co">hola@umiconsulting.co</a>
           <Link href="/aviso-de-privacidad">Aviso de privacidad</Link>
+          <Link href="/privacidad-umipos">Privacidad de UmiPOS</Link>
         </div>
       </div>
       <div className="site-width footer-bottom">
