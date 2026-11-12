@@ -87,21 +87,37 @@ Entorno aislado: PostgreSQL 17, roles reales `api` y `worker`, Redis local, API 
 
 | Verificación                                                                                         | Resultado registrado                                                                                                                                                     |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| API: inventario, planificación, compras, DTO y ajustes                                               | 149 pruebas unitarias aprobadas, 15 archivos.                                                                                                                            |
-| Dashboard: recetas, costos, variaciones, preparación, inventario y días                              | 164 pruebas unitarias aprobadas, 7 archivos.                                                                                                                             |
+| API: inventario, planificación, compras, DTO y ajustes                                               | 150 pruebas unitarias aprobadas, 15 archivos.                                                                                                                            |
+| Dashboard: recetas, costos, variaciones, preparación, inventario y días                              | 166 pruebas unitarias aprobadas, 7 archivos.                                                                                                                             |
 | PostgreSQL: compras, autoría, costos, ventas con recetas, costo inicial, preparación y política/plan | 131 pruebas de integración aprobadas, 7 archivos. Incluyen lotes, etiquetas y alérgenos de las suites existentes.                                                        |
-| Navegador visible con respuestas controladas                                                         | 2 recorridos aprobados: días, cancelación, persistencia, guardado fallido y ancho móvil.                                                                                 |
-| Navegador visible con API real                                                                       | Inicio de sesión, endpoint de plan HTTP 200 y pantalla de plan sin historial renderizada.                                                                                |
+| Navegador visible con respuestas controladas                                                         | 6 recorridos aprobados: dos de días de compra y cuatro de recuperación de recetas, incluida recarga completa.                                                            |
+| Navegador visible con API real                                                                       | Guardado y recarga de días, plan HTTP 200, ancho móvil de 390 px, entradas inválidas HTTP 400 y permisos por negocio verificados.                                        |
 | SMTP local                                                                                           | Una aceptación y un mensaje en Mailpit tras dos instancias simultáneas y un intento adicional. La condición de faltante fue un dato controlado del ensayo de transporte. |
-| Compilación                                                                                          | Contrato, API y dashboard compilados durante la implementación. Dashboard mantiene advertencia de tamaño de chunks.                                                      |
+| Compilación                                                                                          | Contrato, API y dashboard compilados; typecheck de API aprobado. Dashboard mantiene advertencia de tamaño de chunks.                                                     |
 
-**Límite del cierre:** a petición del usuario se detuvo la ampliación de pruebas. Después de esos resultados se ajustó el rechazo de ingredientes inactivos y se extrajo la preparación de solicitudes recuperables, añadiendo dos casos de prueba. No se volvió a ejecutar toda la suite tras esos últimos ajustes. El recorrido adicional de permisos/formulario con API real no se completó: los servidores locales se habían detenido durante la interrupción. Los resultados anteriores no deben presentarse como validación de ese recorrido ni del último árbol completo.
+Lint, límite de advertencias y formato aprobados localmente. El límite registra 69 advertencias existentes, sin categorías nuevas.
+
+### Corrección del control automático del PR
+
+Se corrigieron las actualizaciones síncronas de estado dentro de efectos. Los controles de reintento y actualización ahora preparan el estado. El cambio de negocio conserva el reinicio por clave del componente.
+
+Se eliminó una importación sin uso y una supresión obsoleta. Las consultas del plan comparten una exportación de datos y conservan el cliente HTTP existente. No se elevó el límite de advertencias ni se desactivaron reglas.
+
+El mock de PostgreSQL declara los parámetros que inspeccionan las aserciones. Esto corrige el fallo de TypeScript del control `build-and-test`. Las capturas de Playwright usan el directorio temporal del sistema, compatible con Linux y macOS.
+
+La regresión comprueba ingredientes inactivos y recuperación de solicitudes. Después de una recarga completa, el reintento conserva el cuerpo y las identidades del reemplazo confirmado.
+
+**Alcance:** las verificaciones corresponden al entorno local y los datos sintéticos. La aceptación integral en staging, las decisiones D01–D09 y la activación real del correo corresponden al equipo.
 
 ### Comandos para reproducir en revisión
 
 Desde la raíz, con dependencias instaladas:
 
 ```bash
+pnpm lint
+pnpm check:lint-warnings
+pnpm format:check
+pnpm --filter @umi/api typecheck
 pnpm --filter @umi/contract build
 pnpm --filter @umi/contract generate:check
 pnpm --filter @umi/api build
@@ -118,7 +134,7 @@ Desde la raíz:
 
 ```bash
 pnpm --filter @umi/dashboard test src/data.purchase-days.spec.jsx src/screens/recipe-recovery.spec.js src/screens/recipe-model.spec.js src/screens/costing-model.spec.js src/screens/variance-model.spec.js src/screens/inventory-production-model.spec.js src/screens/inventory-model.spec.js
-pnpm --filter @umi/dashboard exec playwright test e2e/purchase-days.pw.js --headed
+pnpm --filter @umi/dashboard exec playwright test e2e/purchase-days.pw.js e2e/recipe-sales-recovery.pw.js --headed
 ```
 
 Con `DATABASE_URL_APP` y `DATABASE_URL_WORKER` de una base **desechable** preparada con el esquema y sus migraciones, desde `apps/umi-api`:
@@ -136,10 +152,18 @@ La nueva suite de política/plan también está incluida en `test:integration:sc
 | H01–H10   | Funciones previas; no se reconstruyen. Compras de #268 ya están en staging. Se ejecutaron regresiones relacionadas.                                               |
 | H11–H14   | Días, ventas previstas, necesidades y reposición implementados con las reglas propuestas arriba.                                                                  |
 | H15–H16   | Canal SMTP comprobado localmente y avisos implementados; activación real y comprobación de producción pendientes.                                                 |
-| H17–H18   | Política automática y recuperación tras recarga implementadas; verificar el recorrido final de operador.                                                          |
+| H17–H18   | Política automática comprobada con PostgreSQL. Recuperación tras recarga y reintento exacto comprobados en navegador.                                             |
 | H19       | Validación integral en staging pendiente de revisión e integración de este PR.                                                                                    |
 | H20       | Promoción a producción pendiente; no se realiza desde este trabajo.                                                                                               |
 | H21       | Opciones adicionales como PDF/OCR ampliado no incorporadas; no eran parte aprobada de estas propuestas.                                                           |
 | H22       | Suites existentes de costos, diferencias, preparaciones y autoría ejecutadas. La aceptación operativa en staging y sus límites de trazabilidad siguen pendientes. |
 
 Para continuar con Codex: leer este documento y la investigación enlazada, comprobar la rama/base actuales, ejecutar solo las verificaciones pendientes o afectadas, revisar D01–D09 con el equipo y registrar la validación de staging. No asumir que el correo está activado ni que este PR ya fue fusionado o desplegado.
+
+### Permisos comprobados con API real
+
+- Dueño y operador con `merchant.manage`: plan HTTP 200.
+- Usuario con solo `inventory.read`: plan HTTP 403.
+- Negocio ajeno al operador: HTTP 404, sin exponer su existencia.
+- Días nulos, repetidos o fuera del rango: HTTP 400.
+- El dueño del ensayo pertenece a ambos negocios; su acceso a ambos es válido.

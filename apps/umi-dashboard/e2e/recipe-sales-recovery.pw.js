@@ -39,3 +39,10 @@ test('shows the Spanish domain error and keeps the draft editable', async ({
 }) => {
   await translatedError(page, baseURL);
 });
+
+test('recovers the exact pending replacement after a full page reload', async ({
+  recipePage: page,
+  baseURL,
+}) => {
+  await replacementRecovery(page, baseURL, true);
+});

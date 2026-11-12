@@ -569,20 +569,22 @@ async function _loadVoiceConfig(ctx) {
   return _apiFetch(_merchantPath(ctx, '/conversaflow/voice'));
 }
 
-export async function loadInventoryAlertSettings(merchantId) {
-  return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/settings`);
-}
+export const inventoryPlanningData = {
+  async loadInventoryAlertSettings(merchantId) {
+    return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/settings`);
+  },
 
-export async function loadInventoryPlan(merchantId, locationId) {
-  const query = locationId ? `?locationId=${encodeURIComponent(locationId)}` : '';
-  return _apiFetch(routes.inventory.plan(merchantId) + query);
-}
+  async loadInventoryPlan(merchantId, locationId) {
+    const query = locationId ? `?locationId=${encodeURIComponent(locationId)}` : '';
+    return _apiFetch(routes.inventory.plan(merchantId) + query);
+  },
 
-export async function loadPurchaseDays(merchantId) {
-  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
-  const settings = await _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/settings`);
-  return settings.purchaseDays ?? [];
-}
+  async loadPurchaseDays(merchantId) {
+    if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+    const settings = await _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/settings`);
+    return settings.purchaseDays ?? [];
+  },
+};
 
 async function saveMerchantSettings(
   patch,

@@ -11,7 +11,8 @@ function setup({ enabled = true, optIn = true, accepted = true, complete = true 
     day: '2026-11-11',
   };
   const pg = {
-    query: vi.fn(async (sql: string) => {
+    query: vi.fn(async (sql: string, params?: unknown[]) => {
+      void params;
       if (sql.includes('SELECT DISTINCT')) return { rows: optIn ? [owner] : [] };
       if (sql.startsWith('INSERT')) {
         if (claimed) return { rows: [] };

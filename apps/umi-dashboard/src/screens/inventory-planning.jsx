@@ -1,7 +1,7 @@
 import './inventory-planning.css';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { loadInventoryPlan } from '@/data.jsx';
+import { inventoryPlanningData } from '@/data.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { formatMoney, formatNumber } from '@/lib/format.js';
 
@@ -30,9 +30,8 @@ function Planning({ merchantId, locationId, name, location }) {
   );
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
-    loadInventoryPlan(merchantId, locationId)
+    inventoryPlanningData
+      .loadInventoryPlan(merchantId, locationId)
       .then((value) => {
         if (active) setData(value);
       })
@@ -46,11 +45,16 @@ function Planning({ merchantId, locationId, name, location }) {
       active = false;
     };
   }, [merchantId, locationId, refresh]);
+  const refreshPlan = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    setRefresh((value) => value + 1);
+  }, []);
   useEffect(() => {
-    const refreshOnFocus = () => setRefresh((value) => value + 1);
+    const refreshOnFocus = refreshPlan;
     window.addEventListener('focus', refreshOnFocus);
     return () => window.removeEventListener('focus', refreshOnFocus);
-  }, []);
+  }, [refreshPlan]);
   const quantity = (value, scale = 0) =>
     value === null
       ? t`Sin estimación`
@@ -66,11 +70,7 @@ function Planning({ merchantId, locationId, name, location }) {
         <h2>
           <Trans>Plan de compra</Trans>
         </h2>
-        <button
-          className="btn btn-secondary"
-          disabled={loading}
-          onClick={() => setRefresh((value) => value + 1)}
-        >
+        <button className="btn btn-secondary" disabled={loading} onClick={refreshPlan}>
           <Trans>Actualizar</Trans>
         </button>
       </div>

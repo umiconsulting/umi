@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Trans } from '@lingui/react/macro';
-import { loadInventoryAlertSettings, saveMerchantSettings } from '@/data.jsx';
+import { inventoryPlanningData, saveMerchantSettings } from '@/data.jsx';
 export function InventoryAlertSettings({ merchantId }) {
   const [base, setBase] = useState(null);
   const [draft, setDraft] = useState(false);
@@ -13,8 +13,8 @@ export function InventoryAlertSettings({ merchantId }) {
   useEffect(() => {
     let current = true;
     active.current = true;
-    setError(null);
-    loadInventoryAlertSettings(merchantId)
+    inventoryPlanningData
+      .loadInventoryAlertSettings(merchantId)
       .then((value) => {
         if (current) {
           setBase(value.inventoryPlanningEmailEnabled === true);
@@ -63,7 +63,13 @@ export function InventoryAlertSettings({ merchantId }) {
       {error && <p role="alert">{error}</p>}
       {base === null ? (
         error ? (
-          <button className="btn btn-secondary" onClick={() => setRetry((value) => value + 1)}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              setError(null);
+              setRetry((value) => value + 1);
+            }}
+          >
             <Trans>Reintentar</Trans>
           </button>
         ) : (

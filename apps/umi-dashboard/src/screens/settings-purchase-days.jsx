@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { loadPurchaseDays, saveMerchantSettings } from '@/data.jsx';
+import { inventoryPlanningData, saveMerchantSettings } from '@/data.jsx';
 
 /** Mount with a merchant key so pending requests cannot replace another business's draft. */
 export function PurchaseDays({ merchantId }) {
@@ -16,9 +16,8 @@ export function PurchaseDays({ merchantId }) {
   useEffect(() => {
     let current = true;
     active.current = true;
-    setBase(null);
-    setError(null);
-    loadPurchaseDays(merchantId)
+    inventoryPlanningData
+      .loadPurchaseDays(merchantId)
       .then((days) => {
         if (!current) return;
         setBase(days);
@@ -77,7 +76,14 @@ export function PurchaseDays({ merchantId }) {
       {error && <p role="alert">{error}</p>}
       {base === null ? (
         error ? (
-          <button type="button" className="btn btn-secondary" onClick={() => setRetry(retry + 1)}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              setError(null);
+              setRetry(retry + 1);
+            }}
+          >
             <Trans>Reintentar</Trans>
           </button>
         ) : (

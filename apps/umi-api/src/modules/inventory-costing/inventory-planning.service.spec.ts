@@ -10,6 +10,7 @@ function setup(
   options: {
     noHistory?: boolean;
     incomplete?: boolean;
+    inactiveIngredient?: boolean;
     noCost?: boolean;
     negative?: boolean;
     days?: number[];
@@ -45,7 +46,10 @@ function setup(
           ? []
           : [{ mappingId, parentId: null, itemId, numerator: '3', denominator: '1' }],
       };
-    if (sql.includes('AS tracked')) return { rows: [{ itemId, tracked: true, hasRecipe: false }] };
+    if (sql.includes('AS tracked'))
+      return {
+        rows: options.inactiveIngredient ? [] : [{ itemId, tracked: true, hasRecipe: false }],
+      };
     if (sql.includes('stock_balance'))
       return { rows: [{ itemId, available: options.negative ? '-1' : '1' }] };
     if (sql.includes('inventory_planning_delivery')) return { rows: [] };
@@ -123,6 +127,13 @@ describe('purchase plan', () => {
       expect(plan.items[0].expectedConsumption).toBeNull();
     },
   );
+  it('withholds the plan when a recipe references an inactive ingredient', async () => {
+    const { service, access } = setup({ inactiveIngredient: true });
+    const plan = await service.plan(access as never, {});
+    expect(plan.complete).toBe(false);
+    expect(plan.warnings).toContain('incomplete_recipes');
+    expect(plan.products[0].mapped).toBe(false);
+  });
   it('keeps negative balances and unknown cost', async () => {
     const { service, access } = setup({ negative: true, noCost: true });
     const plan = await service.plan(access as never, {});
