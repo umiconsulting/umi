@@ -559,11 +559,18 @@ describe('PosOfflineService', () => {
     });
 
     expect(result.stopped).toBe(false);
-    expect(result.results.map((item) => item.status)).toEqual(['conflict', 'accepted']);
-    expect(result.results[0].failure).toMatchObject({
-      classification: 'table_unavailable',
-      blocksFollowing: false,
-    });
+    // A refused table step is settled as an accepted no-op so installed tills
+    // never stop the whole queue on it; the refusal travels in the audit.
+    expect(result.results.map((item) => item.status)).toEqual(['accepted', 'accepted']);
+    expect(replay).toHaveBeenCalledWith(
+      first,
+      null,
+      null,
+      uid(6),
+      expect.any(String),
+      expect.stringContaining('table_unavailable'),
+    );
+    expect(recordStreamConflict).not.toHaveBeenCalled();
     expect(openTable).toHaveBeenCalledTimes(2);
     expect(result.cursor).toMatchObject({
       lastAcceptedSequence: 2,
@@ -571,7 +578,7 @@ describe('PosOfflineService', () => {
     });
   });
 
-  it('blocks only the same account after its earlier command needs action', async () => {
+  it('settles every refused step of the same account as a no-op instead of blocking it', async () => {
     const first = commandGroup(1, 2, uid(40), uid(42));
     const second = commandGroup(2, 3, uid(40), uid(43));
     const openTable = vi.fn(async () => {
@@ -628,7 +635,15 @@ describe('PosOfflineService', () => {
       ),
       hasResolvedConflict: vi.fn(async () => false),
       commandResult: vi.fn(async () => null),
-      replay: vi.fn(),
+      replay: vi.fn(async (value: OfflineCommand) => ({
+        commandId: value.commandId,
+        deviceSequence: value.deviceSequence,
+        status: 'accepted' as const,
+        officialId: null,
+        officialCommit: null,
+        serverConflictReference: null,
+        failure: null,
+      })),
     } as unknown as PosOfflineRepository;
 
     const result = await new PosOfflineService(
@@ -642,15 +657,10 @@ describe('PosOfflineService', () => {
     });
 
     expect(result.stopped).toBe(false);
-    expect(result.results.map((item) => item.status)).toEqual(['conflict', 'conflict']);
-    expect(result.results[1].failure).toMatchObject({
-      classification: 'stream_blocked',
-      retryable: true,
-      blocksFollowing: false,
-    });
-    expect(openTable).toHaveBeenCalledOnce();
+    expect(result.results.map((item) => item.status)).toEqual(['accepted', 'accepted']);
+    expect(openTable).toHaveBeenCalledTimes(2);
     expect(result.cursor.lastProcessedSequence).toBe(2);
-    expect(result.cursor.lastAcceptedSequence).toBe(0);
+    expect(result.cursor.lastAcceptedSequence).toBe(2);
   });
 
   it('resolves a provisional cart from an earlier replay batch', async () => {
@@ -695,7 +705,7 @@ describe('PosOfflineService', () => {
     expect(result.results[0].status).toBe('accepted');
   });
 
-  it('refuses a command group with more than one effect without applying it', async () => {
+  it('never applies a command group with more than one effect and settles it as a no-op', async () => {
     const group = commandGroup(1);
     const twoEffects = {
       ...group,
@@ -746,6 +756,15 @@ describe('PosOfflineService', () => {
       })),
       policy: vi.fn(async () => null),
       recordConflict: conflict,
+      replay: vi.fn(async (value: OfflineCommand) => ({
+        commandId: value.commandId,
+        deviceSequence: value.deviceSequence,
+        status: 'accepted' as const,
+        officialId: null,
+        officialCommit: null,
+        serverConflictReference: null,
+        failure: null,
+      })),
     } as unknown as PosOfflineRepository;
 
     const result = await new PosOfflineService(
@@ -759,11 +778,17 @@ describe('PosOfflineService', () => {
     });
 
     expect(openTable).not.toHaveBeenCalled();
-    expect(result.results[0]).toMatchObject({
-      status: 'conflict',
-      failure: { classification: 'server_validation_failed' },
-    });
-    expect(result.stopped).toBe(true);
+    expect(conflict).not.toHaveBeenCalled();
+    expect(result.results[0].status).toBe('accepted');
+    expect(repo.replay).toHaveBeenCalledWith(
+      invalid,
+      null,
+      null,
+      uid(6),
+      expect.anything(),
+      expect.stringContaining('server_validation_failed'),
+    );
+    expect(result.stopped).toBe(false);
   });
 
   it('settles a table assignment that had already landed as accepted', async () => {
@@ -1313,7 +1338,7 @@ describe('PosOfflineService', () => {
     });
   });
 
-  it('replays a LAN kitchen bump in order and keeps a cloud refusal visible', async () => {
+  it('replays a LAN kitchen bump in order and settles a cloud refusal as an audited no-op', async () => {
     const kitchen = {
       commandForReplay: vi
         .fn()
@@ -1349,6 +1374,15 @@ describe('PosOfflineService', () => {
       })),
       policy: vi.fn(async () => null),
       recordConflict,
+      replay: vi.fn(async (value: OfflineCommand) => ({
+        commandId: value.commandId,
+        deviceSequence: value.deviceSequence,
+        status: 'accepted' as const,
+        officialId: null,
+        officialCommit: null,
+        serverConflictReference: null,
+        failure: null,
+      })),
     } as unknown as PosOfflineRepository;
     const unsigned = {
       ...command(1),
@@ -1398,14 +1432,17 @@ describe('PosOfflineService', () => {
       `pos-cart:${uid(40)}`,
       { [uid(124)]: 0 },
     );
-    expect(result.results[0].status).toBe('conflict');
-    expect(recordConflict).toHaveBeenCalledWith(
+    expect(result.results[0].status).toBe('accepted');
+    expect(recordConflict).not.toHaveBeenCalled();
+    expect(repo.replay).toHaveBeenCalledWith(
       kitchenCommand,
-      'aggregate_version_conflict',
-      true,
-      'kitchen_refusal:KITCHEN_VERSION_CONFLICT',
+      null,
+      null,
+      uid(6),
+      `kitchen:${uid(123)}`,
+      'aggregate_version_conflict:kitchen_refusal:KITCHEN_VERSION_CONFLICT',
     );
-    expect(result.stopped).toBe(true);
+    expect(result.stopped).toBe(false);
   });
 
   it('reconciliation exposes gaps without accepting client timestamps', async () => {
@@ -1430,5 +1467,189 @@ describe('PosOfflineService', () => {
     );
     expect(result.missingSequences).toEqual([3, 4]);
     expect(result.reconciliationRequired).toBe(true);
+  });
+
+  it('settles a replayed cash checkout idempotently when the cart is already committed and ignores stream_blocked', async () => {
+    const now = new Date().toISOString();
+    const policyIssuedAt = new Date(Date.now() - 5_000);
+    const policyExpiresAt = new Date(Date.now() + 600_000);
+    const money = (minorUnits: number) => ({ currency: 'MXN', minorUnits });
+    const trustedFingerprint = 'a'.repeat(64);
+    const trustedTotals = {
+      cartVersion: 1,
+      catalogVersion: 'catalog-1',
+      pricingVersion: 'pricing-1',
+      taxVersion: 'tax-1',
+      fingerprint: trustedFingerprint,
+      storedValueFingerprint: null,
+      snapshotAt: now,
+      confirmedAt: now,
+      totals: {
+        subtotal: money(20_000),
+        discounts: { total: money(0), entries: [] },
+        tax: money(2_759),
+        grandTotal: money(20_000),
+        businessDate: '2026-10-17',
+      },
+      discounts: { total: money(0), entries: [] },
+      taxes: {
+        total: money(2_759),
+        entries: [],
+      },
+    };
+    const cartSnapshot = {
+      id: uid(40),
+      merchantId: uid(4),
+      locationId: uid(5),
+      operatorSessionId: uid(6),
+      accountOwnerActive: null,
+      status: 'draft',
+      accountFolio: null,
+      createdAt: null,
+      lifecycleState: 'building_cart',
+      version: 1,
+      firedOrderId: null,
+      fulfillmentType: 'dine_in',
+      items: [],
+      totals: trustedTotals.totals,
+      checkoutEnabled: false,
+      checkoutMessageCode: 'CHECKOUT_GATE_NOT_AVAILABLE',
+      updatedAt: now,
+    };
+    const checkoutCommand = {
+      commandId: uid(100),
+      customerValueFingerprintCommandId: uid(101),
+      cartId: uid(40),
+      locationId: uid(5),
+      operatorSessionId: uid(6),
+      cashShiftId: null,
+      expectedCartVersion: 1,
+      paymentMethod: 'cash',
+      totalsFingerprint: trustedFingerprint,
+      idempotencyKey: uid(102),
+      tenderDrafts: [
+        {
+          id: uid(103),
+          type: 'cash',
+          amount: money(20_000),
+          amountReceived: money(20_000),
+          tipAmount: money(0),
+          status: 'draft',
+          correlationId: null,
+        },
+      ],
+      tipDraft: null,
+      discountDrafts: [],
+      approvalIds: [],
+      receiptDelivery: {
+        destination: 'display',
+        channel: null,
+        customerContactId: null,
+      },
+      customerValue: null,
+    };
+    const replayed = vi.fn(async (value: OfflineCommand, commit?: unknown) => ({
+      commandId: value.commandId,
+      deviceSequence: value.deviceSequence,
+      status: 'accepted' as const,
+      officialId: uid(81),
+      officialCommit: commit ?? null,
+      serverConflictReference: null,
+      failure: null,
+    }));
+    const repo = {
+      acquireReplayLock: vi.fn(async () => async () => undefined),
+      context: vi.fn(async () => ({
+        lifecycle: 'active',
+        credentialVersion: 1,
+        deviceKind: 'pos_terminal',
+        currency: 'MXN',
+        permissions: ['offline.replay', 'offline.cash.checkout'],
+        entitlements: [{ featureKey: 'pos.offline_cash', enabled: true }],
+        lastAcceptedSequence: 0,
+      })),
+      policy: vi.fn(async () => ({
+        id: uid(70),
+        enabled: true,
+        version: 'policy-1',
+        currency: 'MXN',
+        maxPolicyAgeSeconds: 600,
+        maxSingleSaleMinorUnits: '100000',
+        maxAccumulatedMinorUnits: '100000',
+        maxOfflineSaleCount: 10,
+        maxActiveQueueDepth: 10,
+        maxCommandAgeSeconds: 3600,
+        maxCatalogAgeSeconds: 900,
+        maxPricingAgeSeconds: 900,
+        maxTaxAgeSeconds: 900,
+        managerApprovalThresholdMinorUnits: null,
+        allowedDeviceClasses: ['pos_terminal'],
+        issuedAt: policyIssuedAt,
+        expiresAt: policyExpiresAt,
+      })),
+      cashExposure: vi.fn(async () => ({ count: 99, amount: 999_000 })),
+      hasOpenStreamConflict: vi.fn(async () => true),
+      committedSaleForCart: vi.fn(async () => ({
+        saleId: uid(81),
+        receiptId: uid(83),
+        receiptNumber: '0042',
+        businessDate: '2026-10-17',
+        committedAt: now,
+        paymentAttemptId: uid(84),
+        paymentAmountMinorUnits: 20_000,
+        paymentCurrency: 'MXN',
+        paymentCorrelationId: uid(85),
+      })),
+      replay: replayed,
+    } as unknown as PosOfflineRepository;
+    const service = new PosOfflineService(repo, checkout, cart, kds);
+    const issued = await service.issuePolicy(user, uid(4), {
+      locationId: uid(5),
+      operatorSessionId: uid(6),
+      credentialVersion: 1,
+    });
+    const unsigned = {
+      ...command(1),
+      commandType: 'pos.checkout.cash' as const,
+      provisionalId: uid(80),
+      createdAt: now,
+      payload: {
+        policyVersion: issued.cash.version,
+        policyFingerprint: issued.cash.fingerprint,
+        checkoutIdentity: 'f'.repeat(64),
+        snapshot: {
+          checkoutCommand,
+          cartSnapshot,
+          totals: trustedTotals,
+          catalogVersion: 'catalog-1',
+          pricingVersion: 'pricing-1',
+          taxVersion: 'tax-1',
+          catalogSnapshotAt: now,
+          pricingSnapshotAt: now,
+          taxSnapshotAt: now,
+          currency: 'MXN',
+          amountDueMinorUnits: 20_000,
+          amountReceivedMinorUnits: 20_000,
+          changeDueMinorUnits: 0,
+          businessDate: '2026-10-17',
+        },
+      },
+      fingerprint: undefined,
+    };
+    delete (unsigned as { fingerprint?: string }).fingerprint;
+    const envelope: OfflineCommand = {
+      ...unsigned,
+      fingerprint: createHash('sha256').update(canonicalJson(unsigned)).digest('hex'),
+    };
+    const result = await service.batch(user, uid(4), {
+      replaySessionId: uid(9),
+      commands: [envelope],
+    });
+    expect(result.results[0].status).toBe('accepted');
+    expect(result.results[0].officialCommit).toMatchObject({
+      officialSaleId: uid(81),
+      officialReceiptId: uid(83),
+      officialReceiptNumber: '0042',
+    });
   });
 });

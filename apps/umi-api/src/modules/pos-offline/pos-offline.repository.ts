@@ -143,6 +143,7 @@ export class PosOfflineRepository {
     officialId: string | null = null,
     replayOperatorSessionId: string = command.operatorSessionId,
     streamKey: string | null = null,
+    skippedReason: string | null = null,
   ): Promise<ReplayResult> {
     const provisionalId = normalizeProvisionalId(command.provisionalId);
     return this.pg.runWithMerchant(
@@ -190,7 +191,13 @@ export class PosOfflineRepository {
              FROM merchant.offline_replay_conflict
              WHERE merchant_id=$1::uuid AND device_id=$2::uuid
                AND credential_version=$3 AND command_id=$4::uuid
-               AND resolution_state='resolved'
+               AND (
+                 resolution_state='resolved'
+                 OR (
+                   command_type='pos.checkout.cash'
+                   AND classification IN ('offline_limit_exceeded','stream_blocked','command_expired')
+                 )
+               )
              LIMIT 1`,
             [
               command.merchantId,
@@ -253,9 +260,17 @@ export class PosOfflineRepository {
               SET resolution_state='resolved',
                   resolution_acknowledged_at=COALESCE(resolution_acknowledged_at, clock_timestamp()),
                   last_observed_at=clock_timestamp()
-            WHERE merchant_id=$1::uuid AND device_id=$2::uuid AND command_id=$3::uuid
+            WHERE merchant_id=$1::uuid AND device_id=$2::uuid
+              AND (
+                command_id=$3::uuid
+                OR (
+                  $4::text IS NOT NULL
+                  AND $5::text = 'pos.checkout.cash'
+                  AND stream_key = $4::text
+                )
+              )
               AND resolution_state <> 'resolved'`,
-          [command.merchantId, command.deviceId, command.commandId],
+          [command.merchantId, command.deviceId, command.commandId, streamKey, command.commandType],
         );
         if (officialCommit && provisionalId) {
           await client.query(
@@ -263,7 +278,7 @@ export class PosOfflineRepository {
             (merchant_id,location_id,device_id,command_id,provisional_id,official_sale_id,
              official_receipt_id,official_receipt_number,reconciliation_reference)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-           ON CONFLICT (merchant_id,provisional_id) DO NOTHING`,
+           ON CONFLICT DO NOTHING`,
             [
               command.merchantId,
               command.locationId,
@@ -282,7 +297,10 @@ export class PosOfflineRepository {
            WHERE merchant_id=$1 AND provisional_id=$2`,
             [command.merchantId, provisionalId],
           );
-          if (mapping.rows[0]?.officialSaleId !== officialCommit.officialSaleId) {
+          if (
+            mapping.rows[0]?.officialSaleId &&
+            mapping.rows[0].officialSaleId !== officialCommit.officialSaleId
+          ) {
             throw new Error('PROVISIONAL_MAPPING_CONFLICT');
           }
         }
@@ -296,7 +314,8 @@ export class PosOfflineRepository {
             'commandType',$4::text,
             'deviceSequence',$5::bigint,
             'originDeviceId',$6::text,
-            'originOperatorSessionId',$7::text
+            'originOperatorSessionId',$7::text,
+            'skippedReason',$8::text
           ),$3::text,'')`,
           [
             command.merchantId,
@@ -306,6 +325,7 @@ export class PosOfflineRepository {
             command.deviceSequence,
             command.originDeviceId ?? null,
             command.originOperatorSessionId ?? null,
+            skippedReason,
           ],
         );
         return result;
@@ -324,12 +344,32 @@ export class PosOfflineRepository {
       merchantId,
       locationId,
       `SELECT count(*)::text AS count,
-              COALESCE(sum((payload->'snapshot'->>'amountDueMinorUnits')::bigint),0)::text
+              COALESCE(sum((c.payload->'snapshot'->>'amountDueMinorUnits')::bigint),0)::text
                 AS amount
-       FROM merchant.offline_replay_command
-       WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND device_id=$3::uuid
-        AND command_type='pos.checkout.cash'
-        AND payload->>'policyFingerprint'=$4`,
+       FROM merchant.offline_replay_command c
+       WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid AND c.device_id=$3::uuid
+        AND c.command_type='pos.checkout.cash'
+        AND c.payload->>'policyFingerprint'=$4
+        AND c.replayed_at >= COALESCE(
+          (
+            SELECT s.opened_at
+            FROM merchant.cash_shift s
+            WHERE s.merchant_id=$1::uuid
+              AND s.location_id=$2::uuid
+              AND s.status='open'
+            ORDER BY s.opened_at DESC
+            LIMIT 1
+          ),
+          (
+            SELECT COALESCE(s.closed_at, s.opened_at)
+            FROM merchant.cash_shift s
+            WHERE s.merchant_id=$1::uuid
+              AND s.location_id=$2::uuid
+            ORDER BY s.opened_at DESC
+            LIMIT 1
+          ),
+          clock_timestamp() - interval '12 hours'
+        )`,
       [merchantId, locationId, deviceId, policyFingerprint],
     );
     return {
@@ -933,11 +973,155 @@ export class PosOfflineRepository {
            AND device_id=$3::uuid
            AND credential_version=$4
            AND command_id=$5::uuid
-           AND resolution_state='resolved'
+           AND (
+             resolution_state='resolved'
+             OR (
+               command_type='pos.checkout.cash'
+               AND classification IN ('offline_limit_exceeded','stream_blocked','command_expired')
+             )
+           )
        ) AS found`,
       [merchantId, locationId, deviceId, credentialVersion, commandId],
     );
     return rows[0]?.found === true;
+  }
+
+  async cartStateForReplay(
+    merchantId: string,
+    locationId: string,
+    cartId: string,
+  ): Promise<{
+    id: string;
+    status: string;
+    lifecycleState: string;
+    version: number;
+    operatorSessionId: string;
+  } | null> {
+    const { rows } = await this.scopedQuery<{
+      id: string;
+      status: string;
+      lifecycleState: string;
+      version: number;
+      operatorSessionId: string;
+    }>(
+      merchantId,
+      locationId,
+      `SELECT id::text AS id,
+              status,
+              lifecycle_state AS "lifecycleState",
+              version,
+              operator_session_id::text AS "operatorSessionId"
+       FROM merchant.pos_cart
+       WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND id=$3::uuid
+       LIMIT 1`,
+      [merchantId, locationId, cartId],
+    );
+    return rows[0] ?? null;
+  }
+
+  async resumeSuspendedCartForReplay(
+    merchantId: string,
+    locationId: string,
+    cartId: string,
+    operatorSessionId: string,
+    resumeFromSuspended: boolean,
+  ): Promise<number | null> {
+    const { rows } = await this.scopedQuery<{ version: number }>(
+      merchantId,
+      locationId,
+      `WITH parked AS (
+         UPDATE merchant.pos_cart other
+         SET lifecycle_state='suspended',
+             updated_at=clock_timestamp()
+         FROM merchant.pos_cart target
+         WHERE target.merchant_id=$1::uuid
+           AND target.location_id=$2::uuid
+           AND target.id=$3::uuid
+           AND $5::boolean
+           AND other.merchant_id=$1::uuid
+           AND other.location_id=$2::uuid
+           AND other.operator_user_id=target.operator_user_id
+           AND other.id <> target.id
+           AND other.status IN ('draft','prepared')
+           AND other.lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
+       )
+       UPDATE merchant.pos_cart
+       SET lifecycle_state=CASE
+             WHEN $5::boolean AND lifecycle_state='suspended' THEN 'recovered'
+             ELSE lifecycle_state
+           END,
+           operator_session_id=$4::uuid,
+           updated_at=clock_timestamp()
+       WHERE merchant_id=$1::uuid
+         AND location_id=$2::uuid
+         AND id=$3::uuid
+         AND status IN ('draft','prepared')
+       RETURNING version`,
+      [merchantId, locationId, cartId, operatorSessionId, resumeFromSuspended],
+    );
+    return rows[0]?.version ?? null;
+  }
+
+  async committedSaleForCart(
+    merchantId: string,
+    locationId: string,
+    cartId: string,
+  ): Promise<{
+    saleId: string;
+    receiptId: string;
+    receiptNumber: string;
+    businessDate: string;
+    committedAt: string;
+    paymentAttemptId: string;
+    paymentAmountMinorUnits: number;
+    paymentCurrency: string;
+    paymentCorrelationId: string;
+  } | null> {
+    const { rows } = await this.scopedQuery<{
+      saleId: string;
+      receiptId: string;
+      receiptNumber: string;
+      businessDate: string;
+      committedAt: string;
+      paymentAttemptId: string;
+      paymentAmountMinorUnits: string;
+      paymentCurrency: string;
+      paymentCorrelationId: string;
+    }>(
+      merchantId,
+      locationId,
+      `SELECT s.id::text AS "saleId",
+              s.receipt_snapshot_id::text AS "receiptId",
+              r.receipt_number AS "receiptNumber",
+              r.business_date::text AS "businessDate",
+              s.committed_at::text AS "committedAt",
+              s.payment_attempt_id::text AS "paymentAttemptId",
+              p.amount_minor_units::text AS "paymentAmountMinorUnits",
+              p.currency AS "paymentCurrency",
+              COALESCE(p.correlation_id, s.id::text) AS "paymentCorrelationId"
+       FROM merchant.pos_committed_sale s
+       JOIN merchant.receipt_snapshot r ON r.id = s.receipt_snapshot_id
+       JOIN merchant.pos_payment_attempt p ON p.id = s.payment_attempt_id
+       WHERE s.merchant_id=$1::uuid
+         AND s.location_id=$2::uuid
+         AND s.cart_id=$3::uuid
+       ORDER BY s.committed_at DESC
+       LIMIT 1`,
+      [merchantId, locationId, cartId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      saleId: row.saleId,
+      receiptId: row.receiptId,
+      receiptNumber: row.receiptNumber,
+      businessDate: row.businessDate,
+      committedAt: row.committedAt,
+      paymentAttemptId: row.paymentAttemptId,
+      paymentAmountMinorUnits: Number(row.paymentAmountMinorUnits),
+      paymentCurrency: row.paymentCurrency,
+      paymentCorrelationId: row.paymentCorrelationId,
+    };
   }
 }
 

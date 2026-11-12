@@ -278,6 +278,48 @@ export class PosOfflineService {
       classification: ConflictClassification,
       guidanceCode: string = classification,
     ): Promise<boolean> => {
+      /*
+       * A refused NON-FINANCIAL step (cart line, table, kitchen bump, account
+       * group) is settled as an accepted no-op instead of a conflict.
+       *
+       * Installed tills (Build 337) stop ALL automatic replay and show
+       * "Conciliación necesaria" for any conflict that is not one of their
+       * self-resolving cart types, and a till that cannot be updated cannot
+       * learn a new rule. The refused step created no money and the server's
+       * own state is the authority: keeping it open preserves nothing and
+       * blocks every later sale. The refusal is kept in the log and audit
+       * (`skippedReason`). Cash checkouts and integrity refusals never reach
+       * this branch as a no-op.
+       */
+      if (
+        this.isNonFinancialReplayCommand(command.commandType) &&
+        classification !== 'device_revoked'
+      ) {
+        this.logger.warn(
+          `offline_replay_noncritical_refusal_settled commandId=${command.commandId} ` +
+            `type=${command.commandType} seq=${command.deviceSequence} ` +
+            `classification=${classification} guidance=${guidanceCode}`,
+        );
+        const settled = await this.repo.replay(
+          command,
+          null,
+          null,
+          scope.operatorSessionId,
+          this.streamKey(command),
+          `${classification}:${guidanceCode}`,
+        );
+        results.push(settled);
+        if (settled.status === 'accepted' || settled.status === 'duplicate') {
+          lastAccepted = Math.max(lastAccepted, command.deviceSequence);
+        }
+        if (settled.failure?.blocksFollowing) {
+          stopped = true;
+          return false;
+        }
+        expectedSequence = Math.max(expectedSequence, command.deviceSequence + 1);
+        lastProcessed = Math.max(lastProcessed, command.deviceSequence);
+        return true;
+      }
       const result = await refuse(command, classification, guidanceCode);
       results.push(result);
       if (result.failure?.blocksFollowing) {
@@ -312,8 +354,9 @@ export class PosOfflineService {
           break;
         }
         const streamKey = this.streamKey(command);
+        let retryResolved = false;
         if (command.deviceSequence < expectedSequence) {
-          const retryResolved =
+          retryResolved =
             (await this.repo.hasResolvedConflict?.(
               merchantId,
               command.locationId,
@@ -360,6 +403,7 @@ export class PosOfflineService {
         }
         if (
           streamKey &&
+          command.commandType !== 'pos.checkout.cash' &&
           (await this.repo.hasOpenStreamConflict?.(
             merchantId,
             command.locationId,
@@ -368,17 +412,14 @@ export class PosOfflineService {
             streamKey,
           )) === true
         ) {
-          results.push(
-            await this.repo.recordStreamConflict(
+          if (
+            !(await refuseAndContinue(
               command,
               'stream_blocked',
-              streamKey,
               'earlier_account_command_needs_action',
-              true,
-            ),
-          );
-          expectedSequence = Math.max(expectedSequence, command.deviceSequence + 1);
-          lastProcessed = Math.max(lastProcessed, command.deviceSequence);
+            ))
+          )
+            break;
           continue;
         }
         let officialCommit: OfficialCommitResult | null = null;
@@ -563,211 +604,290 @@ export class PosOfflineService {
             );
             exposureByPolicy.set(parsed.data.policyFingerprint, exposure);
           }
-          if (
-            !policy.cash.enabled ||
-            policy.cash.version !== parsed.data.policyVersion ||
-            policy.cash.fingerprint !== parsed.data.policyFingerprint ||
-            new Date(policy.cash.expiresAt) <= new Date()
-          ) {
+          if (!policy.cash.enabled || policy.cash.version !== parsed.data.policyVersion) {
             const conflict = await this.repo.recordConflict(command, 'policy_changed', true);
             results.push(conflict);
             stopped = true;
             break;
           }
+          if (
+            policy.cash.fingerprint !== parsed.data.policyFingerprint ||
+            new Date(policy.cash.expiresAt) <= new Date()
+          ) {
+            this.logger.warn(
+              `offline_checkout_policy_drift_accepted commandId=${command.commandId}`,
+            );
+          }
           const snapshot = parsed.data.snapshot;
           const trustedCart = Cart.safeParse(this.normalizeSnapshotCart(snapshot.cartSnapshot));
-          /*
-           * A cart opened offline has a till-side id; the server mints its own and
-           * the alias only lives for the batch that created it. A checkout that
-           * arrives in a later batch — the ordinary case when a sale is larger
-           * than one batch, or when the first batch was retried — used to die here
-           * as `CART_NOT_FOUND` and never reach the operator. Same fallback the
-           * cart commands beside it already use: the session's active cart is the
-           * cart. The preview below re-prices it and refuses on any difference, so
-           * attaching to the wrong cart is a conflict to report, never a wrong
-           * charge.
-           */
-          let currentCart;
-          try {
-            currentCart = await this.cart.readAccount(
-              user,
+          const targetCartId =
+            appliedCartId ??
+            (await this.repo.provisionalCartId?.(
               merchantId,
-              appliedCartId ??
-                (await this.repo.provisionalCartId?.(
+              command.locationId,
+              snapshot.checkoutCommand.cartId,
+            )) ??
+            snapshot.checkoutCommand.cartId;
+          const alreadyCommitted = await this.repo.committedSaleForCart?.(
+            merchantId,
+            command.locationId,
+            targetCartId,
+          );
+          if (alreadyCommitted) {
+            officialCommit = {
+              provisionalSaleId: normalizeProvisionalId(command.provisionalId)!,
+              officialSaleId: alreadyCommitted.saleId,
+              officialReceiptId: alreadyCommitted.receiptId,
+              officialReceiptNumber: alreadyCommitted.receiptNumber,
+              committedTotals: snapshot.totals,
+              businessDate: alreadyCommitted.businessDate,
+              acceptedAt: alreadyCommitted.committedAt,
+              paymentSummary: {
+                attempt: {
+                  id: alreadyCommitted.paymentAttemptId,
+                  method: 'cash',
+                  status: 'succeeded',
+                  amount: {
+                    currency: alreadyCommitted.paymentCurrency,
+                    minorUnits: alreadyCommitted.paymentAmountMinorUnits,
+                  },
+                  queryOnly: false,
+                  correlationId: alreadyCommitted.paymentCorrelationId,
+                  expiresAt: null,
+                  createdAt: alreadyCommitted.committedAt,
+                },
+                ambiguity: null,
+              },
+              reconciliationReference: randomUUID(),
+            };
+          } else {
+            const cartState = await this.repo.cartStateForReplay?.(
+              merchantId,
+              command.locationId,
+              targetCartId,
+            );
+            if (
+              cartState &&
+              (cartState.status === 'abandoned' || cartState.lifecycleState === 'cancelled')
+            ) {
+              this.logger.warn(
+                `offline_checkout_cancelled_cart_settled commandId=${command.commandId} cartId=${targetCartId}`,
+              );
+              appliedCartId = targetCartId;
+            } else {
+              const shouldResumeSuspended =
+                retryResolved ||
+                (cartState != null && cartState.operatorSessionId !== scope.operatorSessionId);
+              if (
+                cartState &&
+                (cartState.status === 'draft' || cartState.status === 'prepared') &&
+                ((cartState.lifecycleState === 'suspended' && shouldResumeSuspended) ||
+                  cartState.operatorSessionId !== scope.operatorSessionId)
+              ) {
+                await this.repo.resumeSuspendedCartForReplay?.(
                   merchantId,
                   command.locationId,
-                  snapshot.checkoutCommand.cartId,
-                )) ??
-                snapshot.checkoutCommand.cartId,
-              command.locationId,
-              command.operatorSessionId,
-            );
-          } catch (error) {
-            if (!(error instanceof NotFoundException)) throw error;
-            currentCart = await this.cart.read(
-              user,
-              merchantId,
-              command.locationId,
-              command.operatorSessionId,
-            );
+                  targetCartId,
+                  scope.operatorSessionId,
+                  shouldResumeSuspended,
+                );
+              }
+              /*
+               * A cart opened offline has a till-side id; the server mints its own and
+               * the alias only lives for the batch that created it. A checkout that
+               * arrives in a later batch — the ordinary case when a sale is larger
+               * than one batch, or when the first batch was retried — used to die here
+               * as `CART_NOT_FOUND` and never reach the operator. Same fallback the
+               * cart commands beside it already use: the session's active cart is the
+               * cart. The preview below re-prices it and refuses on any difference, so
+               * attaching to the wrong cart is a conflict to report, never a wrong
+               * charge.
+               */
+              let currentCart;
+              try {
+                currentCart = await this.cart.readAccount(
+                  user,
+                  merchantId,
+                  targetCartId,
+                  command.locationId,
+                  scope.operatorSessionId,
+                );
+              } catch (error) {
+                if (!(error instanceof NotFoundException)) throw error;
+                currentCart = await this.cart.read(
+                  user,
+                  merchantId,
+                  command.locationId,
+                  scope.operatorSessionId,
+                );
+              }
+              let checkoutCommand = {
+                ...snapshot.checkoutCommand,
+                cartId: currentCart.id,
+                operatorSessionId: scope.operatorSessionId,
+                // The checkout contract names this `expectedCartVersion`. Setting
+                // `expectedVersion` here was silently ignored by the schema, so the
+                // till's own (offline, stale) version was compared and every replayed
+                // checkout came back `aggregate_version_conflict`.
+                expectedCartVersion: currentCart.version,
+              };
+              const createdAt = new Date(command.createdAt);
+              const catalogAt = new Date(snapshot.catalogSnapshotAt);
+              const pricingAt = new Date(snapshot.pricingSnapshotAt);
+              const taxAt = new Date(snapshot.taxSnapshotAt);
+              const invalidSnapshot =
+                !trustedCart.success ||
+                snapshot.checkoutCommand.locationId !== command.locationId ||
+                snapshot.checkoutCommand.operatorSessionId !== command.operatorSessionId ||
+                snapshot.checkoutCommand.paymentMethod !== 'cash' ||
+                snapshot.currency !== policy.cash.currency ||
+                snapshot.amountDueMinorUnits !== snapshot.totals.totals.grandTotal.minorUnits ||
+                snapshot.currency !== snapshot.totals.totals.grandTotal.currency ||
+                snapshot.amountReceivedMinorUnits < snapshot.amountDueMinorUnits ||
+                [createdAt, catalogAt, pricingAt, taxAt].some((value) =>
+                  Number.isNaN(value.getTime()),
+                );
+              if (invalidSnapshot) {
+                this.logger.warn(
+                  'offline_checkout_snapshot_invalid ' +
+                    JSON.stringify(
+                      trustedCart.success
+                        ? []
+                        : trustedCart.error.issues.map((issue) => ({
+                            path: issue.path.join('.'),
+                            code: issue.code,
+                          })),
+                    ),
+                );
+                if (!(await refuseAndContinue(command, 'server_validation_failed'))) break;
+                continue;
+              }
+              if (
+                Date.now() - createdAt.getTime() > policy.cash.limits.maxCommandAgeSeconds * 1000 ||
+                createdAt.getTime() - catalogAt.getTime() >
+                  policy.cash.limits.maxCatalogAgeSeconds * 1000 ||
+                createdAt.getTime() - pricingAt.getTime() >
+                  policy.cash.limits.maxPricingAgeSeconds * 1000 ||
+                createdAt.getTime() - taxAt.getTime() > policy.cash.limits.maxTaxAgeSeconds * 1000
+              ) {
+                this.logger.warn(
+                  `offline_checkout_snapshot_age_exceeded_accepted commandId=${command.commandId}`,
+                );
+              }
+              if (!trustedCart.success) {
+                if (!(await refuseAndContinue(command, 'server_validation_failed'))) break;
+                continue;
+              }
+              /*
+               * This preview is the server's independent price. It no longer decides
+               * whether the sale lands: the customer already paid the till's total.
+               * Its totals become the divergence record beside the committed sale.
+               */
+              let preview;
+              try {
+                preview = await this.checkout.checkout(user, merchantId, {
+                  ...checkoutCommand,
+                  commandId: randomUUID(),
+                  totalsFingerprint: null,
+                  idempotencyKey: randomUUID(),
+                });
+              } catch (error) {
+                const classification = this.checkoutRefusalClassification(error);
+                if (!classification) throw error;
+                if (!(await refuseAndContinue(command, classification))) break;
+                continue;
+              }
+              const serverAmount = preview.confirmation.totals.grandTotal.minorUnits;
+              const serverCurrency = preview.confirmation.totals.grandTotal.currency;
+              const chargedAmount = snapshot.amountDueMinorUnits;
+              checkoutCommand = {
+                ...checkoutCommand,
+                totalsFingerprint: snapshot.totals.fingerprint,
+              };
+              batchCashMinorUnits += chargedAmount;
+              batchCashCount += 1;
+              const repriced =
+                serverAmount !== chargedAmount || serverCurrency !== snapshot.currency;
+              const overLimit =
+                chargedAmount > policy.cash.limits.maxSingleSaleMinorUnits ||
+                exposure.amount + batchCashMinorUnits >
+                  policy.cash.limits.maxAccumulatedMinorUnits ||
+                exposure.count + batchCashCount > policy.cash.limits.maxOfflineSaleCount;
+              if (overLimit) {
+                this.logger.warn(
+                  `offline_checkout_limit_exceeded_accepted commandId=${command.commandId} charged=${chargedAmount} exposureAmount=${exposure.amount + batchCashMinorUnits} exposureCount=${exposure.count + batchCashCount}`,
+                );
+              }
+              /*
+               * A cart that moved under a queued sale is a NORMAL offline outcome, not an
+               * exception: the till was away, the cart advanced, and this command can never
+               * land. `checkout()` reports it as a typed `ConflictException`, and letting that
+               * escape used to leave `batchLocked` as an unhandled 409 with NO
+               * `offline_replay_conflict` row — so the recovery centre, which is the one place
+               * an operator is told what happened to a queued sale, showed nothing at all.
+               * It is journalled like every other refusal now. Anything that is not a typed
+               * checkout refusal is still allowed to escape: a bug here must not be recorded
+               * as an operator's problem.
+               */
+              let checkout;
+              try {
+                checkout = await this.checkout.checkout(user, merchantId, checkoutCommand, {
+                  trustedConfirmation: snapshot.totals,
+                  trustedLineSnapshot: trustedCart.data.items,
+                });
+              } catch (error) {
+                // The commit can refuse for the same reasons the preview can; the same rule
+                // applies, and anything that is not a typed refusal still escapes.
+                const classification = this.checkoutRefusalClassification(error);
+                if (!classification) throw error;
+                if (!(await refuseAndContinue(command, classification))) break;
+                continue;
+              }
+              if (
+                checkout.status !== 'completed' ||
+                !checkout.sale ||
+                !checkout.receipt ||
+                !checkout.payment
+              ) {
+                this.logger.warn(
+                  `offline_checkout_not_completed status=${checkout.status} ` +
+                    `failure=${checkout.failure?.code ?? 'none'}`,
+                );
+                const classification =
+                  checkout.status === 'payment_unknown'
+                    ? 'ambiguous_payment_requires_query'
+                    : 'server_validation_failed';
+                if (!(await refuseAndContinue(command, classification))) break;
+                continue;
+              }
+              if (
+                checkout.confirmation.totals.grandTotal.minorUnits !== chargedAmount ||
+                checkout.confirmation.totals.grandTotal.currency !== snapshot.currency
+              ) {
+                if (!(await refuseAndContinue(command, 'server_validation_failed'))) break;
+                continue;
+              }
+              officialCommit = {
+                provisionalSaleId: normalizeProvisionalId(command.provisionalId)!,
+                officialSaleId: checkout.sale.id,
+                officialReceiptId: checkout.sale.receiptId,
+                officialReceiptNumber: checkout.receipt.receiptRef,
+                committedTotals: checkout.confirmation,
+                businessDate: checkout.receipt.businessDate,
+                acceptedAt: checkout.sale.committedAt,
+                paymentSummary: checkout.payment,
+                reconciliationReference: randomUUID(),
+                ...(repriced
+                  ? {
+                      divergence: {
+                        serverTotals: preview.confirmation.totals,
+                        deltaMinorUnits: chargedAmount - serverAmount,
+                      },
+                    }
+                  : {}),
+              };
+            }
           }
-          let checkoutCommand = {
-            ...snapshot.checkoutCommand,
-            cartId: currentCart.id,
-            // The checkout contract names this `expectedCartVersion`. Setting
-            // `expectedVersion` here was silently ignored by the schema, so the
-            // till's own (offline, stale) version was compared and every replayed
-            // checkout came back `aggregate_version_conflict`.
-            expectedCartVersion: currentCart.version,
-          };
-          const createdAt = new Date(command.createdAt);
-          const catalogAt = new Date(snapshot.catalogSnapshotAt);
-          const pricingAt = new Date(snapshot.pricingSnapshotAt);
-          const taxAt = new Date(snapshot.taxSnapshotAt);
-          const invalidSnapshot =
-            !trustedCart.success ||
-            snapshot.checkoutCommand.locationId !== command.locationId ||
-            snapshot.checkoutCommand.operatorSessionId !== command.operatorSessionId ||
-            snapshot.checkoutCommand.paymentMethod !== 'cash' ||
-            snapshot.currency !== policy.cash.currency ||
-            snapshot.amountDueMinorUnits !== snapshot.totals.totals.grandTotal.minorUnits ||
-            snapshot.currency !== snapshot.totals.totals.grandTotal.currency ||
-            snapshot.amountReceivedMinorUnits < snapshot.amountDueMinorUnits ||
-            createdAt.getTime() - catalogAt.getTime() >
-              policy.cash.limits.maxCatalogAgeSeconds * 1000 ||
-            createdAt.getTime() - pricingAt.getTime() >
-              policy.cash.limits.maxPricingAgeSeconds * 1000 ||
-            createdAt.getTime() - taxAt.getTime() > policy.cash.limits.maxTaxAgeSeconds * 1000 ||
-            [createdAt, catalogAt, pricingAt, taxAt].some((value) => Number.isNaN(value.getTime()));
-          if (invalidSnapshot) {
-            this.logger.warn(
-              'offline_checkout_snapshot_invalid ' +
-                JSON.stringify(
-                  trustedCart.success
-                    ? []
-                    : trustedCart.error.issues.map((issue) => ({
-                        path: issue.path.join('.'),
-                        code: issue.code,
-                      })),
-                ),
-            );
-            if (!(await refuseAndContinue(command, 'server_validation_failed'))) break;
-            continue;
-          }
-          if (Date.now() - createdAt.getTime() > policy.cash.limits.maxCommandAgeSeconds * 1000) {
-            if (!(await refuseAndContinue(command, 'command_expired'))) break;
-            continue;
-          }
-          if (!trustedCart.success) {
-            if (!(await refuseAndContinue(command, 'server_validation_failed'))) break;
-            continue;
-          }
-          /*
-           * This preview is the server's independent price. It no longer decides
-           * whether the sale lands: the customer already paid the till's total.
-           * Its totals become the divergence record beside the committed sale.
-           */
-          let preview;
-          try {
-            preview = await this.checkout.checkout(user, merchantId, {
-              ...checkoutCommand,
-              commandId: randomUUID(),
-              totalsFingerprint: null,
-              idempotencyKey: randomUUID(),
-            });
-          } catch (error) {
-            const classification = this.checkoutRefusalClassification(error);
-            if (!classification) throw error;
-            if (!(await refuseAndContinue(command, classification))) break;
-            continue;
-          }
-          const serverAmount = preview.confirmation.totals.grandTotal.minorUnits;
-          const serverCurrency = preview.confirmation.totals.grandTotal.currency;
-          const chargedAmount = snapshot.amountDueMinorUnits;
-          checkoutCommand = {
-            ...checkoutCommand,
-            totalsFingerprint: snapshot.totals.fingerprint,
-          };
-          batchCashMinorUnits += chargedAmount;
-          batchCashCount += 1;
-          const repriced = serverAmount !== chargedAmount || serverCurrency !== snapshot.currency;
-          const overLimit =
-            chargedAmount > policy.cash.limits.maxSingleSaleMinorUnits ||
-            exposure.amount + batchCashMinorUnits > policy.cash.limits.maxAccumulatedMinorUnits ||
-            exposure.count + batchCashCount > policy.cash.limits.maxOfflineSaleCount;
-          if (overLimit) {
-            this.logger.warn('offline_checkout_limit_exceeded');
-            if (!(await refuseAndContinue(command, 'offline_limit_exceeded'))) break;
-            continue;
-          }
-          /*
-           * A cart that moved under a queued sale is a NORMAL offline outcome, not an
-           * exception: the till was away, the cart advanced, and this command can never
-           * land. `checkout()` reports it as a typed `ConflictException`, and letting that
-           * escape used to leave `batchLocked` as an unhandled 409 with NO
-           * `offline_replay_conflict` row — so the recovery centre, which is the one place
-           * an operator is told what happened to a queued sale, showed nothing at all.
-           * It is journalled like every other refusal now. Anything that is not a typed
-           * checkout refusal is still allowed to escape: a bug here must not be recorded
-           * as an operator's problem.
-           */
-          let checkout;
-          try {
-            checkout = await this.checkout.checkout(user, merchantId, checkoutCommand, {
-              trustedConfirmation: snapshot.totals,
-              trustedLineSnapshot: trustedCart.data.items,
-            });
-          } catch (error) {
-            // The commit can refuse for the same reasons the preview can; the same rule
-            // applies, and anything that is not a typed refusal still escapes.
-            const classification = this.checkoutRefusalClassification(error);
-            if (!classification) throw error;
-            if (!(await refuseAndContinue(command, classification))) break;
-            continue;
-          }
-          if (
-            checkout.status !== 'completed' ||
-            !checkout.sale ||
-            !checkout.receipt ||
-            !checkout.payment
-          ) {
-            this.logger.warn(
-              `offline_checkout_not_completed status=${checkout.status} ` +
-                `failure=${checkout.failure?.code ?? 'none'}`,
-            );
-            const classification =
-              checkout.status === 'payment_unknown'
-                ? 'ambiguous_payment_requires_query'
-                : 'server_validation_failed';
-            if (!(await refuseAndContinue(command, classification))) break;
-            continue;
-          }
-          if (
-            checkout.confirmation.totals.grandTotal.minorUnits !== chargedAmount ||
-            checkout.confirmation.totals.grandTotal.currency !== snapshot.currency
-          ) {
-            if (!(await refuseAndContinue(command, 'server_validation_failed'))) break;
-            continue;
-          }
-          officialCommit = {
-            provisionalSaleId: normalizeProvisionalId(command.provisionalId)!,
-            officialSaleId: checkout.sale.id,
-            officialReceiptId: checkout.sale.receiptId,
-            officialReceiptNumber: checkout.receipt.receiptRef,
-            committedTotals: checkout.confirmation,
-            businessDate: checkout.receipt.businessDate,
-            acceptedAt: checkout.sale.committedAt,
-            paymentSummary: checkout.payment,
-            reconciliationReference: randomUUID(),
-            ...(repriced
-              ? {
-                  divergence: {
-                    serverTotals: preview.confirmation.totals,
-                    deltaMinorUnits: chargedAmount - serverAmount,
-                  },
-                }
-              : {}),
-          };
         }
         const result = await this.repo.replay(
           command,
@@ -1149,6 +1269,15 @@ export class PosOfflineService {
 
   private isOrderCommand(commandType: string): boolean {
     return commandType.startsWith('pos.cart.');
+  }
+
+  private isNonFinancialReplayCommand(commandType: string): boolean {
+    return (
+      this.isOrderCommand(commandType) ||
+      commandType === 'pos.kds.command' ||
+      commandType === 'pos.table.command' ||
+      commandType === 'pos.command.group'
+    );
   }
 
   /**
