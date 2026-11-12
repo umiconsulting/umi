@@ -858,6 +858,7 @@ final class CheckoutController extends ChangeNotifier {
     _commitCommandId = null;
     _commitIdempotencyKey = null;
     _customerValueFingerprintCommandId = null;
+    _confirmationCache.clear();
     // `_policy` is NOT cleared: it describes the location, not the attempt. See
     // its declaration.
     _set(const CheckoutState());

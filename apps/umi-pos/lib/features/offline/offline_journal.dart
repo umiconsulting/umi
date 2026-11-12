@@ -170,7 +170,8 @@ int _advanceAcknowledgedSequence(List<JournalEntry> entries, int acknowledged) {
     if (matches.isEmpty) return next;
     final entry = matches.single;
     if (entry.status != JournalStatus.accepted &&
-        entry.status != JournalStatus.duplicate) {
+        entry.status != JournalStatus.duplicate &&
+        entry.status != JournalStatus.resolved) {
       return next;
     }
     next += 1;
@@ -283,6 +284,9 @@ final class EncryptedOfflineJournal {
   final _cipher = AesGcm.with256bits();
   final ValueNotifier<int> pendingCount = ValueNotifier<int>(0);
   OfflineJournalSnapshot? _lastSnapshot;
+  String? _lastCiphertext;
+  String? _lastKeyString;
+  SecretKey? _cachedSecretKey;
 
   bool hasPendingForCart(String cartId) =>
       _lastSnapshot?.hasPendingForCart(cartId) ?? pendingCount.value > 0;
@@ -293,6 +297,8 @@ final class EncryptedOfflineJournal {
     _ensureSupported();
     final encoded = await _store.readCiphertext();
     if (encoded == null) {
+      _lastCiphertext = null;
+      _lastSnapshot = null;
       return const OfflineJournalSnapshot(
         nextSequence: 1,
         lastAcknowledgedSequence: 0,
@@ -302,6 +308,9 @@ final class EncryptedOfflineJournal {
         lastTrustedServerTime: null,
         lastTrustedLocalTime: null,
       );
+    }
+    if (encoded == _lastCiphertext && _lastSnapshot != null) {
+      return _lastSnapshot!;
     }
     try {
       final wrapper = jsonDecode(encoded) as Map<String, Object?>;
@@ -332,6 +341,7 @@ final class EncryptedOfflineJournal {
             .map((item) => item! as Map<String, Object?>)
             .toList(growable: false),
       );
+      _lastCiphertext = encoded;
       _publishPending(snapshot);
       return snapshot;
     } on OfflineJournalException {
@@ -1017,15 +1027,15 @@ final class EncryptedOfflineJournal {
       clear,
       secretKey: await _key(create: true),
     );
-    await _store.writeCiphertext(
-      jsonEncode({
-        'schemaVersion': offlineJournalSchemaVersion,
-        'keyVersion': 1,
-        'nonce': base64Encode(box.nonce),
-        'ciphertext': base64Encode(box.cipherText),
-        'mac': base64Encode(box.mac.bytes),
-      }),
-    );
+    final encodedWrapper = jsonEncode({
+      'schemaVersion': offlineJournalSchemaVersion,
+      'keyVersion': 1,
+      'nonce': base64Encode(box.nonce),
+      'ciphertext': base64Encode(box.cipherText),
+      'mac': base64Encode(box.mac.bytes),
+    });
+    await _store.writeCiphertext(encodedWrapper);
+    _lastCiphertext = encodedWrapper;
     _publishPending(snapshot);
   }
 
@@ -1037,14 +1047,24 @@ final class EncryptedOfflineJournal {
   Future<SecretKey> _key({required bool create}) async {
     final existing = await _store.readKey();
     if (existing != null) {
-      return SecretKey(base64Decode(existing));
+      if (existing == _lastKeyString && _cachedSecretKey != null) {
+        return _cachedSecretKey!;
+      }
+      final key = SecretKey(base64Decode(existing));
+      _lastKeyString = existing;
+      _cachedSecretKey = key;
+      return key;
     }
     if (!create) {
       throw const OfflineJournalException('encryption_key_unavailable');
     }
     final bytes = List<int>.generate(32, (_) => Random.secure().nextInt(256));
-    await _store.writeKey(base64Encode(bytes));
-    return SecretKey(bytes);
+    final encodedKey = base64Encode(bytes);
+    await _store.writeKey(encodedKey);
+    final key = SecretKey(bytes);
+    _lastKeyString = encodedKey;
+    _cachedSecretKey = key;
+    return key;
   }
 
   void _ensureSupported() {

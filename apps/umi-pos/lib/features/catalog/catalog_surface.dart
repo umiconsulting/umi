@@ -776,6 +776,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     setState(() => _accountTransition = true);
     try {
       final table = await _chooseOrderTable(assigningAccountId: cart.id);
+      _consumeModalPointer();
       if (table == null || !mounted) return false;
       if (!await widget.cart.assignAccountTable(
         table.id,
@@ -1176,6 +1177,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       _showAccountRestoreNotice();
       return;
     }
+    if (_accountTransition) return;
     final code = widget.cart.state.errorCode ?? 'CART_VALIDATION_FAILED';
     setState(() {
       _noticeCode = code;
@@ -1881,6 +1883,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   }) async {
     if (_accountRestoring) {
       _refuseCartWrite();
+      return false;
+    }
+    if (_accountTransition) {
       return false;
     }
     if (widget.cart.state.cart == null) {
