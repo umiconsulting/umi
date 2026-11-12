@@ -1,3 +1,5 @@
+import { InventoryPlanningAlertsService } from './inventory-planning-alerts.service';
+import { InventoryPlanningService } from './inventory-planning.service';
 import { Module } from '@nestjs/common';
 import { OperationsModule } from '../../shared/operations/operations.module';
 import { AuthModule } from '../auth/auth.module';
@@ -27,7 +29,12 @@ import { InventoryCostingService } from './inventory-costing.service';
   // carry the metric registry, not rely on a global registration elsewhere.
   imports: [AuthModule, OperationsModule],
   controllers: [InventoryCostingController],
-  providers: [InventoryCostingRepository, InventoryCostingService],
+  providers: [
+    InventoryCostingRepository,
+    InventoryCostingService,
+    InventoryPlanningService,
+    InventoryPlanningAlertsService,
+  ],
   exports: [InventoryCostingService],
 })
 export class InventoryCostingModule {}

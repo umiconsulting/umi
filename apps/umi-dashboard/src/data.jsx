@@ -346,6 +346,7 @@ async function _loadMerchant(ctx) {
     stripImageUrl: cashSettings?.stripImageUrl || s.stripImageUrl || '',
     passStyle: cashSettings?.passStyle || s.passStyle || 'stamps',
     subscriptionStatus: s.subscriptionStatus || 'ACTIVE',
+    purchaseDays: s.purchaseDays ?? [],
     businessDayStart: s.businessDayStart || '00:00',
     // Effective segment cutoffs (code defaults merged with the owner's overrides).
     segmentThresholds: s.segmentThresholds || {},
@@ -535,7 +536,8 @@ async function loadSaleReceipt(saleId) {
 }
 
 async function executeAdministrativeCommand(operation, targetAggregateId, options) {
-  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  const merchantId =
+    options?.merchantId || window.localStorage.getItem('umi-dashboard-selected-merchant');
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location');
   if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   const input = options || {};
@@ -567,10 +569,27 @@ async function _loadVoiceConfig(ctx) {
   return _apiFetch(_merchantPath(ctx, '/conversaflow/voice'));
 }
 
-async function saveMerchantSettings(patch) {
-  const headers = await getAuthHeaders();
-  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+export async function loadInventoryAlertSettings(merchantId) {
+  return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/settings`);
+}
+
+export async function loadInventoryPlan(merchantId, locationId) {
+  const query = locationId ? `?locationId=${encodeURIComponent(locationId)}` : '';
+  return _apiFetch(routes.inventory.plan(merchantId) + query);
+}
+
+export async function loadPurchaseDays(merchantId) {
   if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  const settings = await _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/settings`);
+  return settings.purchaseDays ?? [];
+}
+
+async function saveMerchantSettings(
+  patch,
+  merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant'),
+) {
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  const headers = await getAuthHeaders();
   return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/settings`, {
     method: 'PATCH',
     headers,

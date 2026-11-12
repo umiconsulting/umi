@@ -296,6 +296,7 @@ export const routes = {
    * no path to build for them here.
    */
   inventory: {
+    plan: (merchantId: string): string => buildPath('inventoryCosting.plan', { merchantId }),
     items: (merchantId: string): string => buildPath('inventoryItem.list', { merchantId }),
     unitConversions: (merchantId: string): string =>
       buildPath('inventoryUnitConversion.list', { merchantId }),
