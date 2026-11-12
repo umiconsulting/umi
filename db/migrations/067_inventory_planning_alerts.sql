@@ -12,6 +12,7 @@ CREATE TABLE merchant.inventory_planning_delivery (
 );
 ALTER TABLE merchant.inventory_planning_delivery ENABLE ROW LEVEL SECURITY;
 ALTER TABLE merchant.inventory_planning_delivery FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS merchant_isolation ON merchant.inventory_planning_delivery;
 CREATE POLICY merchant_isolation ON merchant.inventory_planning_delivery USING (merchant_id = nullif(current_setting('app.current_merchant', true),'')::uuid);
 GRANT SELECT ON merchant.inventory_planning_delivery TO api;
 GRANT SELECT,INSERT,UPDATE ON merchant.inventory_planning_delivery TO worker;

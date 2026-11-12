@@ -167,3 +167,7 @@ Para continuar con Codex: leer este documento y la investigación enlazada, comp
 - Negocio ajeno al operador: HTTP 404, sin exponer su existencia.
 - Días nulos, repetidos o fuera del rango: HTTP 400.
 - El dueño del ensayo pertenece a ambos negocios; su acceso a ambos es válido.
+
+### Cierre del control de migraciones
+
+El control completo de API detectó que la migración 067 carecía de `DROP POLICY IF EXISTS` antes de crear su política. Se agregó la guarda exigida por el repositorio. La política conserva su aislamiento por negocio. La suite `migration-shape.spec.ts` verifica esta convención.
