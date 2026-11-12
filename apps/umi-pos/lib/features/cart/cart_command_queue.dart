@@ -728,7 +728,6 @@ final class CartCommandQueue {
   }
 
   bool _recoveryNeedsOperator(RecoveryPhase phase) =>
-      phase == RecoveryPhase.blockedByConflict ||
       phase == RecoveryPhase.blockedByDevice ||
       phase == RecoveryPhase.blockedByStorage ||
       phase == RecoveryPhase.waitingForCapacity;

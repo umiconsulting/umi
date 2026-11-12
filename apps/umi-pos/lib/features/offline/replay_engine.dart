@@ -353,16 +353,12 @@ final class OfflineRecoveryController extends ChangeNotifier {
     final scope = _scope;
     if (scope == null) return;
     if (_connectivity.state != PosConnectivity.online &&
-        _connectivity.state != PosConnectivity.recovering) {
+        _connectivity.state != PosConnectivity.recovering &&
+        _connectivity.state != PosConnectivity.reconciliationRequired) {
       return;
     }
     if (_running) return;
-    // A blocked stream or a refused device needs an operator, and a closed
-    // server window needs time. Polling the API every heartbeat cannot clear
-    // any of them; it only spends the budget the replay needs to finish. The
-    // operator's action calls [recover] or [resolveConflict] directly.
-    if (_status.phase == RecoveryPhase.blockedByConflict ||
-        _status.phase == RecoveryPhase.blockedByDevice ||
+    if (_status.phase == RecoveryPhase.blockedByDevice ||
         _status.phase == RecoveryPhase.blockedByStorage ||
         _status.phase == RecoveryPhase.waitingForCapacity) {
       return;
@@ -370,6 +366,18 @@ final class OfflineRecoveryController extends ChangeNotifier {
     try {
       final snapshot = await _journal.load();
       if (snapshot.pendingCount == 0) return;
+      if (_status.phase == RecoveryPhase.blockedByConflict &&
+          !snapshot.entries.any(
+            (e) =>
+                e.status == JournalStatus.pending ||
+                e.status == JournalStatus.unknown ||
+                (e.status == JournalStatus.conflict &&
+                    (e.lastSafeErrorCategory == 'offline_limit_exceeded' ||
+                        e.lastSafeErrorCategory == 'stream_blocked' ||
+                        e.lastSafeErrorCategory == 'command_expired')),
+          )) {
+        return;
+      }
     } on OfflineJournalException {
       // Unreadable storage is `recover`'s to report, not a connectivity event's:
       // it sets `blockedByStorage` with the category, which is the state an
@@ -422,7 +430,8 @@ final class OfflineRecoveryController extends ChangeNotifier {
         return;
       }
       if (_connectivity.state != PosConnectivity.online &&
-          _connectivity.state != PosConnectivity.recovering) {
+          _connectivity.state != PosConnectivity.recovering &&
+          _connectivity.state != PosConnectivity.reconciliationRequired) {
         _set(
           RecoveryStatus(
             phase: RecoveryPhase.waitingForConnectivity,
@@ -470,6 +479,7 @@ final class OfflineRecoveryController extends ChangeNotifier {
       // first used to stop at `accepted_result_missing` and never reach this
       // cleanup.
       await _discardFirstDefiniteObsoleteCartConflict(scope);
+      await _retryTransientCashConflicts();
       final afterRecovery = await _journal.load();
       _set(
         RecoveryStatus(
@@ -884,7 +894,6 @@ final class OfflineRecoveryController extends ChangeNotifier {
         }
       }
       if (unresolvedConflict) {
-        _connectivity.reconciliationNeeded();
         _set(
           RecoveryStatus(
             phase: RecoveryPhase.blockedByConflict,
@@ -895,7 +904,6 @@ final class OfflineRecoveryController extends ChangeNotifier {
             conflicts: 1,
           ),
         );
-        return;
       }
       if (resolvedInBatch > 0) {
         // The server refused a cart that no longer exists. Resolving that exact
@@ -925,6 +933,9 @@ final class OfflineRecoveryController extends ChangeNotifier {
     }
     _connectivity.apiReachable(authorityValid: true);
     _retryTimer?.cancel();
+    if (_status.phase == RecoveryPhase.blockedByConflict) {
+      return;
+    }
     _set(
       RecoveryStatus(
         phase: RecoveryPhase.completed,
@@ -934,6 +945,19 @@ final class OfflineRecoveryController extends ChangeNotifier {
         duplicates: duplicates,
       ),
     );
+  }
+
+  Future<void> _retryTransientCashConflicts() async {
+    final snapshot = await _journal.load();
+    for (final entry in snapshot.entries) {
+      if (entry.status == JournalStatus.conflict &&
+          entry.command.commandType == 'pos.checkout.cash' &&
+          (entry.lastSafeErrorCategory == 'offline_limit_exceeded' ||
+              entry.lastSafeErrorCategory == 'stream_blocked' ||
+              entry.lastSafeErrorCategory == 'command_expired')) {
+        await _journal.retryConflict(entry.command.commandId);
+      }
+    }
   }
 
   /// Close the first already-known non-financial cart refusal before building the
