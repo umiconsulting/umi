@@ -1,3 +1,10 @@
+import { getStoredSession } from '@/lib/auth.jsx';
+import {
+  readRecipeRecovery,
+  writeRecipeRecovery,
+  clearRecipeRecovery,
+  prepareRecipeRequest,
+} from './recipe-recovery.js';
 import InventoryImportDialog from './inventory-import-dialog.jsx';
 import InventoryProduction from './inventory-production.jsx';
 import { useMemo, useState } from 'react';
@@ -188,6 +195,15 @@ function filterRecipes(recipes, query) {
 }
 
 export default function RecipeWorkspace() {
+  const merchant = useMerchant();
+  return (
+    <ScopedRecipeWorkspace
+      key={`${merchant?.selectedMerchantId}:${getStoredSession()?.user?.id}`}
+    />
+  );
+}
+
+function ScopedRecipeWorkspace() {
   const { t, i18n } = useLingui();
   const merchant = useMerchant();
   const capabilities = merchant?.capabilities || null;
@@ -196,7 +212,16 @@ export default function RecipeWorkspace() {
   const [importOpen, setImportOpen] = useState(false);
   const [showRetired, setShowRetired] = useState(false);
   const [query, setQuery] = useState('');
-  const [editor, setEditor] = useState(null);
+  const [editor, setEditor] = useState(() => {
+    const pending = readRecipeRecovery(
+      window.sessionStorage,
+      merchant?.selectedMerchantId,
+      getStoredSession()?.user?.id,
+    );
+    return pending
+      ? { id: pending.recipeId, recipe: pending.recipe, recovery: pending.request }
+      : null;
+  });
   const [production, setProduction] = useState(null);
   const locationId = merchant?.selectedLocationId || merchant?.selectedLocation?.id || null;
 
@@ -414,6 +439,7 @@ export default function RecipeWorkspace() {
           key={editor.id}
           recipe={editor.recipe}
           recipeId={editor.id}
+          recovery={editor.recovery}
           items={itemsState.data.items}
           recipes={recipesState.data.recipes}
           targets={targetsState.data.targets}
@@ -579,6 +605,7 @@ function ExplosionPanel({ state, unitOf }) {
  * first save.
  */
 function RecipeEditor({
+  recovery,
   recipe,
   recipeId,
   items,
@@ -592,12 +619,23 @@ function RecipeEditor({
   const { t, i18n } = useLingui();
   const command = useAdministrativeCommand();
   const editing = Boolean(recipe);
-  const draft = useMemo(() => recipeToDraft(recipe), [recipe]);
+  const draft = useMemo(
+    () => recipeToDraft(recovery ? { ...recipe, ...recovery.parameters } : recipe),
+    [recipe, recovery],
+  );
 
-  const [targetKind, setTargetKind] = useState(() => recipe?.targetKind || 'product');
-  const [productId, setProductId] = useState(() => recipe?.productId || '');
-  const [variantId, setVariantId] = useState(() => recipe?.variantId || '');
-  const [targetItemId, setTargetItemId] = useState(() => recipe?.targetItemId || '');
+  const [targetKind, setTargetKind] = useState(
+    () => recovery?.parameters?.targetKind || recipe?.targetKind || 'product',
+  );
+  const [productId, setProductId] = useState(
+    () => recovery?.parameters?.productId || recipe?.productId || '',
+  );
+  const [variantId, setVariantId] = useState(
+    () => recovery?.parameters?.variantId || recipe?.variantId || '',
+  );
+  const [targetItemId, setTargetItemId] = useState(
+    () => recovery?.parameters?.targetItemId || recipe?.targetItemId || '',
+  );
   const [yieldValueText, setYieldValueText] = useState(() =>
     draft.yieldQuantity ? formatScaled(draft.yieldQuantity.value, draft.yieldQuantity.scale) : '1',
   );
@@ -618,7 +656,12 @@ function RecipeEditor({
   const [confirmRetire, setConfirmRetire] = useState(false);
   const [replacement, setReplacement] = useState(null);
   const [saveError, setSaveError] = useState(null);
-  const [unresolvedSave, setUnresolvedSave] = useState(null);
+  const [unresolvedSave, setUnresolvedSave] = useState(recovery ?? null);
+  const sourceContext = useMerchant();
+  const sourceMerchant = sourceContext?.selectedMerchantId;
+  const sourceLocation =
+    sourceContext?.selectedLocationId || sourceContext?.selectedLocation?.id || null;
+  const sourceUser = getStoredSession()?.user?.id;
 
   const explosion = useInventoryRecipeExplosion(editing ? recipeId : null, 0);
   const itemsById = useMemo(() => new Map((items || []).map((item) => [item.id, item])), [items]);
@@ -763,24 +806,41 @@ function RecipeEditor({
   }
 
   async function submitSave(request, token) {
-    const submitted = structuredClone({
-      ...request,
-      parameters: { ...request.parameters, ...(token ? { replaceSalesMapping: token } : {}) },
-    });
+    const submitted = prepareRecipeRequest(request, token, sourceLocation);
+    try {
+      writeRecipeRecovery(window.sessionStorage, {
+        merchantId: sourceMerchant,
+        userId: sourceUser,
+        recipeId,
+        recipe,
+        request: submitted,
+      });
+    } catch {
+      setSaveError(
+        t`No se pudo guardar la recuperación local. Libera espacio en el navegador e intenta de nuevo.`,
+      );
+      return;
+    }
     setUnresolvedSave(submitted);
     setReplacement(null);
     setSaveError(null);
     try {
       const response = await command.execute(submitted.operation, recipeId, {
+        merchantId: sourceMerchant,
+        locationId: submitted.locationId,
+        commandId: submitted.commandId,
+        idempotencyKey: submitted.idempotencyKey,
         targetVersion: submitted.targetVersion,
         parameters: submitted.parameters,
       });
+      clearRecipeRecovery(window.sessionStorage, sourceMerchant, sourceUser, submitted.commandId);
       setUnresolvedSave(null);
       await onSaved(response?.result?.recipe || null);
     } catch (failure) {
       // The shared command hook retains identity for network and 5xx failures.
       // Keep the same payload until that command has a definite outcome.
       if (!failure?.status || failure.status >= 500) return;
+      clearRecipeRecovery(window.sessionStorage, sourceMerchant, sourceUser, submitted.commandId);
       setUnresolvedSave(null);
       const confirmation = recipeReplacementConfirmation(failure, submitted);
       if (confirmation?.replacement) {

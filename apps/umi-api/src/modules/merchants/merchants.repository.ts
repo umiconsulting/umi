@@ -290,6 +290,8 @@ export class MerchantsRepository {
    * predicate, like the other merchant reads.
    */
   async loadBranding(merchantId: string): Promise<{
+    inventoryPlanningEmailEnabled: boolean;
+    purchaseDays: number[];
     brandColor: string | null;
     secondaryColor: string | null;
     logoUrl: string | null;
@@ -299,6 +301,8 @@ export class MerchantsRepository {
   }> {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<{
+        inventoryPlanningEmailEnabled: boolean;
+        purchaseDays: number[];
         brandColor: string | null;
         secondaryColor: string | null;
         logoUrl: string | null;
@@ -310,7 +314,9 @@ export class MerchantsRepository {
                 logo_url AS "logoUrl",
                 business_day_start::text AS "businessDayStart",
                 pos_day_close_policy AS "posDayClosePolicy",
-                segment_thresholds AS "segmentThresholds"
+                segment_thresholds AS "segmentThresholds",
+                inventory_planning_email_enabled AS "inventoryPlanningEmailEnabled",
+                purchase_days AS "purchaseDays"
          FROM merchant.merchant
          WHERE id = $1::uuid
          LIMIT 1`,
@@ -319,6 +325,8 @@ export class MerchantsRepository {
     );
     const row = rows[0];
     return {
+      inventoryPlanningEmailEnabled: row?.inventoryPlanningEmailEnabled ?? false,
+      purchaseDays: row?.purchaseDays ?? [],
       brandColor: row?.brandColor ?? null,
       secondaryColor: row?.secondaryColor ?? null,
       // The café's own logo (migration 014). Set by the branding upload, and read
@@ -531,6 +539,8 @@ export class MerchantsRepository {
       businessDayStart?: string;
       posDayClosePolicy?: 'manual' | 'auto_void';
       segmentThresholds?: SegmentThresholdsDto;
+      purchaseDays?: number[];
+      inventoryPlanningEmailEnabled?: boolean;
     },
   ): Promise<void> {
     await this.pg.withMerchant((c) =>
@@ -541,6 +551,8 @@ export class MerchantsRepository {
              business_day_start = COALESCE($4::time, business_day_start),
              segment_thresholds = COALESCE($5::jsonb, segment_thresholds),
              pos_day_close_policy = COALESCE($6, pos_day_close_policy),
+             purchase_days = COALESCE($7::smallint[], purchase_days),
+             inventory_planning_email_enabled = COALESCE($8::boolean, inventory_planning_email_enabled),
              updated_at = now()
          WHERE id = $1::uuid`,
         [
@@ -550,6 +562,8 @@ export class MerchantsRepository {
           patch.businessDayStart ?? null,
           patch.segmentThresholds ? JSON.stringify(patch.segmentThresholds) : null,
           patch.posDayClosePolicy ?? null,
+          patch.purchaseDays !== undefined ? [...patch.purchaseDays].sort((a, b) => a - b) : null,
+          patch.inventoryPlanningEmailEnabled ?? null,
         ],
       ),
     );

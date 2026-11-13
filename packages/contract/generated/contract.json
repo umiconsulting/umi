@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "ae6b6095cbccb8d0da5579ccc406c44a2c2fcba40fef0bd31692ca32b8216df9",
+  "contentHash": "25080b066ec5b1fe606326fca16f96289151376b63179d5ef2f048479738b49c",
   "contractVersion": "2.54.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -49544,6 +49544,340 @@
         "activeCount",
         "page"
       ],
+      "type": "object"
+    },
+    "InventoryPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "asOf": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "from": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "historyFrom": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "historyTo": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "available": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "estimatedCostMinor": {
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "expectedConsumption": {
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "inventoryItemId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "minimum": {
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "replenishment": {
+                "enum": [
+                  "purchase",
+                  "prepare"
+                ],
+                "type": "string"
+              },
+              "scale": {
+                "maximum": 6,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "suggestedQuantity": {
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "unit": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "replenishment",
+              "inventoryItemId",
+              "name",
+              "unit",
+              "scale",
+              "available",
+              "minimum",
+              "expectedConsumption",
+              "suggestedQuantity",
+              "estimatedCostMinor"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "locationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "nextPurchaseDate": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "notifications": {
+          "additionalProperties": false,
+          "properties": {
+            "configured": {
+              "type": "boolean"
+            },
+            "deliveries": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "day": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string"
+                  },
+                  "state": {
+                    "enum": [
+                      "sending",
+                      "sent",
+                      "unknown"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "day",
+                  "state"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "emailOptIn": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "emailOptIn",
+            "configured",
+            "deliveries"
+          ],
+          "type": "object"
+        },
+        "products": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "expectedUnits": {
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "historyFrom": {
+                "anyOf": [
+                  {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mapped": {
+                "type": "boolean"
+              },
+              "name": {
+                "type": "string"
+              },
+              "productId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "validation": {
+                "additionalProperties": false,
+                "properties": {
+                  "baselineMae": {
+                    "anyOf": [
+                      {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "evaluatedDays": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "mae": {
+                    "anyOf": [
+                      {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "evaluatedDays",
+                  "mae",
+                  "baselineMae"
+                ],
+                "type": "object"
+              },
+              "variantId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "productId",
+              "variantId",
+              "name",
+              "expectedUnits",
+              "historyFrom",
+              "mapped",
+              "validation"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "to": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "notifications",
+        "merchantId",
+        "locationId",
+        "asOf",
+        "timezone",
+        "from",
+        "to",
+        "nextPurchaseDate",
+        "historyFrom",
+        "historyTo",
+        "complete",
+        "warnings",
+        "products",
+        "items"
+      ],
+      "type": "object"
+    },
+    "InventoryPlanQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "InventoryPlate": {
@@ -107750,6 +108084,22 @@
       "pin": false,
       "request": "MenuEngineeringQuery",
       "response": "MenuEngineering"
+    },
+    "GET /api/merchants/:merchantId/inventory-costing/plan": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "VALIDATION_FAILED"
+      ],
+      "idempotent": false,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "merchant.manage",
+      "pin": false,
+      "request": "InventoryPlanQuery",
+      "response": "InventoryPlan"
     },
     "GET /api/merchants/:merchantId/inventory-costing/plates": {
       "approval": false,

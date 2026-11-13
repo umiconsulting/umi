@@ -97,6 +97,24 @@ describe('MerchantsService.buildCapabilities', () => {
 });
 
 describe('MerchantsService.buildSettings', () => {
+  it.each([[], [1, 4], [0, 6]].map((purchaseDays) => ({ purchaseDays })))(
+    'publishes the actual purchase-day selection $purchaseDays',
+    async ({ purchaseDays }) => {
+      const h = make();
+      h.repo.loadLocations.mockResolvedValue([]);
+      h.repo.loadProducts.mockResolvedValue({
+        dashboard: { status: 'active', locationId: null, config: {} },
+      });
+      h.repo.loadBranding.mockResolvedValue({
+        brandColor: null,
+        secondaryColor: null,
+        purchaseDays,
+      });
+      const caps = await h.svc.buildCapabilities(ACCESS, null);
+      expect(h.svc.buildSettings(caps).purchaseDays).toEqual(purchaseDays);
+    },
+  );
+
   it('defaults branding colors when the café has set none', async () => {
     const h = make();
     h.repo.loadLocations.mockResolvedValue([]);

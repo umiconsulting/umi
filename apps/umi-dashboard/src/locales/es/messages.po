@@ -598,6 +598,8 @@ msgstr "Guardado"
 #: src/screens/operations-workspace.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/sales-widgets.jsx
+#: src/screens/settings-inventory-alerts.jsx
+#: src/screens/settings-purchase-days.jsx
 #: src/screens/settings.jsx
 #: src/screens/ventas-report.jsx
 msgid "Reintentar"
@@ -919,6 +921,8 @@ msgstr "Contraseña · 8 caracteres o más"
 #: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
 #: src/screens/sales-analysis-groups.jsx
+#: src/screens/settings-inventory-alerts.jsx
+#: src/screens/settings-purchase-days.jsx
 #: src/screens/settings.jsx
 #: src/screens/staff.jsx
 msgid "Cancelar"
@@ -1191,6 +1195,8 @@ msgstr "Escribe la CLABE o el número de cuenta. Puedes guardar ambos."
 #: src/screens/purchase-entry-dialog.jsx
 #: src/screens/reset-password.jsx
 #: src/screens/sales-analysis-groups.jsx
+#: src/screens/settings-inventory-alerts.jsx
+#: src/screens/settings-purchase-days.jsx
 #: src/screens/settings.jsx
 #: src/screens/staff.jsx
 msgid "Guardando…"
@@ -1498,6 +1504,8 @@ msgstr "Color en el POS"
 #: src/screens/inventory-item-editor.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/recipe-workspace.jsx
+#: src/screens/settings-inventory-alerts.jsx
+#: src/screens/settings-purchase-days.jsx
 #: src/screens/settings.jsx
 msgid "Guardar"
 msgstr "Guardar"
@@ -2815,6 +2823,7 @@ msgid "El canal en tiempo real no responde; la lista se actualiza cada 10 s."
 msgstr "El canal en tiempo real no responde; la lista se actualiza cada 10 s."
 
 #: src/screens/devices.jsx
+#: src/screens/inventory-planning.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/orders.jsx
 #: src/screens/overview.jsx
@@ -4116,6 +4125,7 @@ msgstr "Siguiente"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/settings-purchase-days.jsx
 msgid "Lunes"
 msgstr "Lunes"
 
@@ -4126,6 +4136,7 @@ msgstr "Lun"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/settings-purchase-days.jsx
 msgid "Martes"
 msgstr "Martes"
 
@@ -4136,6 +4147,7 @@ msgstr "Mar"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/settings-purchase-days.jsx
 msgid "Miércoles"
 msgstr "Miércoles"
 
@@ -4146,6 +4158,7 @@ msgstr "Mié"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/settings-purchase-days.jsx
 msgid "Jueves"
 msgstr "Jueves"
 
@@ -4156,6 +4169,7 @@ msgstr "Jue"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/settings-purchase-days.jsx
 msgid "Viernes"
 msgstr "Viernes"
 
@@ -4166,6 +4180,7 @@ msgstr "Vie"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/settings-purchase-days.jsx
 msgid "Sábado"
 msgstr "Sábado"
 
@@ -4176,6 +4191,7 @@ msgstr "Sáb"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/settings-purchase-days.jsx
 msgid "Domingo"
 msgstr "Domingo"
 
@@ -4413,6 +4429,7 @@ msgstr "Guardar ajuste"
 
 #: src/screens/inventory-copy.js
 #: src/screens/inventory-costing.jsx
+#: src/screens/inventory-planning.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
 #: src/screens/purchase-entry-dialog.jsx
@@ -4463,6 +4480,7 @@ msgstr "L"
 
 #: src/screens/inventory-copy.js
 #: src/screens/inventory-costing.jsx
+#: src/screens/inventory-planning.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
 #: src/screens/purchase-entry-dialog.jsx
@@ -4473,6 +4491,7 @@ msgstr "porción"
 
 #: src/screens/inventory-copy.js
 #: src/screens/inventory-costing.jsx
+#: src/screens/inventory-planning.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
 #: src/screens/purchase-entry-dialog.jsx
@@ -4483,6 +4502,7 @@ msgstr "paquete"
 
 #: src/screens/inventory-copy.js
 #: src/screens/inventory-costing.jsx
+#: src/screens/inventory-planning.jsx
 #: src/screens/invoice-inbox.jsx
 #: src/screens/prep-list.jsx
 #: src/screens/purchase-entry-dialog.jsx
@@ -4696,6 +4716,7 @@ msgstr "Con costo"
 #: src/screens/inventory-costing.jsx
 #: src/screens/inventory-item-editor.jsx
 #: src/screens/inventory-item-panel.jsx
+#: src/screens/inventory-planning.jsx
 #: src/screens/inventory-workspace.jsx
 #: src/screens/menu-engineering.jsx
 #: src/screens/recipe-workspace.jsx
@@ -4706,6 +4727,11 @@ msgstr "Sin costo"
 #: src/screens/inventory-item-panel.jsx
 msgid "Costo"
 msgstr "Costo"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-planning.jsx
+msgid "Plan de compra"
+msgstr "Plan de compra"
 
 #: src/screens/inventory-costing.jsx
 #: src/screens/variance.jsx
@@ -4731,6 +4757,7 @@ msgid "Cargando el costo de lo que vendiste…"
 msgstr "Cargando el costo de lo que vendiste…"
 
 #: src/screens/inventory-costing.jsx
+#: src/screens/inventory-planning.jsx
 #: src/screens/inventory-workspace.jsx
 #: src/screens/overview.jsx
 #: src/screens/sales-purchase-analysis.jsx
@@ -5003,6 +5030,7 @@ msgid "El costo usa el promedio ponderado de las compras recibidas. Si no hay co
 msgstr "El costo usa el promedio ponderado de las compras recibidas. Si no hay compras, usa el costo inicial guardado. Sin ninguno de los dos, el artículo queda sin costo."
 
 #: src/screens/inventory-costing.jsx
+#: src/screens/inventory-planning.jsx
 #: src/screens/prep-list.jsx
 #: src/screens/purchase-entry-dialog.jsx
 #: src/screens/recipe-workspace.jsx
@@ -5305,6 +5333,7 @@ msgid "No hay artículos en las áreas elegidas."
 msgstr "No hay artículos en las áreas elegidas."
 
 #: src/screens/inventory-filters.jsx
+#: src/screens/inventory-planning.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/recipe-workspace.jsx
 #: src/screens/ventas-report.jsx
@@ -5996,6 +6025,196 @@ msgstr "Editar costo inicial"
 msgid "Ninguno declarado"
 msgstr "Ninguno declarado"
 
+#: src/screens/inventory-planning.jsx
+#~ msgid "Promedio del mismo día de la semana durante ocho semanas. Hoy se cuenta completo. Las compras pendientes no aumentan la disponibilidad."
+#~ msgstr "Promedio del mismo día de la semana durante ocho semanas. Hoy se cuenta completo. Las compras pendientes no aumentan la disponibilidad."
+
+#: src/screens/inventory-planning.jsx
+#~ msgid "Cantidad sugerida = consumo previsto + mínimo − disponible. Se redondea a la unidad mínima del artículo; no se crean compras ni movimientos."
+#~ msgstr "Cantidad sugerida = consumo previsto + mínimo − disponible. Se redondea a la unidad mínima del artículo; no se crean compras ni movimientos."
+
+#: src/screens/inventory-planning.jsx
+#~ msgid "Error medio de validación"
+#~ msgstr "Error medio de validación"
+
+#: src/screens/inventory-planning.jsx
+msgid "Sin estimación"
+msgstr "Sin estimación"
+
+#: src/screens/inventory-planning.jsx
+msgid "Calculando el plan…"
+msgstr "Calculando el plan…"
+
+#: src/screens/inventory-planning.jsx
+msgid "Cubre del"
+msgstr "Cubre del"
+
+#: src/screens/inventory-planning.jsx
+msgid "al"
+msgstr "al"
+
+#: src/screens/inventory-planning.jsx
+msgid "Próxima compra:"
+msgstr "Próxima compra:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Configura los días de compra en Ajustes."
+msgstr "Configura los días de compra en Ajustes."
+
+#: src/screens/inventory-planning.jsx
+msgid "Faltan días de compra, historial suficiente o recetas completas. Revisa los productos; las cantidades de compra se ocultan para evitar una estimación incompleta."
+msgstr "Faltan días de compra, historial suficiente o recetas completas. Revisa los productos; las cantidades de compra se ocultan para evitar una estimación incompleta."
+
+#: src/screens/inventory-planning.jsx
+msgid "Compras sugeridas"
+msgstr "Compras sugeridas"
+
+#: src/screens/inventory-planning.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/registros.jsx
+msgid "Disponible"
+msgstr "Disponible"
+
+#: src/screens/inventory-planning.jsx
+msgid "Consumo previsto"
+msgstr "Consumo previsto"
+
+#: src/screens/inventory-planning.jsx
+msgid "Mínimo"
+msgstr "Mínimo"
+
+#: src/screens/inventory-planning.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Acción"
+msgstr "Acción"
+
+#: src/screens/inventory-planning.jsx
+msgid "Cantidad sugerida"
+msgstr "Cantidad sugerida"
+
+#: src/screens/inventory-planning.jsx
+msgid "Costo estimado"
+msgstr "Costo estimado"
+
+#: src/screens/inventory-planning.jsx
+#: src/screens/settings-purchase-days.jsx
+msgid "Sin configurar"
+msgstr "Sin configurar"
+
+#: src/screens/inventory-planning.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Preparar"
+msgstr "Preparar"
+
+#: src/screens/inventory-planning.jsx
+msgid "Comprar"
+msgstr "Comprar"
+
+#: src/screens/inventory-planning.jsx
+msgid "Ventas estimadas"
+msgstr "Ventas estimadas"
+
+#: src/screens/inventory-planning.jsx
+msgid "Unidades estimadas"
+msgstr "Unidades estimadas"
+
+#: src/screens/inventory-planning.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Receta"
+msgstr "Receta"
+
+#: src/screens/inventory-planning.jsx
+msgid "Precisión de la estimación"
+msgstr "Precisión de la estimación"
+
+#: src/screens/inventory-planning.jsx
+msgid "Completa"
+msgstr "Completa"
+
+#: src/screens/inventory-planning.jsx
+#: src/screens/inventory-workspace.jsx
+msgid "Revisar"
+msgstr "Revisar"
+
+#: src/screens/inventory-planning.jsx
+msgid "Sin historial suficiente"
+msgstr "Sin historial suficiente"
+
+#: src/screens/inventory-planning.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/members.jsx
+msgid "Ver detalle"
+msgstr "Ver detalle"
+
+#: src/screens/inventory-planning.jsx
+msgid "Error medio de validación:"
+msgstr "Error medio de validación:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Base semanal:"
+msgstr "Base semanal:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Cómo se calcula el plan"
+msgstr "Cómo se calcula el plan"
+
+#: src/screens/inventory-planning.jsx
+msgid "Historial:"
+msgstr "Historial:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Zona horaria:"
+msgstr "Zona horaria:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Calculado:"
+msgstr "Calculado:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Promedio del mismo día de la semana durante ocho semanas. Hoy se cuenta completo. Las compras pendientes no aumentan la disponibilidad. Los días sin ventas registradas se consideran cero; los cierres o fallas de captura pueden reducir la estimación."
+msgstr "Promedio del mismo día de la semana durante ocho semanas. Hoy se cuenta completo. Las compras pendientes no aumentan la disponibilidad. Los días sin ventas registradas se consideran cero; los cierres o fallas de captura pueden reducir la estimación."
+
+#: src/screens/inventory-planning.jsx
+msgid "Cantidad sugerida = consumo previsto + mínimo − disponible. Primero se descuenta lo que ya está preparado; solo lo que falta genera demanda de ingredientes. Se redondea a la unidad mínima del artículo; no se crean compras ni movimientos."
+msgstr "Cantidad sugerida = consumo previsto + mínimo − disponible. Primero se descuenta lo que ya está preparado; solo lo que falta genera demanda de ingredientes. Se redondea a la unidad mínima del artículo; no se crean compras ni movimientos."
+
+#: src/screens/inventory-planning.jsx
+msgid "Mostrar avisos en este navegador"
+msgstr "Mostrar avisos en este navegador"
+
+#: src/screens/inventory-planning.jsx
+msgid "Hay 1 artículo por reponer. Ver sugerencias."
+msgstr "Hay 1 artículo por reponer. Ver sugerencias."
+
+#. placeholder {0}: shortage.length
+#: src/screens/inventory-planning.jsx
+msgid "Hay {0} artículos por reponer. Ver sugerencias."
+msgstr "Hay {0} artículos por reponer. Ver sugerencias."
+
+#: src/screens/inventory-planning.jsx
+msgid "Correo al dueño:"
+msgstr "Correo al dueño:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Activado"
+msgstr "Activado"
+
+#: src/screens/inventory-planning.jsx
+msgid "Desactivado"
+msgstr "Desactivado"
+
+#: src/screens/inventory-planning.jsx
+msgid "Canal configurado"
+msgstr "Canal configurado"
+
+#: src/screens/inventory-planning.jsx
+msgid "Canal pendiente de configuración"
+msgstr "Canal pendiente de configuración"
+
+#: src/screens/inventory-planning.jsx
+msgid "Hay un envío pendiente o con resultado incierto. Revisa el registro antes de intentar otro envío."
+msgstr "Hay un envío pendiente o con resultado incierto. Revisa el registro antes de intentar otro envío."
+
 #: src/screens/inventory-production.jsx
 msgid "La receta cambió. Revisa de nuevo los ingredientes antes de confirmar."
 msgstr "La receta cambió. Revisa de nuevo los ingredientes antes de confirmar."
@@ -6187,10 +6406,6 @@ msgid "Archivados"
 msgstr "Archivados"
 
 #: src/screens/inventory-workspace.jsx
-msgid "Revisar"
-msgstr "Revisar"
-
-#: src/screens/inventory-workspace.jsx
 msgid "Activar conteo"
 msgstr "Activar conteo"
 
@@ -6310,11 +6525,6 @@ msgstr "Limpiar filtros"
 #: src/screens/inventory-workspace.jsx
 msgid "Seleccionar"
 msgstr "Seleccionar"
-
-#: src/screens/inventory-workspace.jsx
-#: src/screens/members.jsx
-msgid "Ver detalle"
-msgstr "Ver detalle"
 
 #: src/screens/inventory-workspace.jsx
 msgid "umbral"
@@ -7195,11 +7405,6 @@ msgstr "Activo"
 
 #: src/screens/operations-workspace.jsx
 #: src/screens/registros.jsx
-msgid "Disponible"
-msgstr "Disponible"
-
-#: src/screens/operations-workspace.jsx
-#: src/screens/registros.jsx
 msgid "En uso"
 msgstr "En uso"
 
@@ -7664,10 +7869,6 @@ msgstr "Ejecutar recuperación del dominio"
 #: src/screens/operations-workspace.jsx
 msgid "Correlación"
 msgstr "Correlación"
-
-#: src/screens/operations-workspace.jsx
-msgid "Acción"
-msgstr "Acción"
 
 #: src/screens/operations-workspace.jsx
 msgid "Usa la acción del dominio."
@@ -9769,10 +9970,6 @@ msgid "Aún no hay recetas. Crea la primera."
 msgstr "Aún no hay recetas. Crea la primera."
 
 #: src/screens/recipe-workspace.jsx
-msgid "Receta"
-msgstr "Receta"
-
-#: src/screens/recipe-workspace.jsx
 msgid "Rendimiento"
 msgstr "Rendimiento"
 
@@ -9788,10 +9985,6 @@ msgstr "Retirada"
 #: src/screens/recipe-workspace.jsx
 msgid "{0, plural, one {Se usa en # receta} other {Se usa en # recetas}}"
 msgstr "{0, plural, one {Se usa en # receta} other {Se usa en # recetas}}"
-
-#: src/screens/recipe-workspace.jsx
-msgid "Preparar"
-msgstr "Preparar"
 
 #. placeholder {0}: recipe.targetName
 #: src/screens/recipe-workspace.jsx
@@ -9829,6 +10022,10 @@ msgstr "Sin precio"
 #: src/screens/recipe-workspace.jsx
 msgid "El desglose muestra los ingredientes de cada receta. Agrega un costo inicial o registra una compra para conocer su costo."
 msgstr "El desglose muestra los ingredientes de cada receta. Agrega un costo inicial o registra una compra para conocer su costo."
+
+#: src/screens/recipe-workspace.jsx
+msgid "No se pudo guardar la recuperación local. Libera espacio en el navegador e intenta de nuevo."
+msgstr "No se pudo guardar la recuperación local. Libera espacio en el navegador e intenta de nuevo."
 
 #: src/screens/recipe-workspace.jsx
 msgid "La configuración de inventario cambió. Guarda de nuevo para revisar el estado actual."
@@ -10647,6 +10844,43 @@ msgstr "Hora del pedido en {0}. Una hora sin movimientos no demuestra falta de d
 msgid "Ver desglose"
 msgstr "Ver desglose"
 
+#: src/screens/settings-inventory-alerts.jsx
+msgid "Avisos de inventario"
+msgstr "Avisos de inventario"
+
+#: src/screens/settings-inventory-alerts.jsx
+msgid "Resumen por correo al dueño después de las 09:00 del negocio, como máximo una vez al día. Requiere un canal de correo configurado."
+msgstr "Resumen por correo al dueño después de las 09:00 del negocio, como máximo una vez al día. Requiere un canal de correo configurado."
+
+#: src/screens/settings-inventory-alerts.jsx
+#: src/screens/settings-purchase-days.jsx
+#: src/screens/settings.jsx
+msgid "Cargando ajustes…"
+msgstr "Cargando ajustes…"
+
+#: src/screens/settings-inventory-alerts.jsx
+msgid "Enviar avisos por correo al dueño"
+msgstr "Enviar avisos por correo al dueño"
+
+#: src/screens/settings-inventory-alerts.jsx
+#: src/screens/settings-purchase-days.jsx
+#: src/screens/settings.jsx
+msgid "Cambios guardados"
+msgstr "Cambios guardados"
+
+#: src/screens/settings-purchase-days.jsx
+msgid "Días de compra"
+msgstr "Días de compra"
+
+#: src/screens/settings-purchase-days.jsx
+msgid "Selecciona los días en que sueles comprar."
+msgstr "Selecciona los días en que sueles comprar."
+
+#: src/screens/settings-purchase-days.jsx
+#: src/screens/settings.jsx
+msgid "Sin guardar"
+msgstr "Sin guardar"
+
 #: src/screens/settings.jsx
 #~ msgid "Los cambios de Cash se guardan solo porque Umi Cash está activo."
 #~ msgstr "Los cambios de Cash se guardan solo porque Umi Cash está activo."
@@ -10696,24 +10930,12 @@ msgid "Cancelada"
 msgstr "Cancelada"
 
 #: src/screens/settings.jsx
-msgid "Cambios guardados"
-msgstr "Cambios guardados"
-
-#: src/screens/settings.jsx
-msgid "Sin guardar"
-msgstr "Sin guardar"
-
-#: src/screens/settings.jsx
 msgid "Regalo de cumpleaños"
 msgstr "Regalo de cumpleaños"
 
 #: src/screens/settings.jsx
 msgid "Recompensa de temporada"
 msgstr "Recompensa de temporada"
-
-#: src/screens/settings.jsx
-msgid "Cargando ajustes…"
-msgstr "Cargando ajustes…"
 
 #: src/screens/settings.jsx
 msgid "Sin datos de configuración."

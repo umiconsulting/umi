@@ -1,3 +1,4 @@
+import { InventoryAlertSettings } from './settings-inventory-alerts.jsx';
 import React, { useState, useEffect, useCallback, useId, useRef } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
@@ -17,6 +18,7 @@ import {
   createLocation,
   geocodeAddress,
 } from '@/data.jsx';
+import { PurchaseDays } from './settings-purchase-days.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 
 // Screen 5 — Settings (Branding + Loyalty + Promotions)
@@ -493,6 +495,13 @@ const SettingsScreen = () => {
       <section className="surface">
         {/* Sucursales — location aliases/descriptor (multi-location, ConversaFlow only) */}
         <LocationProfilesCard conversaflowActive={conversaflowActive} />
+
+        {merchantState?.selectedMerchantId && (
+          <React.Fragment key={merchantState.selectedMerchantId}>
+            <PurchaseDays merchantId={merchantState.selectedMerchantId} />
+            <InventoryAlertSettings merchantId={merchantState.selectedMerchantId} />
+          </React.Fragment>
+        )}
 
         {/* Merchant info */}
         <div style={{ padding: 24, borderTop: '1px solid var(--line-soft)' }}>

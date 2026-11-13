@@ -162,6 +162,7 @@ export const configSchema = z
     // winback). OFF by default: umi-cash still runs these journeys during the
     // dual-writer window, so enabling here before umi-cash stops would double-send.
     // Owner flips to true at the Phase 3 cutover (and disables the umi-cash crons).
+    INVENTORY_PLANNING_EMAIL_ENABLED: booleanFromEnv.default(false),
     LIFECYCLE_CRONS_ENABLED: booleanFromEnv.default(false),
     // KDS customer status notifications (Phase 4). When a KDS transition/partial-
     // cancel runs, emit a `twilio.status_notification`/`twilio.cancel_notification`

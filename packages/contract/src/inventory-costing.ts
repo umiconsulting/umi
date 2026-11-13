@@ -612,7 +612,72 @@ export const MenuEngineering = z
   .strict();
 export type MenuEngineering = z.infer<typeof MenuEngineering>;
 
+export const InventoryPlanQuery = z.object({ locationId: Uuid.optional() }).strict();
+export type InventoryPlanQuery = z.infer<typeof InventoryPlanQuery>;
+export const InventoryPlan = z
+  .object({
+    notifications: z
+      .object({
+        emailOptIn: z.boolean(),
+        configured: z.boolean(),
+        deliveries: z.array(
+          z.object({ day: MerchantDate, state: z.enum(['sending', 'sent', 'unknown']) }).strict(),
+        ),
+      })
+      .strict(),
+    merchantId: Uuid,
+    locationId: Uuid.nullable(),
+    asOf: IsoTimestamp,
+    timezone: z.string(),
+    from: MerchantDate,
+    to: MerchantDate.nullable(),
+    nextPurchaseDate: MerchantDate.nullable(),
+    historyFrom: MerchantDate,
+    historyTo: MerchantDate,
+    complete: z.boolean(),
+    warnings: z.array(z.string()),
+    products: z.array(
+      z
+        .object({
+          productId: Uuid,
+          variantId: Uuid.nullable(),
+          name: z.string(),
+          expectedUnits: z.number().int().safe().nonnegative().nullable(),
+          historyFrom: MerchantDate.nullable(),
+          mapped: z.boolean(),
+          validation: z
+            .object({
+              evaluatedDays: z.number().int().nonnegative(),
+              mae: z.number().nonnegative().nullable(),
+              baselineMae: z.number().nonnegative().nullable(),
+            })
+            .strict(),
+        })
+        .strict(),
+    ),
+    items: z.array(
+      z
+        .object({
+          replenishment: z.enum(['purchase', 'prepare']),
+          inventoryItemId: Uuid,
+          name: z.string(),
+          unit: z.string(),
+          scale: z.number().int().min(0).max(6),
+          available: z.number().int().safe(),
+          minimum: z.number().int().safe().nonnegative().nullable(),
+          expectedConsumption: z.number().int().safe().nonnegative().nullable(),
+          suggestedQuantity: z.number().int().safe().nonnegative().nullable(),
+          estimatedCostMinor: z.number().int().safe().nonnegative().nullable(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type InventoryPlan = z.infer<typeof InventoryPlan>;
+
 export const inventoryCostingModels = {
+  InventoryPlanQuery,
+  InventoryPlan,
   CostBasisKind,
   PlateCostDefect,
   PlateCostState,

@@ -154,9 +154,13 @@ jobs:
           # Each stable branch has its own project. PRs preview on umi-dashboard.
           BRANCH="$DEPLOY_BRANCH"
           echo "Deploying to Cloudflare Pages (branch: $BRANCH)"
+          DEPLOY_STATUS=0
           OUT=$(pnpm dlx wrangler@4.129.0 pages deploy apps/umi-dashboard/dist \
-            --project-name="$PAGES_PROJECT" --branch="$BRANCH" --commit-dirty=true 2>&1)
+            --project-name="$PAGES_PROJECT" --branch="$BRANCH" --commit-dirty=true 2>&1) || DEPLOY_STATUS=$?
           echo "$OUT"
+          if [ "$DEPLOY_STATUS" -ne 0 ]; then
+            exit "$DEPLOY_STATUS"
+          fi
           URL=$(echo "$OUT" | grep -oE 'https://[a-z0-9.-]+\.pages\.dev' | tail -1)
           {
             echo "### Cloudflare Pages — $PAGES_PROJECT"

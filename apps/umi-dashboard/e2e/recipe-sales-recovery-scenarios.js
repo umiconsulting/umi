@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect } from '@playwright/test';
 const merchantId = '11111111-1111-4111-8111-111111111111';
 const locationId = '22222222-2222-4222-8222-222222222222';
@@ -141,7 +143,7 @@ export async function openEditor(page, baseURL, create = false) {
   return dialog;
 }
 
-export async function replacementRecovery(page, baseURL) {
+export async function replacementRecovery(page, baseURL, reload = false) {
   const writes = await prepare(page, 'replacement');
   let dialog = await openEditor(page, baseURL, true);
   await dialog.getByRole('button', { name: 'Guardar', exact: true }).click();
@@ -151,11 +153,20 @@ export async function replacementRecovery(page, baseURL) {
   ).toBeDisabled();
   await expect(dialog.getByRole('button', { name: 'Guardar', exact: true })).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Cerrar', exact: true })).toBeDisabled();
-  await page.screenshot({ path: '/private/tmp/umi-inventory-phase2-task2-retry-503.png' });
+  await page.screenshot({ path: join(tmpdir(), 'umi-inventory-phase2-task2-retry-503.png') });
+  if (reload) {
+    await page.reload();
+    dialog = page.getByRole('dialog');
+    await expect(
+      dialog.getByRole('button', { name: 'Reintentar guardado', exact: true }),
+    ).toBeVisible();
+  }
   await dialog.getByRole('button', { name: 'Reintentar guardado', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Editar receta', exact: true })).toBeVisible();
   expect(writes).toHaveLength(3);
   expect(writes[1].parameters.replaceSalesMapping).toEqual({ mappingId, expectedVersion: 4 });
+  expect(writes[1].commandId).not.toBe(writes[0].commandId);
+  expect(writes[1].idempotencyKey).not.toBe(writes[0].idempotencyKey);
   expect(writes[2]).toEqual(writes[1]);
 }
 
@@ -169,7 +180,7 @@ export async function staleRecovery(page, baseURL) {
       { exact: true },
     ),
   ).toBeVisible();
-  await page.screenshot({ path: '/private/tmp/umi-inventory-phase2-task2-stale-reload.png' });
+  await page.screenshot({ path: join(tmpdir(), 'umi-inventory-phase2-task2-stale-reload.png') });
   await dialog.getByRole('button', { name: 'Recargar', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await page.getByRole('button', { name: 'Editar Pan de recuperación', exact: true }).click();
@@ -187,7 +198,9 @@ export async function translatedError(page, baseURL) {
     dialog.getByText('No tienes permiso para administrar el inventario.', { exact: true }),
   ).toBeVisible();
   await expect(dialog.getByText('Raw service error', { exact: true })).toHaveCount(0);
-  await page.screenshot({ path: '/private/tmp/umi-inventory-phase2-task2-translated-error.png' });
+  await page.screenshot({
+    path: join(tmpdir(), 'umi-inventory-phase2-task2-translated-error.png'),
+  });
   await expect(
     dialog.getByRole('textbox', { name: 'Cantidad del ingrediente 1', exact: true }),
   ).toBeEnabled();
