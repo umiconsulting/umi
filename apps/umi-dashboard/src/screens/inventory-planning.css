@@ -64,7 +64,10 @@
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
-.purchase-day { position: relative; cursor: pointer; }
+.purchase-day {
+  position: relative;
+  cursor: pointer;
+}
 .purchase-day input {
   position: absolute;
   opacity: 0;
@@ -78,7 +81,9 @@
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
-.purchase-day input:disabled + .day-pill { opacity: .55; }
+.purchase-day input:disabled + .day-pill {
+  opacity: 0.55;
+}
 @media (max-width: 600px) {
   .inventory-planning {
     padding: 16px !important;

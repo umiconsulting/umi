@@ -102,10 +102,7 @@ export function PurchaseDays({ merchantId }) {
               <Trans>Días de compra</Trans>
             </legend>
             {days.map(([day, label]) => (
-              <label
-                key={day}
-                className="purchase-day"
-              >
+              <label key={day} className="purchase-day">
                 <input
                   type="checkbox"
                   checked={draft.includes(day)}

@@ -203,7 +203,9 @@ function Planning({ merchantId, locationId, name, location }) {
                         t`Sin historial suficiente`
                       ) : (
                         <details className="planning-validation">
-                          <summary><Trans>Ver detalle</Trans></summary>
+                          <summary>
+                            <Trans>Ver detalle</Trans>
+                          </summary>
                           <Trans>Error medio de validación:</Trans>{' '}
                           {formatNumber(product.validation.mae, { maximumFractionDigits: 2 })} ·{' '}
                           <Trans>Base semanal:</Trans>{' '}
@@ -224,28 +226,31 @@ function Planning({ merchantId, locationId, name, location }) {
             </p>
           )}
           <details className="planning-method">
-            <summary><Trans>Cómo se calcula el plan</Trans></summary>
-          <p>
-            <Trans>Historial:</Trans> {data.historyFrom} — {data.historyTo}.{' '}
-            <Trans>Zona horaria:</Trans> {data.timezone}.
-          </p>
-          <p>
-            <Trans>Calculado:</Trans> {new Date(data.asOf).toLocaleString()}
-          </p>
-          <p>
-            <Trans>
-              Promedio del mismo día de la semana durante ocho semanas. Hoy se cuenta completo. Las
-              compras pendientes no aumentan la disponibilidad. Los días sin ventas registradas se
-              consideran cero; los cierres o fallas de captura pueden reducir la estimación.
-            </Trans>
-          </p>
-          <p>
-            <Trans>
-              Cantidad sugerida = consumo previsto + mínimo − disponible. Primero se descuenta lo
-              que ya está preparado; solo lo que falta genera demanda de ingredientes. Se redondea a
-              la unidad mínima del artículo; no se crean compras ni movimientos.
-            </Trans>
-          </p>
+            <summary>
+              <Trans>Cómo se calcula el plan</Trans>
+            </summary>
+            <p>
+              <Trans>Historial:</Trans> {data.historyFrom} — {data.historyTo}.{' '}
+              <Trans>Zona horaria:</Trans> {data.timezone}.
+            </p>
+            <p>
+              <Trans>Calculado:</Trans> {new Date(data.asOf).toLocaleString()}
+            </p>
+            <p>
+              <Trans>
+                Promedio del mismo día de la semana durante ocho semanas. Hoy se cuenta completo.
+                Las compras pendientes no aumentan la disponibilidad. Los días sin ventas
+                registradas se consideran cero; los cierres o fallas de captura pueden reducir la
+                estimación.
+              </Trans>
+            </p>
+            <p>
+              <Trans>
+                Cantidad sugerida = consumo previsto + mínimo − disponible. Primero se descuenta lo
+                que ya está preparado; solo lo que falta genera demanda de ingredientes. Se redondea
+                a la unidad mínima del artículo; no se crean compras ni movimientos.
+              </Trans>
+            </p>
           </details>
           <label style={{ display: 'flex', gap: 8, minHeight: 44, alignItems: 'center' }}>
             <input
@@ -265,7 +270,9 @@ function Planning({ merchantId, locationId, name, location }) {
           {alerts && shortage.length > 0 && (
             <p role="status">
               <a href="#inventory-purchase-suggestions">
-                {shortage.length === 1 ? t`Hay 1 artículo por reponer. Ver sugerencias.` : t`Hay ${shortage.length} artículos por reponer. Ver sugerencias.`}
+                {shortage.length === 1
+                  ? t`Hay 1 artículo por reponer. Ver sugerencias.`
+                  : t`Hay ${shortage.length} artículos por reponer. Ver sugerencias.`}
               </a>
             </p>
           )}
