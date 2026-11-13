@@ -6034,24 +6034,16 @@ msgstr "Ninguno declarado"
 #~ msgstr "Cantidad sugerida = consumo previsto + mínimo − disponible. Se redondea a la unidad mínima del artículo; no se crean compras ni movimientos."
 
 #: src/screens/inventory-planning.jsx
+#~ msgid "Error medio de validación"
+#~ msgstr "Error medio de validación"
+
+#: src/screens/inventory-planning.jsx
 msgid "Sin estimación"
 msgstr "Sin estimación"
 
 #: src/screens/inventory-planning.jsx
 msgid "Calculando el plan…"
 msgstr "Calculando el plan…"
-
-#: src/screens/inventory-planning.jsx
-msgid "Historial:"
-msgstr "Historial:"
-
-#: src/screens/inventory-planning.jsx
-msgid "Zona horaria:"
-msgstr "Zona horaria:"
-
-#: src/screens/inventory-planning.jsx
-msgid "Calculado:"
-msgstr "Calculado:"
 
 #: src/screens/inventory-planning.jsx
 msgid "Cubre del"
@@ -6070,87 +6062,12 @@ msgid "Configura los días de compra en Ajustes."
 msgstr "Configura los días de compra en Ajustes."
 
 #: src/screens/inventory-planning.jsx
-msgid "Promedio del mismo día de la semana durante ocho semanas. Hoy se cuenta completo. Las compras pendientes no aumentan la disponibilidad. Los días sin ventas registradas se consideran cero; los cierres o fallas de captura pueden reducir la estimación."
-msgstr "Promedio del mismo día de la semana durante ocho semanas. Hoy se cuenta completo. Las compras pendientes no aumentan la disponibilidad. Los días sin ventas registradas se consideran cero; los cierres o fallas de captura pueden reducir la estimación."
-
-#: src/screens/inventory-planning.jsx
 msgid "Faltan días de compra, historial suficiente o recetas completas. Revisa los productos; las cantidades de compra se ocultan para evitar una estimación incompleta."
 msgstr "Faltan días de compra, historial suficiente o recetas completas. Revisa los productos; las cantidades de compra se ocultan para evitar una estimación incompleta."
 
 #: src/screens/inventory-planning.jsx
-msgid "Mostrar avisos en este navegador"
-msgstr "Mostrar avisos en este navegador"
-
-#. placeholder {0}: shortage.length
-#: src/screens/inventory-planning.jsx
-msgid "Hay {0} artículos por reponer. Ver sugerencias."
-msgstr "Hay {0} artículos por reponer. Ver sugerencias."
-
-#: src/screens/inventory-planning.jsx
-msgid "Correo al dueño:"
-msgstr "Correo al dueño:"
-
-#: src/screens/inventory-planning.jsx
-msgid "Activado"
-msgstr "Activado"
-
-#: src/screens/inventory-planning.jsx
-msgid "Desactivado"
-msgstr "Desactivado"
-
-#: src/screens/inventory-planning.jsx
-msgid "Canal configurado"
-msgstr "Canal configurado"
-
-#: src/screens/inventory-planning.jsx
-msgid "Canal pendiente de configuración"
-msgstr "Canal pendiente de configuración"
-
-#: src/screens/inventory-planning.jsx
-msgid "Hay un envío pendiente o con resultado incierto. Revisa el registro antes de intentar otro envío."
-msgstr "Hay un envío pendiente o con resultado incierto. Revisa el registro antes de intentar otro envío."
-
-#: src/screens/inventory-planning.jsx
-msgid "Ventas estimadas"
-msgstr "Ventas estimadas"
-
-#: src/screens/inventory-planning.jsx
-msgid "Unidades estimadas"
-msgstr "Unidades estimadas"
-
-#: src/screens/inventory-planning.jsx
-#: src/screens/recipe-workspace.jsx
-msgid "Receta"
-msgstr "Receta"
-
-#: src/screens/inventory-planning.jsx
-msgid "Error medio de validación"
-msgstr "Error medio de validación"
-
-#: src/screens/inventory-planning.jsx
-msgid "Completa"
-msgstr "Completa"
-
-#: src/screens/inventory-planning.jsx
-#: src/screens/inventory-workspace.jsx
-msgid "Revisar"
-msgstr "Revisar"
-
-#: src/screens/inventory-planning.jsx
-msgid "Sin historial suficiente"
-msgstr "Sin historial suficiente"
-
-#: src/screens/inventory-planning.jsx
-msgid "Base semanal:"
-msgstr "Base semanal:"
-
-#: src/screens/inventory-planning.jsx
 msgid "Compras sugeridas"
 msgstr "Compras sugeridas"
-
-#: src/screens/inventory-planning.jsx
-msgid "Cantidad sugerida = consumo previsto + mínimo − disponible. Primero se descuenta lo que ya está preparado; solo lo que falta genera demanda de ingredientes. Se redondea a la unidad mínima del artículo; no se crean compras ni movimientos."
-msgstr "Cantidad sugerida = consumo previsto + mínimo − disponible. Primero se descuenta lo que ya está preparado; solo lo que falta genera demanda de ingredientes. Se redondea a la unidad mínima del artículo; no se crean compras ni movimientos."
 
 #: src/screens/inventory-planning.jsx
 #: src/screens/operations-workspace.jsx
@@ -6192,6 +6109,111 @@ msgstr "Preparar"
 #: src/screens/inventory-planning.jsx
 msgid "Comprar"
 msgstr "Comprar"
+
+#: src/screens/inventory-planning.jsx
+msgid "Ventas estimadas"
+msgstr "Ventas estimadas"
+
+#: src/screens/inventory-planning.jsx
+msgid "Unidades estimadas"
+msgstr "Unidades estimadas"
+
+#: src/screens/inventory-planning.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Receta"
+msgstr "Receta"
+
+#: src/screens/inventory-planning.jsx
+msgid "Precisión de la estimación"
+msgstr "Precisión de la estimación"
+
+#: src/screens/inventory-planning.jsx
+msgid "Completa"
+msgstr "Completa"
+
+#: src/screens/inventory-planning.jsx
+#: src/screens/inventory-workspace.jsx
+msgid "Revisar"
+msgstr "Revisar"
+
+#: src/screens/inventory-planning.jsx
+msgid "Sin historial suficiente"
+msgstr "Sin historial suficiente"
+
+#: src/screens/inventory-planning.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/members.jsx
+msgid "Ver detalle"
+msgstr "Ver detalle"
+
+#: src/screens/inventory-planning.jsx
+msgid "Error medio de validación:"
+msgstr "Error medio de validación:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Base semanal:"
+msgstr "Base semanal:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Cómo se calcula el plan"
+msgstr "Cómo se calcula el plan"
+
+#: src/screens/inventory-planning.jsx
+msgid "Historial:"
+msgstr "Historial:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Zona horaria:"
+msgstr "Zona horaria:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Calculado:"
+msgstr "Calculado:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Promedio del mismo día de la semana durante ocho semanas. Hoy se cuenta completo. Las compras pendientes no aumentan la disponibilidad. Los días sin ventas registradas se consideran cero; los cierres o fallas de captura pueden reducir la estimación."
+msgstr "Promedio del mismo día de la semana durante ocho semanas. Hoy se cuenta completo. Las compras pendientes no aumentan la disponibilidad. Los días sin ventas registradas se consideran cero; los cierres o fallas de captura pueden reducir la estimación."
+
+#: src/screens/inventory-planning.jsx
+msgid "Cantidad sugerida = consumo previsto + mínimo − disponible. Primero se descuenta lo que ya está preparado; solo lo que falta genera demanda de ingredientes. Se redondea a la unidad mínima del artículo; no se crean compras ni movimientos."
+msgstr "Cantidad sugerida = consumo previsto + mínimo − disponible. Primero se descuenta lo que ya está preparado; solo lo que falta genera demanda de ingredientes. Se redondea a la unidad mínima del artículo; no se crean compras ni movimientos."
+
+#: src/screens/inventory-planning.jsx
+msgid "Mostrar avisos en este navegador"
+msgstr "Mostrar avisos en este navegador"
+
+#: src/screens/inventory-planning.jsx
+msgid "Hay 1 artículo por reponer. Ver sugerencias."
+msgstr "Hay 1 artículo por reponer. Ver sugerencias."
+
+#. placeholder {0}: shortage.length
+#: src/screens/inventory-planning.jsx
+msgid "Hay {0} artículos por reponer. Ver sugerencias."
+msgstr "Hay {0} artículos por reponer. Ver sugerencias."
+
+#: src/screens/inventory-planning.jsx
+msgid "Correo al dueño:"
+msgstr "Correo al dueño:"
+
+#: src/screens/inventory-planning.jsx
+msgid "Activado"
+msgstr "Activado"
+
+#: src/screens/inventory-planning.jsx
+msgid "Desactivado"
+msgstr "Desactivado"
+
+#: src/screens/inventory-planning.jsx
+msgid "Canal configurado"
+msgstr "Canal configurado"
+
+#: src/screens/inventory-planning.jsx
+msgid "Canal pendiente de configuración"
+msgstr "Canal pendiente de configuración"
+
+#: src/screens/inventory-planning.jsx
+msgid "Hay un envío pendiente o con resultado incierto. Revisa el registro antes de intentar otro envío."
+msgstr "Hay un envío pendiente o con resultado incierto. Revisa el registro antes de intentar otro envío."
 
 #: src/screens/inventory-production.jsx
 msgid "La receta cambió. Revisa de nuevo los ingredientes antes de confirmar."
@@ -6503,11 +6525,6 @@ msgstr "Limpiar filtros"
 #: src/screens/inventory-workspace.jsx
 msgid "Seleccionar"
 msgstr "Seleccionar"
-
-#: src/screens/inventory-workspace.jsx
-#: src/screens/members.jsx
-msgid "Ver detalle"
-msgstr "Ver detalle"
 
 #: src/screens/inventory-workspace.jsx
 msgid "umbral"

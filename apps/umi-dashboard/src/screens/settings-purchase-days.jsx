@@ -1,3 +1,4 @@
+import './inventory-planning.css';
 import { useEffect, useRef, useState } from 'react';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { inventoryPlanningData, saveMerchantSettings } from '@/data.jsx';
@@ -103,7 +104,7 @@ export function PurchaseDays({ merchantId }) {
             {days.map(([day, label]) => (
               <label
                 key={day}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }}
+                className="purchase-day"
               >
                 <input
                   type="checkbox"
@@ -115,7 +116,7 @@ export function PurchaseDays({ merchantId }) {
                     );
                   }}
                 />
-                {label}
+                <span className={'day-pill' + (draft.includes(day) ? ' on' : '')}>{label}</span>
               </label>
             ))}
           </fieldset>
