@@ -36,12 +36,17 @@ node scripts/umi-play-review-seed.mjs
 ```
 
 El seeder puede repetirse. Conserva los pedidos y las ventas del comercio demo.
+Una repetición con los mismos valores conserva las credenciales existentes.
+Un PIN sin cambios conserva las sesiones activas de los revisores.
 El usuario `play-review@umipos.invalid` tiene autoridad de propietario solo en ese comercio.
 La API normal configura su PIN con la clave de firma del entorno.
 La concesión se activa después de comprobar el inicio de sesión y configurar el PIN.
 El código y el PIN no caducan. La cuenta no depende de una prueba gratuita.
 
-El catálogo contiene cuatro productos ficticios. El pago en efectivo no requiere una caja física ni un turno abierto.
+El catálogo contiene cuatro productos ficticios y una caja lógica: `Google Play Demo`.
+El efectivo requiere un turno abierto. El revisor puede abrirlo con saldo inicial de cero.
+La caja permite selección por operador. Una instalación nueva puede recuperar su turno mediante el flujo normal.
+No se requiere una terminal de pago ni una impresora física.
 No se crean integraciones de pago, correo, mensajería o facturación para este comercio.
 El administrador debe conservar este aislamiento y verificarlo antes de cada revisión.
 
@@ -57,7 +62,10 @@ Instrucciones base, que se deben completar con los valores privados comprobados:
 > Open the app. On the device enrollment screen, enter the enrollment code provided here.
 > Enrollment completes automatically. On the operator sign-in screen, enter the PIN provided here.
 > The account opens UmiPOS Google Play Demo, a separate business with fictional products.
-> Select a product and use Cash to complete a sample sale. No physical payment terminal is needed.
+> For a sample sale, choose Takeout, add a product, and select Checkout, then Cash.
+> When prompted, open a cash shift on Google Play Demo with an opening amount of 0.00.
+> If a previous installation holds the shift, use the normal cash register recovery with the same operator PIN.
+> Return to checkout and complete the cash sale. No physical payment terminal or printer is needed.
 > The enrollment code is reusable across installations. No OTP, email verification, payment, or manual approval is required.
 
 Comprueba el flujo desde dos instalaciones nuevas contra la API que utiliza el AAB enviado.
