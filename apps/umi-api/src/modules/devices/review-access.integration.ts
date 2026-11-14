@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, scryptSync } from 'node:crypto';
 import { Client } from 'pg';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -83,6 +83,7 @@ describe('store review access stays within the reserved demo merchant', () => {
       ]);
       await admin.query('DELETE FROM merchant.device WHERE merchant_id=$1', [merchantId]);
       for (const table of [
+        'physical_register',
         'pos_checkout_policy',
         'cash_shift_policy',
         'pos_exception_policy',
@@ -183,15 +184,35 @@ describe('store review access stays within the reserved demo merchant', () => {
     ]);
     let failLogin = true;
     let failPin = false;
+    let pinUpdates = 0;
     const server = createServer((request, response) => {
-      response.statusCode = (request.url?.includes('/login') ? failLogin : failPin) ? 503 : 200;
-      response.setHeader('content-type', 'application/json');
-      response.end('{}');
+      void (async () => {
+        response.statusCode = (request.url?.includes('/login') ? failLogin : failPin) ? 503 : 200;
+        if (request.method === 'PATCH' && response.statusCode === 200) {
+          pinUpdates += 1;
+          const salt = 'ab'.repeat(16);
+          await admin.query(
+            'UPDATE merchant.staff SET operator_pin_salt=$1,operator_pin_hash=$2,operator_pin_lookup=$3 WHERE user_id=$4 AND merchant_id=$5',
+            [
+              salt,
+              scryptSync('482619', salt, 64).toString('hex'),
+              hash('test-only-lookup'),
+              userId,
+              merchantId,
+            ],
+          );
+        }
+        response.setHeader('content-type', 'application/json');
+        response.end('{}');
+      })().catch(() => {
+        response.statusCode = 500;
+        response.end('{}');
+      });
     });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('Missing local API port');
-    const seed = (setupCode = code) =>
+    const seed = (setupCode = code, operatorPin = '482619') =>
       promisify(execFile)(process.execPath, ['../../scripts/umi-play-review-seed.mjs'], {
         env: {
           ...process.env,
@@ -202,7 +223,7 @@ describe('store review access stays within the reserved demo merchant', () => {
           REVIEW_SEED_CONFIRM: 'isolated-demo',
           REVIEW_SETUP_CODE: setupCode,
           REVIEW_ADMIN_PASSWORD: 'test-only-password-long-enough',
-          REVIEW_OPERATOR_PIN: '482619',
+          REVIEW_OPERATOR_PIN: operatorPin,
         },
       });
     try {
@@ -217,6 +238,7 @@ describe('store review access stays within the reserved demo merchant', () => {
       failLogin = false;
       await seed();
       await seed();
+      expect(pinUpdates).toBe(1);
       expect(
         (
           await admin.query(
@@ -225,8 +247,15 @@ describe('store review access stays within the reserved demo merchant', () => {
           )
         ).rows[0].n,
       ).toBe(4);
+      const register = await admin.query(
+        'SELECT display_name,assignment_policy FROM merchant.physical_register WHERE merchant_id=$1',
+        [merchantId],
+      );
+      expect(register.rows).toEqual([
+        { display_name: 'Google Play Demo', assignment_policy: 'operator_selects' },
+      ]);
       failPin = true;
-      await expect(seed()).rejects.toThrow();
+      await expect(seed(code, '482620')).rejects.toThrow();
       await expect(seed('NEWCODE1')).rejects.toThrow();
       const grant = (
         await admin.query(
