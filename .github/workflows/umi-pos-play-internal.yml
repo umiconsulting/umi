@@ -69,7 +69,7 @@ jobs:
             exit 1
           fi
           mkdir -p "$RUNNER_TEMP/play-notes"
-          printf '%s\n' "$RELEASE_NOTES" > "$RUNNER_TEMP/play-notes/whatsnew-es-419"
+          printf '%s' "$RELEASE_NOTES" > "$RUNNER_TEMP/play-notes/whatsnew-es-419"
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
