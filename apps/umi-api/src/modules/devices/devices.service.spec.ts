@@ -29,6 +29,7 @@ const make = () => {
       expiresAt: input.expiresAt,
     })),
     claimPairing: vi.fn(),
+    findReviewAccess: vi.fn().mockResolvedValue(null),
     listPairingRequests: vi.fn().mockResolvedValue([]),
     listDevices: vi.fn().mockResolvedValue([device]),
     updateDevice: vi.fn().mockResolvedValue(device),
@@ -82,6 +83,49 @@ const make = () => {
 };
 
 describe('DevicesService', () => {
+  it('enrolls separate review installations without an administrator being present', async () => {
+    const { service, repo } = make();
+    repo.findReviewAccess.mockResolvedValue({
+      merchantId: device.merchantId,
+      locationId: device.locationId,
+      actorUserId: device.id,
+    });
+    repo.claimPairing.mockImplementation((input) => ({
+      state: 'claimed',
+      pairingSessionId: input.pairingSessionId,
+      expiresAt: new Date(Date.now() + 300_000),
+    }));
+    repo.decidePairing.mockResolvedValue({
+      enrollmentRequestId: device.id,
+      state: 'credential_ready',
+      decidedAt: new Date().toISOString(),
+      pairingSessionId: device.id,
+    });
+    const first = await service.claim(
+      {
+        setupCode: 'REVIEW12',
+        installationId: 'review-installation-one',
+        platform: 'android',
+        deviceType: 'pos_terminal',
+      },
+      '127.0.0.1',
+    );
+    const second = await service.claim(
+      {
+        setupCode: 'REVIEW12',
+        installationId: 'review-installation-two',
+        platform: 'android',
+        deviceType: 'pos_terminal',
+      },
+      '127.0.0.1',
+    );
+    expect(first.pairingSessionId).not.toBe(second.pairingSessionId);
+    expect(repo.decidePairing).toHaveBeenCalledTimes(2);
+    expect(
+      repo.beginPairing.mock.calls.every(([input]) => input.merchantId === device.merchantId),
+    ).toBe(true);
+    expect(new Set(repo.beginPairing.mock.calls.map(([input]) => input.codeHash)).size).toBe(2);
+  });
   it('creates a bounded deterministic one-time challenge', async () => {
     const { service, repo } = make();
     const first = await service.begin(device.merchantId, device.id, {
