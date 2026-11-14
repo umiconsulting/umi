@@ -23,7 +23,7 @@ Optional:
   UMIPOS_ANDROID_KEYSTORE_PASSWORD and UMIPOS_ANDROID_KEY_PASSWORD
                              Default: Secret Service values for service
                              umipos-android-release, account juan
-  UMIPOS_ARTIFACT_PATH      Default: ~/Downloads/UmiPOS-<version>-production-release-build<code>.apk
+  UMIPOS_ARTIFACT_PATH      Default: ~/Downloads/UmiPOS-<version>-production-release-build<code>.<apk|aab>
   UMIPOS_ANDROID_CERT_SHA256
                              Expected signing certificate fingerprint
   UMIPOS_ALLOW_DEBUG_SIGNER Set to 1 only for a controlled signing migration.
@@ -161,15 +161,27 @@ if unzip -l "$artifact" | grep -q 'libvmservice_snapshot.so'; then
 fi
 
 if [[ "$artifact_format" == appbundle ]]; then
-  java -jar "$BUNDLETOOL_JAR" validate --bundle="$artifact"
-  bundle_package="$(java -jar "$BUNDLETOOL_JAR" dump manifest --bundle="$artifact" --xpath='/manifest/@package')"
-  bundle_code="$(java -jar "$BUNDLETOOL_JAR" dump manifest --bundle="$artifact" --xpath='/manifest/@android:versionCode')"
-  bundle_debuggable="$(java -jar "$BUNDLETOOL_JAR" dump manifest --bundle="$artifact" --xpath='/manifest/application/@android:debuggable')"
-  if [[ "$bundle_package" != "$app_id" || "$bundle_code" != "$UMIPOS_BUILD_NUMBER" || "$bundle_debuggable" != false ]]; then
-    printf 'The bundle identity or release mode does not match.\n' >&2
-    exit 1
-  fi
-  signature="$(LC_ALL=C jarsigner -verify "$artifact")"
+  java -jar "$BUNDLETOOL_JAR" validate --bundle="$artifact" >/dev/null
+  manifest="$(java -jar "$BUNDLETOOL_JAR" dump manifest --bundle="$artifact")"
+  python3 -c '
+import sys
+import xml.etree.ElementTree as ET
+root = ET.fromstring(sys.stdin.read())
+android = "{http://schemas.android.com/apk/res/android}"
+application = root.find("application")
+valid = (
+    root.get("package") == sys.argv[1]
+    and root.get(android + "versionCode") == sys.argv[2]
+    and root.get(android + "versionName") == sys.argv[3]
+    and application is not None
+    and application.get(android + "debuggable", "false") == "false"
+)
+if not valid:
+    sys.exit("The bundle identity or release mode does not match.")
+' "$app_id" "$UMIPOS_BUILD_NUMBER" "$UMIPOS_RELEASE_VERSION" <<<"$manifest"
+  signature="$(LC_ALL=C jarsigner -verify -strict \
+    -keystore "$UMIPOS_ANDROID_KEYSTORE_PATH" \
+    -storepass:env UMIPOS_ANDROID_KEYSTORE_PASSWORD "$artifact")"
   if ! grep -q 'jar verified\.' <<<"$signature"; then
     printf 'The bundle signature is invalid or absent.\n' >&2
     exit 1

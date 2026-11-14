@@ -1,4 +1,6 @@
 # Miscellaneous
+# Kotlin creates this cache during Android release builds.
+android/.kotlin/
 *.class
 *.log
 *.pyc
