@@ -14,6 +14,9 @@ Cada instalación recibe una solicitud temporal y una credencial propia por el f
 El PIN, los permisos, el aislamiento y la prueba del dispositivo siguen activos.
 La autorización automática solo admite terminales POS Android.
 Los códigos normales conservan la aprobación manual y el vencimiento de cinco minutos.
+Mientras la concesión está activa, su propietario puede iniciar sesiones POS en varias
+instalaciones Android de la sucursal demo. Así una reinstalación no necesita cerrar la
+sesión anterior. Los demás operadores conservan la exclusividad entre dispositivos.
 
 ## Preparación
 

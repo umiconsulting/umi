@@ -1,4 +1,4 @@
-import { createHash, scryptSync } from 'node:crypto';
+import { createHash, scryptSync, randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PgService } from '../../shared/database/pg.service';
 import { DevicesRepository } from './devices.repository';
 import { DevicesService } from './devices.service';
+import { PosEntryRepository } from '../pos-entry/pos-entry.repository';
 
 const merchantId = 'a1100000-0000-4000-8000-000000000001';
 const locationId = 'a1100000-0000-4000-8000-000000000002';
@@ -81,6 +82,8 @@ describe('store review access stays within the reserved demo merchant', () => {
       await admin.query('DELETE FROM runtime.device_enrollment_request WHERE merchant_id=$1', [
         merchantId,
       ]);
+      await admin.query('DELETE FROM runtime.operator_session WHERE merchant_id=$1', [merchantId]);
+      await admin.query('DELETE FROM runtime.session WHERE merchant_id=$1', [merchantId]);
       await admin.query('DELETE FROM merchant.device WHERE merchant_id=$1', [merchantId]);
       for (const table of [
         'physical_register',
@@ -269,5 +272,82 @@ describe('store review access stays within the reserved demo merchant', () => {
         server.close((error) => (error ? reject(error) : resolve())),
       );
     }
+  });
+  it('starts the demo on a replacement installation while keeping normal operator exclusivity', async () => {
+    const repo = new PosEntryRepository(pg);
+    const inputs = [];
+    for (let i = 0; i < 3; i++) {
+      const deviceId = randomUUID();
+      const durableSessionId = randomUUID();
+      await admin.query(
+        `INSERT INTO merchant.device(id,merchant_id,location_id,name,kind,platform)
+         VALUES($1,$2,$3,'Review replacement','pos_terminal','android')`,
+        [deviceId, merchantId, locationId],
+      );
+      await admin.query(
+        `INSERT INTO runtime.session(id,merchant_id,principal_type,principal_id,token_hash,metadata,expires_at)
+         VALUES($1,$2,'device',$3,$4,jsonb_build_object('app','pos','operatorUserId',$5::text,'locationId',$6::text),now()+interval '1 day')`,
+        [durableSessionId, merchantId, deviceId, hash(durableSessionId), userId, locationId],
+      );
+      inputs.push({
+        durableSessionId,
+        deviceId,
+        userId,
+        merchantId,
+        locationId,
+        expiresAt: new Date(Date.now() + 3600000),
+      });
+    }
+    expect(await repo.startOperator(inputs[0])).toMatchObject({ deviceId: inputs[0].deviceId });
+    expect(await repo.startOperator(inputs[1])).toMatchObject({ deviceId: inputs[1].deviceId });
+    await admin.query('UPDATE runtime.app_review_access SET enabled=false WHERE merchant_id=$1', [
+      merchantId,
+    ]);
+    await expect(repo.startOperator(inputs[2])).rejects.toMatchObject({
+      response: { code: 'OPERATOR_SESSION_BUSY' },
+    });
+    await admin.query('UPDATE runtime.app_review_access SET enabled=true WHERE merchant_id=$1', [
+      merchantId,
+    ]);
+    const otherLocation = randomUUID();
+    await admin.query(
+      "INSERT INTO merchant.location(id,merchant_id,name) VALUES($1,$2,'Other location')",
+      [otherLocation, merchantId],
+    );
+    await admin.query('UPDATE runtime.app_review_access SET location_id=$2 WHERE merchant_id=$1', [
+      merchantId,
+      otherLocation,
+    ]);
+    await expect(repo.startOperator(inputs[2])).rejects.toMatchObject({
+      response: { code: 'OPERATOR_SESSION_BUSY' },
+    });
+    await admin.query('UPDATE runtime.app_review_access SET location_id=$2 WHERE merchant_id=$1', [
+      merchantId,
+      locationId,
+    ]);
+    const otherUser = randomUUID();
+    await admin.query(`INSERT INTO umi."user"(id,full_name) VALUES($1,'Other owner')`, [otherUser]);
+    await admin.query('UPDATE runtime.app_review_access SET created_by=$2 WHERE merchant_id=$1', [
+      merchantId,
+      otherUser,
+    ]);
+    await expect(repo.startOperator(inputs[2])).rejects.toMatchObject({
+      response: { code: 'OPERATOR_SESSION_BUSY' },
+    });
+    await admin.query('UPDATE runtime.app_review_access SET created_by=$2 WHERE merchant_id=$1', [
+      merchantId,
+      userId,
+    ]);
+    await admin.query('DELETE FROM umi."user" WHERE id=$1', [otherUser]);
+    await admin.query("UPDATE merchant.device SET platform='ios' WHERE id=$1", [
+      inputs[2].deviceId,
+    ]);
+    await expect(repo.startOperator(inputs[2])).rejects.toMatchObject({
+      response: { code: 'OPERATOR_SESSION_BUSY' },
+    });
+    await admin.query("UPDATE merchant.device SET platform='android' WHERE id=$1", [
+      inputs[2].deviceId,
+    ]);
+    expect(await repo.startOperator(inputs[2])).toMatchObject({ deviceId: inputs[2].deviceId });
   });
 });
