@@ -2082,10 +2082,26 @@ export class PosCheckoutRepository {
           `SELECT id::text,method,amount_minor_units::text AS "amountMinorUnits",currency,
                 status,query_only AS "queryOnly",correlation_id AS "correlationId",
                 expires_at::text AS "expiresAt",created_at::text AS "createdAt"
-         FROM merchant.pos_payment_attempt
-         WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND cart_id=$3::uuid
-           AND status IN ('unknown','timeout')
-         ORDER BY created_at DESC
+         FROM merchant.pos_payment_attempt attempt
+         WHERE attempt.merchant_id=$1::uuid AND attempt.location_id=$2::uuid
+           AND attempt.cart_id=$3::uuid
+           AND (
+             attempt.status IN ('unknown','timeout')
+             OR (
+               attempt.status='succeeded'
+               AND attempt.tender_id IS NULL
+               AND NOT EXISTS (
+                 SELECT 1
+                   FROM merchant.pos_committed_sale sale
+                  WHERE sale.merchant_id=attempt.merchant_id
+                    AND sale.cart_id=attempt.cart_id
+                    AND sale.payment_attempt_id=attempt.id
+               )
+             )
+           )
+         ORDER BY
+           CASE WHEN attempt.status IN ('unknown','timeout') THEN 0 ELSE 1 END,
+           attempt.created_at DESC
          LIMIT 1`,
           [merchantId, locationId, cartId],
         );
@@ -2105,14 +2121,17 @@ export class PosCheckoutRepository {
                 correlationId: row.correlationId,
                 createdAt: row.createdAt,
               },
-              ambiguity: {
-                paymentRef: row.id,
-                status: 'unknown',
-                queryOnly: true,
-                canRetryAsNew: false,
-                queryAfter: row.expiresAt,
-                correlationId: row.correlationId,
-              },
+              ambiguity:
+                row.status === 'unknown' || row.status === 'timeout'
+                  ? {
+                      paymentRef: row.id,
+                      status: 'unknown',
+                      queryOnly: true,
+                      canRetryAsNew: false,
+                      queryAfter: row.expiresAt,
+                      correlationId: row.correlationId,
+                    }
+                  : null,
             }
           : null;
         return { ...snapshot, paymentOutcome };

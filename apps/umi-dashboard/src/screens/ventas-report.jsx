@@ -91,6 +91,7 @@ function SeriesChart({ series, bucket, currency }) {
   return (
     <Panel title={bucket === 'hour' ? <Trans>Venta por hora</Trans> : <Trans>Venta por día</Trans>}>
       <div
+        className="series-chart-scroll"
         style={{
           display: 'flex',
           alignItems: 'flex-end',
@@ -366,8 +367,9 @@ function Pivot({ productMix, byOperator, byHour, currency }) {
           ))}
         </div>
       </div>
-      <div style={{ overflowX: 'auto' }}>
+      <div className="report-pivot-scroll" style={{ overflowX: 'auto' }}>
         <table
+          className="report-pivot-table"
           style={{
             width: '100%',
             borderCollapse: 'collapse',

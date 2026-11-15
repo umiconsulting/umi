@@ -216,6 +216,46 @@ describe('AppleWebServiceController · the PassKit HTTP contract', () => {
   // ── download ─────────────────────────────────────────────────────────────
   const passPath = `/api/${HANDLE}/passes/apple/v1/passes/${PASS_TYPE}/${SERIAL}`;
 
+  it('download · 304 without rendering when the authenticated pass has not changed', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: passPath,
+      headers: {
+        authorization: `ApplePass ${TOKEN}`,
+        'if-modified-since': 'Wed, 12 Aug 2026 10:00:00 GMT',
+      },
+    });
+    expect(res.statusCode).toBe(304);
+    expect(res.body).toBe('');
+    expect(res.headers['last-modified']).toBe('Wed, 12 Aug 2026 10:00:00 GMT');
+    expect(wallet.renderPass).not.toHaveBeenCalled();
+  });
+
+  it('download · 200 when the device has an older version', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: passPath,
+      headers: {
+        authorization: `ApplePass ${TOKEN}`,
+        'if-modified-since': 'Wed, 12 Aug 2026 09:59:59 GMT',
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(wallet.renderPass).toHaveBeenCalled();
+  });
+
+  it('download · 401 for an invalid token even when the modified date matches', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: passPath,
+      headers: {
+        authorization: 'ApplePass wrong',
+        'if-modified-since': 'Wed, 12 Aug 2026 10:00:00 GMT',
+      },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
   it('download · 200 with the pkpass content type and Last-Modified', async () => {
     const res = await app.inject({
       method: 'GET',

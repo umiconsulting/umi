@@ -58,6 +58,16 @@ begin
     where ns.nspname='merchant' and cl.relname='kitchen_order'
       and cl.relrowsecurity and cl.relforcerowsecurity
   ) then raise exception 'Gate 4A kitchen order RLS is incomplete'; end if;
+  -- Gate 4A: the checkout transaction writes the kitchen projection with the
+  -- request-path role. A second 90_rls application must not remove these grants.
+  if not has_table_privilege('api','merchant.kitchen_order','INSERT') then
+    raise exception 'Gate 4A checkout grant is missing: api cannot insert merchant.kitchen_order'; end if;
+  if not has_table_privilege('api','merchant.kitchen_order','UPDATE') then
+    raise exception 'Gate 4A checkout grant is missing: api cannot update merchant.kitchen_order'; end if;
+  if not has_table_privilege('api','merchant.kitchen_order_item','INSERT') then
+    raise exception 'Gate 4A checkout grant is missing: api cannot insert merchant.kitchen_order_item'; end if;
+  if not has_table_privilege('api','merchant.kitchen_event','INSERT') then
+    raise exception 'Gate 4A checkout grant is missing: api cannot insert merchant.kitchen_event'; end if;
   if not exists (
     select 1 from pg_trigger where tgname='kitchen_event_append_only'
   ) then raise exception 'missing append-only trigger: kitchen_event'; end if;

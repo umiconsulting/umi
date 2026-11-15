@@ -44,12 +44,21 @@ export class CashCustomerController {
 
   @Post('customers')
   @HttpCode(201)
-  registerCustomer(
+  async registerCustomer(
     @PubMerchant() t: PublicMerchant,
     @Body() dto: RegisterDto,
-    @Headers('user-agent') ua?: string,
+    @Headers('user-agent') ua: string | undefined,
+    @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    return this.register.register(t.merchantId, t.name, dto, ua ?? null);
+    // A returning customer's session is a normal response, not an error detail.
+    const { alreadyRegistered, ...payload } = await this.register.register(
+      t.merchantId,
+      t.name,
+      dto,
+      ua ?? null,
+    );
+    if (alreadyRegistered) reply.status(409);
+    return payload;
   }
 
   @Get('gift/:code')

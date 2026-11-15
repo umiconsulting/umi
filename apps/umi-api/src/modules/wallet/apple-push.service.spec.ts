@@ -1,6 +1,58 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
+import { EventEmitter } from 'node:events';
+import http2 from 'node:http2';
 import { ApplePushService } from './apple-push.service';
+
+afterEach(() => vi.restoreAllMocks());
+
+it('authenticates a test pass push with its signing certificate when no APN token key exists', async () => {
+  const request = Object.assign(new EventEmitter(), {
+    setTimeout: vi.fn(),
+    close: vi.fn(),
+    end: vi.fn(() => {
+      request.emit('response', { ':status': 200 });
+      request.emit('end');
+    }),
+  });
+  const client = Object.assign(new EventEmitter(), {
+    request: vi.fn(() => request),
+    close: vi.fn(),
+  });
+  const connect = vi.spyOn(http2, 'connect').mockReturnValue(client as never);
+  const env: Record<string, string> = {
+    WALLET_MODE: 'test',
+    WALLET_TEST_MERCHANT_IDS: 'test-merchant',
+    APPLE_PASS_TYPE_ID: 'pass.example.test',
+    APPLE_SIGNER_CERT: Buffer.from('test-certificate').toString('base64'),
+    APPLE_SIGNER_KEY: Buffer.from('test-signing-key').toString('base64'),
+    APPLE_KEY_PASSPHRASE: 'test-passphrase',
+  };
+  const svc = new ApplePushService(
+    { get: (key: string) => env[key] } as never,
+    {
+      merchantForCard: async () => 'test-merchant',
+      pushTokensForCard: async () => ['test-device-token'],
+    } as never,
+  );
+  expect(svc.isConfigured()).toBe(true);
+  expect(await svc.pushCard('test-card')).toEqual({ sent: 1, failed: 0 });
+  expect(connect).toHaveBeenCalledWith('https://api.push.apple.com', {
+    cert: Buffer.from('test-certificate'),
+    key: Buffer.from('test-signing-key'),
+    passphrase: 'test-passphrase',
+  });
+  expect(client.request).toHaveBeenCalledWith(
+    expect.objectContaining({
+      ':path': '/3/device/test-device-token',
+      'apns-topic': 'pass.example.test',
+    }),
+  );
+  expect(client.request).not.toHaveBeenCalledWith(
+    expect.objectContaining({ authorization: expect.any(String) }),
+  );
+  expect(request.end).toHaveBeenCalledWith('{}');
+});
 
 /**
  * THE TOUCH IS PART OF THE PUSH.

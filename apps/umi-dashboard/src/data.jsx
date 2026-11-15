@@ -21,6 +21,16 @@ import { useMerchant } from '@/lib/merchant-context.jsx';
 import { MODULES, hasRequiredPermission, isProductActive } from '@/lib/module-registry.js';
 import { routes } from '@umi/contract/routes';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { queryClient } from '@/lib/query-client.js';
+import {
+  salesAnalysisQuery,
+  salesCachePolicy,
+  salesDenied,
+  salesResult,
+  shouldClearDeniedSales,
+  clearSalesReports,
+  invalidateSalesReports,
+} from '@/lib/sales-analysis-query.js';
 import { subscribeConversationMessages } from '@/lib/conversation-realtime.js';
 
 const EMPTY_OVERVIEW = {};
@@ -1580,69 +1590,81 @@ function useSalesSummary(range, refresh, enabled = true) {
 }
 
 function salesQueryIdentity(ctx) {
+  const permissions = ctx?.capabilities?.membership?.permissions ?? [];
   return [
     _merchantId(ctx),
     _locationId(ctx),
     getStoredSession()?.user?.id,
-    ctx?.capabilities?.membership?.permissions,
+    [...new Set(permissions)].sort().join(','),
     ctx?.capabilities?.membership?.locationId,
   ];
 }
 
-function salesQueryResult(result) {
-  return {
-    data: result.data,
-    loading: result.isFetching,
-    error: result.error?.message,
-    errorCode: result.error?.code,
-    refetch: result.refetch,
-  };
+function useClearDeniedSales(result, merchantId) {
+  const lastSuccessAt = useRefD(0);
+  const clearedSuccessAt = useRefD(null);
+  useEffectD(() => {
+    if (!salesDenied(result)) {
+      if (result.data && result.dataUpdatedAt) lastSuccessAt.current = result.dataUpdatedAt;
+      return;
+    }
+    if (
+      !merchantId ||
+      !shouldClearDeniedSales(result, lastSuccessAt.current, clearedSuccessAt.current)
+    )
+      return;
+    clearedSuccessAt.current = lastSuccessAt.current;
+    clearSalesReports(queryClient, merchantId);
+  }, [merchantId, result.data, result.dataUpdatedAt, result.error]);
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
 export function useSalesAnalysisOptions() {
   const ctx = useMerchant();
+  const merchantId = _merchantId(ctx);
   const result = useQuery({
+    ...salesCachePolicy,
     queryKey: ['sales-analysis-options', ...salesQueryIdentity(ctx)],
-    queryFn: () => _apiFetch(routes.salesAnalysis.options(_merchantId(ctx))),
-    enabled: Boolean(_merchantId(ctx)) && !ctx?.loading,
+    queryFn: ({ signal }) => _apiFetch(routes.salesAnalysis.options(merchantId), { signal }),
+    enabled: Boolean(merchantId) && !ctx?.loading,
     retry: false,
   });
-  return salesQueryResult(result);
+  useClearDeniedSales(result, merchantId);
+  return salesResult(result);
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
-export function useSalesAnalysis(query, refresh) {
+export function useSalesAnalysis(query) {
   const ctx = useMerchant();
-  const serialized = query
-    ? new URLSearchParams(
-        Object.entries(query).filter(([, value]) => value != null && value !== ''),
-      ).toString()
-    : '';
+  const merchantId = _merchantId(ctx);
   const result = useQuery({
-    queryKey: ['sales-analysis', ...salesQueryIdentity(ctx), serialized, refresh],
-    queryFn: () => _apiFetch(`${routes.salesAnalysis.read(_merchantId(ctx))}?${serialized}`),
-    enabled: Boolean(query && _merchantId(ctx)) && !ctx?.loading,
+    ...salesAnalysisQuery(salesQueryIdentity(ctx), query, _apiFetch),
+    enabled: Boolean(query && merchantId) && !ctx?.loading,
     retry: false,
   });
-  return salesQueryResult(result);
+  useClearDeniedSales(result, merchantId);
+  return salesResult(result);
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
-export function saveSalesAnalysisGroup(merchantId, group) {
+export async function saveSalesAnalysisGroup(merchantId, group) {
   const { id, ...body } = group;
-  return _apiFetch(routes.salesAnalysis.saveGroup(merchantId, id), {
+  const saved = await _apiFetch(routes.salesAnalysis.saveGroup(merchantId, id), {
     method: 'PUT',
     body: JSON.stringify(body),
   });
+  await invalidateSalesReports(queryClient, merchantId);
+  return saved;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
-export function deleteSalesAnalysisGroup(merchantId, group) {
-  return _apiFetch(
+export async function deleteSalesAnalysisGroup(merchantId, group) {
+  const deleted = await _apiFetch(
     `${routes.salesAnalysis.deleteGroup(merchantId, group.id)}?expectedVersion=${group.version}`,
     { method: 'DELETE' },
   );
+  await invalidateSalesReports(queryClient, merchantId);
+  return deleted;
 }
 
 // The AI sales narrative for the current range/scope. Lazy companion to useSalesSummary;

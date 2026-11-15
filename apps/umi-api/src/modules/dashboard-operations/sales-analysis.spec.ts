@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { analyzePurchases, type AnalysisSale } from './sales-analysis';
+import { UnprocessableEntityException } from '@nestjs/common';
+import { analyzePurchases, analyzeSummary, type AnalysisSale } from './sales-analysis';
+import { SalesAnalysisService } from './sales-analysis.service';
+import type { SalesAnalysisRepository } from './sales-analysis.repository';
 
 const bread = '10000000-0000-4000-8000-000000000001';
 const coffee = '10000000-0000-4000-8000-000000000002';
@@ -198,5 +201,94 @@ describe('análisis de compras', () => {
     });
     expect(result.selectedGroups.support).toBeNull();
     expect(result.byHour).toEqual([]);
+  });
+});
+
+describe('bounded basket state at the service boundary', () => {
+  const merchantId = '20000000-0000-4000-8000-000000000001';
+  const access = {
+    merchantId,
+    locationId: null,
+    permissions: ['sale.lifecycle', 'location.switch'],
+  } as never;
+  const user = { id: 'user-1' } as never;
+  const context = {
+    timezone: 'America/Mazatlan',
+    currency: 'MXN',
+    capturedAt: '2026-11-02T12:00:00.000Z',
+    firstSaleDate: day,
+    today: day,
+    products: [],
+    groups: [],
+    locations: [],
+  };
+  const wideSale = sale('wide', {
+    merchandiseMinorUnits: 500000,
+    lines: Array.from({ length: 500 }, (_, index) => ({
+      id: `line-${index}`,
+      productId: `product-${index}`,
+      name: `Product ${index}`,
+      quantity: 1,
+      merchandiseMinorUnits: 1000,
+    })),
+  });
+  function serviceFor(sales: AnalysisSale[]) {
+    const repository = {
+      read: async () => ({ context, sales }),
+    } as unknown as SalesAnalysisRepository;
+    return new SalesAnalysisService(repository);
+  }
+  async function rejectionOf(promise: Promise<unknown>) {
+    try {
+      await promise;
+    } catch (error) {
+      return error as UnprocessableEntityException;
+    }
+    throw new Error('The promise did not reject');
+  }
+
+  it('returns HTTP 200 shape with the exact summary when the basket work budget fails', async () => {
+    const report = await serviceFor([wideSale]).read(user, access, query);
+    const summary = analyzeSummary([wideSale], query);
+    expect(report.basketState).toEqual({ state: 'unavailable', code: 'BASKETS_TOO_COMPLEX' });
+    expect(report.totals).toEqual(summary.totals);
+    expect(report.byDay).toEqual(summary.byDay);
+    expect(report.byHour).toEqual(summary.byHour);
+    expect(report.coverage).toBeUndefined();
+    expect(report.unitsDistribution).toBeUndefined();
+    expect(report.pairs).toBeUndefined();
+    expect(report.selectedGroups).toBeUndefined();
+    expect(report.byCategory).toBeDefined();
+  });
+
+  it('emits the complete state with all four basket fields on a normal report', async () => {
+    const report = await serviceFor([sale('one')]).read(user, access, query);
+    expect(report.basketState).toEqual({ state: 'complete', code: null });
+    expect(report.coverage).toBeDefined();
+    expect(report.unitsDistribution).toBeDefined();
+    expect(report.pairs).toBeDefined();
+    expect(report.selectedGroups).toBeDefined();
+  });
+
+  it('keeps a summary money overflow fatal at 422', async () => {
+    const error = await rejectionOf(
+      serviceFor([
+        sale('huge', { merchandiseMinorUnits: Number.MAX_SAFE_INTEGER }),
+        sale('one', { merchandiseMinorUnits: 1 }),
+      ]).read(user, access, query),
+    );
+    expect(error).toBeInstanceOf(UnprocessableEntityException);
+    expect(error.getResponse()).toMatchObject({ code: 'REPORT_AMOUNT_OUT_OF_RANGE' });
+  });
+
+  it('keeps a repository range refusal fatal at 422', async () => {
+    const repository = {
+      read: async () => {
+        throw new UnprocessableEntityException({ code: 'REPORT_RANGE_TOO_LARGE' });
+      },
+    } as unknown as SalesAnalysisRepository;
+    const error = await rejectionOf(new SalesAnalysisService(repository).read(user, access, query));
+    expect(error).toBeInstanceOf(UnprocessableEntityException);
+    expect(error.getResponse()).toMatchObject({ code: 'REPORT_RANGE_TOO_LARGE' });
   });
 });

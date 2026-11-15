@@ -9,7 +9,8 @@ export default function NewTenantPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
-    slug: '',
+    plan: 'starter',
+    timezone: 'America/Mexico_City',
     name: '',
     city: '',
     cardPrefix: '',
@@ -45,25 +46,35 @@ export default function NewTenantPage() {
 
     const body: Record<string, unknown> = {
       ...form,
+      stampsRequired: form.visitsRequired,
       cardPrefix: form.cardPrefix.toUpperCase(),
       locations: validLocations,
     };
+
+    delete body.visitsRequired;
+    if (!form.secondaryColor) delete body.secondaryColor;
 
     if (trialEnabled) {
       const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
       body.trialEndsAt = trialEndsAt.toISOString();
     }
 
-    const res = await fetch('/api/umi/tenants', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      router.push('/umi/admin');
-    } else {
-      setError(data.error || 'Error al crear cafetería');
+    try {
+      const res = await fetch('/api/umi/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        router.push('/umi/admin');
+      } else {
+        setError(data.error || 'Error al crear cafetería');
+        setSaving(false);
+      }
+    } catch {
+      setError('No se pudo conectar con Umi. Intenta de nuevo.');
+    } finally {
       setSaving(false);
     }
   }
@@ -90,6 +101,10 @@ export default function NewTenantPage() {
           <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
             <h2 className="u-display" style={{ fontSize: 18, fontWeight: 600, color: '#1A1F33', margin: 0 }}>Información del negocio</h2>
 
+            <label className="block text-sm font-medium text-gray-700">
+              Zona horaria
+              <input value={form.timezone} onChange={field('timezone')} className="w-full border rounded-xl px-3 py-2.5 mt-1 text-sm" required />
+            </label>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Nombre</label>
@@ -104,10 +119,12 @@ export default function NewTenantPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Slug <span className="text-gray-400 font-normal">(URL: /{'{slug}'})</span>
+                  Plan
                 </label>
-                <input type="text" value={form.slug} onChange={field('slug')} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="elgranribera" required maxLength={30} pattern="[a-z0-9-]+" />
-                <p className="text-xs text-gray-400 mt-1">Solo minúsculas, números y guiones</p>
+                <select value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })} className="w-full border rounded-xl px-3 py-2.5 text-sm">
+                  <option value="starter">Starter</option><option value="growth">Growth</option><option value="pro">Pro</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">La nueva cafetería recibe un enlace con su identificador.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">

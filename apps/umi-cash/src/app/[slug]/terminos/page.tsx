@@ -3,14 +3,14 @@ import BackButton from '@/components/ui/BackButton';
 import { getTenant } from '@/lib/tenant';
 import { notFound } from 'next/navigation';
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
-  const tenant = await getTenant(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const tenant = await getTenant((await params).slug);
   if (!tenant) return {};
   return { title: `Términos y Condiciones — ${tenant.name}` };
 }
 
-export default async function TerminosPage({ params }: { params: { slug: string } }) {
-  const tenant = await getTenant(params.slug);
+export default async function TerminosPage({ params }: { params: Promise<{ slug: string }> }) {
+  const tenant = await getTenant((await params).slug);
   if (!tenant) notFound();
   const name = tenant.name;
 
@@ -127,7 +127,7 @@ export default async function TerminosPage({ params }: { params: { slug: string 
         </section>
 
         <div className="text-center pt-2 space-y-3">
-          <Link href={`/${params.slug}/aviso-privacidad`} className="underline text-sm block" style={{ color: 'var(--color-ink-light)' }}>
+          <Link href={`/${(await params).slug}/aviso-privacidad`} className="underline text-sm block" style={{ color: 'var(--color-ink-light)' }}>
             Ver Aviso de Privacidad
           </Link>
           <BackButton label="← Volver" />

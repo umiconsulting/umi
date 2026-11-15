@@ -1,49 +1,19 @@
 import Link from 'next/link';
-import { prisma } from '@/lib/prisma';
-import { getTenantConfig } from '@/lib/tenant';
-import { requireUmiAdmin } from '@/lib/umi-auth';
+import { umiAdminFetch } from '@/lib/umi-auth';
 import { LogoutButton } from './_components/LogoutButton';
 import { TenantRow } from './_components/TenantRow';
 
 export const dynamic = 'force-dynamic';
 
 export default async function UmiMasterAdmin() {
-  await requireUmiAdmin();
-
-  // The legacy single `Tenant` row is fanned out across core.tenants +
-  // loyalty.programs + ops.businesses + grow.subscriptions. Reassemble the legacy
-  // row shape that <TenantRow> expects, plus the user/card counts.
-  const tenantRows = await prisma.tenants.findMany({ orderBy: { created_at: 'asc' } });
-
-  const tenants = await Promise.all(
-    tenantRows.map(async (t) => {
-      const [config, userCount, cardCount, rewardConfig] = await Promise.all([
-        getTenantConfig(t.slug),
-        prisma.tenant_memberships.count({ where: { tenant_id: t.id } }),
-        prisma.cards.count({ where: { tenant_id: t.id } }),
-        prisma.reward_configs.findFirst({
-          where: { tenant_id: t.id, is_active: true },
-          orderBy: { activated_at: 'desc' },
-        }),
-      ]);
-
-      return {
-        id: t.id,
-        name: t.name,
-        city: config?.city ?? null,
-        slug: t.slug,
-        cardPrefix: config?.cardPrefix ?? '',
-        primaryColor: config?.primaryColor ?? '#B5605A',
-        subscriptionStatus: config?.subscriptionStatus ?? 'ACTIVE',
-        suspendedAt: config?.suspendedAt ?? null,
-        trialEndsAt: config?.trialEndsAt ?? null,
-        _count: { users: userCount, cards: cardCount },
-        rewardConfigs: rewardConfig
-          ? [{ rewardName: rewardConfig.reward_name, visitsRequired: rewardConfig.visits_required }]
-          : [],
-      };
-    })
-  );
+  const response = await umiAdminFetch('/api/umi/tenants');
+  type Tenant = React.ComponentProps<typeof TenantRow>['tenant'];
+  const rows = await response.json() as Tenant[];
+  const tenants = rows.map((row) => ({
+    ...row,
+    trialEndsAt: row.trialEndsAt ? new Date(row.trialEndsAt) : null,
+    suspendedAt: row.suspendedAt ? new Date(row.suspendedAt) : null,
+  }));
 
   const totalUsers = tenants.reduce((sum, t) => sum + t._count.users, 0);
   const totalCards = tenants.reduce((sum, t) => sum + t._count.cards, 0);

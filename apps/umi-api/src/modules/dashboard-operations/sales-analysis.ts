@@ -122,36 +122,57 @@ function refundEvent(
   };
 }
 
-function metricEvents(sales: AnalysisSale[], query: SalesAnalysisQuery): MetricEvent[] {
-  return sales.flatMap((sale) => {
+function* metricEvents(sales: AnalysisSale[], query: SalesAnalysisQuery): Generator<MetricEvent> {
+  for (const sale of sales) {
     const purchased = within(sale.day, query);
-    const events = purchased ? [saleEvent(sale)] : [];
+    if (purchased) yield saleEvent(sale);
     for (const refund of sale.refunds) {
       const included = query.refundView === 'sale_result' ? purchased : within(refund.day, query);
-      if (included) events.push(refundEvent(sale, refund, query));
+      if (included) yield refundEvent(sale, refund, query);
     }
-    return events;
-  });
+  }
 }
 
-function summarizeDimension(
-  events: MetricEvent[],
-  keyOf: (event: MetricEvent) => string,
-  labelOf = keyOf,
-) {
-  const groups = new Map<string, { label: string; metrics: MetricAccumulator }>();
-  for (const event of events) {
-    const key = keyOf(event);
-    let group = groups.get(key);
-    if (!group) {
-      group = { label: labelOf(event), metrics: emptyMetrics() };
-      groups.set(key, group);
-    }
-    addMetrics(group.metrics, event);
+type MetricGroups = Map<string, { label: string; metrics: MetricAccumulator }>;
+
+function addDimension(groups: MetricGroups, key: string, event: MetricEvent, label = key) {
+  let group = groups.get(key);
+  if (!group) {
+    group = { label, metrics: emptyMetrics() };
+    groups.set(key, group);
   }
+  addMetrics(group.metrics, event);
+}
+
+function finishDimension(groups: MetricGroups) {
   return [...groups]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, group]) => ({ key, label: group.label, ...finishMetrics(group.metrics) }));
+}
+
+export function analyzeSummary(sales: AnalysisSale[], query: SalesAnalysisQuery) {
+  const totals = emptyMetrics();
+  const byHour: MetricGroups = new Map();
+  const byDay: MetricGroups = new Map();
+  const byWeekday: MetricGroups = new Map();
+  const byMonth: MetricGroups = new Map();
+  const byLocation: MetricGroups = new Map();
+  for (const event of metricEvents(sales, query)) {
+    addMetrics(totals, event);
+    addDimension(byHour, event.hour, event);
+    addDimension(byDay, event.day, event);
+    addDimension(byWeekday, event.weekday, event);
+    addDimension(byMonth, event.day.slice(0, 7), event);
+    addDimension(byLocation, event.locationId, event, event.locationName);
+  }
+  return {
+    totals: finishMetrics(totals),
+    byHour: finishDimension(byHour),
+    byDay: finishDimension(byDay),
+    byWeekday: finishDimension(byWeekday),
+    byMonth: finishDimension(byMonth),
+    byLocation: finishDimension(byLocation),
+  };
 }
 
 export function analyzePurchases(
@@ -159,20 +180,5 @@ export function analyzePurchases(
   query: SalesAnalysisQuery,
   groups: AnalysisGroup[],
 ) {
-  const events = metricEvents(sales, query);
-  const totals = emptyMetrics();
-  for (const event of events) addMetrics(totals, event);
-  return {
-    ...analyzeBaskets(sales, query, groups),
-    totals: finishMetrics(totals),
-    byHour: summarizeDimension(events, (event) => event.hour),
-    byDay: summarizeDimension(events, (event) => event.day),
-    byWeekday: summarizeDimension(events, (event) => event.weekday),
-    byMonth: summarizeDimension(events, (event) => event.day.slice(0, 7)),
-    byLocation: summarizeDimension(
-      events,
-      (event) => event.locationId,
-      (event) => event.locationName,
-    ),
-  };
+  return { ...analyzeBaskets(sales, query, groups), ...analyzeSummary(sales, query) };
 }

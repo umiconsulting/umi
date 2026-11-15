@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   HttpException,
   Injectable,
@@ -61,12 +60,13 @@ export class CashRegisterService {
         merchantId,
       );
       // Already registered, but hand back a session so the page shows wallet
-      // buttons (same UX as umi-cash). Carried in the exception body.
-      throw new ConflictException({
+      // buttons (same UX as umi-cash). Keep the session in the normal response.
+      return {
+        alreadyRegistered: true as const,
         error: 'Este teléfono ya está registrado',
         accessToken,
         user: { id: existing.personId, name: existing.displayName, role: 'CUSTOMER' },
-      });
+      };
     }
 
     const personId = await this.repo.resolveContact(merchantId, input.phone, input.name);

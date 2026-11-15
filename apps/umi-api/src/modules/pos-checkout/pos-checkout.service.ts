@@ -1170,9 +1170,26 @@ export class PosCheckoutService {
       ),
     );
     if (result.status !== 'succeeded' || !result.result) {
-      throw new ConflictException({
-        code: result.failureCode ?? 'CHECKOUT_CART_CHANGED',
-      });
+      const code = result.failureCode ?? 'CHECKOUT_CART_CHANGED';
+      if (code === 'OPTIMISTIC_VERSION_CONFLICT') {
+        const recovery = await this.repo.recovery(
+          merchantId,
+          dto.locationId,
+          dto.operatorSessionId,
+          dto.cartId,
+          user.id,
+          authorization.permissions.includes('checkout.recover.any') ||
+            authorization.permissions.includes('*'),
+        );
+        const attemptId = recovery?.paymentOutcome?.attempt.id;
+        if (attemptId) {
+          throw new ConflictException({
+            code,
+            details: { attemptId, operatorGuidance: 'query_payment' },
+          });
+        }
+      }
+      throw new ConflictException({ code });
     }
     return result.result;
   }

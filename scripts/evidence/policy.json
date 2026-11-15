@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1",
+  "coverage": {
+    "enforced": true,
+    "requiredCheckIds": ["evaluator-selftest", "pos-checkout-partial-guards"]
+  },
+  "packetsDir": "scripts/evidence/runs",
+  "checks": [
+    {
+      "id": "evaluator-selftest",
+      "argv": ["node", "--test", "scripts/evidence/evidence.spec.mjs"],
+      "cwd": ".",
+      "tested": [
+        "scripts/evidence/evidence.mjs",
+        "scripts/evidence/schema.mjs",
+        "scripts/evidence/evidence.spec.mjs",
+        "scripts/evidence/policy.json"
+      ],
+      "minStdoutBytes": 1
+    },
+    {
+      "id": "pos-checkout-partial-guards",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@umi/api",
+        "exec",
+        "vitest",
+        "run",
+        "src/modules/pos-checkout/checkout-partial-guards.spec.ts"
+      ],
+      "cwd": ".",
+      "tested": [
+        "apps/umi-api/src/modules/pos-checkout/checkout-partial-guards.spec.ts",
+        "apps/umi-api/src/modules/pos-cart/pos-cart.repository.ts",
+        "apps/umi-api/src/modules/table-map/table-map.repository.ts",
+        "apps/umi-api/vitest.config.ts",
+        "packages/contract/package.json",
+        "packages/contract/tsup.config.ts",
+        "packages/contract/tsconfig.json",
+        "packages/contract/src/index.ts",
+        "packages/contract/src/table-state.ts",
+        "packages/contract/src/platform.ts"
+      ],
+      "minStdoutBytes": 1
+    }
+  ]
+}

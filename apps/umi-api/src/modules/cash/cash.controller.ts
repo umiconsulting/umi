@@ -31,6 +31,7 @@ import { CashReadService } from './cash-read.service';
 import { registerRole } from './cash-roles';
 import { CashScanService } from './cash-scan.service';
 import { ClientErrorDto } from './dto/client-error.dto';
+import { CustomerRewardOverrideDto } from './dto/customer-reward.dto';
 import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 
 const HOUR = 60 * 60 * 1000;
@@ -135,6 +136,12 @@ export class CashController {
     return this.cash.getSettings(t.merchantId);
   }
 
+  @Get('messages')
+  @RequirePermission('merchant.manage')
+  getMessages(@Merchant() t: MerchantAccess, @Query() query: Record<string, unknown>) {
+    return this.cash.getMessages(t.merchantId, query);
+  }
+
   @Patch('settings')
   @RequirePermission('merchant.manage')
   async updateSettings(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
@@ -168,6 +175,28 @@ export class CashController {
   @Get('customers/:id')
   getCustomer(@Merchant() t: MerchantAccess, @Param('id', ParseUUIDPipe) id: string) {
     return this.cash.getCustomer(t.merchantId, id, registerRole(t));
+  }
+
+  /**
+   * Set or clear one customer's reward. This is an owner decision, so the route
+   * needs `merchant.manage` — the permission only `owner` and `admin` hold, and
+   * the same gate as the redemption revert beside it. The legacy route allowed
+   * only `ADMIN`; the canonical key names the same authority.
+   *
+   * The customer id is tenant-scoped. A customer from another café resolves to
+   * not found. `null` clears the override and returns `customReward: null`.
+   */
+  @Patch('customers/:id')
+  @RequirePermission('merchant.manage')
+  async updateCustomerReward(
+    @Merchant() t: MerchantAccess,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CustomerRewardOverrideDto,
+  ) {
+    const result = await this.cash.setCustomerReward(t.merchantId, id, dto.customReward ?? null);
+    // The pass shows the reward name. A failed push must not fail the save.
+    void this.walletPass.refreshCard(result.cardId);
+    return { success: true, customReward: result.customReward };
   }
 
   /**

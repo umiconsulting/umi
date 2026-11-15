@@ -155,4 +155,14 @@
   .category-sales-legend-row strong {
     font-size: 11px;
   }
+  .category-sales-heading h2 a,
+  .category-sales-report,
+  .category-sales-legend-row {
+    min-height: 44px;
+  }
+  .category-sales-heading h2 a,
+  .category-sales-report {
+    display: inline-flex;
+    align-items: center;
+  }
 }

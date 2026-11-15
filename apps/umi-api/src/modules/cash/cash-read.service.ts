@@ -75,6 +75,14 @@ export class CashReadService {
     private readonly cards: CashCardRepository,
   ) {}
 
+  getMessages(merchantId: string, query: Row) {
+    const page = Math.max(1, Math.min(parseInt(query.page, 10) || 1, 100_000));
+    const limit = Math.max(1, Math.min(parseInt(query.limit, 10) || 50, 200));
+    const journey =
+      typeof query.journey === 'string' ? query.journey.trim().slice(0, 128) || null : null;
+    return this.repo.messageHistory(merchantId, page, limit, journey);
+  }
+
   async getSettings(merchantId: string): Promise<Row> {
     const t = await this.repo.branding(merchantId);
     if (!t) throw new NotFoundException({ error: 'Merchant no encontrado' });
@@ -447,6 +455,41 @@ export class CashReadService {
   async programId(merchantId: string): Promise<string | null> {
     const t = await this.repo.branding(merchantId);
     return (t?.programId as string) ?? null;
+  }
+
+  /**
+   * Set or clear one customer's reward.
+   *
+   * The customer id addresses the customer, not the card. `adminCustomerDetail`
+   * resolves the card inside the merchant scope, so a customer id from another
+   * café cannot reach a card here.
+   *
+   * `null` clears the override. An object trims the text before the write.
+   */
+  async setCustomerReward(
+    merchantId: string,
+    customerId: string,
+    reward: { name: string; description?: string | null } | null,
+  ): Promise<{
+    cardId: string;
+    customReward: { name: string; description: string | null } | null;
+  }> {
+    const detail = await this.repo.adminCustomerDetail(merchantId, customerId);
+    if (!detail) throw new NotFoundException({ error: 'Cliente no encontrado' });
+
+    const clean = reward
+      ? {
+          name: reward.name.trim(),
+          description: reward.description?.trim() || null,
+        }
+      : null;
+    if (clean && !clean.name) {
+      throw new BadRequestException({ error: 'El nombre de la recompensa es obligatorio' });
+    }
+
+    const result = await this.repo.setCardRewardOverride(merchantId, detail.cardId, clean);
+    if (!result) throw new NotFoundException({ error: 'Cliente no encontrado' });
+    return result;
   }
 
   /**
