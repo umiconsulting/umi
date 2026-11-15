@@ -106,10 +106,7 @@ function liveResolver(text) {
   // Drop the explicit history sentence: it names the retired paths to forbid them.
   return text
     .split('\n')
-    .filter(
-      (line) =>
-        !/are not in the current tree\. Do not use them as owners\./i.test(line),
-    )
+    .filter((line) => !/are not in the current tree\. Do not use them as owners\./i.test(line))
     .join('\n');
 }
 
@@ -176,8 +173,7 @@ export function checkRepo(root) {
   const cases = ROUTING_CASES.map((item) => {
     const line = ruleLines.find(
       (candidate) =>
-        candidate.includes(item.rule.toLowerCase()) &&
-        candidate.includes(item.owner.toLowerCase()),
+        candidate.includes(item.rule.toLowerCase()) && candidate.includes(item.owner.toLowerCase()),
     );
     const pass = Boolean(line);
     if (!pass) {
@@ -252,69 +248,93 @@ export function selfTest() {
     }
   };
 
-  run('stale owner path is rejected', (dir) => {
-    const file = FILES.registry;
-    const text = readFileSync(path.join(dir, file), 'utf8');
-    writeFixture(
-      dir,
-      file,
-      text.replace(
-        '## Selection rules',
-        '## Selection rules\n\n- Shared backend: `apps/umi-conversaflow`.',
-      ),
-    );
-  }, 'retired owner path');
+  run(
+    'stale owner path is rejected',
+    (dir) => {
+      const file = FILES.registry;
+      const text = readFileSync(path.join(dir, file), 'utf8');
+      writeFixture(
+        dir,
+        file,
+        text.replace(
+          '## Selection rules',
+          '## Selection rules\n\n- Shared backend: `apps/umi-conversaflow`.',
+        ),
+      );
+    },
+    'retired owner path',
+  );
 
-  run('retired tracker is rejected', (dir) => {
-    const file = FILES.agents;
-    const text = readFileSync(path.join(dir, file), 'utf8');
-    writeFixture(
-      dir,
-      file,
-      text.replace(
-        'Umi no longer uses Azure Boards.',
-        'Work items and specs live in **Azure Boards**.',
-      ),
-    );
-  }, 'retired tracker instruction');
+  run(
+    'retired tracker is rejected',
+    (dir) => {
+      const file = FILES.agents;
+      const text = readFileSync(path.join(dir, file), 'utf8');
+      writeFixture(
+        dir,
+        file,
+        text.replace(
+          'Umi no longer uses Azure Boards.',
+          'Work items and specs live in **Azure Boards**.',
+        ),
+      );
+    },
+    'retired tracker instruction',
+  );
 
-  run('missing canonical owner is rejected', (dir) => {
-    const file = FILES.resolver;
-    const text = readFileSync(path.join(dir, file), 'utf8');
-    writeFixture(dir, file, text.replace('`apps/umi-api`: canonical backend', '`apps/umi-api`'));
-  }, 'missing canonical backend owner');
+  run(
+    'missing canonical owner is rejected',
+    (dir) => {
+      const file = FILES.resolver;
+      const text = readFileSync(path.join(dir, file), 'utf8');
+      writeFixture(dir, file, text.replace('`apps/umi-api`: canonical backend', '`apps/umi-api`'));
+    },
+    'missing canonical backend owner',
+  );
 
-  run('broken legacy link is rejected', (dir) => {
-    const file = FILES.agentOs;
-    const text = readFileSync(path.join(dir, file), 'utf8');
-    writeFixture(dir, file, text.replace('](../../AGENTS.md)', '](../../AGENTS-MISSING.md)'));
-  }, 'broken link');
+  run(
+    'broken legacy link is rejected',
+    (dir) => {
+      const file = FILES.agentOs;
+      const text = readFileSync(path.join(dir, file), 'utf8');
+      writeFixture(dir, file, text.replace('](../../AGENTS.md)', '](../../AGENTS-MISSING.md)'));
+    },
+    'broken link',
+  );
 
-  run('resolver retired owner is rejected', (dir) => {
-    const file = FILES.resolver;
-    const text = readFileSync(path.join(dir, file), 'utf8');
-    writeFixture(
-      dir,
-      file,
-      text.replace(
-        'Historical paths `apps/umi-conversaflow` and `apps/umi-logs` are not in the current tree. Do not use them as owners. Keep old references as history only.',
-        'Shared backend owner: `apps/umi-conversaflow`.',
-      ),
-    );
-  }, 'retired owner path');
+  run(
+    'resolver retired owner is rejected',
+    (dir) => {
+      const file = FILES.resolver;
+      const text = readFileSync(path.join(dir, file), 'utf8');
+      writeFixture(
+        dir,
+        file,
+        text.replace(
+          'Historical paths `apps/umi-conversaflow` and `apps/umi-logs` are not in the current tree. Do not use them as owners. Keep old references as history only.',
+          'Shared backend owner: `apps/umi-conversaflow`.',
+        ),
+      );
+    },
+    'retired owner path',
+  );
 
-  run('weakened triage rule is rejected', (dir) => {
-    const file = FILES.registry;
-    const text = readFileSync(path.join(dir, file), 'utf8');
-    writeFixture(
-      dir,
-      file,
-      text.replace(
-        'Current requirements and pending work: the user\'s current instruction, the active task brief, and the run record.',
-        'Current requirements and pending work: the user\'s current instruction.',
-      ),
-    );
-  }, 'routing case "Triage the pending work item"');
+  run(
+    'weakened triage rule is rejected',
+    (dir) => {
+      const file = FILES.registry;
+      const text = readFileSync(path.join(dir, file), 'utf8');
+      writeFixture(
+        dir,
+        file,
+        text.replace(
+          "Current requirements and pending work: the user's current instruction, the active task brief, and the run record.",
+          "Current requirements and pending work: the user's current instruction.",
+        ),
+      );
+    },
+    'routing case "Triage the pending work item"',
+  );
 
   return results;
 }
