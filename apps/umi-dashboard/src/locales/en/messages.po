@@ -12115,3 +12115,7 @@ msgstr "{0} tickets have no identified table visit."
 #: src/screens/category-sales.jsx
 msgid "{0}: sin ventas en el periodo."
 msgstr "{0}: no sales in this period."
+
+#: src/screens/overview.jsx
+msgid "La comparación con el periodo anterior no está disponible."
+msgstr "The comparison with the previous period is not available."

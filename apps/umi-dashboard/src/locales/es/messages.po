@@ -12115,3 +12115,7 @@ msgstr "{0} tickets no tienen una visita de mesa identificada."
 #: src/screens/category-sales.jsx
 msgid "{0}: sin ventas en el periodo."
 msgstr "{0}: sin ventas en el periodo."
+
+#: src/screens/overview.jsx
+msgid "La comparación con el periodo anterior no está disponible."
+msgstr "La comparación con el periodo anterior no está disponible."

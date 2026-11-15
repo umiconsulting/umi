@@ -147,6 +147,18 @@ export const FIN_CASES = {
     t.writeJson('baseline-period-movements.json', normalized(baselineMovements.body));
     t.writeJson('candidate-sale-result.json', normalized(sale.body));
     t.writeJson('candidate-period-movements.json', normalized(movements.body));
+    // The baseline commit counts zero pairs because it removes a refunded line
+    // before pair counting. I1-FIN-01 accepts one pair at the candidate. These
+    // two pinned expectations cannot hold at the same head.
+    if (baselineSale.body.pairs?.length === 0 && sale.body.pairs?.length === 1) {
+      return {
+        status: 'BLOCKED',
+        failure: {
+          message:
+            'Baseline b4ba45fc returns pairs=[] because it removes refunded lines. I1-FIN-01 requires pairs=1 at the candidate. The FIN-01 anchor and the FIN-03 pair equality conflict.',
+        },
+      };
+    }
     const dimensions = [
       'byHour',
       'byDay',

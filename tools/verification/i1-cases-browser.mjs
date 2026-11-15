@@ -489,15 +489,17 @@ export const BROWSER_CASES = {
       await session.waitForPrimary();
       await session.page.waitForTimeout(800);
       const after = await session.primaryText();
+      const bodyAfter = await session.bodyText();
+      t.writeJson('body-after.json', { text: bodyAfter });
       await session.screenshot('screen.png');
       t.writeJson('requests.json', reportRequests(session));
       t.checks.eq('old amount survives', amount(after), amount(old));
       t.checks.eq('old capturedAt survives', capturedAt(session), oldCaptured);
       t.checks.check(
         'no error replaces the value',
-        !/No se pudo/.test(await session.bodyText()),
+        !/No se pudo/.test(bodyAfter),
         true,
-        'no error',
+        bodyAfter.slice(0, 400),
       );
       return { observations: { old, after, oldCaptured } };
     } finally {
