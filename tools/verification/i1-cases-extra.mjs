@@ -224,7 +224,7 @@ export const EXTRA_CASES = {
       await session.page.waitForTimeout(400);
       const pressed = await first.getAttribute('aria-pressed');
       const cells = await session.page.evaluate(() => {
-        const dot = document.querySelector('.category-sales-report [aria-hidden="true"]');
+        const dot = document.querySelector('.category-sales-card [aria-hidden="true"], .category-sales-report [aria-hidden="true"]');
         const group = document.querySelector('.category-sales-report [data-selected="true"], .category-sales-report .selected');
         return { dotHidden: dot?.getAttribute('aria-hidden'), opacity: group ? getComputedStyle(group).opacity : null };
       });
