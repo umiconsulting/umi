@@ -109,14 +109,13 @@ const QUERIES: Record<DashboardOperationDomain, ReturnType<typeof row>> = {
   ),
   sales: row(
     `SELECT s.id::text,r.receipt_number AS "publicReference",concat('Venta ',r.receipt_number) AS title,
-    concat_ws(' · ',concat('Fecha comercial ',r.business_date::text),st.name,CASE WHEN coalesce(disc.total,0)>0 THEN 'Desc '||trim(to_char(disc.total/100.0,'FM999990.00')) END) AS detail,'committed' AS status,s.location_id::text AS "locationId",
+    concat_ws(' · ',concat('Fecha comercial ',r.business_date::text),st.name,CASE WHEN coalesce((r.snapshot->'discountTotal'->>'minorUnits')::bigint,0)>0 THEN 'Desc '||trim(to_char(coalesce((r.snapshot->'discountTotal'->>'minorUnits')::bigint,0)/100.0,'FM999990.00')) END) AS detail,'committed' AS status,s.location_id::text AS "locationId",
     s.committed_at::text AS "occurredAt",r.grand_total AS "amountMinorUnits",r.currency,
     NULL::bigint AS version,NULL::text AS "correlationId",
-    jsonb_build_object('operator',st.name,'discountMinorUnits',coalesce(disc.total,0)) AS facts FROM merchant.pos_committed_sale s
+    jsonb_build_object('operator',st.name,'discountMinorUnits',coalesce((r.snapshot->'discountTotal'->>'minorUnits')::bigint,0)) AS facts FROM merchant.pos_committed_sale s
     JOIN merchant.receipt_snapshot r ON r.id=s.receipt_snapshot_id
     LEFT JOIN merchant.cash_shift cs ON cs.id=s.cash_shift_id
-    LEFT JOIN merchant.staff st ON st.user_id=cs.responsible_operator_id AND st.merchant_id=s.merchant_id
-    LEFT JOIN (SELECT order_id,sum(amount) total FROM merchant.order_discount GROUP BY order_id) disc ON disc.order_id=s.order_id`,
+    LEFT JOIN merchant.staff st ON st.user_id=cs.responsible_operator_id AND st.merchant_id=s.merchant_id`,
     's.merchant_id=$1::uuid',
     's.committed_at DESC,s.id',
   ),
@@ -433,11 +432,9 @@ export class DashboardOperationsRepository {
           tips: string;
         }>(
           `SELECT coalesce(sum(r.grand_total),0)::bigint AS net, count(*)::bigint AS orders,
-                  coalesce(sum(disc.total),0)::bigint AS discount,
+                  coalesce(sum((r.snapshot->'discountTotal'->>'minorUnits')::bigint),0)::bigint AS discount,
                   coalesce(sum((r.snapshot->'tip'->>'minorUnits')::bigint),0)::bigint AS tips
            ${joinSale}
-           LEFT JOIN (SELECT order_id,sum(amount) total FROM merchant.order_discount GROUP BY order_id) disc
-             ON disc.order_id=s.order_id
            WHERE ${range}`,
           wp,
         );

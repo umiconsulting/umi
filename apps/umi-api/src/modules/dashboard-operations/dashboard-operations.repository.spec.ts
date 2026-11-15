@@ -146,3 +146,58 @@ describe('DashboardOperationsRepository.salesSummary — channel attribution', (
     ]);
   });
 });
+
+describe('DashboardOperationsRepository.salesSummary — discount totals', () => {
+  // MET-06: the frozen receipt snapshot holds the discount. merchant.order_discount
+  // has no rows in the fixture, so a join to it reports a silent zero.
+  function makeDiscount() {
+    const query = vi.fn((sql: string) => {
+      if (/m\.timezone/.test(sql))
+        return Promise.resolve({
+          rows: [{ timezone: 'America/Mexico_City', currency: 'MXN', today: '2026-11-15' }],
+        });
+      if (/AS discount/.test(sql))
+        return Promise.resolve({
+          rows: [{ net: '3000', orders: '1', discount: '3000', tips: '0' }],
+        });
+      return Promise.resolve({ rows: [] });
+    });
+    const pg = {
+      runWithMerchant: vi.fn(
+        (_m: string, _u: string, op: (c: { query: typeof query }) => unknown) => op({ query }),
+      ),
+    };
+    return { repository: new DashboardOperationsRepository(pg as never), pg, query };
+  }
+
+  it('reads the 3000 discount from the receipt snapshot, not order_discount', async () => {
+    const fixture = makeDiscount();
+    const summary = await fixture.repository.salesSummary(
+      '55555555-5555-4555-8555-000000000001',
+      '1860305f-e864-d745-29e6-fb8830926cc6',
+      { range: 'last_7_days', locationId: undefined },
+      null,
+    );
+
+    expect(summary.totals.discountMinorUnits).toBe(3000);
+
+    const totalsCall = fixture.query.mock.calls.find(([sql]) => /AS discount/.test(sql));
+    expect(totalsCall).toBeDefined();
+    const totalsSql = totalsCall![0];
+    expect(totalsSql).toContain("r.snapshot->'discountTotal'");
+    expect(totalsSql).not.toContain('merchant.order_discount');
+
+    await fixture.repository.list(
+      '55555555-5555-4555-8555-000000000001',
+      '1860305f-e864-d745-29e6-fb8830926cc6',
+      { domain: 'sales', locationId: undefined, cursor: 0, limit: 20 },
+      null,
+    );
+    const factsCall = fixture.query.mock.calls.find(([sql]) =>
+      /jsonb_build_object\('operator'/.test(sql),
+    );
+    expect(factsCall).toBeDefined();
+    expect(factsCall![0]).toContain("r.snapshot->'discountTotal'");
+    expect(factsCall![0]).not.toContain('merchant.order_discount');
+  });
+});
