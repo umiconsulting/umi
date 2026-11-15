@@ -211,14 +211,13 @@ jobs:
     secrets:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
+  # The landing Pages project is production. Only main may deploy it.
   deploy-landing:
     needs: [ready, changes]
     if: >-
       (needs.changes.outputs.landing == 'true' || inputs.deploy) &&
-      (((github.event_name == 'push' || inputs.deploy) &&
-        (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')) ||
-       (github.event_name == 'pull_request' && !github.event.pull_request.draft &&
-        github.event.pull_request.head.repo.full_name == github.repository && github.head_ref != 'main'))
+      (github.event_name == 'push' || inputs.deploy) &&
+      github.ref == 'refs/heads/main'
     uses: ./.github/workflows/deploy-landing.yml
     secrets:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -245,5 +244,5 @@ jobs:
             deployed("deploy-api-staging"; $branch == "staging" and .changes.outputs.api == "true") and
             deployed("deploy-api-production"; $branch == "main" and .changes.outputs.api == "true") and
             deployed("deploy-dashboard"; .changes.outputs.dashboard == "true") and
-            deployed("deploy-landing"; .changes.outputs.landing == "true")
+            deployed("deploy-landing"; $branch == "main" and .changes.outputs.landing == "true")
           ' <<< "$RESULTS"

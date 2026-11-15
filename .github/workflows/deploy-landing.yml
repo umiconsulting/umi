@@ -11,6 +11,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
+    # The caller gates this too. Keep the workflow safe on its own.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

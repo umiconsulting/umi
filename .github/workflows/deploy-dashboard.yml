@@ -35,10 +35,10 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: 8aef562d6d0c51b70f1b83fa1d2912a4
           DEPLOY_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
-          # Staging has its own Pages project and host. Keep it; do not send a
-          # staging build to the production project.
+          # Only main deploys to the production project. Every other ref
+          # (staging and per-PR previews) uses the staging project.
           PAGES_PROJECT=umi-dashboard
-          if [ "$DEPLOY_BRANCH" = "staging" ]; then
+          if [ "$DEPLOY_BRANCH" != "main" ]; then
             PAGES_PROJECT=umi-dashboard-staging
           fi
           pnpm dlx wrangler@4.129.0 pages deploy apps/umi-dashboard/dist --project-name="$PAGES_PROJECT" --branch="$DEPLOY_BRANCH" --commit-dirty=true
