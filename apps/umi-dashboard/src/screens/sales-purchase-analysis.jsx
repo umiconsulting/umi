@@ -197,13 +197,7 @@ function Totals({ report }) {
   const facts = [
     [
       <Trans key="average">Ticket promedio sin propina</Trans>,
-      totals.tickets === 0 ? (
-        <span>
-          <Trans>Sin tickets para calcular</Trans> {money(totals.averageTicketMinorUnits)}
-        </span>
-      ) : (
-        money(totals.averageTicketMinorUnits)
-      ),
+      money(totals.averageTicketMinorUnits),
     ],
     [<Trans key="tickets">Tickets de venta</Trans>, number(totals.tickets)],
     [<Trans key="units">Piezas netas por ticket</Trans>, number(totals.unitsPerTicket)],
@@ -214,6 +208,11 @@ function Totals({ report }) {
   return (
     <Panel title={<Trans>Ventas y ticket promedio</Trans>}>
       <div className="analysis-lead figures">{money(totals.netMinorUnits)}</div>
+      {totals.tickets === 0 && (
+        <p className="analysis-note">
+          <Trans>Sin tickets para calcular</Trans>
+        </p>
+      )}
       <p>
         <Trans>
           Venta neta de productos, después de descuentos y devoluciones. Excluye propinas.

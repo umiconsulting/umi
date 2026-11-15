@@ -39,15 +39,16 @@ export function SalesRefreshError({ capturedAt, timezone, onRetry, network = fal
   return (
     <div className="sales-state surface" role="alert">
       <p>
-        {network ? (
-          <Trans>No se pudieron cargar las ventas. Los importes no están disponibles.</Trans>
-        ) : (
-          <Trans>
-            No se pudo actualizar. Estos importes son de las{' '}
-            {formatTime(capturedAt, { timeZone: timezone })}.
-          </Trans>
-        )}
+        <Trans>
+          No se pudo actualizar. Estos importes son de las{' '}
+          {formatTime(capturedAt, { timeZone: timezone })}.
+        </Trans>
       </p>
+      {network && (
+        <p>
+          <Trans>No se pudieron cargar las ventas. Los importes no están disponibles.</Trans>
+        </p>
+      )}
       <button type="button" className="btn btn-secondary" onClick={onRetry}>
         <Trans>Reintentar</Trans>
       </button>

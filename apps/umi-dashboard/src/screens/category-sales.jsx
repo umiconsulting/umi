@@ -214,13 +214,13 @@ export default function CategorySalesCard({
                         <Trans>Categoría</Trans>
                       </th>
                       <th>
+                        <Trans>Venta neta</Trans>
+                      </th>
+                      <th>
                         <Trans>Ventas antes de devoluciones</Trans>
                       </th>
                       <th>
                         <Trans>Devoluciones</Trans>
-                      </th>
-                      <th>
-                        <Trans>Venta neta</Trans>
                       </th>
                       <th>
                         <Trans>Participación</Trans>
@@ -245,9 +245,9 @@ export default function CategorySalesCard({
                             {categoryName(row)}
                           </button>
                         </th>
+                        <td>{formatOperationMoney(row.netMinorUnits, report.currency)}</td>
                         <td>{formatOperationMoney(row.merchandiseMinorUnits, report.currency)}</td>
                         <td>{formatOperationMoney(row.refundsMinorUnits, report.currency)}</td>
-                        <td>{formatOperationMoney(row.netMinorUnits, report.currency)}</td>
                         <td>{percentage(row)}</td>
                       </tr>
                     ))}
@@ -257,13 +257,13 @@ export default function CategorySalesCard({
                       <th scope="row">
                         <Trans>Total</Trans>
                       </th>
+                      <td>{formatOperationMoney(total, report.currency)}</td>
                       <td>
                         {formatOperationMoney(report.totals.merchandiseMinorUnits, report.currency)}
                       </td>
                       <td>
                         {formatOperationMoney(report.totals.refundsMinorUnits, report.currency)}
                       </td>
-                      <td>{formatOperationMoney(total, report.currency)}</td>
                       <td>{state === 'ready' ? formatNumber(1, { style: 'percent' }) : '—'}</td>
                     </tr>
                   </tfoot>

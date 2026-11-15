@@ -130,7 +130,7 @@ describe('Business overview', () => {
     const html = render();
     expect(html).toContain('Venta neta');
     expect(html).toContain('No se pudieron cargar las ventas');
-    expect(html).not.toContain('No se pudo actualizar');
+    expect(html).toContain('No se pudo actualizar');
   });
   it('shows a distinct no-tickets state and a zero-sales state', () => {
     state.report = loaded(

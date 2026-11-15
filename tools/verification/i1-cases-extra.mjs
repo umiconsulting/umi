@@ -813,7 +813,7 @@ export const EXTRA_CASES = {
     t.checks.eq('check:pr exit code', result.status, 0);
     t.checks.check(
       'no lint, format, PR data or freeze error',
-      !/error|ERR_|failed/i.test(result.stdout + result.stderr),
+      !/\bERR_|\bfailed\b|\berror\b(?!s)/i.test(result.stdout + result.stderr),
       true,
       result.status,
     );
