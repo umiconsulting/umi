@@ -490,6 +490,13 @@ final class _PreviewCatalogRepository implements CatalogRepository {
 /// is deliberately unimplemented: a render must not mutate anything.
 final class _PreviewCartRepository implements CartRepository {
   @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => throw UnimplementedError('incomingOrder');
+
+  @override
   Future<Cart> create(String merchantId, CreateCartRequest request) =>
       throw UnimplementedError();
   @override
@@ -525,6 +532,8 @@ final class _PreviewCartRepository implements CartRepository {
   Future<FireOrderResult> fire(String merchantId, FireOrderRequest request) =>
       throw UnimplementedError();
   @override
-  Future<Cart> setFulfillment(String merchantId, SetCartFulfillmentRequest input) =>
-      throw UnimplementedError();
+  Future<Cart> setFulfillment(
+    String merchantId,
+    SetCartFulfillmentRequest input,
+  ) => throw UnimplementedError();
 }

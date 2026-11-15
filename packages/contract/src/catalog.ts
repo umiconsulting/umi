@@ -192,7 +192,8 @@ import type { ZodTypeAny } from 'zod';
 /** 2.52.0 adds purchase analysis, configurable groups and explicit report errors. */
 /** 2.54.0 adds direct inventory purchases and private invoice artifacts. */
 /** 2.55.0 adds the typed basket state and keeps the summary when the basket budget fails. */
-export const CONTRACT_VERSION = '2.55.0';
+/** 2.56.0 adds settlement-cart origin fields and the payment hold classification. */
+export const CONTRACT_VERSION = '2.56.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;

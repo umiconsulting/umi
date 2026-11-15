@@ -8,6 +8,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'display_preferences.dart';
 import 'pos_icons.dart';
 import 'pos_theme.dart';
 
@@ -120,16 +121,31 @@ final class PosApp extends StatelessWidget {
               ? darkTheme ?? PosThemeData(brightness: Brightness.dark)
               : theme ?? PosThemeData(),
       };
-      return PosTheme(
-        data: data,
-        child: DefaultTextStyle(
-          style: data.textTheme.bodyMedium!,
-          child: IconTheme(
-            data: IconThemeData(color: data.colorScheme.onSurface, size: 24),
-            child:
-                builder?.call(context, child) ??
-                child ??
-                const SizedBox.shrink(),
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          statusBarColor: const Color(0x00000000),
+          statusBarIconBrightness: data.colorScheme.dark
+              ? Brightness.light
+              : Brightness.dark,
+          statusBarBrightness: data.colorScheme.dark
+              ? Brightness.dark
+              : Brightness.light,
+          systemNavigationBarColor: data.colorScheme.background,
+          systemNavigationBarIconBrightness: data.colorScheme.dark
+              ? Brightness.light
+              : Brightness.dark,
+        ),
+        child: PosTheme(
+          data: data,
+          child: DefaultTextStyle(
+            style: data.textTheme.bodyMedium!,
+            child: IconTheme(
+              data: IconThemeData(color: data.colorScheme.onSurface, size: 24),
+              child:
+                  builder?.call(context, child) ??
+                  child ??
+                  const SizedBox.shrink(),
+            ),
           ),
         ),
       );
@@ -184,7 +200,8 @@ class PosPage extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final rail =
-                    constraints.maxWidth >= 1100 &&
+                    constraints.maxWidth >= 700 &&
+                    constraints.maxHeight >= 600 &&
                     bottomNavigationBar is PosNavigation;
                 final content = Expanded(
                   key: const ValueKey('pos-page-content'),
@@ -254,7 +271,7 @@ class PosHeader extends StatelessWidget implements PreferredSizeWidget {
     this.backgroundColor,
     this.centerTitle = false,
     this.actionsInline = false,
-    this.toolbarHeight = 72,
+    this.toolbarHeight = 56,
     super.key,
   });
   final Widget? title, leading;
@@ -680,6 +697,7 @@ class PosButton extends StatefulWidget {
     required this.onPressed,
     required this.child,
     this.style,
+    this.compact = false,
     this.autofocus = false,
     this.focusNode,
     this.onLongPress,
@@ -692,6 +710,7 @@ class PosButton extends StatefulWidget {
     required Widget label,
     required this.icon,
     this.style,
+    this.compact = false,
     this.autofocus = false,
     this.focusNode,
     this.onLongPress,
@@ -703,6 +722,7 @@ class PosButton extends StatefulWidget {
     required this.onPressed,
     required this.child,
     this.style,
+    this.compact = false,
     this.autofocus = false,
     this.focusNode,
     this.onLongPress,
@@ -715,6 +735,7 @@ class PosButton extends StatefulWidget {
     required Widget label,
     required this.icon,
     this.style,
+    this.compact = false,
     this.autofocus = false,
     this.focusNode,
     this.onLongPress,
@@ -727,6 +748,7 @@ class PosButton extends StatefulWidget {
     required this.child,
     this.icon,
     this.style,
+    this.compact = false,
     this.autofocus = false,
     this.focusNode,
     this.onLongPress,
@@ -738,6 +760,7 @@ class PosButton extends StatefulWidget {
   final Widget child;
   final Widget? icon;
   final PosButtonStyle? style;
+  final bool compact;
   final bool autofocus;
   final bool? selected;
   final FocusNode? focusNode;
@@ -798,7 +821,10 @@ class PosButton extends StatefulWidget {
           48,
           minimum?.width.isFinite == true ? minimum!.width : 0,
         ),
-        minHeight: math.max(kind == 0 ? 56 : 48, minimum?.height ?? 0),
+        minHeight: math.max(
+          compact ? 44 : (kind == 0 ? 56 : 48),
+          minimum?.height ?? 0,
+        ),
       ),
       child: DecoratedBox(
         decoration: ShapeDecoration(color: fill, shape: shape),
@@ -877,6 +903,7 @@ class PosOutlineButton extends PosButton {
     required super.onPressed,
     required super.child,
     super.style,
+    super.compact,
     super.autofocus,
     super.focusNode,
     super.onLongPress,
@@ -887,6 +914,7 @@ class PosOutlineButton extends PosButton {
     required Widget label,
     required Widget icon,
     super.style,
+    super.compact,
     super.autofocus,
     super.focusNode,
     super.key,
@@ -899,6 +927,7 @@ class PosTextButton extends PosButton {
     required super.onPressed,
     required super.child,
     super.style,
+    super.compact,
     super.autofocus,
     super.focusNode,
     super.onLongPress,
@@ -909,6 +938,7 @@ class PosTextButton extends PosButton {
     required Widget label,
     required Widget icon,
     super.style,
+    super.compact,
     super.autofocus,
     super.focusNode,
     super.key,

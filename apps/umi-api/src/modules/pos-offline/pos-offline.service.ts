@@ -276,7 +276,9 @@ export class PosOfflineService {
     const refuseAndContinue = async (
       command: OfflineCommand,
       classification: ConflictClassification,
-      guidanceCode: string = classification,
+      guidanceCode: string = classification === 'payment_unresolved'
+        ? 'cart_payment_unresolved'
+        : classification,
     ): Promise<boolean> => {
       const result = await refuse(command, classification, guidanceCode);
       results.push(result);
@@ -1041,6 +1043,8 @@ export class PosOfflineService {
       return 'aggregate_version_conflict';
     }
     if (code === 'CHECKOUT_CART_CHANGED') return 'cart_mismatch';
+    // A payment in progress is a financial hold, not a generic validation error.
+    if (code === 'CART_PAYMENT_UNRESOLVED') return 'payment_unresolved';
     // A table another till took while this one was offline is the one refusal a
     // dine-in operator can act on by choosing another table. Reporting it as
     // "validation failed" sent them to look at the wrong thing.

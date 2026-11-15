@@ -86,6 +86,7 @@ final class CartCommandQueue {
     required void Function(String event) onEvent,
     required void Function(bool busy) onBusy,
     void Function()? onSettled,
+    void Function(String commandId)? onPaymentHold,
     ConnectivityController? connectivity,
     OfflineRecoveryController? recovery,
     HubCommandForwarder? hub,
@@ -97,6 +98,7 @@ final class CartCommandQueue {
        _onEvent = onEvent,
        _onBusy = onBusy,
        _onSettled = onSettled,
+       _onPaymentHold = onPaymentHold,
        _connectivity = connectivity,
        _recovery = recovery,
        _hub = hub {
@@ -114,6 +116,7 @@ final class CartCommandQueue {
   final void Function(String event) _onEvent;
   final void Function(bool busy) _onBusy;
   final void Function()? _onSettled;
+  final void Function(String commandId)? _onPaymentHold;
   final ConnectivityController? _connectivity;
   final OfflineRecoveryController? _recovery;
   final HubCommandForwarder? _hub;
@@ -820,6 +823,19 @@ final class CartCommandQueue {
     }
   }
 
+  /// Drop a refused command and every later command for the same cart. The
+  /// server cart is the only base after a financial hold.
+  void dropRefused(String commandId) {
+    final index = _commands.indexWhere(
+      (command) => command.commandId == commandId,
+    );
+    if (index < 0) return;
+    final cartId = _commands[index].payload['cartId'];
+    _commands.removeAt(index);
+    _commands.removeWhere((command) => command.payload['cartId'] == cartId);
+    _emitPrediction();
+  }
+
   Future<void> _settleAfterReplay() async {
     if (_disposed || _reconciling) return;
     _reconciling = true;
@@ -830,6 +846,13 @@ final class CartCommandQueue {
     try {
       final snapshot = await _journal.load();
       if (_disposed || generation != _selectionGeneration) return;
+      for (final entry in snapshot.entries) {
+        if (entry.status == JournalStatus.conflict &&
+            entry.failure?['classification'] == 'payment_unresolved') {
+          _onPaymentHold?.call(entry.command.commandId);
+          return;
+        }
+      }
       final terminalIds = snapshot.entries
           .where(
             (entry) => switch (entry.status) {

@@ -538,71 +538,78 @@ void main() {
     expect(find.text('2 mesas'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
-  testWidgets('tables render a bold label, a divider, and seat dots', (
-    tester,
-  ) async {
-    final area = areaFixture('dining', 'Dining room', [
-      tableElement(
-        id: 'big',
-        label: 'T1',
-        capacity: 4,
-        shape: 'round',
-        x: 300,
-        width: 200,
-        height: 200,
-      ),
-      // 40 px at this scale stays below the detail threshold.
-      tableElement(
-        id: 'tiny',
-        label: 'T2',
-        capacity: 2,
-        x: 900,
-        width: 40,
-        height: 40,
-      ),
-    ]);
-    await tester.pumpWidget(
-      PosApp(
-        home: PosPage(
-          body: FloorPlanMap(area: area, onTableTap: (_) {}),
+  testWidgets(
+    'available tables retain green state, labels and capacity marks',
+    (tester) async {
+      final area = areaFixture('dining', 'Dining room', [
+        tableElement(
+          id: 'big',
+          label: 'T1',
+          capacity: 4,
+          shape: 'round',
+          x: 300,
+          width: 200,
+          height: 200,
         ),
-      ),
-    );
-    expect(find.text('T1'), findsOneWidget);
-    expect(
-      tester.widget<Text>(find.text('T1')).style?.fontWeight,
-      FontWeight.w700,
-    );
-    expect(
-      find.byKey(const ValueKey('floor-plan-divider-big')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const ValueKey('floor-plan-seats-big')), findsOneWidget);
-    expect(
-      tester.widget<FloorPlanSeatDots>(find.byType(FloorPlanSeatDots)).count,
-      4,
-    );
-    expect(
-      tester
-          .widget<PosSurface>(
-            find.byKey(const ValueKey('floor-plan-element-big')),
-          )
-          .shape,
-      isA<CircleBorder>(),
-    );
-    expect(
-      tester
-          .widget<PosSurface>(
-            find.byKey(const ValueKey('floor-plan-element-big')),
-          )
-          .color,
-      PosColors.white,
-    );
-    expect(find.text('T2'), findsOneWidget);
-    expect(find.byKey(const ValueKey('floor-plan-divider-tiny')), findsNothing);
-    expect(find.byKey(const ValueKey('floor-plan-seats-tiny')), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+        // 40 px at this scale stays below the detail threshold.
+        tableElement(
+          id: 'tiny',
+          label: 'T2',
+          capacity: 2,
+          x: 900,
+          width: 40,
+          height: 40,
+        ),
+      ]);
+      await tester.pumpWidget(
+        PosApp(
+          home: PosPage(
+            body: FloorPlanMap(area: area, onTableTap: (_) {}),
+          ),
+        ),
+      );
+      expect(find.text('T1'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.text('T1')).style?.fontWeight,
+        FontWeight.w500,
+      );
+      expect(
+        find.byKey(const ValueKey('floor-plan-divider-big')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('floor-plan-seats-big')),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<FloorPlanSeatDots>(find.byType(FloorPlanSeatDots)).count,
+        4,
+      );
+      expect(
+        tester
+            .widget<PosSurface>(
+              find.byKey(const ValueKey('floor-plan-element-big')),
+            )
+            .shape,
+        isA<CircleBorder>(),
+      );
+      expect(
+        tester
+            .widget<PosSurface>(
+              find.byKey(const ValueKey('floor-plan-element-big')),
+            )
+            .color,
+        const Color(0xffe7f2eb),
+      );
+      expect(find.text('T2'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('floor-plan-divider-tiny')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('floor-plan-seats-tiny')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('surface shows area tabs and switches the rendered area', (
     tester,
   ) async {

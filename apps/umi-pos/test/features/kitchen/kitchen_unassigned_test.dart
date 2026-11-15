@@ -569,6 +569,9 @@ void main() {
     expect(find.text('1 × Latte'), findsOneWidget);
     expect(find.text('1 × Toast'), findsOneWidget);
 
+    await tester.ensureVisible(
+      find.byKey(ValueKey('open-unassigned-ticket-$orderId')),
+    );
     await tester.tap(find.byKey(ValueKey('open-unassigned-ticket-$orderId')));
     await tester.pumpAndSettle();
     expect(find.byType(KitchenUnassignedSurface), findsOneWidget);

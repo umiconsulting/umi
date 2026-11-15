@@ -18,6 +18,13 @@ import 'package:umi_pos/features/cart/cart_repository.dart';
 /// These tests pin the two halves of the answer: let go of the account when the server's
 /// own read says it is not the till's to write, and leave it alone when it still is.
 final class _CartRepository implements CartRepository {
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => throw UnimplementedError('incomingOrder');
+
   Cart cart = _cart();
   Object? addFailure;
   Object? readFailure;

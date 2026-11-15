@@ -65,6 +65,8 @@ final class HardwareSurface extends StatefulWidget {
     required this.service,
     required this.permissions,
     required this.registerId,
+    this.embedded = false,
+    this.section,
     super.key,
   });
 
@@ -72,6 +74,8 @@ final class HardwareSurface extends StatefulWidget {
   final HardwareService service;
   final OperatorPermissions permissions;
   final String? registerId;
+  final bool embedded;
+  final String? section;
 
   @override
   State<HardwareSurface> createState() => _HardwareSurfaceState();
@@ -169,39 +173,65 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
   Widget build(BuildContext context) {
     final snapshot = _snapshot;
     return PosPage(
-      appBar: PosHeader(
-        title: StationHeading(
-          title: text('Hardware center', 'Centro de hardware'),
-        ),
-        actions: [
-          PosIconButton(
-            tooltip: text('Refresh hardware', 'Actualizar hardware'),
-            onPressed: _busy ? null : _load,
-            icon: const PosIcon(PosGlyphs.refresh),
-          ),
-          PosIconButton(
-            tooltip: text('Close', 'Cerrar'),
-            onPressed: () => Navigator.pop(context),
-            icon: const PosIcon(PosGlyphs.close),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: _busy && snapshot == null
-            ? const Center(child: PosSpinner())
-            : _error != null
-            ? Center(
-                child: Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    text(
-                      'Hardware data is unavailable.',
-                      'Los datos de hardware no están disponibles.',
-                    ),
-                  ),
+      appBar: widget.embedded
+          ? null
+          : PosHeader(
+              title: StationHeading(
+                title: widget.embedded
+                    ? (widget.section == 'print'
+                          ? text('Printing', 'Impresión')
+                          : text(
+                              'Devices at this register',
+                              'Dispositivos de esta caja',
+                            ))
+                    : text('Hardware center', 'Centro de hardware'),
+              ),
+              actions: [
+                PosIconButton(
+                  tooltip: text('Refresh hardware', 'Actualizar hardware'),
+                  onPressed: _busy ? null : _load,
+                  icon: const PosIcon(PosGlyphs.refresh),
                 ),
-              )
-            : _content(snapshot),
+                if (!widget.embedded)
+                  PosIconButton(
+                    tooltip: text('Close', 'Cerrar'),
+                    onPressed: () => Navigator.pop(context),
+                    icon: const PosIcon(PosGlyphs.close),
+                  ),
+              ],
+            ),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (widget.embedded)
+              Align(
+                alignment: Alignment.centerRight,
+                child: PosTextButton.icon(
+                  onPressed: _busy ? null : _load,
+                  icon: const PosIcon(PosGlyphs.refresh, size: 18),
+                  label: Text(text('Refresh hardware', 'Actualizar hardware')),
+                ),
+              ),
+            Expanded(
+              child: _busy && snapshot == null
+                  ? const Center(child: PosSpinner())
+                  : _error != null
+                  ? Center(
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          text(
+                            'Hardware data is unavailable.',
+                            'Los datos de hardware no están disponibles.',
+                          ),
+                        ),
+                      ),
+                    )
+                  : _content(snapshot),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -216,63 +246,133 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Semantics(
-          header: true,
-          child: Text(
-            text('Assigned devices', 'Dispositivos asignados'),
-            style: PosTheme.of(context).textTheme.titleLarge,
+        if (widget.section != 'print') ...[
+          Semantics(
+            header: true,
+            child: Text(
+              text('Assigned devices', 'Dispositivos asignados'),
+              style: PosTheme.of(context).textTheme.titleLarge,
+            ),
           ),
-        ),
-        if (widget.permissions.allows('hardware.manage'))
-          Wrap(
-            spacing: 8,
-            children: [
-              // One tap: look on the till's own USB host port, then add whatever
-              // printer answers. The cable is the configuration, so the operator
-              // never picks a host, a port, or a transport.
-              PosButton.icon(
-                onPressed: _busy ? null : _addUsbPrinter,
-                icon: const PosIcon(PosGlyphs.usb),
-                label: Text(text('Find USB printer', 'Buscar impresora USB')),
-              ),
-              // The drawer's other cable, in one tap: the terminal is asked
-              // whether it has its own cashbox port, and a record is filed only
-              // when it answers. A tablet gets a sentence instead of a device
-              // row that could never open anything.
-              PosButton.icon(
-                onPressed: _busy ? null : _addTerminalDrawer,
-                icon: const PosIcon(PosGlyphs.pointOfSaleOutlined),
-                label: Text(
-                  text('Find terminal drawer', 'Buscar cajón de la terminal'),
+          if (widget.permissions.allows('hardware.manage'))
+            Wrap(
+              spacing: 8,
+              children: [
+                // One tap: look on the till's own USB host port, then add whatever
+                // printer answers. The cable is the configuration, so the operator
+                // never picks a host, a port, or a transport.
+                PosOutlineButton.icon(
+                  onPressed: _busy ? null : _addUsbPrinter,
+                  icon: const PosIcon(PosGlyphs.usb),
+                  label: Text(text('Find USB printer', 'Buscar impresora USB')),
                 ),
-              ),
-              PosButton.icon(
-                onPressed: _busy ? null : _register,
-                icon: const PosIcon(PosGlyphs.add),
-                label: Text(text('Register device', 'Registrar dispositivo')),
-              ),
-            ],
-          ),
-        const SizedBox(height: 8),
-        if (devices.isEmpty)
-          Text(text('No assigned hardware.', 'No hay hardware asignado.')),
-        ...devices.map(_deviceCard),
-        const SizedBox(height: 24),
-        Semantics(
-          header: true,
-          child: Text(
-            text('Printer queue', 'Cola de impresión'),
+                // The drawer's other cable, in one tap: the terminal is asked
+                // whether it has its own cashbox port, and a record is filed only
+                // when it answers. A tablet gets a sentence instead of a device
+                // row that could never open anything.
+                PosOutlineButton.icon(
+                  onPressed: _busy ? null : _addTerminalDrawer,
+                  icon: const PosIcon(PosGlyphs.cashDrawer),
+                  label: Text(
+                    text('Find terminal drawer', 'Buscar cajón de la terminal'),
+                  ),
+                ),
+                PosOutlineButton.icon(
+                  onPressed: _busy ? null : _register,
+                  icon: const PosIcon(PosGlyphs.add),
+                  label: Text(text('Register device', 'Registrar dispositivo')),
+                ),
+              ],
+            ),
+          const SizedBox(height: 8),
+          if (devices.isEmpty)
+            Text(text('No assigned hardware.', 'No hay hardware asignado.')),
+          _deviceGrid(devices),
+        ],
+        if (widget.section == 'print') ...[
+          Text(
+            text('Receipts', 'Tickets'),
             style: PosTheme.of(context).textTheme.titleLarge,
           ),
-        ),
-        if (jobs.isEmpty)
-          Text(text('The queue is empty.', 'La cola está vacía.')),
-        // NEWEST FIRST. The API reads the queue in creation order, which is right for a
-        // dispatcher and wrong for the person who just pressed "Run test": the page they
-        // asked for landed at the bottom of a scrolling list, off screen, so a working
-        // button looked like a broken one. On the pilot till this was the second half of
-        // "Ejecutar prueba no funciona" — the first was the command being refused.
-        ...jobs.reversed.map(_jobTile),
+          const SizedBox(height: 12),
+          PosListRow(
+            title: Text(
+              text('Print receipt on checkout', 'Imprimir el recibo al cobrar'),
+            ),
+            subtitle: Text(
+              (snapshot?.policy?['autoPrintReceipt'] as bool? ?? true)
+                  ? text('Enabled', 'Activado')
+                  : text('Disabled', 'Desactivado'),
+            ),
+          ),
+          PosListRow(
+            title: Text(text('Copies per receipt', 'Copias por recibo')),
+            subtitle: Text(
+              '${snapshot?.policy?['receiptCopiesDefault'] as int? ?? 1}',
+            ),
+          ),
+          PosListRow(
+            title: Text(text('Primary printer', 'Impresora principal')),
+            subtitle: Text(
+              devices
+                      .where(
+                        (device) =>
+                            device.type == 'printer' &&
+                            device.primary == true &&
+                            device.enabled,
+                      )
+                      .map((device) => device.publicReference)
+                      .firstOrNull ??
+                  text(
+                    'No active primary printer.',
+                    'Sin impresora principal activa.',
+                  ),
+            ),
+          ),
+          if (widget.permissions.allows('hardware.manage'))
+            PosOutlineButton.icon(
+              key: const ValueKey('printing-preferences'),
+              onPressed: _busy ? null : _configurePrinter,
+              icon: const PosIcon(PosGlyphs.settingsOutlined),
+              label: Text(
+                text('Receipt preferences', 'Preferencias del recibo'),
+              ),
+            ),
+          const SizedBox(height: 20),
+          Text(
+            text('Receipt printers', 'Impresoras de recibos'),
+            style: PosTheme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          if (!devices.any((device) => device.type == 'printer'))
+            Text(
+              text(
+                'No receipt printer assigned.',
+                'Sin impresora de recibos asignada.',
+              ),
+            ),
+          _deviceGrid(
+            devices.where((device) => device.type == 'printer').toList(),
+          ),
+        ],
+        if (widget.section != 'devices') ...[
+          const SizedBox(height: 24),
+          Semantics(
+            header: true,
+            child: Text(
+              text('Printer queue', 'Cola de impresión'),
+              style: PosTheme.of(context).textTheme.titleLarge,
+            ),
+          ),
+          if (jobs.isEmpty)
+            Text(text('The queue is empty.', 'La cola está vacía.')),
+          // NEWEST FIRST. The API reads the queue in creation order, which is right for a
+          // dispatcher and wrong for the person who just pressed "Run test": the page they
+          // asked for landed at the bottom of a scrolling list, off screen, so a working
+          // button looked like a broken one. On the pilot till this was the second half of
+          // "Ejecutar prueba no funciona" — the first was the command being refused.
+          ...jobs.reversed.map(_jobTile),
+        ],
         if ((snapshot?.unknownCommands ?? 0) > 0)
           Semantics(
             liveRegion: true,
@@ -294,7 +394,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
                       (device) => device.type == 'cash_drawer',
                     ),
                   ),
-            icon: const PosIcon(PosGlyphs.pointOfSaleOutlined),
+            icon: const PosIcon(PosGlyphs.cashDrawer),
             label: Text(
               text(
                 'Issue authorized second open',
@@ -306,51 +406,78 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
     );
   }
 
-  Widget _deviceCard(HardwareDevice device) => PosCard(
+  Widget _deviceGrid(List<HardwareDevice> devices) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns =
+          constraints.maxWidth >=
+              720 * MediaQuery.textScalerOf(context).scale(1)
+          ? 2
+          : 1;
+      final width = (constraints.maxWidth - 16 * (columns - 1)) / columns;
+      return Wrap(
+        spacing: 16,
+        runSpacing: 16,
+        children: [
+          for (final device in devices)
+            SizedBox(width: width, child: _deviceCard(device)),
+        ],
+      );
+    },
+  );
+
+  Widget _deviceCard(HardwareDevice device) => Container(
+    decoration: BoxDecoration(
+      color: PosTheme.of(context).colorScheme.surface,
+      border: Border.all(
+        color: PosTheme.of(context).colorScheme.outlineVariant,
+      ),
+      borderRadius: BorderRadius.circular(8),
+    ),
     child: Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${_deviceType(device.type)} · ${device.publicReference}',
-                  style: PosTheme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              Semantics(
-                label: device.enabled
-                    ? _unverifiedTerminalDrawer(device)
-                          ? text(
-                              'Terminal port available; physical drawer unverified',
-                              'Puerto de la terminal disponible; cajón físico sin verificar',
-                            )
-                          : text('Device enabled', 'Dispositivo activo')
-                    : text('Device disabled', 'Dispositivo inactivo'),
-                child: PosIcon(
-                  !device.enabled
-                      ? PosGlyphs.block
-                      : _unverifiedTerminalDrawer(device)
-                      ? PosGlyphs.helpOutline
-                      : PosGlyphs.checkCircle,
-                  color: device.enabled && !_unverifiedTerminalDrawer(device)
-                      ? PosColors.green
-                      : PosColors.grey,
-                ),
-              ),
-            ],
+          Text(
+            '${device.manufacturer} ${device.model}',
+            style: PosTheme.of(context).textTheme.titleSmall,
           ),
-          Text('${device.manufacturer} ${device.model}'),
-          Text('${text('Connection', 'Conexión')}: ${_connection(device)}'),
+          const SizedBox(height: 8),
+          PosTag(
+            label: Text(
+              !device.enabled
+                  ? text('Disabled', 'Inactivo')
+                  : _unverifiedTerminalDrawer(device)
+                  ? text('Drawer unverified', 'Cajón sin verificar')
+                  : _connection(device),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '${text('Device', 'Dispositivo')}: ${_deviceType(device.type)} · ${device.publicReference}',
+            style: PosTheme.of(context).textTheme.bodySmall,
+          ),
+          Text(
+            '${text('Use', 'Uso')}: ${device.primary == true ? text('Primary', 'Principal') : _deviceType(device.type)}',
+            style: PosTheme.of(context).textTheme.bodySmall,
+          ),
+          Text(
+            '${text('Connection', 'Conexión')}: ${_connection(device)}',
+            style: PosTheme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          const PosDivider(),
           Wrap(
             spacing: 8,
             children: [
               if (_canTest(device))
                 PosOutlineButton.icon(
                   onPressed: _busy ? null : () => _diagnostic(device),
-                  icon: const PosIcon(PosGlyphs.healthAndSafetyOutlined),
+                  icon: PosIcon(
+                    device.type == 'printer'
+                        ? PosGlyphs.printOutlined
+                        : PosGlyphs.healthAndSafetyOutlined,
+                  ),
                   label: Text(text('Run test', 'Ejecutar prueba')),
                 ),
               if (widget.permissions.allows('hardware.manage'))

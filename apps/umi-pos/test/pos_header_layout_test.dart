@@ -7,6 +7,9 @@ void main() {
   testWidgets('header and navigation consume system padding once', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(
       PosApp(
         home: MediaQuery(

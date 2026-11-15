@@ -66,6 +66,7 @@ class DenominationCounter extends StatefulWidget {
     required this.denominations,
     required this.onChanged,
     this.showTotal = true,
+    this.grouped = false,
     super.key,
   });
 
@@ -73,6 +74,7 @@ class DenominationCounter extends StatefulWidget {
   final List<int> denominations;
   final ValueChanged<DenominationTally> onChanged;
   final bool showTotal;
+  final bool grouped;
 
   @override
   State<DenominationCounter> createState() => _DenominationCounterState();
@@ -180,6 +182,90 @@ class _DenominationCounterState extends State<DenominationCounter> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = PosTheme.of(context);
+    if (widget.grouped) {
+      final es = Localizations.localeOf(context).languageCode == 'es';
+      final groups = widget.currency == 'MXN'
+          ? <(String, List<int>)>[
+              (
+                es ? 'Billetes' : 'Bills',
+                widget.denominations.where((value) => value >= 2000).toList(),
+              ),
+              (
+                es ? 'Monedas' : 'Coins',
+                widget.denominations.where((value) => value < 2000).toList(),
+              ),
+            ]
+          : <(String, List<int>)>[
+              (es ? 'Denominaciones' : 'Denominations', widget.denominations),
+            ];
+      return LayoutBuilder(
+        builder: (context, box) {
+          final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+          final splitGroups =
+              box.maxWidth >= 400 * scale && scale < 1.5 && groups.length > 1;
+          final groupWidth = splitGroups
+              ? (box.maxWidth - 24) / groups.length
+              : box.maxWidth;
+          final columns = !splitGroups && groupWidth >= 312 && scale < 1.5
+              ? 2
+              : 1;
+          final width = (groupWidth - 8 * (columns - 1)) / columns;
+          Widget group((String, List<int>) item) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(item.$1, style: theme.textTheme.titleSmall),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final denomination in item.$2)
+                    SizedBox(
+                      width: width,
+                      child: _denominationRow(
+                        context,
+                        l,
+                        theme,
+                        denomination,
+                        width,
+                        stacked: true,
+                        splitGroup: splitGroups,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (splitGroups)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var index = 0; index < groups.length; index++) ...[
+                      if (index > 0) const SizedBox(width: 24),
+                      Expanded(child: group(groups[index])),
+                    ],
+                  ],
+                )
+              else
+                for (final item in groups)
+                  if (item.$2.isNotEmpty) ...[
+                    group(item),
+                    const SizedBox(height: 16),
+                  ],
+              if (widget.showTotal)
+                Text(
+                  '${es ? 'Total contado' : 'Counted total'} · ${_money(_total)}',
+                ),
+            ],
+          );
+        },
+      );
+    }
     // Every denomination in the drawer, laid out in two columns whenever there
     // is room for them.
     //
@@ -199,7 +285,7 @@ class _DenominationCounterState extends State<DenominationCounter> {
         // in the same dialog, the operator could not tell the rows apart.
         final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
         final field = 64.0 * scale;
-        final minRow = 88.0 * scale + UmiSpacing.xs + 48 + field + 48;
+        final minRow = 88.0 * scale + UmiSpacing.xs + 48 + field + 48 + 16;
         final columns = constraints.maxWidth >= minRow * 2 + gap ? 2 : 1;
         final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
         // The name cell is capped rather than stretched: on a wide card the row
@@ -207,7 +293,7 @@ class _DenominationCounterState extends State<DenominationCounter> {
         // its own buttons. Capped, every row's buttons start at the same offset
         // and the row reads as one line. The cap grows with the text, so a large
         // scale gets the width the money needs instead of an ellipsis.
-        final labelWidth = (width - UmiSpacing.xs - 48 - field - 48).clamp(
+        final labelWidth = (width - UmiSpacing.xs - 48 - field - 48 - 16).clamp(
           88.0 * scale,
           170.0 * scale,
         );
@@ -276,6 +362,7 @@ class _DenominationCounterState extends State<DenominationCounter> {
     int denomination,
     double labelWidth, {
     required bool stacked,
+    bool splitGroup = false,
   }) {
     final quantity = _counts[denomination] ?? 0;
     final label = Column(
@@ -284,11 +371,13 @@ class _DenominationCounterState extends State<DenominationCounter> {
       children: [
         Text(
           _money(denomination),
-          style: theme.textTheme.bodyLarge,
+          style: widget.grouped
+              ? theme.textTheme.bodyMedium
+              : theme.textTheme.bodyLarge,
           maxLines: stacked ? null : 2,
           overflow: stacked ? null : TextOverflow.ellipsis,
         ),
-        if (quantity > 0)
+        if (quantity > 0 || widget.grouped)
           Text(
             '= ${_money(denomination * quantity)}',
             maxLines: stacked ? null : 1,
@@ -323,9 +412,59 @@ class _DenominationCounterState extends State<DenominationCounter> {
         icon: const PosIcon(PosGlyphs.add),
       ),
     ];
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: stacked ? UmiSpacing.sm : 2),
-      child: stacked
+    return Container(
+      margin: EdgeInsets.only(bottom: widget.grouped ? 0 : 2),
+      padding: EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: widget.grouped ? 8 : 0,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: widget.grouped
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (splitGroup)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _money(denomination),
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            '= ${_money(denomination * quantity)}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Text(_money(denomination), style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 8),
+                Row(children: controls),
+                if (!splitGroup) const SizedBox(height: 8),
+                if (!splitGroup)
+                  Text(
+                    '= ${_money(denomination * quantity)}',
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            )
+          : stacked
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,

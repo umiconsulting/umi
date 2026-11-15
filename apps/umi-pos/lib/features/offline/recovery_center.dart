@@ -420,6 +420,10 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
         spanish
             ? 'Un paso anterior de esta cuenta necesita atención. Resuélvelo y vuelve a sincronizar.'
             : 'An earlier step on this account needs attention. Resolve it and synchronize again.',
+      'payment_unresolved' =>
+        spanish
+            ? 'Termina o cancela el cobro antes de cambiar esta cuenta.'
+            : 'Finish or cancel the payment before you change this account.',
       'price_changed' =>
         spanish
             ? 'El total cambió. Vuelve a revisar la cuenta y cóbrala de nuevo.'

@@ -230,6 +230,8 @@ final class FakeCommandRepository implements KitchenCommandRepository {
   final List<PosKitchenCommandRequest> sent = [];
   String? lastMerchantId;
   Object? failure;
+  String responseStatus = 'ready';
+  String responseUpdatedAt = serverClock;
 
   /// Held commands wait on this, so a test can look at the board mid-flight.
   Completer<void>? gate;
@@ -247,10 +249,10 @@ final class FakeCommandRepository implements KitchenCommandRepository {
     if (failure != null) throw failure;
     return KitchenCommandResult(
       kitchenOrderId: request.kitchenOrderId,
-      status: 'ready',
+      status: responseStatus,
       version: request.expectedVersion + 1,
       sequence: 4,
-      updatedAt: serverClock,
+      updatedAt: responseUpdatedAt,
     );
   }
 }
@@ -288,6 +290,96 @@ loadedBoard({List<KitchenOrderProjection>? orders}) async {
 }
 
 void main() {
+  testWidgets('preparation lanes use the actual station work state', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = await pumpBoard(
+      tester,
+      orders: [
+        order(
+          status: 'in_preparation',
+          reference: 'Active prep',
+          items: [itemJson(itemLatte, 'Latte', status: 'preparing')],
+        ),
+      ],
+    );
+    expect(
+      find.ancestor(
+        of: find.text('Active prep'),
+        matching: find.byKey(const ValueKey('kitchen-lane-preparing')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('kitchen-active-ticket-accent')),
+      findsOneWidget,
+    );
+    expect(harness.kitchen.sent, isEmpty);
+    await harness.dispose(tester);
+  });
+
+  testWidgets(
+    'ready visibility changes presentation and retains a live station count',
+    (tester) async {
+      tester.view.physicalSize = const Size(1440, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final ready = order(status: 'ready', reference: 'Ready order');
+      final pending = KitchenOrderProjection.fromJson({
+        ...order(reference: 'Pending order').toJson(),
+        'id': 'pending-order',
+      });
+      final harness = await pumpBoard(tester, orders: [pending, ready]);
+      expect(find.text('Ready order'), findsOneWidget);
+      expect(find.text('Hide ready (1)'), findsOneWidget);
+      final reads = harness.room.reads;
+      await tester.tap(find.byKey(const ValueKey('kitchen-ready-visibility')));
+      await tester.pump();
+      expect(find.text('Ready order'), findsNothing);
+      expect(find.text('Pending order'), findsOneWidget);
+      expect(find.text('Show ready (1)'), findsOneWidget);
+      expect(harness.room.reads, reads);
+      expect(harness.kitchen.sent, isEmpty);
+      harness.room.orders = [pending];
+      await harness.board.refresh();
+      await tester.pump();
+      expect(find.text('Show ready (0)'), findsOneWidget);
+      expect(harness.kitchen.sent, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('kitchen-ready-visibility')));
+      await tester.pump();
+      expect(find.text('Hide ready (0)'), findsOneWidget);
+      await harness.dispose(tester);
+    },
+  );
+
+  testWidgets(
+    'ready lane follows the actual station status of a partial order',
+    (tester) async {
+      tester.view.physicalSize = const Size(1440, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final harness = await pumpBoard(
+        tester,
+        orders: [
+          order(
+            status: 'partially_ready',
+            reference: 'Station ready',
+            items: [itemJson(itemLatte, 'Latte', status: 'ready')],
+          ),
+        ],
+      );
+      expect(find.text('Hide ready (1)'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('kitchen-ready-visibility')));
+      await tester.pump();
+      expect(find.text('Station ready'), findsNothing);
+      expect(harness.kitchen.sent, isEmpty);
+      await harness.dispose(tester);
+    },
+  );
+
   testWidgets(
     'a queued ticket crosses its station threshold without a refresh',
     (tester) async {
@@ -310,7 +402,12 @@ void main() {
         tester.element(find.text('Tiempo vencido')),
       ).colorScheme.error;
       expect(
-        find.byWidgetPredicate((w) => w is Container && w.color == red),
+        find.byWidgetPredicate(
+          (w) =>
+              w is PosSurface &&
+              w.shape is RoundedRectangleBorder &&
+              (w.shape! as RoundedRectangleBorder).side.color == red,
+        ),
         findsWidgets,
       );
       await harness.dispose(tester);
@@ -376,6 +473,211 @@ void main() {
         expect(harness.kitchen.sent.last.kitchenOrderId, orderId);
       },
     );
+
+    test(
+      'station completion retains sibling work and its next version',
+      () async {
+        final completedStation = order(
+          status: 'ready',
+          stationName: 'Cocina',
+          items: [itemJson(itemToast, 'Toast', status: 'ready')],
+        );
+        final sibling = order(
+          station: '00000000-0000-4000-8000-0000000000e2',
+          stationName: 'Barra',
+          items: [itemJson(itemLatte, 'Latte')],
+        );
+        final harness = await loadedBoard(orders: [completedStation, sibling]);
+        addTearDown(harness.board.dispose);
+        addTearDown(harness.connectivity.dispose);
+        final gate = Completer<void>();
+        harness.kitchen
+          ..gate = gate
+          ..responseStatus = 'partially_ready'
+          ..responseUpdatedAt = '2026-09-16T18:01:00.000Z';
+
+        final completion = harness.board.complete(completedStation);
+
+        expect(harness.board.state.orders.single.toJson(), sibling.toJson());
+        expect(harness.board.pendingCommandCount, 1);
+        expect(harness.kitchen.sent.single.commandType, 'complete');
+        expect(harness.kitchen.sent.single.itemIds, [itemToast]);
+        expect(harness.kitchen.sent.single.expectedVersion, 1);
+
+        gate.complete();
+        expect(await completion, isTrue);
+
+        expect(harness.board.state.orders, hasLength(1));
+        final retained = harness.board.state.orders.single;
+        expect(retained.toJson(), {
+          ...sibling.toJson(),
+          'version': 2,
+          'updatedAt': '2026-09-16T18:01:00.000Z',
+        });
+        expect(harness.board.pendingCommandCount, 0);
+        expect(harness.room.reads, 1);
+
+        expect(await harness.board.startPreparation(retained), isTrue);
+        expect(harness.kitchen.sent, hasLength(2));
+        expect(harness.kitchen.sent.last.commandType, 'start_preparation');
+        expect(harness.kitchen.sent.last.itemIds, [itemLatte]);
+        expect(harness.kitchen.sent.last.expectedVersion, 2);
+        expect(harness.board.state.orders.single.stationId, sibling.stationId);
+        expect(harness.board.state.orders.single.version, 3);
+        expect(
+          KitchenOrderItem.fromJson(
+            harness.board.state.orders.single.items.single,
+          ).status,
+          'preparing',
+        );
+        expect(harness.room.reads, 1);
+      },
+    );
+
+    test('station cancel acknowledgement retains the sibling notice', () async {
+      final acknowledgedStation = order(
+        status: 'cancelled',
+        stationName: 'Cocina',
+        items: [itemJson(itemToast, 'Toast', status: 'cancelled')],
+      );
+      final sibling = order(
+        status: 'cancelled',
+        station: '00000000-0000-4000-8000-0000000000e2',
+        stationName: 'Barra',
+        items: [itemJson(itemLatte, 'Latte', status: 'cancelled')],
+      );
+      final harness = await loadedBoard(orders: [acknowledgedStation, sibling]);
+      addTearDown(harness.board.dispose);
+      addTearDown(harness.connectivity.dispose);
+      final gate = Completer<void>();
+      harness.kitchen
+        ..gate = gate
+        ..responseStatus = 'cancelled'
+        ..responseUpdatedAt = '2026-09-16T18:01:00.000Z';
+
+      final acknowledgement = harness.board.discard(acknowledgedStation);
+
+      expect(harness.board.state.orders.single.toJson(), sibling.toJson());
+      expect(harness.board.pendingCommandCount, 1);
+      expect(harness.kitchen.sent.single.commandType, 'cancel_ack');
+      expect(harness.kitchen.sent.single.itemIds, [itemToast]);
+      expect(harness.kitchen.sent.single.expectedVersion, 1);
+
+      gate.complete();
+      expect(await acknowledgement, isTrue);
+
+      expect(harness.board.state.orders, hasLength(1));
+      final retained = harness.board.state.orders.single;
+      expect(retained.toJson(), {
+        ...sibling.toJson(),
+        'version': 2,
+        'updatedAt': '2026-09-16T18:01:00.000Z',
+      });
+      expect(harness.board.pendingCommandCount, 0);
+      expect(harness.room.reads, 1);
+
+      harness.kitchen.gate = Completer<void>();
+      final siblingAcknowledgement = harness.board.discard(retained);
+
+      expect(harness.board.state.orders, isEmpty);
+      expect(harness.board.pendingCommandCount, 1);
+      expect(harness.kitchen.sent, hasLength(2));
+      expect(harness.kitchen.sent.last.commandType, 'cancel_ack');
+      expect(harness.kitchen.sent.last.itemIds, [itemLatte]);
+      expect(harness.kitchen.sent.last.expectedVersion, 2);
+
+      harness.kitchen.gate!.complete();
+      expect(await siblingAcknowledgement, isTrue);
+      expect(harness.board.state.orders, isEmpty);
+      expect(harness.board.pendingCommandCount, 0);
+      expect(harness.room.reads, 1);
+    });
+
+    for (final commandType in ['complete', 'cancel_ack']) {
+      test(
+        'late $commandType retains newer sibling snapshot and next version',
+        () async {
+          final cancelled = commandType == 'cancel_ack';
+          final selected = order(
+            status: cancelled ? 'cancelled' : 'ready',
+            items: [
+              itemJson(
+                itemToast,
+                'Toast',
+                status: cancelled ? 'cancelled' : 'ready',
+              ),
+            ],
+          );
+          final sibling = order(
+            status: cancelled ? 'cancelled' : 'queued',
+            station: '00000000-0000-4000-8000-0000000000e2',
+            items: [
+              itemJson(
+                itemLatte,
+                'Latte',
+                status: cancelled ? 'cancelled' : 'queued',
+              ),
+            ],
+          );
+          final harness = await loadedBoard(orders: [selected, sibling]);
+          addTearDown(harness.board.dispose);
+          addTearDown(harness.connectivity.dispose);
+          final gate = Completer<void>();
+          harness.kitchen
+            ..gate = gate
+            ..responseStatus = cancelled ? 'cancelled' : 'partially_ready'
+            ..responseUpdatedAt = '2026-09-16T18:01:00.000Z';
+          final pending = cancelled
+              ? harness.board.discard(selected)
+              : harness.board.complete(selected);
+
+          expect(harness.board.state.orders.single.toJson(), sibling.toJson());
+          expect(harness.kitchen.sent.single.expectedVersion, 1);
+
+          final newerSibling = KitchenOrderProjection.fromJson({
+            ...sibling.toJson(),
+            'version': 3,
+            'updatedAt': '2026-09-16T18:02:00.000Z',
+            'status': cancelled ? 'cancelled' : 'in_preparation',
+            'items': [
+              itemJson(
+                itemLatte,
+                'Latte',
+                status: cancelled ? 'cancelled' : 'preparing',
+              ),
+            ],
+          });
+          harness.room.orders = [newerSibling];
+          await harness.board.load(merchantId, query);
+          expect(
+            harness.board.state.orders.single.toJson(),
+            newerSibling.toJson(),
+          );
+
+          gate.complete();
+          expect(await pending, isTrue);
+
+          final retained = harness.board.state.orders.single;
+          expect(retained.version, 3);
+          expect(retained.toJson(), newerSibling.toJson());
+          expect(harness.board.pendingCommandCount, 0);
+          expect(harness.room.reads, 2);
+
+          final next = cancelled
+              ? harness.board.discard(retained)
+              : harness.board.markItemReady(retained, itemLatte);
+          expect(await next, isTrue);
+          expect(harness.kitchen.sent, hasLength(2));
+          expect(
+            harness.kitchen.sent.last.commandType,
+            cancelled ? 'cancel_ack' : 'mark_item_ready',
+          );
+          expect(harness.kitchen.sent.last.itemIds, [itemLatte]);
+          expect(harness.kitchen.sent.last.expectedVersion, 3);
+          expect(harness.room.reads, 2);
+        },
+      );
+    }
 
     test('a recall carries the reason the cook gave', () async {
       final harness = await loadedBoard(orders: [order(status: 'ready')]);
@@ -1241,7 +1543,7 @@ void main() {
       );
 
       expect(find.text('Capuccino'), findsNothing);
-      expect(find.text('Plancha'), findsOneWidget);
+      expect(find.text('Plancha'), findsNWidgets(2));
       expect(find.text('Todos'), findsOneWidget);
       await tester.tap(find.text('Todos'));
       await tester.pump();
@@ -1513,7 +1815,7 @@ void main() {
       expect(find.text('Course 2'), findsOneWidget);
       // The count is portions, matching the `3×` on the line inside it.
       expect(find.text('Held · 3'), findsOneWidget);
-      expect(find.text('3×'), findsOneWidget);
+      expect(find.text('3'), findsOneWidget);
       expect(find.text('Not cooking yet'), findsOneWidget);
 
       // And it is not work: the tap asks the kitchen for nothing.
@@ -1544,6 +1846,7 @@ void main() {
         ],
       );
 
+      await tester.ensureVisible(find.text('Fire course 2'));
       await tester.tap(find.text('Fire course 2'));
       await _settle(tester);
 
@@ -1562,11 +1865,9 @@ void main() {
     ) async {
       final harness = await pumpBoard(tester);
 
-      // The everyday sale is course 1 and already fired. Course 1 is named
-      // because the ticket is read in courses, and there is no fire control
-      // because there is nothing waiting — the step must not cost a busy café a
-      // tap per ticket.
-      expect(find.text('Course 1'), findsOneWidget);
+      // The everyday fired course has no redundant heading or fire control.
+      // Multi-course tickets retain their explicit course boundaries.
+      expect(find.text('Course 1'), findsNothing);
       expect(find.textContaining('Fire course'), findsNothing);
       expect(find.textContaining('Held'), findsNothing);
       await harness.dispose(tester);
@@ -1895,16 +2196,14 @@ void main() {
             isFalse,
             reason: 'The complete ticket identity must remain readable',
           );
-          final quantity = tester.renderObject<RenderParagraph>(
-            find.text('2×'),
-          );
+          final quantity = tester.renderObject<RenderParagraph>(find.text('2'));
           final boxes = quantity.getBoxesForSelection(
-            const TextSelection(baseOffset: 0, extentOffset: 2),
+            const TextSelection(baseOffset: 0, extentOffset: 1),
           );
           expect(
             boxes.map((b) => b.top).toSet(),
             hasLength(1),
-            reason: 'The quantity and multiplication mark form one unit',
+            reason: 'The quantity stays on one readable line',
           );
           final held = tester.renderObject<RenderParagraph>(
             find.text(l.kitchenCourseHeldNote),
@@ -1996,7 +2295,10 @@ void main() {
         ),
       );
       await _settle(tester);
-      expect(find.text('1×'), findsOneWidget);
+      expect(
+        find.text('1'),
+        findsNWidgets(2),
+      ); // One lane count and one ticket quantity.
       expect(find.text(l.kitchenAllDayCount(7)), findsOneWidget);
       expect(find.text('×7'), findsNothing);
       expect(find.byTooltip(l.kitchenAllDayTooltip(7, 2)), findsOneWidget);

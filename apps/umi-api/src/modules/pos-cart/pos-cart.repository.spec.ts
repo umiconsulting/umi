@@ -438,6 +438,48 @@ describe('PosCartRepository.fire — the second round', () => {
     updatedAt: '2026-10-07T12:00:00.000Z',
   });
 
+  it('answers already_prepared for a bound cart and writes no order', async () => {
+    const statements: string[] = [];
+    const client = {
+      query: vi.fn().mockImplementation((sql: unknown) => {
+        const s = String(sql);
+        statements.push(s);
+        if (/FROM merchant\.pos_checkout_draft/u.test(s)) return { rows: [], rowCount: 0 };
+        if (/FROM merchant\.pos_cart[\s\S]*FOR UPDATE/u.test(s)) {
+          return {
+            rows: [
+              {
+                firedOrderId: null,
+                originOrderId: '90000000-0000-4000-8000-000000000001',
+                version: 3,
+                status: 'draft',
+                lifecycleState: 'building_cart',
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+        if (/SELECT COALESCE\(o\.external_ref,o\.id::text\) AS reference/u.test(s)) {
+          return { rows: [{ reference: 'WEB-77', lineCount: '2' }], rowCount: 1 };
+        }
+        return { rows: [], rowCount: 1 };
+      }),
+    } as unknown as PoolClient;
+    const repository = new PosCartRepository({} as PgService);
+
+    const result = await repository.fire(client, MERCHANT, cart, 3, OPERATOR_SESSION);
+
+    expect(result).toEqual({
+      state: 'already_prepared',
+      orderId: '90000000-0000-4000-8000-000000000001',
+      reference: 'WEB-77',
+      lineCount: 2,
+      cartVersion: 3,
+    });
+    expect(statements.join('\n')).not.toMatch(/INSERT INTO merchant\.customer_order/u);
+    expect(statements.join('\n')).not.toMatch(/UPDATE merchant\.pos_cart\b/u);
+  });
+
   it('appends only the unfired lines to the order the cart already owns', async () => {
     const statements: string[] = [];
     const client = {

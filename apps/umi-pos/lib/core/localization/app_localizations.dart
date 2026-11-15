@@ -4651,6 +4651,12 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Hoy: {ordered}'**
   String kitchenAllDayCount(int ordered);
+
+  /// No description provided for @offlineOriginBoundBlockedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Un pedido web ya está en cocina. Reconecta para cobrarlo.'**
+  String get offlineOriginBoundBlockedMessage;
 }
 
 class _AppLocalizationsDelegate

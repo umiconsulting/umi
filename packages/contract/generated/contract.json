@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "7f8bc55a1064c97c0a035a08ffe7701e1bf95926dbc40240f1e6a5568d303f3d",
-  "contractVersion": "2.55.0",
+  "contentHash": "a3c2811fef4472defa9b401eef9e287fef337682a42c39d9b5e34f8e4ce6beb7",
+  "contractVersion": "2.56.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -788,6 +788,11 @@
             "CART_ACCOUNT_BUSY",
             "CART_VERSION_CONFLICT",
             "CART_PAYMENT_UNRESOLVED",
+            "CART_ORIGIN_CART_NOT_EMPTY",
+            "CART_ORIGIN_NOT_OPEN",
+            "CART_ORIGIN_ALREADY_FIRED",
+            "CART_ORIGIN_LOCKED",
+            "CART_ORIGIN_MISMATCH",
             "CART_TABLE_ACCOUNT_EXISTS",
             "CART_ALREADY_ASSIGNED",
             "TABLE_HAS_OPEN_ACCOUNT",
@@ -795,6 +800,7 @@
             "KITCHEN_ITEM_NOT_FOUND",
             "CART_LINE_DAY_CLOSED",
             "PRODUCT_UNAVAILABLE",
+            "OFFLINE_ORIGIN_BOUND_BLOCKED",
             "VARIANT_NOT_AVAILABLE",
             "MODIFIER_SELECTION_INVALID",
             "CHECKOUT_GATE_NOT_AVAILABLE",
@@ -1031,6 +1037,11 @@
                 "CART_ACCOUNT_BUSY",
                 "CART_VERSION_CONFLICT",
                 "CART_PAYMENT_UNRESOLVED",
+                "CART_ORIGIN_CART_NOT_EMPTY",
+                "CART_ORIGIN_NOT_OPEN",
+                "CART_ORIGIN_ALREADY_FIRED",
+                "CART_ORIGIN_LOCKED",
+                "CART_ORIGIN_MISMATCH",
                 "CART_TABLE_ACCOUNT_EXISTS",
                 "CART_ALREADY_ASSIGNED",
                 "TABLE_HAS_OPEN_ACCOUNT",
@@ -1038,6 +1049,7 @@
                 "KITCHEN_ITEM_NOT_FOUND",
                 "CART_LINE_DAY_CLOSED",
                 "PRODUCT_UNAVAILABLE",
+                "OFFLINE_ORIGIN_BOUND_BLOCKED",
                 "VARIANT_NOT_AVAILABLE",
                 "MODIFIER_SELECTION_INVALID",
                 "CHECKOUT_GATE_NOT_AVAILABLE",
@@ -3407,6 +3419,32 @@
                     "format": "uuid",
                     "type": "string"
                   },
+                  "originChannel": {
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "whatsapp",
+                          "web",
+                          "aggregator"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "originOrderId": {
+                    "anyOf": [
+                      {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "status": {
                     "enum": [
                       "draft",
@@ -4373,6 +4411,32 @@
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
+        },
+        "originChannel": {
+          "anyOf": [
+            {
+              "enum": [
+                "whatsapp",
+                "web",
+                "aggregator"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originOrderId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "status": {
           "enum": [
@@ -22509,6 +22573,7 @@
         "policy_changed",
         "unsupported_offline_command",
         "ambiguous_payment_requires_query",
+        "payment_unresolved",
         "server_validation_failed",
         "reconciliation_required",
         "terminal_failure"
@@ -22566,6 +22631,7 @@
                           "policy_changed",
                           "unsupported_offline_command",
                           "ambiguous_payment_requires_query",
+                          "payment_unresolved",
                           "server_validation_failed",
                           "reconciliation_required",
                           "terminal_failure"
@@ -35939,6 +36005,14 @@
               "type": "null"
             }
           ]
+        },
+        "state": {
+          "enum": [
+            "fired",
+            "already_fired",
+            "already_prepared"
+          ],
+          "type": "string"
         }
       },
       "required": [
@@ -35947,7 +36021,8 @@
         "orderId",
         "reference",
         "lineCount",
-        "firedAt"
+        "firedAt",
+        "state"
       ],
       "type": "object"
     },
@@ -64810,6 +64885,32 @@
                 "format": "uuid",
                 "type": "string"
               },
+              "originChannel": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "whatsapp",
+                      "web",
+                      "aggregator"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "originOrderId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "status": {
                 "enum": [
                   "draft",
@@ -70472,6 +70573,262 @@
         "itemCount",
         "totalMinorUnits",
         "placedAt"
+      ],
+      "type": "object"
+    },
+    "PosIncomingOrderDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "enum": [
+            "whatsapp",
+            "web",
+            "aggregator"
+          ],
+          "type": "string"
+        },
+        "customerName": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "itemCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lines": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "lineId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "modifiers": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "maxLength": 160,
+                      "type": "string"
+                    },
+                    "quantity": {
+                      "exclusiveMinimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "quantity"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              "name": {
+                "maxLength": 240,
+                "type": "string"
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "productId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "quantity": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "unitPriceMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "variantName": {
+                "anyOf": [
+                  {
+                    "maxLength": 160,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "lineId",
+              "productId",
+              "name",
+              "variantName",
+              "quantity",
+              "unitPriceMinorUnits",
+              "notes",
+              "modifiers"
+            ],
+            "type": "object"
+          },
+          "maxItems": 250,
+          "type": "array"
+        },
+        "orderId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "placedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "placed",
+            "preparing",
+            "ready"
+          ],
+          "type": "string"
+        },
+        "totalMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "orderId",
+        "channel",
+        "status",
+        "reference",
+        "customerName",
+        "itemCount",
+        "totalMinorUnits",
+        "placedAt",
+        "lines"
+      ],
+      "type": "object"
+    },
+    "PosIncomingOrderLine": {
+      "additionalProperties": false,
+      "properties": {
+        "lineId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "modifiers": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "maxLength": 160,
+                "type": "string"
+              },
+              "quantity": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "quantity"
+            ],
+            "type": "object"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "name": {
+          "maxLength": 240,
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "productId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quantity": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "unitPriceMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "variantName": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "lineId",
+        "productId",
+        "name",
+        "variantName",
+        "quantity",
+        "unitPriceMinorUnits",
+        "notes",
+        "modifiers"
       ],
       "type": "object"
     },
@@ -79608,6 +79965,7 @@
                           "policy_changed",
                           "unsupported_offline_command",
                           "ambiguous_payment_requires_query",
+                          "payment_unresolved",
                           "server_validation_failed",
                           "reconciliation_required",
                           "terminal_failure"
@@ -85067,6 +85425,7 @@
                           "policy_changed",
                           "unsupported_offline_command",
                           "ambiguous_payment_requires_query",
+                          "payment_unresolved",
                           "server_validation_failed",
                           "reconciliation_required",
                           "terminal_failure"
@@ -85920,6 +86279,7 @@
                 "policy_changed",
                 "unsupported_offline_command",
                 "ambiguous_payment_requires_query",
+                "payment_unresolved",
                 "server_validation_failed",
                 "reconciliation_required",
                 "terminal_failure"
@@ -85980,6 +86340,7 @@
             "policy_changed",
             "unsupported_offline_command",
             "ambiguous_payment_requires_query",
+            "payment_unresolved",
             "server_validation_failed",
             "reconciliation_required",
             "terminal_failure"
@@ -86120,6 +86481,7 @@
                     "policy_changed",
                     "unsupported_offline_command",
                     "ambiguous_payment_requires_query",
+                    "payment_unresolved",
                     "server_validation_failed",
                     "reconciliation_required",
                     "terminal_failure"
@@ -88526,6 +88888,7 @@
                 "policy_changed",
                 "unsupported_offline_command",
                 "ambiguous_payment_requires_query",
+                "payment_unresolved",
                 "server_validation_failed",
                 "reconciliation_required",
                 "terminal_failure"
@@ -90579,6 +90942,32 @@
                   "operatorSessionId": {
                     "format": "uuid",
                     "type": "string"
+                  },
+                  "originChannel": {
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "whatsapp",
+                          "web",
+                          "aggregator"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "originOrderId": {
+                    "anyOf": [
+                      {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "status": {
                     "enum": [
@@ -93232,6 +93621,32 @@
             "operatorSessionId": {
               "format": "uuid",
               "type": "string"
+            },
+            "originChannel": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "whatsapp",
+                    "web",
+                    "aggregator"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "originOrderId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "status": {
               "enum": [
@@ -107197,6 +107612,26 @@
       "public": true,
       "retryable": false
     },
+    "CART_ORIGIN_ALREADY_FIRED": {
+      "public": true,
+      "retryable": false
+    },
+    "CART_ORIGIN_CART_NOT_EMPTY": {
+      "public": true,
+      "retryable": false
+    },
+    "CART_ORIGIN_LOCKED": {
+      "public": true,
+      "retryable": false
+    },
+    "CART_ORIGIN_MISMATCH": {
+      "public": true,
+      "retryable": false
+    },
+    "CART_ORIGIN_NOT_OPEN": {
+      "public": true,
+      "retryable": false
+    },
     "CART_PAYMENT_UNRESOLVED": {
       "public": true,
       "retryable": false
@@ -107590,6 +108025,10 @@
       "retryable": false
     },
     "NEGATIVE_STOCK_BLOCKED": {
+      "public": true,
+      "retryable": false
+    },
+    "OFFLINE_ORIGIN_BOUND_BLOCKED": {
       "public": true,
       "retryable": false
     },
@@ -108681,6 +109120,22 @@
       "pin": false,
       "request": "CartQuery",
       "response": "PosIncomingOrders"
+    },
+    "GET /api/v1/pos/merchants/:merchantId/cart/incoming-orders/:orderId": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "cart.write",
+      "pin": false,
+      "request": "CartQuery",
+      "response": "PosIncomingOrderDetail"
     },
     "GET /api/v1/pos/merchants/:merchantId/cart/open-accounts": {
       "approval": false,

@@ -1,6 +1,7 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect } from '@playwright/test';
+import { mkdtemp } from 'node:fs/promises';
 const merchantId = '11111111-1111-4111-8111-111111111111';
 const locationId = '22222222-2222-4222-8222-222222222222';
 const itemId = '33333333-3333-4333-8333-333333333333';
@@ -143,7 +144,17 @@ export async function openEditor(page, baseURL, create = false) {
   return dialog;
 }
 
-export async function replacementRecovery(page, baseURL, reload = false) {
+async function saveEvidence(page, filename, evidencePath) {
+  const path =
+    evidencePath ?? join(await mkdtemp(join(tmpdir(), 'umi-recipe-sales-recovery-')), filename);
+  await page.screenshot({ path });
+}
+
+// The third argument is a reload flag for #278 coverage, or an evidence path for
+// the portable browser run. Accept both so neither caller loses its behavior.
+export async function replacementRecovery(page, baseURL, third = false, evidencePath) {
+  const reload = third === true;
+  const evidence = typeof third === 'string' ? third : evidencePath;
   const writes = await prepare(page, 'replacement');
   let dialog = await openEditor(page, baseURL, true);
   await dialog.getByRole('button', { name: 'Guardar', exact: true }).click();
@@ -153,7 +164,7 @@ export async function replacementRecovery(page, baseURL, reload = false) {
   ).toBeDisabled();
   await expect(dialog.getByRole('button', { name: 'Guardar', exact: true })).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Cerrar', exact: true })).toBeDisabled();
-  await page.screenshot({ path: join(tmpdir(), 'umi-inventory-phase2-task2-retry-503.png') });
+  await saveEvidence(page, 'umi-inventory-phase2-task2-retry-503.png', evidence);
   if (reload) {
     await page.reload();
     dialog = page.getByRole('dialog');
@@ -170,7 +181,7 @@ export async function replacementRecovery(page, baseURL, reload = false) {
   expect(writes[2]).toEqual(writes[1]);
 }
 
-export async function staleRecovery(page, baseURL) {
+export async function staleRecovery(page, baseURL, evidencePath) {
   const writes = await prepare(page, 'stale');
   let dialog = await openEditor(page, baseURL);
   await dialog.getByRole('button', { name: 'Guardar', exact: true }).click();
@@ -180,7 +191,7 @@ export async function staleRecovery(page, baseURL) {
       { exact: true },
     ),
   ).toBeVisible();
-  await page.screenshot({ path: join(tmpdir(), 'umi-inventory-phase2-task2-stale-reload.png') });
+  await saveEvidence(page, 'umi-inventory-phase2-task2-stale-reload.png', evidencePath);
   await dialog.getByRole('button', { name: 'Recargar', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await page.getByRole('button', { name: 'Editar Pan de recuperación', exact: true }).click();
@@ -190,7 +201,7 @@ export async function staleRecovery(page, baseURL) {
   expect(writes[1].targetVersion).toBe(4);
 }
 
-export async function translatedError(page, baseURL) {
+export async function translatedError(page, baseURL, evidencePath) {
   await prepare(page, 'permission');
   const dialog = await openEditor(page, baseURL);
   await dialog.getByRole('button', { name: 'Guardar', exact: true }).click();
@@ -198,9 +209,7 @@ export async function translatedError(page, baseURL) {
     dialog.getByText('No tienes permiso para administrar el inventario.', { exact: true }),
   ).toBeVisible();
   await expect(dialog.getByText('Raw service error', { exact: true })).toHaveCount(0);
-  await page.screenshot({
-    path: join(tmpdir(), 'umi-inventory-phase2-task2-translated-error.png'),
-  });
+  await saveEvidence(page, 'umi-inventory-phase2-task2-translated-error.png', evidencePath);
   await expect(
     dialog.getByRole('textbox', { name: 'Cantidad del ingrediente 1', exact: true }),
   ).toBeEnabled();

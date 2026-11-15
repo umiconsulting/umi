@@ -204,7 +204,7 @@ test('guarda una receta convertida con su unidad, factores y cantidad física', 
   await page.goto(`${baseURL}/inventory/recetas`);
   await page.getByRole('button', { name: 'Editar Pan de prueba' }).click();
   const dialog = page.getByRole('dialog', { name: 'Editar receta' });
-  await expect(dialog.getByRole('textbox', { name: 'Cantidad del componente 1' })).toHaveValue(
+  await expect(dialog.getByRole('textbox', { name: 'Cantidad del ingrediente 1' })).toHaveValue(
     '1.25',
   );
   await expect(dialog.getByText('kg', { exact: true })).toBeVisible();

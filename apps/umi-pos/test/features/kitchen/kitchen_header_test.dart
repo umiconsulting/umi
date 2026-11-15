@@ -47,6 +47,10 @@ void main() {
         ),
       ],
     );
+    if (find.byTooltip('Filtros de cocina').evaluate().isNotEmpty) {
+      await tester.tap(find.byTooltip('Filtros de cocina'));
+      await tester.pump();
+    }
     final filters = find.byKey(const ValueKey('kitchen-filters'));
     Finder control(String label) => find
         .ancestor(
@@ -102,6 +106,10 @@ void main() {
           ),
       ],
     );
+    if (find.byTooltip('Filtros de cocina').evaluate().isNotEmpty) {
+      await tester.tap(find.byTooltip('Filtros de cocina'));
+      await tester.pump();
+    }
     final filters = find.byKey(const ValueKey('kitchen-filters'));
     Finder control(Finder text) => find
         .ancestor(
@@ -147,6 +155,9 @@ void main() {
 
     expect(find.text('Latte'), findsOneWidget);
     expect(find.text('Pizza'), findsNothing);
+    expect(find.byKey(const ValueKey('kitchen-filters')), findsNothing);
+    await tester.tap(find.byTooltip('Filtros de cocina'));
+    await tester.pump();
     expect(find.byKey(const ValueKey('kitchen-filters')), findsOneWidget);
     expect(find.byKey(const ValueKey('kitchen-view-select')), findsNothing);
     expect(find.text('Preparación'), findsNothing);

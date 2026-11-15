@@ -8,7 +8,6 @@ import '../../core/security/operator_permissions.dart';
 import '../../core/theme/display_preferences.dart';
 import '../../core/theme/umi_theme.dart';
 import '../../shared/widgets/connectivity_label.dart';
-import '../../shared/widgets/station_document.dart';
 import '../entry/entry_controller.dart';
 import '../offline/connectivity_controller.dart';
 import 'kitchen_alerts.dart';
@@ -90,6 +89,8 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
   String _dayFilter = 'today';
   bool get _muted => _preferences?.kitchenSoundsMuted ?? _localMuted;
   String? _stationFilter;
+  bool _filtersExpanded = false;
+  bool _showReady = true;
 
   @override
   void initState() {
@@ -232,13 +233,54 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
     final l10n = AppLocalizations.of(context);
     final state = widget.controller.state;
     final orders = state.orders;
+    final es = l10n.localeName.startsWith('es');
+    // Normalize the saved station before deriving the visible heading as well as the rail.
+    final knownStationIds = {
+      ...state.stations.map((station) => station.id),
+      ..._stationsIn(orders).map((station) => station.id),
+    };
+    if (_stationFilter != null &&
+        knownStationIds.isNotEmpty &&
+        !knownStationIds.contains(_stationFilter)) {
+      _stationFilter = null;
+    }
+    final stationName = _stationFilter == null
+        ? (es ? 'Cocina' : 'Kitchen')
+        : state.stations
+                  .where((station) => station.id == _stationFilter)
+                  .map((station) => station.name)
+                  .firstOrNull ??
+              _stationsIn(orders)
+                  .where((station) => station.id == _stationFilter)
+                  .map((station) => station.name)
+                  .firstOrNull ??
+              _screenStationName ??
+              (es ? 'Cocina' : 'Kitchen');
     return PosPage(
       appBar: PosHeader(
         key: const ValueKey('kitchen-toolbar'),
         automaticallyImplyLeading: false,
         toolbarHeight: 56,
         titleSpacing: 12,
-        title: StationHeading(title: l10n.kitchenBoardTitle),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              es ? 'Preparación de pedidos' : 'Order preparation',
+              style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+                color: PosTheme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            Text(
+              stationName,
+              style: PosTheme.of(context).textTheme.headlineSmall?.copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
         actions: [
           PosIconButton(
             onPressed: _toggleSounds,
@@ -285,24 +327,7 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
             ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (_canReadKitchen)
-              Align(
-                alignment: Alignment.centerRight,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: UmiSpacing.md,
-                    vertical: UmiSpacing.xs,
-                  ),
-                  child: _unassignedButton(l10n),
-                ),
-              ),
-            Expanded(child: _ticketRail(context, l10n, state, orders)),
-          ],
-        ),
-      ),
+      body: SafeArea(child: _ticketRail(context, l10n, state, orders)),
     );
   }
 
@@ -402,6 +427,9 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
                   .where((order) => order.businessDate == businessDate)
                   .toList(),
     };
+    final readyCount = visible
+        .where((order) => kitchenStationStatus(order) == 'ready')
+        .length;
     final visibleCount = visible.length + unassignedVisible.length;
     final todayCount =
         today.length +
@@ -433,65 +461,125 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Padding(
-                    key: const ValueKey('kitchen-filters'),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    child: Wrap(
-                      alignment: WrapAlignment.start,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 16,
-                      runSpacing: 6,
-                      children: [
-                        if (chipStations.length > 1 || _stationFilter != null)
-                          _stationChips(context, l10n, chipStations),
-                        if (businessDate != null)
-                          Wrap(
-                            spacing: UmiSpacing.sm,
-                            runSpacing: 6,
-                            children: [
-                              for (final choice in [
-                                (
-                                  id: 'today',
-                                  label: spanish ? 'Hoy' : 'Today',
-                                  count: todayCount,
-                                ),
-                                (
-                                  id: 'previous',
-                                  label: spanish ? 'Anteriores' : 'Previous',
-                                  count: previousCount,
-                                ),
-                                (
-                                  id: 'all',
-                                  label: spanish ? 'Todos' : 'All',
-                                  count: allCount,
-                                ),
-                              ])
-                                PosTooltip(
-                                  message:
-                                      choice.id == 'previous' &&
-                                          previous.isNotEmpty
-                                      ? (spanish
-                                            ? '${previous.length} pendientes de jornadas anteriores. Revisa Anteriores.'
-                                            : '${previous.length} pending from previous business days. Review Previous.')
-                                      : choice.label,
-                                  child: _StationChip(
-                                    label: '${choice.label} (${choice.count})',
-                                    widthLabel:
-                                        '${choice.label} (${'8' * orders.length.toString().length})',
-                                    icon: choice.id == 'previous'
-                                        ? PosGlyphs.history
-                                        : null,
-                                    selected: _dayFilter == choice.id,
-                                    onTap: () =>
-                                        setState(() => _dayFilter = choice.id),
+                  if (MediaQuery.sizeOf(context).width < 700)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16, right: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              spanish
+                                  ? 'Comandas de cocina'
+                                  : 'Kitchen tickets',
+                              style: PosTheme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: PosTheme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
-                                ),
-                            ],
+                            ),
                           ),
-                      ],
+                          PosIconButton(
+                            tooltip: spanish
+                                ? 'Filtros de cocina'
+                                : 'Kitchen filters',
+                            onPressed: () => setState(
+                              () => _filtersExpanded = !_filtersExpanded,
+                            ),
+                            icon: const PosIcon(PosGlyphs.tune, size: 20),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (MediaQuery.sizeOf(context).width >= 700 ||
+                      _filtersExpanded)
+                    Padding(
+                      key: const ValueKey('kitchen-filters'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      child: Wrap(
+                        alignment: WrapAlignment.start,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 16,
+                        runSpacing: 6,
+                        children: [
+                          if (_canReadKitchen) _unassignedButton(l10n),
+                          if (chipStations.length > 1 || _stationFilter != null)
+                            _stationChips(context, l10n, chipStations),
+                          if (businessDate != null)
+                            Wrap(
+                              spacing: UmiSpacing.sm,
+                              runSpacing: 6,
+                              children: [
+                                for (final choice in [
+                                  (
+                                    id: 'today',
+                                    label: spanish ? 'Hoy' : 'Today',
+                                    count: todayCount,
+                                  ),
+                                  (
+                                    id: 'previous',
+                                    label: spanish ? 'Anteriores' : 'Previous',
+                                    count: previousCount,
+                                  ),
+                                  (
+                                    id: 'all',
+                                    label: spanish ? 'Todos' : 'All',
+                                    count: allCount,
+                                  ),
+                                ])
+                                  PosTooltip(
+                                    message:
+                                        choice.id == 'previous' &&
+                                            previous.isNotEmpty
+                                        ? (spanish
+                                              ? '${previous.length} pendientes de jornadas anteriores. Revisa Anteriores.'
+                                              : '${previous.length} pending from previous business days. Review Previous.')
+                                        : choice.label,
+                                    child: _StationChip(
+                                      label:
+                                          '${choice.label} (${choice.count})',
+                                      widthLabel:
+                                          '${choice.label} (${'8' * orders.length.toString().length})',
+                                      icon: choice.id == 'previous'
+                                          ? PosGlyphs.history
+                                          : null,
+                                      selected: _dayFilter == choice.id,
+                                      onTap: () => setState(
+                                        () => _dayFilter = choice.id,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: PosTextButton.icon(
+                        key: const ValueKey('kitchen-ready-visibility'),
+                        onPressed: () =>
+                            setState(() => _showReady = !_showReady),
+                        icon: PosIcon(
+                          _showReady
+                              ? PosGlyphs.visibilityOffOutlined
+                              : PosGlyphs.visibilityOutlined,
+                          size: 18,
+                        ),
+                        label: Text(
+                          spanish
+                              ? '${_showReady ? 'Ocultar' : 'Mostrar'} listos ($readyCount)'
+                              : '${_showReady ? 'Hide' : 'Show'} ready ($readyCount)',
+                        ),
+                      ),
                     ),
                   ),
                   if (state.errorCode != null)
@@ -534,63 +622,155 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
                   ],
                 ),
               ),
-              _ => LayoutBuilder(
-                builder: (context, constraints) => SingleChildScrollView(
-                  padding: const EdgeInsets.all(UmiSpacing.md),
-                  child: Wrap(
-                    spacing: UmiSpacing.md,
-                    runSpacing: UmiSpacing.md,
-                    children: [
-                      for (final order in visible)
-                        _TicketCard(
-                          now: widget.clock(),
-                          currentBusinessDate: businessDate,
-                          permissions: OperatorPermissions(
-                            widget.entry.state.operator?.permissions ??
-                                const [],
-                          ),
-                          width:
-                              (320 * MediaQuery.textScalerOf(context).scale(1))
-                                  .clamp(
-                                    0.0,
-                                    (constraints.maxWidth - 2 * UmiSpacing.md)
-                                        .clamp(0.0, double.infinity),
-                                  )
-                                  .toDouble(),
-                          order: order,
-                          l10n: l10n,
-                          allDayFor: state.allDayFor,
-                          onItemTap: (itemId) =>
-                              widget.controller.markItemReady(order, itemId),
-                          onFire: (courseNumber) => widget.controller
-                              .fireCourse(order, courseNumber: courseNumber),
-                          onStart: () =>
-                              widget.controller.startPreparation(order),
-                          onComplete: () => widget.controller.complete(order),
-                          onDiscard: () => widget.controller.discard(order),
-                          onRecall: () => _recall(order),
-                        ),
-                      for (final order in unassignedVisible)
-                        _UnassignedTicketCard(
-                          width:
-                              (320 * MediaQuery.textScalerOf(context).scale(1))
-                                  .clamp(
-                                    0.0,
-                                    (constraints.maxWidth - 2 * UmiSpacing.md)
-                                        .clamp(0.0, double.infinity),
-                                  )
-                                  .toDouble(),
-                          order: order,
-                          onOpen: _openUnassigned,
-                        ),
-                    ],
-                  ),
-                ),
+              _ => _stateLanes(
+                context,
+                l10n,
+                state,
+                visible,
+                unassignedVisible,
               ),
             },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _stateLanes(
+    BuildContext context,
+    AppLocalizations l10n,
+    KitchenBoardState state,
+    List<KitchenOrderProjection> orders,
+    List<KitchenUnassignedOrderProjection> unassigned,
+  ) {
+    final es = l10n.localeName.startsWith('es');
+    final palette = PosTheme.of(context).colorScheme;
+    final queued = <KitchenOrderProjection>[];
+    final preparing = <KitchenOrderProjection>[];
+    final ready = <KitchenOrderProjection>[];
+    for (final order in orders) {
+      switch (kitchenStationStatus(order)) {
+        case 'ready':
+          ready.add(order);
+        case 'in_preparation' || 'partially_ready':
+          preparing.add(order);
+        default:
+          queued.add(order);
+      }
+    }
+    Widget ticket(KitchenOrderProjection order, double width) => _TicketCard(
+      now: widget.clock(),
+      currentBusinessDate: state.businessDate,
+      permissions: OperatorPermissions(
+        widget.entry.state.operator?.permissions ?? const [],
+      ),
+      width: width,
+      order: order,
+      l10n: l10n,
+      allDayFor: state.allDayFor,
+      onItemTap: (itemId) => widget.controller.markItemReady(order, itemId),
+      onFire: (courseNumber) =>
+          widget.controller.fireCourse(order, courseNumber: courseNumber),
+      onStart: () => widget.controller.startPreparation(order),
+      onComplete: () => widget.controller.complete(order),
+      onDiscard: () => widget.controller.discard(order),
+      onRecall: () => _recall(order),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 16.0;
+        final laneCount = _showReady ? 3 : 2;
+        final horizontal =
+            constraints.maxWidth >=
+            800 * MediaQuery.textScalerOf(context).scale(1);
+        final width = horizontal
+            ? (constraints.maxWidth - 32 - gap * (laneCount - 1)) / laneCount
+            : constraints.maxWidth - 32;
+        Widget lane(
+          String id,
+          String label,
+          List<KitchenOrderProjection> items, {
+          bool withUnassigned = false,
+        }) => Container(
+          key: ValueKey('kitchen-lane-$id'),
+          width: width,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: palette.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: PosTheme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    Text(
+                      '${items.length + (withUnassigned ? unassigned.length : 0)}',
+                      style: PosTheme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              for (final order in items) ...[
+                ticket(order, width - 24),
+                const SizedBox(height: 12),
+              ],
+              if (withUnassigned)
+                for (final order in unassigned) ...[
+                  _UnassignedTicketCard(
+                    width: width - 24,
+                    order: order,
+                    onOpen: _openUnassigned,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+            ],
+          ),
+        );
+        final lanes = [
+          lane(
+            'queued',
+            es ? 'Recibidos' : 'Received',
+            queued,
+            withUnassigned: true,
+          ),
+          lane(
+            'preparing',
+            es ? 'En preparación' : 'In preparation',
+            preparing,
+          ),
+          if (_showReady) lane('ready', es ? 'Listos' : 'Ready', ready),
+        ];
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: horizontal
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var index = 0; index < lanes.length; index++) ...[
+                      if (index > 0) const SizedBox(width: gap),
+                      lanes[index],
+                    ],
+                  ],
+                )
+              : Column(
+                  children: [
+                    for (var index = 0; index < lanes.length; index++) ...[
+                      if (index > 0) const SizedBox(height: gap),
+                      lanes[index],
+                    ],
+                  ],
+                ),
+        );
+      },
     );
   }
 
@@ -954,11 +1134,11 @@ final class _TicketCard extends StatelessWidget {
             label: l10n.kitchenStatusReady,
           ),
           'partially_ready' => (
-            color: const Color(0xFF2E7DFF),
+            color: scheme.primary,
             label: l10n.kitchenStatusPartiallyReady,
           ),
           'in_preparation' => (
-            color: const Color(0xFF2E7DFF),
+            color: scheme.primary,
             label: l10n.kitchenStatusInPreparation,
           ),
           'exception' => (
@@ -969,7 +1149,12 @@ final class _TicketCard extends StatelessWidget {
             color: scheme.error,
             label: l10n.kitchenStatusCancelled,
           ),
-          _ => (color: scheme.outline, label: l10n.kitchenStatusQueued),
+          _ => (
+            color: scheme.dark
+                ? const Color(0xFFE8B66C)
+                : const Color(0xFF8A570F),
+            label: l10n.kitchenStatusQueued,
+          ),
         };
 
   String _elapsed() {
@@ -1003,13 +1188,26 @@ final class _TicketCard extends StatelessWidget {
     return SizedBox(
       width: width,
       child: PosSurface(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
+        color: scheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: urgent || high || kitchenOrderOverdue(order, now)
+                ? accent
+                : scheme.outlineVariant,
+          ),
+        ),
+        borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(height: 4, color: accent),
+            if (kitchenStationStatus(order) == 'in_preparation')
+              Container(
+                key: const ValueKey('kitchen-active-ticket-accent'),
+                height: 3,
+                color: accent,
+              ),
             Padding(
               padding: const EdgeInsets.all(UmiSpacing.md),
               child: Column(
@@ -1019,14 +1217,20 @@ final class _TicketCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          currentBusinessDate != null &&
-                                  order.businessDate != currentBusinessDate
-                              ? '${order.publicReference} · ${order.businessDate}'
-                              : order.publicReference,
-                          style: PosTheme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                          order.stationName ??
+                              (l10n.localeName.startsWith('es')
+                                  ? 'Cocina'
+                                  : 'Kitchen'),
+                          style: PosTheme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                       ),
+                      PosIcon(
+                        PosGlyphs.schedule,
+                        size: 14,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
                       Text(
                         _elapsed(),
                         style: PosTheme.of(context).textTheme.bodySmall
@@ -1034,32 +1238,43 @@ final class _TicketCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: UmiSpacing.sm,
-                    runSpacing: UmiSpacing.xs,
-                    children: [
-                      KitchenFulfillmentBadge(
-                        fulfillmentType: order.fulfillmentType,
-                      ),
-                      // Which station owes this ticket. A till is handed one card per
-                      // station for the same cuenta, so without the name two cards are
-                      // the same card; a station device has one, where the label is a
-                      // caption rather than the only way to tell them apart.
-                      if ((order.stationName ?? '').isNotEmpty)
-                        _Pill(color: scheme.primary, label: order.stationName!),
-                      _Pill(color: status.color, label: status.label),
-                      if (urgent || high) ...[
-                        _Pill(
-                          color: accent,
-                          label: urgent
-                              ? l10n.kitchenPriorityUrgent
-                              : l10n.kitchenPriorityHigh,
-                        ),
-                      ],
-                    ],
+                  const SizedBox(height: 16),
+                  Text(
+                    currentBusinessDate != null &&
+                            order.businessDate != currentBusinessDate
+                        ? '${order.publicReference} · ${order.businessDate}'
+                        : order.publicReference,
+                    style: PosTheme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  const PosDivider(height: UmiSpacing.lg),
+                  const SizedBox(height: 12),
+                  KitchenFulfillmentBadge(
+                    fulfillmentType: order.fulfillmentType,
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: status.color.withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      [
+                        status.label,
+                        if (urgent) l10n.kitchenPriorityUrgent,
+                        if (high) l10n.kitchenPriorityHigh,
+                      ].join(' · '),
+                      style: PosTheme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: status.color),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   if (kitchenStationStatus(order) != order.status)
                     Text(
                       '${l10n.localeName.startsWith('es') ? 'Pedido completo' : 'Whole order'}: ${switch (order.status) {
@@ -1079,6 +1294,10 @@ final class _TicketCard extends StatelessWidget {
                           order.status != 'cancelled' &&
                           permissions.allows('kitchen.ready'),
                       group: groups[index],
+                      showHeading:
+                          groups.length > 1 ||
+                          groups[index].courseNumber != 1 ||
+                          groups[index].held.isNotEmpty,
                       l10n: l10n,
                       allDayFor: allDayFor,
                       onItemTap: onItemTap,
@@ -1127,6 +1346,7 @@ final class _TicketCard extends StatelessWidget {
 final class _CourseBlock extends StatelessWidget {
   const _CourseBlock({
     required this.group,
+    required this.showHeading,
     required this.canMarkReady,
     required this.l10n,
     required this.allDayFor,
@@ -1134,6 +1354,7 @@ final class _CourseBlock extends StatelessWidget {
   });
 
   final KitchenCourseGroup group;
+  final bool showHeading;
   final bool canMarkReady;
   final AppLocalizations l10n;
   final KitchenAllDayItem? Function(KitchenOrderItem item) allDayFor;
@@ -1145,13 +1366,14 @@ final class _CourseBlock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          l10n.kitchenCourseGroup(group.courseNumber),
-          style: PosTheme.of(context).textTheme.labelLarge?.copyWith(
-            color: scheme.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
+        if (showHeading)
+          Text(
+            l10n.kitchenCourseGroup(group.courseNumber),
+            style: PosTheme.of(context).textTheme.labelLarge?.copyWith(
+              color: scheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
         const SizedBox(height: UmiSpacing.xs),
         for (final item in group.fired)
           _ItemRow(
@@ -1343,11 +1565,26 @@ final class _ItemRow extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '${item.quantity}×',
-                  style: PosTheme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    decoration: voided ? TextDecoration.lineThrough : null,
+                Container(
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: scheme.outlineVariant),
+                  ),
+                  child: Text(
+                    '${item.quantity}',
+                    textAlign: TextAlign.center,
+                    style: PosTheme.of(context).textTheme.titleSmall?.copyWith(
+                      decoration: voided ? TextDecoration.lineThrough : null,
+                    ),
                   ),
                 ),
                 const SizedBox(width: UmiSpacing.sm),

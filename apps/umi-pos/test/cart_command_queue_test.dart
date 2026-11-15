@@ -105,6 +105,13 @@ const _provisionalB = ProvisionalLine(
 );
 
 final class _QueuedRepository implements CartRepository {
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => throw UnimplementedError('incomingOrder');
+
   final IntList expectedVersions = IntList();
   final List<Completer<Cart>> requests = [];
   Object? addFailure;

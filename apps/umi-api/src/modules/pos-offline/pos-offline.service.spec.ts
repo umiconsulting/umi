@@ -695,6 +695,74 @@ describe('PosOfflineService', () => {
     expect(result.results[0].status).toBe('accepted');
   });
 
+  it('keeps a partial-payment refusal as a financial hold', async () => {
+    const replay = vi.fn(async (value: OfflineCommand) => ({
+      commandId: value.commandId,
+      deviceSequence: value.deviceSequence,
+      status: 'accepted' as const,
+      officialId: uid(80),
+      officialCommit: null,
+      serverConflictReference: null,
+      failure: null,
+    }));
+    const orderCart = {
+      readAccount: vi.fn(async () => ({ id: uid(80), version: 3 })),
+      add: vi.fn(async () => {
+        throw new ConflictException({ code: 'CART_PAYMENT_UNRESOLVED' });
+      }),
+    } as unknown as PosCartService;
+    const recordStreamConflict = vi.fn(async (value: OfflineCommand, classification: string) => ({
+      commandId: value.commandId,
+      deviceSequence: value.deviceSequence,
+      status: 'conflict' as const,
+      officialId: null,
+      officialCommit: null,
+      serverConflictReference: uid(95),
+      failure: {
+        classification,
+        retryable: false,
+        blocksFollowing: false,
+        operatorActionRequired: true,
+        managerActionRequired: false,
+        guidanceCode: 'cart_payment_unresolved',
+        correlationId: value.commandId,
+      },
+    }));
+    const repo = {
+      acquireReplayLock: vi.fn(async () => async () => undefined),
+      context: vi.fn(async () => ({
+        lifecycle: 'active',
+        credentialVersion: 1,
+        permissions: ['offline.replay', 'cart.write'],
+        lastAcceptedSequence: 1,
+      })),
+      policy: vi.fn(async () => null),
+      provisionalCartId: vi.fn(async () => uid(80)),
+      replay,
+      recordStreamConflict,
+    } as unknown as PosOfflineRepository;
+
+    const result = await new PosOfflineService(repo, checkout, orderCart, kds).batch(user, uid(4), {
+      replaySessionId: uid(9),
+      commands: [lineAddCommand(2)],
+    });
+
+    expect(result.results[0]).toMatchObject({
+      status: 'conflict',
+      failure: {
+        classification: 'payment_unresolved',
+        retryable: false,
+        guidanceCode: 'cart_payment_unresolved',
+      },
+    });
+    expect(recordStreamConflict).toHaveBeenCalledWith(
+      expect.anything(),
+      'payment_unresolved',
+      expect.any(String),
+      'cart_payment_unresolved',
+    );
+  });
+
   it('refuses a command group with more than one effect without applying it', async () => {
     const group = commandGroup(1);
     const twoEffects = {

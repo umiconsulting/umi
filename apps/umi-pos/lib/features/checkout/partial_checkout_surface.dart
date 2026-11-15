@@ -8,6 +8,23 @@ import '../../core/theme/umi_theme.dart';
 import '../cart/cart_controller.dart';
 import '../cash/money_input.dart';
 import 'checkout_controller.dart';
+import 'payment_account_line.dart';
+import 'payment_method_tile.dart';
+
+// Catalog nests a page for the order header inside its navigation shell.
+// Walk through header-only pages to find the actual permitted navigation.
+PosNavigation? checkoutNavigationOf(BuildContext context) {
+  PosNavigation? navigation;
+  context.visitAncestorElements((element) {
+    final page = element.widget;
+    if (page is PosPage && page.bottomNavigationBar is PosNavigation) {
+      navigation = page.bottomNavigationBar! as PosNavigation;
+      return false;
+    }
+    return true;
+  });
+  return navigation;
+}
 
 Future<void> showPartialCheckout(
   BuildContext context, {
@@ -15,26 +32,34 @@ Future<void> showPartialCheckout(
   required CartController cart,
   required String operatorSessionId,
   String? operatorName,
+  String? merchantLabel,
+  Widget? headerAction,
   required bool canConfirmManualTerminal,
   required String? cashShiftId,
   Future<void> Function()? prepare,
   required Future<bool?> Function(int amountMinor, bool selected)
   onShowBankTransferDetails,
-}) => Navigator.of(context).push(
-  PosPageRoute<void>(
-    fullscreenDialog: true,
-    builder: (_) => PartialCheckoutSurface(
-      checkout: checkout,
-      cart: cart,
-      operatorSessionId: operatorSessionId,
-      operatorName: operatorName,
-      canConfirmManualTerminal: canConfirmManualTerminal,
-      cashShiftId: cashShiftId,
-      prepare: prepare,
-      onShowBankTransferDetails: onShowBankTransferDetails,
+}) {
+  final navigation = checkoutNavigationOf(context);
+  return Navigator.of(context).push(
+    PosPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => PartialCheckoutSurface(
+        checkout: checkout,
+        cart: cart,
+        operatorSessionId: operatorSessionId,
+        operatorName: operatorName,
+        merchantLabel: merchantLabel,
+        navigation: navigation,
+        headerAction: headerAction,
+        canConfirmManualTerminal: canConfirmManualTerminal,
+        cashShiftId: cashShiftId,
+        prepare: prepare,
+        onShowBankTransferDetails: onShowBankTransferDetails,
+      ),
     ),
-  ),
-);
+  );
+}
 
 /// Each press records one payment on the server. The server's ledger supplies
 /// both the balance and the exact drafts used when the account is closed.
@@ -44,6 +69,9 @@ final class PartialCheckoutSurface extends StatefulWidget {
     required this.cart,
     required this.operatorSessionId,
     this.operatorName,
+    this.merchantLabel,
+    this.navigation,
+    this.headerAction,
     required this.canConfirmManualTerminal,
     required this.cashShiftId,
     this.prepare,
@@ -55,6 +83,9 @@ final class PartialCheckoutSurface extends StatefulWidget {
   final CartController cart;
   final String operatorSessionId;
   final String? operatorName;
+  final String? merchantLabel;
+  final PosNavigation? navigation;
+  final Widget? headerAction;
   final bool canConfirmManualTerminal;
   final String? cashShiftId;
   final Future<void> Function()? prepare;
@@ -748,427 +779,752 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
   @override
   Widget build(BuildContext context) {
     final theme = PosTheme.of(context);
-    final blocked = hasUnknown || uncertain || finalizationUnknown;
     return PosPage(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(UmiSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      appBar: widget.merchantLabel == null
+          ? null
+          : PosHeader(
+              actionsInline: true,
+              automaticallyImplyLeading: false,
+              toolbarHeight: 56,
+              title: Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          label('Cobro dividido', 'Split payment'),
-                          style: theme.textTheme.headlineSmall,
-                        ),
+                  if (widget.navigation == null ||
+                      MediaQuery.sizeOf(context).width < 700) ...[
+                    Text(
+                      'umi',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontSize: 22,
                       ),
-                      PosTextButton(
-                        onPressed: busy ? null : _refresh,
-                        child: Text(label('Actualizar', 'Refresh')),
-                      ),
-                      PosIconButton(
-                        tooltip: label('Cerrar', 'Close'),
-                        onPressed: busy
-                            ? null
-                            : () => Navigator.of(context).pop(),
-                        icon: const PosIcon(PosGlyphs.close),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    [cart.accountFolio, tableLabel]
-                        .whereType<String>()
-                        .where((value) => value.isNotEmpty)
-                        .join(' · '),
-                    key: const ValueKey('partial-account-context'),
-                    style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(width: 16),
+                  ],
+                  Expanded(
+                    child: Text(
+                      widget.merchantLabel!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
+                    ),
                   ),
                 ],
               ),
+              actions: [
+                ?widget.headerAction,
+                if (widget.operatorName != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      width: MediaQuery.sizeOf(context).width < 700 ? 80 : 160,
+                      child: PosTooltip(
+                        message: widget.operatorName!,
+                        child: Text(
+                          widget.operatorName!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(
-                  UmiSpacing.lg,
-                  0,
-                  UmiSpacing.lg,
-                  UmiSpacing.xl,
+      bottomNavigationBar: widget.navigation == null
+          ? null
+          : PosNavigation(
+              destinations: widget.navigation!.destinations,
+              selectedIndex: widget.navigation!.selectedIndex,
+            ),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+            final wide = constraints.maxWidth >= 680 * scale;
+            final narrowPanes = constraints.maxWidth < 1000;
+            _compactPhone = !wide && constraints.maxWidth < 700 && scale < 1.5;
+            _methodBankVertical =
+                wide &&
+                constraints.maxWidth >= 680 * scale &&
+                MediaQuery.textScalerOf(context).scale(16) < 24 &&
+                ledger != null &&
+                !canFinalize &&
+                !hasUnknown &&
+                !uncertain &&
+                !finalizationUnknown;
+            final editor = Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    _compactPhone ? 4 : 12,
+                    16,
+                    0,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: PosTextButton(
+                          compact: _compactPhone,
+                          style: _compactPhone
+                              ? _compactTextButtonStyle()
+                              : null,
+                          onPressed: busy
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                          child: Text(
+                            label('Volver a la cuenta', 'Back to account'),
+                          ),
+                        ),
+                      ),
+                      PosTextButton(
+                        compact: _compactPhone,
+                        style: _compactPhone ? _compactTextButtonStyle() : null,
+                        onPressed: busy ? null : _refresh,
+                        child: Text(label('Actualizar', 'Refresh')),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 900),
+                Expanded(
+                  child: SingleChildScrollView(
+                    key: const ValueKey('partial-payment-editor'),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (ledger == null && busy)
-                          const Center(child: PosSpinner()),
-                        if (error != null) ...[
-                          _notice(error!),
-                          const SizedBox(height: UmiSpacing.md),
-                        ],
-                        if (ledger != null) ...[
-                          Wrap(
-                            spacing: UmiSpacing.md,
-                            runSpacing: UmiSpacing.md,
-                            children: [
-                              _BalanceTile(
-                                label: label('Total consumo', 'Order total'),
-                                value: money(due),
-                              ),
-                              _BalanceTile(
-                                label: label('Pagado', 'Paid'),
-                                value: money(paid),
-                              ),
-                              _BalanceTile(
-                                label: label(
-                                  'Consumo de esta persona',
-                                  'This portion',
-                                ),
-                                value: money(principalMinor ?? 0),
-                              ),
-                              _BalanceTile(
-                                label: label('Propina de este pago', 'Tip'),
-                                value: money(tipMinor ?? 0),
-                              ),
-                              _BalanceTile(
-                                label: label('Cobrar ahora', 'Charge now'),
-                                value: money(charge),
-                              ),
-                              _BalanceTile(
-                                label: label('Falta', 'Remaining'),
-                                value: money(remaining),
-                                emphasized: true,
-                              ),
-                            ],
+                        if (_compactPhone)
+                          _compactAccountHeader()
+                        else ...[
+                          Text(
+                            label('Cobro dividido', 'Split payment'),
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontSize: 18,
+                            ),
                           ),
-                          if (tipsPaid > 0)
-                            Text(
-                              '${label('Propinas cobradas', 'Tips collected')}: ${money(tipsPaid)}',
-                            ),
-                          const SizedBox(height: UmiSpacing.lg),
-                          if (tenderDrafts.isNotEmpty) _history(theme),
-                          if (blocked) ...[
-                            const SizedBox(height: UmiSpacing.md),
-                            _notice(
-                              hasUnknown
-                                  ? label(
-                                      'Hay un pago sin confirmar. Consulta su estado antes de cobrar otra vez.',
-                                      'A payment is unresolved. Check its status before charging again.',
-                                    )
-                                  : finalizationUnknown
-                                  ? label(
-                                      'El cierre no está confirmado. Actualiza para consultar la cuenta.',
-                                      'The close is not confirmed. Refresh to check the account.',
-                                    )
-                                  : label(
-                                      'No sabemos si el último pago se registró. Actualiza antes de repetirlo.',
-                                      'The last payment may have been recorded. Refresh before retrying.',
-                                    ),
-                            ),
-                            if (hasUnknown && unresolvedTender != null) ...[
-                              const SizedBox(height: UmiSpacing.sm),
-                              Wrap(
-                                spacing: UmiSpacing.sm,
-                                children: [
-                                  PosButton.tonal(
-                                    key: const ValueKey('partial-unknown-paid'),
-                                    onPressed: busy
-                                        ? null
-                                        : () => _resolveUnknown(true),
-                                    child: Text(
-                                      label('Sí se cobró', 'It was paid'),
-                                    ),
-                                  ),
-                                  PosButton.tonal(
-                                    key: const ValueKey(
-                                      'partial-unknown-failed',
-                                    ),
-                                    onPressed: busy
-                                        ? null
-                                        : () => _resolveUnknown(false),
-                                    child: Text(
-                                      label('No se cobró', 'It was not paid'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                            if (uncertain && retryReady)
-                              PosTextButton(
-                                key: const ValueKey(
-                                  'partial-retry-same-payment',
-                                ),
-                                onPressed: _postPending,
-                                child: Text(
-                                  label(
-                                    'Reintentar el mismo pago',
-                                    'Retry the same payment',
-                                  ),
-                                ),
-                              ),
-                          ],
-                          if (!canFinalize && !blocked) ...[
-                            const SizedBox(height: UmiSpacing.lg),
-                            Text(
-                              label(
-                                'Cobrar a esta persona',
-                                'Charge this guest',
-                              ),
-                              style: theme.textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: UmiSpacing.sm),
-                            Wrap(
-                              spacing: UmiSpacing.sm,
-                              children: [
-                                for (final parts in [1, 2, 3, 4])
-                                  PosTextButton(
-                                    key: ValueKey('partial-equal-$parts'),
-                                    onPressed: busy
-                                        ? null
-                                        : () => setState(() {
-                                            final suggested =
-                                                (remaining / parts).ceil();
-                                            principal.text = (suggested / 100)
-                                                .toStringAsFixed(2);
-                                            if (method == 'cash') {
-                                              cashReceived.text =
-                                                  ((suggested +
-                                                              (tipMinor ?? 0)) /
-                                                          100)
-                                                      .toStringAsFixed(2);
-                                            }
-                                          }),
-                                    child: Text(
-                                      parts == 1
-                                          ? label('Todo', 'All')
-                                          : label(
-                                              'Entre $parts',
-                                              'Split $parts ways',
-                                            ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            PosField(
-                              key: const ValueKey('partial-principal'),
-                              controller: principal,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                              inputFormatters: cashAmountFormatters,
-                              decoration: PosFieldDecoration(
-                                labelText: label(
-                                  'Consumo de esta persona',
-                                  'This guest’s portion',
-                                ),
-                                errorText:
-                                    principalMinor == null ||
-                                        principalMinor! <= 0 ||
-                                        principalMinor! > remaining
-                                    ? label(
-                                        'Escribe un importe entre cero y el saldo.',
-                                        'Enter an amount up to the remaining balance.',
-                                      )
-                                    : null,
-                              ),
-                            ),
-                            const SizedBox(height: UmiSpacing.md),
-                            if (widget.checkout.policy?.tip['enabled'] ==
-                                true) ...[
-                              Text(
-                                tipOwnerLabel,
-                                key: const ValueKey('partial-tip-owner'),
-                                style: theme.textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: UmiSpacing.xs),
-                              Text(
-                                '${label('Base sugerida', 'Suggested base')} · '
-                                '${money(tipBaseMinor)} '
-                                '${label('antes de impuestos', 'before tax')}',
-                                key: const ValueKey('partial-tip-base'),
-                              ),
-                              const SizedBox(height: UmiSpacing.sm),
-                              Wrap(
-                                spacing: UmiSpacing.sm,
-                                runSpacing: UmiSpacing.sm,
-                                children: [
-                                  PosButton.tonal(
-                                    key: const ValueKey('partial-tip-zero'),
-                                    selected: _selectedTipBasisPoints == 0,
-                                    onPressed: busy
-                                        ? null
-                                        : () => _setTipForBasisPoints(0),
-                                    child: Text(label('Sin propina', 'No tip')),
-                                  ),
-                                  for (final raw
-                                      in widget
-                                                  .checkout
-                                                  .policy
-                                                  ?.tip['presetBasisPoints']
-                                              as List? ??
-                                          const [])
-                                    if (raw is num && raw.toInt() > 0)
-                                      PosButton.tonal(
-                                        key: ValueKey(
-                                          'partial-tip-bp-${raw.toInt()}',
-                                        ),
-                                        selected:
-                                            _selectedTipBasisPoints ==
-                                            raw.toInt(),
-                                        onPressed: busy
-                                            ? null
-                                            : () => _setTipForBasisPoints(
-                                                raw.toInt(),
-                                              ),
-                                        child: Text(
-                                          '${_percentageLabel(raw.toInt())} · '
-                                          '${money(tipForBasisPoints(raw.toInt()))}',
-                                        ),
-                                      ),
-                                ],
-                              ),
-                              const SizedBox(height: UmiSpacing.sm),
-                              PosField(
-                                key: const ValueKey('partial-tip'),
-                                controller: tip,
-                                readOnly:
-                                    widget
-                                        .checkout
-                                        .policy
-                                        ?.tip['customFixedEnabled'] !=
-                                    true,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                inputFormatters: cashAmountFormatters,
-                                decoration: PosFieldDecoration(
-                                  labelText: label(
-                                    'Propina de este pago',
-                                    'Tip for this payment',
-                                  ),
-                                  helperText:
-                                      widget
-                                              .checkout
-                                              .policy
-                                              ?.tip['customFixedEnabled'] ==
-                                          true
-                                      ? null
-                                      : label(
-                                          'Selecciona una opción de propina.',
-                                          'Choose a tip option.',
-                                        ),
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: UmiSpacing.md),
-                            Text(
-                              label('Método de pago', 'Payment method'),
-                              style: theme.textTheme.titleMedium,
-                            ),
-                            if (lockedMethod != null)
-                              Text(
-                                label(
-                                  'Esta cuenta continúa con el mismo método. El local no permite combinar métodos.',
-                                  'This account keeps the same method. This location does not allow mixed methods.',
-                                ),
-                              ),
-                            const SizedBox(height: UmiSpacing.sm),
-                            Wrap(
-                              spacing: UmiSpacing.sm,
-                              runSpacing: UmiSpacing.sm,
-                              children: [
-                                if (widget.cashShiftId != null &&
-                                    (lockedMethod == null ||
-                                        lockedMethod == 'cash'))
-                                  _methodButton(
-                                    'cash',
-                                    label('Efectivo', 'Cash'),
-                                  ),
-                                if (manualAllowed &&
-                                    (lockedMethod == null ||
-                                        lockedMethod == 'manual_terminal'))
-                                  _methodButton(
-                                    'manual_terminal',
-                                    label(
-                                      'Terminal externa',
-                                      'External terminal',
-                                    ),
-                                  ),
-                                if (bankAllowed &&
-                                    (lockedMethod == null ||
-                                        lockedMethod == 'bank_transfer'))
-                                  _methodButton(
-                                    'bank_transfer',
-                                    label('Transferencia', 'Bank transfer'),
-                                  ),
-                              ],
-                            ),
-                            if (method == 'bank_transfer')
-                              PosTextButton(
-                                key: const ValueKey(
-                                  'partial-bank-view-details',
-                                ),
-                                onPressed:
-                                    (busy && !_ledgerLoading) ||
-                                        pendingCommand != null
-                                    ? null
-                                    : () => widget.onShowBankTransferDetails(
-                                        charge,
-                                        true,
-                                      ),
-                                child: Text(
-                                  label(
-                                    'Ver datos bancarios',
-                                    'View bank details',
-                                  ),
-                                ),
-                              ),
-                            if (!methodAvailable)
-                              _notice(
-                                label(
-                                  'Abre un turno de caja o habilita un método de pago para dividir esta cuenta.',
-                                  'Open a cash shift or enable a payment method to split this account.',
-                                ),
-                              ),
-                            const SizedBox(height: UmiSpacing.md),
-                            Text(
-                              '${label('Consumo', 'Portion')} ${money(principalMinor ?? 0)} + '
-                              '${label('propina', 'tip')} ${money(tipMinor ?? 0)} = '
-                              '${label('cargo', 'charge')} ${money(charge)}',
-                              key: const ValueKey('partial-exact-charge'),
-                              style: theme.textTheme.titleMedium,
-                            ),
-                          ],
+                          const SizedBox(height: 4),
+                          Text(
+                            [cart.accountFolio, tableLabel]
+                                .whereType<String>()
+                                .where((value) => value.isNotEmpty)
+                                .join(' · '),
+                            key: const ValueKey('partial-account-context'),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 16),
                         ],
+                        if (!wide && ledger != null)
+                          PosDisclosure(
+                            key: const ValueKey('partial-account-disclosure'),
+                            compact: _compactPhone,
+                            tilePadding: _compactPhone ? EdgeInsets.zero : null,
+                            title: Text(
+                              label('Detalle de la cuenta', 'Account details'),
+                              style: _compactPhone
+                                  ? theme.textTheme.bodyMedium
+                                  : null,
+                            ),
+                            children: [_accountSummary()],
+                          ),
+                        _paymentControls(),
                       ],
                     ),
                   ),
                 ),
+                if (ledger != null)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      _compactPhone ? 8 : 16,
+                      16,
+                      _compactPhone ? 8 : 16,
+                    ),
+                    child: _checkoutBar(),
+                  ),
+              ],
+            );
+            if (!wide) return editor;
+            return Padding(
+              padding: EdgeInsets.all(narrowPanes ? 8 : 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_methodBankVertical) ...[
+                    SizedBox(
+                      width: narrowPanes ? 112 : 168,
+                      child: SingleChildScrollView(
+                        child: _paymentMethods(vertical: true),
+                      ),
+                    ),
+                    SizedBox(width: narrowPanes ? 16 : 24),
+                  ],
+                  Expanded(child: editor),
+                  SizedBox(width: narrowPanes ? 16 : 24),
+                  SizedBox(
+                    width: 304,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        border: Border.all(
+                          color: theme.colorScheme.outlineVariant,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: SingleChildScrollView(
+                        key: const ValueKey('partial-account-summary'),
+                        padding: const EdgeInsets.all(16),
+                        child: _accountSummary(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            if (ledger != null)
-              Padding(
-                padding: const EdgeInsets.all(UmiSpacing.lg),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1400),
-                  child: _checkoutBar(),
-                ),
-              ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 
+  bool _compactPhone = false;
+
+  PosButtonStyle _compactTextButtonStyle() => PosTextButton.styleFrom(
+    textStyle: PosTheme.of(context).textTheme.bodyMedium,
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  );
+
+  Widget _compactAccountHeader() {
+    final theme = PosTheme.of(context);
+    final titleStyle = theme.textTheme.bodyMedium?.copyWith(
+      fontSize: 18,
+      fontWeight: FontWeight.w600,
+    );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label('Cobro dividido', 'Split payment'),
+                style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+              ),
+              Text(
+                [cart.accountFolio, tableLabel]
+                    .whereType<String>()
+                    .where((value) => value.isNotEmpty)
+                    .join(' · '),
+                key: const ValueKey('partial-account-context'),
+                style: titleStyle,
+              ),
+            ],
+          ),
+        ),
+        if (ledger != null) ...[
+          const SizedBox(width: 12),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  label('Por cobrar', 'Amount due'),
+                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+                ),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(money(remaining), style: titleStyle),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  bool _methodBankVertical = false;
+  double _methodWidth = 180;
+
+  Widget _paymentControls() {
+    final theme = PosTheme.of(context);
+    final blocked = hasUnknown || uncertain || finalizationUnknown;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (ledger == null && busy) const Center(child: PosSpinner()),
+        if (error != null) ...[_notice(error!), const SizedBox(height: 16)],
+        if (ledger != null) ...[
+          if (!_compactPhone)
+            _summaryRow(
+              label('Por cobrar', 'Amount due'),
+              money(remaining),
+              emphasized: true,
+            ),
+          if (blocked) ...[
+            SizedBox(height: _compactPhone ? 8 : UmiSpacing.md),
+            _notice(
+              hasUnknown
+                  ? label(
+                      'Hay un pago sin confirmar. Consulta su estado antes de cobrar otra vez.',
+                      'A payment is unresolved. Check its status before charging again.',
+                    )
+                  : finalizationUnknown
+                  ? label(
+                      'El cierre no está confirmado. Actualiza para consultar la cuenta.',
+                      'The close is not confirmed. Refresh to check the account.',
+                    )
+                  : label(
+                      'No sabemos si el último pago se registró. Actualiza antes de repetirlo.',
+                      'The last payment may have been recorded. Refresh before retrying.',
+                    ),
+            ),
+            if (hasUnknown && unresolvedTender != null) ...[
+              const SizedBox(height: UmiSpacing.sm),
+              Wrap(
+                spacing: UmiSpacing.sm,
+                children: [
+                  PosButton.tonal(
+                    key: const ValueKey('partial-unknown-paid'),
+                    onPressed: busy ? null : () => _resolveUnknown(true),
+                    child: Text(label('Sí se cobró', 'It was paid')),
+                  ),
+                  PosButton.tonal(
+                    key: const ValueKey('partial-unknown-failed'),
+                    onPressed: busy ? null : () => _resolveUnknown(false),
+                    child: Text(label('No se cobró', 'It was not paid')),
+                  ),
+                ],
+              ),
+            ],
+            if (uncertain && retryReady)
+              PosTextButton(
+                key: const ValueKey('partial-retry-same-payment'),
+                onPressed: _postPending,
+                child: Text(
+                  label('Reintentar el mismo pago', 'Retry the same payment'),
+                ),
+              ),
+          ],
+          if (!canFinalize && !blocked) ...[
+            if (_compactPhone) ...[
+              _paymentMethods(),
+              const SizedBox(height: 8),
+            ] else
+              const SizedBox(height: UmiSpacing.lg),
+            Text(
+              label('Cobrar a esta persona', 'Charge this guest'),
+              style: _compactPhone
+                  ? theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    )
+                  : theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: UmiSpacing.sm),
+            Wrap(
+              spacing: UmiSpacing.sm,
+              children: [
+                for (final parts in [1, 2, 3, 4])
+                  PosTextButton(
+                    compact: _compactPhone,
+                    style: _compactPhone ? _compactTextButtonStyle() : null,
+                    key: ValueKey('partial-equal-$parts'),
+                    onPressed: busy
+                        ? null
+                        : () => setState(() {
+                            final suggested = (remaining / parts).ceil();
+                            principal.text = (suggested / 100).toStringAsFixed(
+                              2,
+                            );
+                            if (method == 'cash') {
+                              cashReceived.text =
+                                  ((suggested + (tipMinor ?? 0)) / 100)
+                                      .toStringAsFixed(2);
+                            }
+                          }),
+                    child: Text(
+                      parts == 1
+                          ? label('Todo', 'All')
+                          : label('Entre $parts', 'Split $parts ways'),
+                    ),
+                  ),
+              ],
+            ),
+            PosField(
+              key: const ValueKey('partial-principal'),
+              style: _compactPhone ? theme.textTheme.bodyMedium : null,
+              controller: principal,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: cashAmountFormatters,
+              decoration: PosFieldDecoration(
+                isDense: _compactPhone,
+                labelText: label(
+                  'Consumo de esta persona',
+                  'This guest’s portion',
+                ),
+                errorText:
+                    principalMinor == null ||
+                        principalMinor! <= 0 ||
+                        principalMinor! > remaining
+                    ? label(
+                        'Escribe un importe entre cero y el saldo.',
+                        'Enter an amount up to the remaining balance.',
+                      )
+                    : null,
+              ),
+            ),
+            SizedBox(height: _compactPhone ? 8 : UmiSpacing.md),
+            if (widget.checkout.policy?.tip['enabled'] == true)
+              PosDisclosure(
+                key: const ValueKey('partial-tip-disclosure'),
+                compact: _compactPhone,
+                tilePadding: _compactPhone ? EdgeInsets.zero : null,
+                title: Text(
+                  label('Agregar propina', 'Add tip'),
+                  style: _compactPhone ? theme.textTheme.bodyMedium : null,
+                ),
+                initiallyExpanded: (tipMinor ?? 0) > 0,
+                children: [
+                  Text(
+                    tipOwnerLabel,
+                    key: const ValueKey('partial-tip-owner'),
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: UmiSpacing.xs),
+                  Text(
+                    '${label('Base sugerida', 'Suggested base')} · '
+                    '${money(tipBaseMinor)} '
+                    '${label('antes de impuestos', 'before tax')}',
+                    key: const ValueKey('partial-tip-base'),
+                  ),
+                  const SizedBox(height: UmiSpacing.sm),
+                  Wrap(
+                    spacing: UmiSpacing.sm,
+                    runSpacing: UmiSpacing.sm,
+                    children: [
+                      PosButton.tonal(
+                        key: const ValueKey('partial-tip-zero'),
+                        selected: _selectedTipBasisPoints == 0,
+                        onPressed: busy ? null : () => _setTipForBasisPoints(0),
+                        child: Text(label('Sin propina', 'No tip')),
+                      ),
+                      for (final raw
+                          in widget.checkout.policy?.tip['presetBasisPoints']
+                                  as List? ??
+                              const [])
+                        if (raw is num && raw.toInt() > 0)
+                          PosButton.tonal(
+                            key: ValueKey('partial-tip-bp-${raw.toInt()}'),
+                            selected: _selectedTipBasisPoints == raw.toInt(),
+                            onPressed: busy
+                                ? null
+                                : () => _setTipForBasisPoints(raw.toInt()),
+                            child: Text(
+                              '${_percentageLabel(raw.toInt())} · '
+                              '${money(tipForBasisPoints(raw.toInt()))}',
+                            ),
+                          ),
+                    ],
+                  ),
+                  const SizedBox(height: UmiSpacing.sm),
+                  PosField(
+                    key: const ValueKey('partial-tip'),
+                    controller: tip,
+                    readOnly:
+                        widget.checkout.policy?.tip['customFixedEnabled'] !=
+                        true,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: cashAmountFormatters,
+                    decoration: PosFieldDecoration(
+                      labelText: label(
+                        'Propina de este pago',
+                        'Tip for this payment',
+                      ),
+                      helperText:
+                          widget.checkout.policy?.tip['customFixedEnabled'] ==
+                              true
+                          ? null
+                          : label(
+                              'Selecciona una opción de propina.',
+                              'Choose a tip option.',
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            SizedBox(height: _compactPhone ? 8 : UmiSpacing.md),
+            if (!_methodBankVertical && !_compactPhone) _paymentMethods(),
+            if (method == 'bank_transfer')
+              PosTextButton(
+                key: const ValueKey('partial-bank-view-details'),
+                onPressed: (busy && !_ledgerLoading) || pendingCommand != null
+                    ? null
+                    : () => widget.onShowBankTransferDetails(charge, true),
+                child: Text(label('Ver datos bancarios', 'View bank details')),
+              ),
+            if (!methodAvailable)
+              _notice(
+                label(
+                  'Abre un turno de caja o habilita un método de pago para dividir esta cuenta.',
+                  'Open a cash shift or enable a payment method to split this account.',
+                ),
+              ),
+            SizedBox(height: _compactPhone ? 8 : UmiSpacing.md),
+            if (method == 'cash') _cashInput(),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _paymentMethods({bool vertical = false}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(
+        label('Método de pago', 'Payment method'),
+        style: _compactPhone
+            ? PosTheme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12)
+            : PosTheme.of(context).textTheme.titleMedium,
+      ),
+      if (lockedMethod != null)
+        Text(
+          label(
+            'Esta cuenta continúa con el mismo método. El local no permite combinar métodos.',
+            'This account keeps the same method. This location does not allow mixed methods.',
+          ),
+        ),
+      SizedBox(height: _compactPhone ? 4 : UmiSpacing.sm),
+      LayoutBuilder(
+        builder: (context, box) {
+          final compact = MediaQuery.sizeOf(context).width < 700;
+          final count =
+              (widget.cashShiftId != null &&
+                      (lockedMethod == null || lockedMethod == 'cash')
+                  ? 1
+                  : 0) +
+              (manualAllowed &&
+                      (lockedMethod == null ||
+                          lockedMethod == 'manual_terminal')
+                  ? 1
+                  : 0) +
+              (bankAllowed &&
+                      (lockedMethod == null || lockedMethod == 'bank_transfer')
+                  ? 1
+                  : 0);
+          final columns = MediaQuery.textScalerOf(context).scale(16) >= 24
+              ? min(2, max(1, count))
+              : max(1, count);
+          _methodWidth = compact
+              ? (box.maxWidth - 4 * (columns - 1)) / columns
+              : (vertical ? box.maxWidth : 180);
+          return Wrap(
+            direction: vertical ? Axis.vertical : Axis.horizontal,
+            spacing: compact ? 4 : 8,
+            runSpacing: compact ? 4 : 8,
+            children: [
+              if (widget.cashShiftId != null &&
+                  (lockedMethod == null || lockedMethod == 'cash'))
+                _methodButton('cash', label('Efectivo', 'Cash')),
+              if (manualAllowed &&
+                  (lockedMethod == null || lockedMethod == 'manual_terminal'))
+                _methodButton(
+                  'manual_terminal',
+                  label('Terminal externa', 'External terminal'),
+                ),
+              if (bankAllowed &&
+                  (lockedMethod == null || lockedMethod == 'bank_transfer'))
+                _methodButton(
+                  'bank_transfer',
+                  label('Transferencia', 'Bank transfer'),
+                ),
+            ],
+          );
+        },
+      ),
+    ],
+  );
+
+  Widget _accountSummary() {
+    final theme = PosTheme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          [
+            cart.accountFolio,
+            tableLabel,
+          ].whereType<String>().where((value) => value.isNotEmpty).join(' · '),
+          style: theme.textTheme.titleLarge,
+        ),
+        const SizedBox(height: 8),
+        Text(switch (cart.fulfillmentType) {
+          'dine_in' => label('En mesa', 'Dine in'),
+          'takeout' => label('Para llevar', 'Takeout'),
+          'delivery' => label('Entrega', 'Delivery'),
+          _ => cart.fulfillmentType,
+        }, style: theme.textTheme.bodySmall),
+        const SizedBox(height: 24),
+        for (final item in cart.items) ...[
+          PaymentAccountLine(item: CartItem.fromJson(item)),
+          const SizedBox(height: 16),
+        ],
+        const PosDivider(),
+        const SizedBox(height: 16),
+        _summaryRow(label('Total consumo', 'Order total'), money(due)),
+        _summaryRow(label('Pagado', 'Paid'), money(paid)),
+        if (tipsPaid > 0)
+          _summaryRow(
+            label('Propinas cobradas', 'Tips collected'),
+            money(tipsPaid),
+          ),
+        _summaryRow(
+          label('Falta', 'Remaining'),
+          money(remaining),
+          emphasized: true,
+        ),
+        if (tenderDrafts.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _history(theme),
+        ],
+      ],
+    );
+  }
+
+  Widget _summaryRow(String title, String value, {bool emphasized = false}) {
+    final theme = PosTheme.of(context);
+    final style = emphasized
+        ? theme.textTheme.titleLarge
+        : theme.textTheme.bodyMedium;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Text(title, style: style)),
+          const SizedBox(width: 12),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.topRight,
+              child: Text(value, style: style),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _keypadInput(String key) {
+    final old = cashReceived.text;
+    final next = key == 'backspace'
+        ? (old.isEmpty ? '' : old.substring(0, old.length - 1))
+        : '$old$key';
+    // Match the decimal cash keypad: the shared parser remains the money guard.
+    if (!RegExp(r'^\d{0,8}(\.\d{0,2})?$').hasMatch(next)) return;
+    cashReceivedEdited = true;
+    cashReceived.text = next;
+  }
+
+  Widget _cashInput() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      PosField(
+        key: const ValueKey('partial-cash-received'),
+        controller: cashReceived,
+        style: _compactPhone ? PosTheme.of(context).textTheme.bodyMedium : null,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: cashAmountFormatters,
+        decoration: PosFieldDecoration(
+          isDense: _compactPhone,
+          labelText: label('Efectivo recibido', 'Cash received'),
+        ),
+        onChanged: (_) => cashReceivedEdited = true,
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final value in <int>{charge, 20000, 50000})
+            PosButton.tonal(
+              key: ValueKey('partial-cash-quick-$value'),
+              onPressed: busy
+                  ? null
+                  : () {
+                      cashReceivedEdited = true;
+                      cashReceived.text = (value / 100).toStringAsFixed(2);
+                    },
+              child: Text(
+                value == charge ? label('Exacto', 'Exact') : money(value),
+              ),
+            ),
+          PosTextButton(
+            key: const ValueKey('partial-cash-clear'),
+            onPressed: busy
+                ? null
+                : () {
+                    cashReceivedEdited = true;
+                    cashReceived.clear();
+                  },
+            child: Text(label('Borrar', 'Clear')),
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      for (final row in const [
+        ['1', '2', '3'],
+        ['4', '5', '6'],
+        ['7', '8', '9'],
+        ['.', '0', 'backspace'],
+      ])
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(
+            children: [
+              for (var i = 0; i < row.length; i++) ...[
+                if (i > 0) const SizedBox(width: 4),
+                Expanded(
+                  child: SizedBox(
+                    height:
+                        44 *
+                        MediaQuery.textScalerOf(context).scale(1).clamp(1, 1.5),
+                    child: PosButton.tonal(
+                      compact: true,
+                      style: PosButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                      ),
+                      key: ValueKey('partial-cash-key-${row[i]}'),
+                      onPressed: busy ? null : () => _keypadInput(row[i]),
+                      child: row[i] == 'backspace'
+                          ? Text(
+                              label('⌫', '⌫'),
+                              semanticsLabel: label(
+                                'Borrar cifra',
+                                'Delete digit',
+                              ),
+                            )
+                          : Text(row[i]),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+    ],
+  );
+
   Widget _checkoutBar() {
     final action = PosButton(
+      compact: true,
+      style: PosButton.styleFrom(minimumSize: const Size.fromHeight(48)),
       key: ValueKey(canFinalize ? 'partial-finalize' : 'partial-charge'),
       onPressed: canFinalize && !busy && !finalizationUnknown
           ? _finalize
@@ -1182,90 +1538,108 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
       ),
     );
     final blockedHere = hasUnknown || uncertain || finalizationUnknown;
-    if (canFinalize || blockedHere || method != 'cash') return action;
+    if (canFinalize || blockedHere) return action;
 
     final received = receivedMinor;
     final difference = received == null ? null : received - charge;
-    final cash = PosField(
-      key: const ValueKey('partial-cash-received'),
-      controller: cashReceived,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: cashAmountFormatters,
-      decoration: PosFieldDecoration(
-        labelText: label('Efectivo recibido', 'Cash received'),
-      ),
-      onChanged: (_) => cashReceivedEdited = true,
-    );
-    final change = Column(
-      key: const ValueKey('partial-cash-change'),
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          difference != null && difference < 0
-              ? label('Falta', 'Amount due')
-              : label('Cambio', 'Change'),
-          style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
-            color: PosTheme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        Text(
-          difference == null ? '—' : money(difference.abs()),
-          style: PosTheme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-        ),
-      ],
-    );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 760) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    final change = _compactPhone
+        ? SizedBox(
+            key: const ValueKey('partial-cash-change'),
+            height: 36,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    difference != null && difference < 0
+                        ? label('Falta', 'Amount due')
+                        : label('Cambio', 'Change'),
+                    style: PosTheme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(fontSize: 12),
+                  ),
+                ),
+                Text(
+                  difference == null ? '—' : money(difference.abs()),
+                  style: PosTheme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          )
+        : Column(
+            key: const ValueKey('partial-cash-change'),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              cash,
-              const SizedBox(height: UmiSpacing.sm),
-              change,
-              const SizedBox(height: UmiSpacing.sm),
-              action,
+              Text(
+                difference != null && difference < 0
+                    ? label('Falta', 'Amount due')
+                    : label('Cambio', 'Change'),
+                style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+                  color: PosTheme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Text(
+                difference == null ? '—' : money(difference.abs()),
+                style: PosTheme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ],
           );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            SizedBox(width: 280, child: cash),
-            const SizedBox(width: UmiSpacing.lg),
-            SizedBox(width: 180, child: change),
-            const SizedBox(width: UmiSpacing.lg),
-            Expanded(child: action),
-          ],
-        );
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '${label('Consumo', 'Portion')} ${money(principalMinor ?? 0)} + '
+          '${label('propina', 'tip')} ${money(tipMinor ?? 0)} = '
+          '${label('cargo', 'charge')} ${money(charge)}',
+          key: const ValueKey('partial-exact-charge'),
+          style: _compactPhone
+              ? PosTheme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12)
+              : PosTheme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 8),
+        if (method == 'cash') ...[
+          change,
+          SizedBox(height: _compactPhone ? 4 : 12),
+        ],
+        action,
+      ],
     );
   }
 
-  Widget _methodButton(String value, String title) => PosButton.tonal(
-    key: ValueKey('partial-method-$value'),
-    selected: method == value,
-    onPressed: (busy && !_ledgerLoading) || pendingCommand != null
-        ? null
-        : () async {
-            if (value == 'bank_transfer') {
-              final accepted = await widget.onShowBankTransferDetails(
-                charge,
-                method == value,
-              );
-              if (accepted != true || !mounted) return;
-            }
-            setState(() {
-              method = value;
-              if (value == 'cash' && cashReceived.text.isEmpty) {
-                cashReceived.text = (charge / 100).toStringAsFixed(2);
+  Widget _methodButton(String value, String title) => SizedBox(
+    width: _methodWidth,
+    child: PaymentMethodTile(
+      key: ValueKey('partial-method-$value'),
+      icon: switch (value) {
+        'cash' => PosGlyphs.paymentsOutlined,
+        'manual_terminal' => PosGlyphs.creditCardOutlined,
+        _ => PosGlyphs.bank,
+      },
+      label: title,
+      selected: method == value,
+      onTap: (busy && !_ledgerLoading) || pendingCommand != null
+          ? null
+          : () async {
+              if (value == 'bank_transfer') {
+                final accepted = await widget.onShowBankTransferDetails(
+                  charge,
+                  method == value,
+                );
+                if (accepted != true || !mounted) return;
               }
-            });
-          },
-    child: Text(title),
+              setState(() {
+                method = value;
+                if (value == 'cash' && cashReceived.text.isEmpty) {
+                  cashReceived.text = (charge / 100).toStringAsFixed(2);
+                }
+              });
+            },
+    ),
   );
 
   Widget _history(PosThemeData theme) => Column(
@@ -1306,39 +1680,6 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
     ),
     child: Text(message),
   );
-}
-
-final class _BalanceTile extends StatelessWidget {
-  const _BalanceTile({
-    required this.label,
-    required this.value,
-    this.emphasized = false,
-  });
-  final String label;
-  final String value;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = PosTheme.of(context);
-    return Container(
-      constraints: const BoxConstraints(minWidth: 180),
-      padding: const EdgeInsets.all(UmiSpacing.md),
-      decoration: BoxDecoration(
-        color: emphasized
-            ? theme.colorScheme.primaryContainer
-            : theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(UmiRadius.control),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: theme.textTheme.labelMedium),
-          Text(value, style: theme.textTheme.headlineSmall),
-        ],
-      ),
-    );
-  }
 }
 
 String _newId() {

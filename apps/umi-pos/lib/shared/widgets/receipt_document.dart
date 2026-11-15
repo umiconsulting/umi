@@ -230,14 +230,17 @@ class ReceiptDocument extends StatelessWidget {
   const ReceiptDocument({
     required this.receipt,
     this.padding = EdgeInsets.zero,
+    this.scrollable = true,
     super.key,
   });
   final ReceiptSnapshot receipt;
   final EdgeInsetsGeometry padding;
+  final bool scrollable;
 
   @override
   Widget build(BuildContext context) => CustomScrollView(
-    primary: true,
+    primary: scrollable,
+    physics: scrollable ? null : const NeverScrollableScrollPhysics(),
     semanticChildCount: receipt.lines.length,
     // The dialog gives this viewport a finite height. Short documents keep
     // their natural height; long documents build only nearby line widgets.
@@ -315,12 +318,8 @@ class _ReceiptHeader extends StatelessWidget {
             textAlign: TextAlign.center,
             style: _mono(theme, weight: FontWeight.w700, size: 15),
           ),
-        Text(
-          '${l.businessDateLabel}: ${receipt.businessDate}',
-          style: small,
-        ),
-        if (clock != null)
-          Text('${l.localTimeLabel}: $clock', style: small),
+        Text('${l.businessDateLabel}: ${receipt.businessDate}', style: small),
+        if (clock != null) Text('${l.localTimeLabel}: $clock', style: small),
         if (receipt.operatorName case final String name when name.isNotEmpty)
           Text('${l.operatorLabel}: $name', style: small),
         const SizedBox(height: UmiSpacing.sm),
