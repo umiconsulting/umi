@@ -112,4 +112,9 @@ export default tseslint.config(
       '@typescript-eslint/unbound-method': 'off',
     },
   },
+  {
+    // Operational scripts use syntax checks. They are outside the application build.
+    files: ['scripts/**/*.mjs', 'scripts/**/*.ts'],
+    extends: [tseslint.configs.disableTypeChecked],
+  },
 );

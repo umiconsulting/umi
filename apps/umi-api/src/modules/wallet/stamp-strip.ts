@@ -24,6 +24,18 @@ const MAX_STAMP = 180;
 /** Brand assets change when a café is re-branded, which is rare and manual. */
 const assetCache = new Map<string, Buffer>();
 
+/** New cafés have no uploaded stamp artwork. Use distinct empty and earned circles. */
+async function stampAsset(url: string, assetBase: string, filled: boolean): Promise<Buffer> {
+  try {
+    return await loadAsset(url, assetBase);
+  } catch {
+    return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
+      <circle cx="90" cy="90" r="73" fill="${filled ? '#fff' : 'none'}" stroke="#fff" stroke-width="6" opacity="${filled ? '1' : '.35'}"/>
+      ${filled ? '<path d="m55 91 24 24 47-51" fill="none" stroke="#3d3029" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>' : ''}
+    </svg>`);
+  }
+}
+
 function hexToBackground(hex?: string | null): {
   r: number;
   g: number;
@@ -96,8 +108,8 @@ export async function generateStampStrip(input: StampStripInput): Promise<Buffer
   const bonusFrom = input.bonusFrom ?? null;
 
   const [filledBuf, emptyBuf] = await Promise.all([
-    loadAsset(input.filledStampUrl, assetBase),
-    loadAsset(input.emptyStampUrl, assetBase),
+    stampAsset(input.filledStampUrl, assetBase, true),
+    stampAsset(input.emptyStampUrl, assetBase, false),
   ]);
 
   let welcomeBuf: Buffer | null = null;

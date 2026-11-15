@@ -17,6 +17,9 @@ export function middleware(req: NextRequest) {
   // CORS / origin check for API mutation endpoints
   if (pathname.startsWith('/api/') && MUTATING_METHODS.has(method ?? '')) {
     const origin = req.headers.get('origin');
+    if (req.headers.get('sec-fetch-site') === 'cross-site') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     // Allow requests with no Origin (server-to-server, Postman in dev)
     if (origin && !ALLOWED_ORIGINS.includes(origin.replace(/\/$/, ''))) {
       return new NextResponse(JSON.stringify({ error: 'Forbidden' }), {

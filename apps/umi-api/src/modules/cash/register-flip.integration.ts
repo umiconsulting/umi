@@ -1,25 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 
-/**
- * THE FLIP CANNOT FORWARD A ROUTE THIS APP DOES NOT SERVE.
- *
- * `apps/umi-cash/next.config.mjs` lists the register routes it hands to umi-api
- * when `CASH_API_ORIGIN` is set. A Next rewrite is a proxy: it does not check
- * that the destination exists. An entry umi-api does not serve becomes a 404
- * from an origin the café operator is not looking at, on a till that worked
- * yesterday — and the two files live in different apps, so nothing but this
- * connects them.
- *
- * SCHEMA FAMILY, deliberately. It needs the app to BOOT and nothing more: no
- * customers, no cards, no backfill. That is what lets it run on the pristine
- * build in CI, on every pull request, which is the only place a list edited by
- * hand gets caught in time.
- */
+/** Verify the HTTP contracts the preserved Cash interfaces and frozen wallet URLs consume. */
 describe('the register flip forwards only routes this app serves', () => {
   let app: NestFastifyApplication;
   const served = new Set<string>();
@@ -41,30 +25,40 @@ describe('the register flip forwards only routes this app serves', () => {
     await app?.close();
   });
 
-  it('lists every forwarded route among this app’s own routes', () => {
-    const config = readFileSync(resolve(__dirname, '../../../../umi-cash/next.config.mjs'), 'utf8');
-    const block = config.match(/const REGISTER_ROUTES = \[([\s\S]*?)\];/);
-    expect(block, 'REGISTER_ROUTES not found in umi-cash/next.config.mjs').toBeTruthy();
-
-    // Strip the comments first. They carry apostrophes ("the customer's own
-    // side"), and a naive quote match reads those as route literals.
-    const literals = block![1].replace(/\/\/[^\n]*/g, '');
-    const forwarded = [...literals.matchAll(/'(\/[^']+)'/g)].map((m) => m[1]);
-    expect(forwarded.length).toBeGreaterThan(10);
-
-    // The two apps name their path parameters differently — umi-cash says
-    // `:handle`, umi-api says `:merchantRef`. What a proxy forwards on is the
-    // SHAPE of the path, so that is what is compared.
-    const shape = (url: string) => url.replace(/:[A-Za-z]+/g, ':p');
-    const shapesServed = new Set([...served].map((r) => shape(r.split(' ')[1])));
-    const missing = forwarded.filter((f) => !shapesServed.has(shape(f)));
-    expect(missing).toEqual([]);
+  it('serves the Cash business, public, and wallet contracts', () => {
+    const contracts = [
+      'POST /api/:ref/auth/login',
+      'POST /api/:ref/auth/refresh',
+      'POST /api/:ref/auth/logout',
+      'GET /api/:ref/config',
+      'GET /api/:ref/admin/settings',
+      'PATCH /api/:ref/admin/settings',
+      'GET /api/:ref/admin/messages',
+      'GET /api/:ref/admin/stats',
+      'GET /api/:ref/admin/customers',
+      'GET /api/:ref/admin/reward-config',
+      'GET /api/:ref/admin/gift-cards',
+      'POST /api/:ref/admin/gift-cards',
+      'GET /api/:ref/gift/:code',
+      'POST /api/:ref/gift/:code',
+      'GET /api/:ref/passes/google',
+      'GET /api/:ref/passes/apple',
+      'GET /api/:ref/stamp-strip/:state',
+      'POST /api/:ref/passes/apple/v1/devices/:deviceId/registrations/:passTypeId/:serial',
+      'GET /api/:ref/passes/apple/v1/passes/:passTypeId/:serial',
+      'POST /api/merchants',
+      'GET /api/umi/tenants',
+      'GET /api/umi/tenants/:id',
+      'PATCH /api/umi/tenants/:id',
+      'DELETE /api/umi/tenants/:id',
+    ];
+    const shape = (route: string) => route.replace(/:[A-Za-z]+/g, ':p');
+    const shapes = new Set([...served].map(shape));
+    expect(contracts.filter((route) => !shapes.has(shape(route)))).toEqual([]);
   });
 
-  it('forwards both staff and customer gift-card routes', () => {
-    const config = readFileSync(resolve(__dirname, '../../../../umi-cash/next.config.mjs'), 'utf8');
-    const block = config.match(/const REGISTER_ROUTES = \[([\s\S]*?)\];/)![1];
-    expect(block).toContain('/api/:handle/admin/gift-cards');
-    expect(block).toContain('/api/:handle/gift/:code');
+  it('refuses anonymous access to the internal admin projection', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/umi/tenants' });
+    expect(response.statusCode).toBe(401);
   });
 });

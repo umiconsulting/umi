@@ -56,7 +56,7 @@ export class WalletPassRepository {
    */
   async merchantByHandle(handle: string): Promise<{ id: string; name: string } | null> {
     const { rows } = await this.pg.query<{ id: string; name: string }>(
-      `SELECT id::text, name FROM merchant.merchant WHERE handle = $1 LIMIT 1`,
+      `SELECT id::text, name FROM merchant.merchant WHERE handle = $1 OR id::text = $1 LIMIT 1`,
       [handle],
     );
     return rows[0] ?? null;
@@ -73,7 +73,7 @@ export class WalletPassRepository {
       `SELECT p.secondary_color
        FROM merchant.merchant AS m
        JOIN merchant.loyalty_program AS p ON p.merchant_id = m.id
-       WHERE m.handle = $1
+       WHERE m.handle = $1 OR m.id::text = $1
        LIMIT 1`,
       [handle],
     );
@@ -452,7 +452,7 @@ export class WalletPassRepository {
     const [head, locations, state] = await Promise.all([
       this.pg.query<PassHeadRow>(
         `SELECT m.name                    AS merchant_name,
-                m.handle                  AS merchant_handle,
+                coalesce(m.handle,m.id::text) AS merchant_handle,
                 m.timezone                AS timezone,
                 c.card_number             AS card_number,
                 c.lifecycle_message       AS lifecycle_message,

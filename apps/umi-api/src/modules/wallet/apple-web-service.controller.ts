@@ -154,6 +154,20 @@ export class AppleWebServiceController {
     if (!pass) return void reply.status(401).send();
     if (!this.wallet.isConfigured()) return void reply.status(500).send();
 
+    const modifiedSince = req.headers['if-modified-since'];
+    const since = typeof modifiedSince === 'string' ? Date.parse(modifiedSince) : NaN;
+    // HTTP dates have second precision. Authenticate before any conditional response.
+    if (
+      Number.isFinite(since) &&
+      Math.floor(pass.cardUpdatedAt.getTime() / 1000) <= Math.floor(since / 1000)
+    ) {
+      return void reply
+        .status(304)
+        .header('Last-Modified', pass.cardUpdatedAt.toUTCString())
+        .header('Cache-Control', 'no-store')
+        .send();
+    }
+
     const { buffer, lastModified } = await this.wallet.renderPass(pass);
     reply
       .status(200)

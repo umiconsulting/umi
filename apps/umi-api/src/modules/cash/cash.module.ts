@@ -21,6 +21,9 @@ import { CashAuthController } from './cash-auth.controller';
 import { CashAuthService } from './cash-auth.service';
 import { CashCardService } from './cash-card.service';
 import { CashCardRepository } from './cash-card.repository';
+import { CashPublicController } from './cash-public.controller';
+import { CashPlatformController } from './cash-platform.controller';
+import { CashPlatformRepository } from './cash-platform.repository';
 
 /**
  * Cash domain — reads (analytics, customers, gift-cards) + live customer-facing
@@ -40,6 +43,8 @@ import { CashCardRepository } from './cash-card.repository';
     CashCustomerController,
     CashCardController,
     CashAuthController,
+    CashPublicController,
+    CashPlatformController,
   ],
   providers: [
     CashReadService,
@@ -54,6 +59,7 @@ import { CashCardRepository } from './cash-card.repository';
     CashAuthService,
     CashCardService,
     CashCardRepository,
+    CashPlatformRepository,
   ],
 })
 export class CashModule {}
