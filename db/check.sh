@@ -14,6 +14,7 @@ createdb "$GATE_DB"
 trap 'dropdb --if-exists "$GATE_DB"' EXIT
 
 bash db/00_run.sh "$GATE_DB"
+
 psql -X -v ON_ERROR_STOP=1 -d "$GATE_DB" -v bootstrap_email=ci@umi.invalid -f db/backfill/seed_rbac.sql
 psql -X -v ON_ERROR_STOP=1 -d "$GATE_DB" -f apps/umi-api/test/integration/harness-roles.sql
 psql -X -v ON_ERROR_STOP=1 -d "$GATE_DB" -f apps/umi-api/db/roles/004_login_roles.sql
@@ -33,7 +34,19 @@ query() { psql -X -v ON_ERROR_STOP=1 -At -d "$GATE_DB" -c "$1"; }
 policies="$(query 'select count(*) from pg_policies')"
 ledger="$(query 'select filename, checksum, applied_at from runtime.migration_ledger order by filename')"
 psql -X -v ON_ERROR_STOP=1 -d "$GATE_DB" -f db/test/ledger-seed.sql
-psql -X -v ON_ERROR_STOP=1 -d "$GATE_DB" -f db/90_rls.sql
+
+# Prove db/90_rls.sql is idempotent without keeping its revokes. A persistent
+# second application revoked INSERT/UPDATE on merchant.kitchen_order that
+# db/47_checkout_kitchen_projection.sql grants after 90_rls in the 00_run order.
+policies_before="$(psql -X -qAt -d "$GATE_DB" -c 'select count(*) from pg_policies')"
+policies_same="$(psql -X -qAt -v ON_ERROR_STOP=1 -v before="$policies_before" -d "$GATE_DB" <<'SQL'
+begin;
+\i db/90_rls.sql
+select count(*) = :before from pg_policies;
+rollback;
+SQL
+)"
+test "$policies_same" = "t"
 bash db/migrate.sh "$GATE_DB"
 test "$(query 'select filename, checksum, applied_at from runtime.migration_ledger order by filename')" = "$ledger"
 test "$(query 'select count(*) from pg_policies')" = "$policies"
