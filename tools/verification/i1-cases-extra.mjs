@@ -424,7 +424,7 @@ export const EXTRA_CASES = {
         {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ name: group.name, productIds: products.map((row) => row.product_id), expectedVersion: group.version }),
+          body: JSON.stringify({ name: 'Grupo G otra sesión', productIds: products.map((row) => row.product_id), expectedVersion: group.version }),
         },
       );
       session.clearObservations();
@@ -438,7 +438,7 @@ export const EXTRA_CASES = {
       t.checks.includes('prior values are visible', text, 'Venta neta');
       return { observations: {} };
     } finally {
-      await t.db.query(`update merchant.sales_analysis_group set version=1 where id=$1`, [group.id]);
+      await t.db.query(`update merchant.sales_analysis_group set name=$2, version=1 where id=$1`, [group.id, group.name]);
       await session.close();
     }
   },
