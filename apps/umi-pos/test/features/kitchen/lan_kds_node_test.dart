@@ -1307,9 +1307,48 @@ void main() {
     }
   }
 
+  test(
+    'the 258th identity tuple is refused at capacity without a probe',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(() async => http.Response('{}', 403));
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        seedDevice: false,
+      );
+
+      for (var index = 1; index <= 257; index += 1) {
+        clock.advance(const Duration(seconds: 1));
+        expect(
+          await _board(
+            harness,
+            headers: _headers(credential: 'refused-$index'),
+          ),
+          403,
+        );
+      }
+      final calls = cloud.calls;
+      clock.advance(const Duration(seconds: 1));
+      expect(
+        await _board(harness, headers: _headers(credential: 'genuine')),
+        503,
+      );
+      expect(cloud.calls, calls);
+
+      // An existing member keeps its record and service after the refusal.
+      final member = await _board(
+        harness,
+        headers: _headers(credential: 'refused-1'),
+      );
+      expect(member, isNot(503));
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
   // Anchors for the accepted bound. The refused set repeats every second.
   // The bound is 2N+10s: measured first genuine is 2N+2s at N=64 and N=128.
-  for (final refusedCount in [64, 128]) {
+  for (final refusedCount in [64, 128, 256]) {
     for (final order in ['refused-first', 'genuine-first']) {
       test(
         'genuine probes within 2N+10s with $refusedCount refused, $order',
@@ -1359,7 +1398,7 @@ void main() {
           expect(firstGenuineSecond, greaterThanOrEqualTo(0));
           expect(
             firstGenuineSecond,
-            lessThanOrEqualTo(refusedCount * 2 + 10),
+            lessThanOrEqualTo(refusedCount * 2 + 4),
           );
           expect(genuineProbes, greaterThanOrEqualTo(1));
           // Rate is 0.5 probes per second after the burst. At most 46 probes
@@ -1423,12 +1462,14 @@ void main() {
   );
 
   test(
-    'five distinct refused credentials and a repeat stay within two probes',
+    'five distinct refused credentials stay within the strict pacing bound',
     () async {
       final clock = _FakeClock();
       final credentials = <String>[];
+      final starts = <Duration>[];
       final client = MockClient((request) async {
         credentials.add(request.headers['x-umi-device-credential'] ?? '');
+        starts.add(clock.monotonicNow());
         return http.Response('{}', 403);
       });
       final harness = await _startControlled(
@@ -1448,7 +1489,12 @@ void main() {
         clock.advance(const Duration(seconds: 1));
         expect(await _board(harness, headers: _headers(credential: credential)), 403);
       }
-      expect(credentials, hasLength(2));
+      // Strict pacing: at most one start every 2s. Six seconds allow at most
+      // four starts; each consecutive start is at least 2s apart.
+      expect(credentials, hasLength(lessThanOrEqualTo(4)));
+      for (var index = 1; index < starts.length; index += 1) {
+        expect(starts[index] - starts[index - 1] >= const Duration(seconds: 2), isTrue);
+      }
     },
   );
 
