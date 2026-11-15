@@ -174,8 +174,9 @@ final class LanKdsNode {
     _probePending.removeWhere(
       (_, at) => now - at > _probePendingTtl,
     );
-    // A credential that stops asking must not hold priority forever.
-    _probeLastAt.removeWhere((_, at) => now - at >= _probePeriod * 4);
+    // Keep a probed hash visible until the bounded map evicts it. A time
+    // eviction makes an old refused hash look unprobed again and lets it
+    // take the next token ahead of a newcomer.
     final mine = _probeLastAt[credentialHash];
     if (mine != null && now - mine < _probePeriod) return true;
     if (_probeTokens < 1) return true;

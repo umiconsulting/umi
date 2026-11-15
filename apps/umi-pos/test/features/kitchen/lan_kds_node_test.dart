@@ -1240,7 +1240,8 @@ void main() {
   for (final refusedCount in [2, 3, 4, 6, 8, 16, 32]) {
     for (final order in ['refused-first', 'genuine-first', 'rotated']) {
       test(
-        'genuine probes within 45s with $refusedCount refused, $order',
+        'genuine probes within the fairness bound with '
+        '$refusedCount refused, $order',
         () async {
           final clock = _FakeClock();
           final credentials = <String>[];
@@ -1262,18 +1263,22 @@ void main() {
 
           for (var second = 0; second < 90; second += 1) {
             clock.advance(const Duration(seconds: 1));
-            // True rotation: the identity that sends first changes every
-            // second. The refused set is the same N hashes.
+            // The refused set is the same N hashes. Rotated moves the whole
+            // batch, so the genuine does not always send last. It does not
+            // fall through to refused-first.
             final refused = List.generate(
               refusedCount,
-              (index) => order == 'rotated'
-                  ? 'refused-${(index + second) % refusedCount + 1}'
-                  : 'refused-${index + 1}',
+              (index) => 'refused-${index + 1}',
             );
-            final batch = switch (order) {
+            final base = switch (order) {
               'genuine-first' => ['genuine', ...refused],
               _ => [...refused, 'genuine'],
             };
+            final shift = order == 'rotated' ? second % base.length : 0;
+            final batch = [
+              ...base.skip(shift),
+              ...base.take(shift),
+            ];
             for (final credential in batch) {
               expect(
                 await _board(
@@ -1298,6 +1303,73 @@ void main() {
           }
           expect(credentials, hasLength(lessThanOrEqualTo(46)));
         },
+      );
+    }
+  }
+
+  // Anchors for the accepted bound. The refused set repeats every second.
+  // The bound is 2N+10s: measured first genuine is 2N+2s at N=64 and N=128.
+  for (final refusedCount in [64, 128]) {
+    for (final order in ['refused-first', 'genuine-first']) {
+      test(
+        'genuine probes within 2N+10s with $refusedCount refused, $order',
+        () async {
+          final clock = _FakeClock();
+          final credentials = <String>[];
+          var firstGenuineSecond = -1;
+          final client = MockClient((request) async {
+            final credential =
+                request.headers['x-umi-device-credential'] ?? '';
+            credentials.add(credential);
+            if (credential == 'genuine' && firstGenuineSecond < 0) {
+              firstGenuineSecond = clock.monotonicNow().inSeconds;
+            }
+            return http.Response('{}', 403);
+          });
+          final harness = await _startControlled(
+            clock: clock,
+            client: client,
+            seedDevice: false,
+          );
+          final seconds = refusedCount * 2 + 30;
+
+          for (var second = 0; second < seconds; second += 1) {
+            clock.advance(const Duration(seconds: 1));
+            final refused = List.generate(
+              refusedCount,
+              (index) => 'refused-${index + 1}',
+            );
+            final batch = order == 'genuine-first'
+                ? ['genuine', ...refused]
+                : [...refused, 'genuine'];
+            for (final credential in batch) {
+              expect(
+                await _board(
+                  harness,
+                  headers: _headers(credential: credential),
+                ),
+                403,
+              );
+            }
+          }
+
+          final genuineProbes = credentials
+              .where((credential) => credential == 'genuine')
+              .length;
+          expect(firstGenuineSecond, greaterThanOrEqualTo(0));
+          expect(
+            firstGenuineSecond,
+            lessThanOrEqualTo(refusedCount * 2 + 10),
+          );
+          expect(genuineProbes, greaterThanOrEqualTo(1));
+          // Rate is 0.5 probes per second after the burst. At most 46 probes
+          // in 90 seconds was measured. Keep that rate for longer windows.
+          expect(
+            credentials,
+            hasLength(lessThanOrEqualTo(seconds ~/ 2 + 6)),
+          );
+        },
+        timeout: const Timeout(Duration(minutes: 5)),
       );
     }
   }
