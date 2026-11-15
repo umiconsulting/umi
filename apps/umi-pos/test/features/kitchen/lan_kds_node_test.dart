@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -22,6 +23,8 @@ const _command = '00000000-0000-4000-8000-000000000008';
 const _idempotency = '00000000-0000-4000-8000-000000000009';
 const _correlation = '00000000-0000-4000-8000-000000000010';
 const _credential = 'paired-device-credential-value';
+const _otherMerchant = '00000000-0000-4000-8000-000000000012';
+const _otherLocation = '00000000-0000-4000-8000-000000000013';
 
 void main() {
   test(
@@ -59,9 +62,7 @@ void main() {
         ),
         cloudBase: Uri.parse('https://cloud.example.test'),
         port: 0,
-        client: MockClient(
-          (_) async => http.Response('{"error":"unavailable"}', 503),
-        ),
+        client: _offlineAfterValidationClient(),
       );
       final bound = await node.start();
       final base = Uri.parse('http://127.0.0.1:${bound.port}');
@@ -555,7 +556,7 @@ void main() {
       ),
       cloudBase: Uri.parse('https://cloud.example.test'),
       port: 0,
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: _offlineAfterValidationClient(),
     );
     final bound = await node.start();
     addTearDown(node.stop);
@@ -619,7 +620,7 @@ void main() {
       ),
       cloudBase: Uri.parse('https://cloud.example.test'),
       port: 0,
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: _offlineAfterValidationClient(),
     );
     final bound = await node.start();
     addTearDown(node.stop);
@@ -721,7 +722,7 @@ void main() {
       ),
       cloudBase: Uri.parse('https://cloud.example.test'),
       port: 0,
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: _offlineAfterValidationClient(),
     );
     final bound = await node.start();
     addTearDown(node.stop);
@@ -839,7 +840,7 @@ void main() {
       ),
       cloudBase: Uri.parse('https://cloud.example.test'),
       port: 0,
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: _offlineAfterValidationClient(),
     );
     final bound = await node.start();
     addTearDown(node.stop);
@@ -909,7 +910,7 @@ void main() {
       ),
       cloudBase: Uri.parse('https://cloud.example.test'),
       port: 0,
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: _offlineAfterValidationClient(),
     );
     final bound = await node.start();
     addTearDown(node.stop);
@@ -986,7 +987,7 @@ void main() {
         return journal.resolveConflictAndRetryFollowing(commandId);
       },
       port: 0,
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: _offlineAfterValidationClient(),
     );
     final bound = await node.start();
     addTearDown(node.stop);
@@ -1086,18 +1087,312 @@ void main() {
     );
     expect(retained.entries.last.status, JournalStatus.pending);
   });
+
+  test(
+    'accepts cached trust before 300 seconds and refuses at the boundary',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(_Cloud.valid);
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+      );
+      expect(await _board(harness), 200);
+
+      // The cloud is now absent. A local request at 299 seconds must not renew
+      // the trust, and the request itself must still be served.
+      cloud.respond = _Cloud.unavailable;
+      clock.advance(const Duration(seconds: 299));
+      expect(await _board(harness), 200);
+
+      // At 300 seconds the record is no longer valid. The cloud is still absent,
+      // so the node refuses instead of trusting the stored hash.
+      clock.advance(const Duration(seconds: 1));
+      expect(await _board(harness), 403);
+    },
+  );
+
+  test('refuses at 300 seconds when the cloud times out', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.valid);
+    final harness = await _startControlled(clock: clock, client: cloud.client);
+    expect(await _board(harness), 200);
+
+    cloud.respond = () async => throw TimeoutException('cloud timeout');
+    clock.advance(const Duration(seconds: 300));
+    expect(await _board(harness), 403);
+  });
+
+  test('requires a new cloud validation after a restart', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.valid);
+    final local = _MemoryLocal();
+    final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+    final first = await _startControlled(
+      clock: clock,
+      client: cloud.client,
+      local: local,
+      journal: journal,
+    );
+    expect(await _board(first), 200);
+
+    cloud.respond = _Cloud.unavailable;
+    clock.advance(const Duration(seconds: 1));
+    final restarted = await _startControlled(
+      clock: clock,
+      client: cloud.client,
+      local: local,
+      journal: journal,
+    );
+    expect(await _board(restarted), 403);
+  });
+
+  test('rejects a merchant or location scope change', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.valid);
+    final harness = await _startControlled(clock: clock, client: cloud.client);
+    expect(await _board(harness), 200);
+
+    cloud.respond = _Cloud.unavailable;
+    final changed = _headers(
+      merchant: _otherMerchant,
+      location: _otherLocation,
+    );
+    expect(await _board(harness, headers: changed), 403);
+  });
+
+  test('rejects a credential change while the cloud is absent', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.valid);
+    final harness = await _startControlled(clock: clock, client: cloud.client);
+    expect(await _board(harness), 200);
+
+    cloud.respond = _Cloud.unavailable;
+    expect(
+      await _board(harness, headers: _headers(credential: 'rotated')),
+      403,
+    );
+  });
+
+  test('rejects a wall-clock rollback', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.valid);
+    final harness = await _startControlled(clock: clock, client: cloud.client);
+    expect(await _board(harness), 200);
+
+    clock.advance(const Duration(seconds: 10));
+    clock.moveWallBack(const Duration(seconds: 20));
+    cloud.respond = _Cloud.unavailable;
+    expect(await _board(harness), 403);
+  });
+
+  test(
+    'an explicit cloud rejection removes trust and keeps the node',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(_Cloud.valid);
+      final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        journal: journal,
+      );
+      expect(await _board(harness), 200);
+
+      await journal.append(
+        commandId: _command,
+        deviceId: _host,
+        credentialVersion: 1,
+        merchantId: _merchant,
+        locationId: _location,
+        operatorSessionId: _session,
+        idempotencyKey: _idempotency,
+        payload: {'acknowledgement': 'safe'},
+      );
+
+      cloud.respond = () async => http.Response('{}', 403);
+      clock.advance(const Duration(seconds: 31));
+      expect(await _board(harness), 403);
+      expect(
+        await harness.local.readNetworkDevice(_merchant, _location, _peer),
+        isNull,
+      );
+      expect((await journal.load()).entries, hasLength(1));
+      expect(
+        (await journal.load()).entries.single.status,
+        JournalStatus.pending,
+      );
+
+      // The refusal removed trust; it did not stop the existing KDS node.
+      final health = await http.get(harness.base.resolve('/health/live'));
+      expect(health.statusCode, 200);
+    },
+  );
 }
 
-Map<String, String> _headers({String credential = _credential}) => {
+Map<String, String> _headers({
+  String credential = _credential,
+  String merchant = _merchant,
+  String location = _location,
+}) => {
   'content-type': 'application/json',
   'x-umi-device-id': _peer,
   'x-umi-device-public-id': _peer,
   'x-umi-installation-id': '00000000-0000-4000-8000-000000000011',
   'x-umi-device-credential': credential,
-  'x-umi-merchant-id': _merchant,
-  'x-umi-location-id': _location,
+  'x-umi-merchant-id': merchant,
+  'x-umi-location-id': location,
   'x-umi-client-time': DateTime.now().toUtc().toIso8601String(),
 };
+
+Map<String, Object?> _deviceJson() => {
+  'id': _peer,
+  'publicId': _peer,
+  'merchantId': _merchant,
+  'locationId': _location,
+  'displayName': 'KDS Cocina',
+  'type': 'kds',
+  'platform': 'android',
+  'mobility': 'static',
+  'state': 'active',
+  'credentialVersion': 1,
+  'lastSeenAt': null,
+  'rotationRequired': false,
+  'revokedAt': null,
+  'replacementDeviceId': null,
+};
+
+/// The cloud validates once, then stops answering. A wrong credential is
+/// refused, so a stranger cannot use the same helper to pair.
+http.Client _offlineAfterValidationClient() => MockClient((request) async {
+  if (request.url.path == '/api/v1/devices/status') {
+    if (request.headers['x-umi-device-credential'] == _credential) {
+      return http.Response(
+        jsonEncode(_deviceJson()),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    }
+    return http.Response('{}', 403);
+  }
+  return http.Response('{}', 503);
+});
+
+final class _FakeClock implements LanNodeClock {
+  _FakeClock() : _wall = DateTime.utc(2026, 11, 15, 0, 0, 0);
+
+  DateTime _wall;
+  Duration _monotonic = Duration.zero;
+
+  @override
+  DateTime wallNow() => _wall;
+
+  @override
+  Duration monotonicNow() => _monotonic;
+
+  void advance(Duration delta) {
+    _wall = _wall.add(delta);
+    _monotonic += delta;
+  }
+
+  void moveWallBack(Duration delta) {
+    _wall = _wall.subtract(delta);
+  }
+}
+
+final class _Cloud {
+  _Cloud(this.respond);
+
+  Future<http.Response> Function() respond;
+  int calls = 0;
+  late final http.Client client = MockClient((_) {
+    calls += 1;
+    return respond();
+  });
+
+  static Future<http.Response> valid() async => http.Response(
+    jsonEncode(_deviceJson()),
+    200,
+    headers: {'content-type': 'application/json'},
+  );
+
+  static Future<http.Response> unavailable() async => http.Response('{}', 503);
+}
+
+final class _ControlledHarness {
+  const _ControlledHarness({
+    required this.local,
+    required this.journal,
+    required this.base,
+  });
+
+  final _MemoryLocal local;
+  final EncryptedOfflineJournal journal;
+  final Uri base;
+}
+
+Future<_ControlledHarness> _startControlled({
+  required _FakeClock clock,
+  required http.Client client,
+  _MemoryLocal? local,
+  EncryptedOfflineJournal? journal,
+}) async {
+  final resolvedLocal = local ?? _MemoryLocal();
+  final resolvedJournal =
+      journal ?? EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+  final store = LanKdsStore(resolvedLocal);
+  await store.saveCloudBoard(_merchant, _location, [_ticketMap()]);
+  await resolvedLocal.writeNetworkDevice(
+    LocalNetworkDevice(
+      merchantId: _merchant,
+      locationId: _location,
+      deviceId: _peer,
+      role: 'kds',
+      stationId: null,
+      address: null,
+      port: null,
+      credentialHash: sha256.convert(utf8.encode(_credential)).toString(),
+      pairedAt: DateTime.now().toUtc().toIso8601String(),
+      lastSeenAt: DateTime.now().toUtc().toIso8601String(),
+      status: 'active',
+    ),
+  );
+  final node = LanKdsNode(
+    local: resolvedLocal,
+    journal: resolvedJournal,
+    store: store,
+    identity: () async => const LanNodeIdentity(
+      merchantId: _merchant,
+      locationId: _location,
+      operatorSessionId: _session,
+      deviceId: _host,
+      credentialVersion: 1,
+    ),
+    cloudBase: Uri.parse('https://cloud.example.test'),
+    port: 0,
+    client: client,
+    clock: clock,
+  );
+  final bound = await node.start();
+  addTearDown(node.stop);
+  return _ControlledHarness(
+    local: resolvedLocal,
+    journal: resolvedJournal,
+    base: Uri.parse('http://127.0.0.1:${bound.port}'),
+  );
+}
+
+Future<int> _board(
+  _ControlledHarness harness, {
+  Map<String, String>? headers,
+}) async {
+  final response = await http.post(
+    harness.base.resolve('/api/kds/board'),
+    headers: headers ?? _headers(),
+    body: jsonEncode({'action': 'snapshot'}),
+  );
+  return response.statusCode;
+}
 
 Cart _cartForTicket(String fulfillmentType) => Cart(
   id: '00000000-0000-4000-8000-000000000060',

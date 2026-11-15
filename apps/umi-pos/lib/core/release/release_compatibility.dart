@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:umi_contract/umi_contract.dart' show apiMajorVersion;
 
 import '../config/app_config.dart';
 import '../errors/app_error.dart';
@@ -52,6 +53,12 @@ final class ApiReleaseCompatibilityGateway
     if (server['environment'] != _config.environment.name) {
       return ReleaseCompatibility.unsupported;
     }
+    // The URL major is the compatibility axis. The artifact major below is a
+    // separate identity: it can move without a change to the HTTP contract.
+    final serverApiMajor = server['apiMajorVersion'];
+    if (serverApiMajor is! int || serverApiMajor != apiMajorVersion) {
+      return ReleaseCompatibility.unsupported;
+    }
     final serverContract = _version(server['contractVersion']);
     final clientContract = _version(_config.release.contractVersion);
     final minimumPos = _version(server['minimumPosVersion']);
@@ -66,12 +73,6 @@ final class ApiReleaseCompatibilityGateway
     }
     if (_compare(clientVersion!, minimumPos!) < 0) {
       return ReleaseCompatibility.upgradeRequired;
-    }
-    if (serverContract![0] > clientContract![0]) {
-      return ReleaseCompatibility.upgradeRequired;
-    }
-    if (serverContract[0] < clientContract[0]) {
-      return ReleaseCompatibility.serverUpgradeRequiredFoundation;
     }
     return ReleaseCompatibility.compatible;
   }

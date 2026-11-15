@@ -15,11 +15,50 @@ import '../offline/offline_journal.dart';
 import 'hub_command_forwarder.dart';
 import 'lan_kds_store.dart';
 
+/// The process clock for LAN trust.
+///
+/// [monotonicNow] must not jump backwards while the process runs. [wallNow]
+/// detects a wall-clock rollback. Tests replace this clock with a controlled
+/// one to exercise the 300-second boundary.
+abstract interface class LanNodeClock {
+  DateTime wallNow();
+  Duration monotonicNow();
+}
+
+final class _SystemLanNodeClock implements LanNodeClock {
+  const _SystemLanNodeClock();
+  static final Stopwatch _process = Stopwatch()..start();
+
+  @override
+  DateTime wallNow() => DateTime.now();
+
+  @override
+  Duration monotonicNow() => _process.elapsed;
+}
+
+/// The last successful cloud validation of one peer and credential.
+final class _LanTrust {
+  const _LanTrust({
+    required this.credentialHash,
+    required this.merchantId,
+    required this.locationId,
+    required this.monotonicAt,
+    required this.wallAt,
+  });
+
+  final String credentialHash;
+  final String merchantId;
+  final String locationId;
+  final Duration monotonicAt;
+  final DateTime wallAt;
+}
+
 /// The local API of the main station.
 ///
 /// It serves the kitchen surface only. A peer is trusted by the hash of the
-/// device credential it presents. Cloud validation pairs a new peer. After that,
-/// the stored hash is enough while the cloud is unreachable.
+/// device credential it presents. Cloud validation pairs a new peer. The cloud
+/// answer is trusted for at most 300 seconds. A restart, a clock rollback, or
+/// an absent validation record requires a new cloud validation.
 final class LanKdsNode {
   LanKdsNode({
     required LocalWorkingCopy local,
@@ -30,13 +69,15 @@ final class LanKdsNode {
     Future<int> Function(String commandId)? resolveConflict,
     this.port = lanNodePort,
     http.Client? client,
+    LanNodeClock? clock,
   }) : _local = local,
        _journal = journal,
        _store = store,
        _identity = identity,
        _cloudBase = cloudBase,
        _resolveConflict = resolveConflict,
-       _client = client ?? http.Client();
+       _client = client ?? http.Client(),
+       _clock = clock ?? const _SystemLanNodeClock();
 
   final LocalWorkingCopy _local;
   final EncryptedOfflineJournal _journal;
@@ -45,14 +86,19 @@ final class LanKdsNode {
   final Uri _cloudBase;
   final Future<int> Function(String commandId)? _resolveConflict;
   final http.Client _client;
+  final LanNodeClock _clock;
   final int port;
+
+  static const Duration _trustPeriod = Duration(seconds: 300);
+  static const Duration _probePeriod = Duration(seconds: 30);
 
   HttpServer? _server;
   StreamSubscription<HttpRequest>? _requests;
   final StreamController<void> _changed = StreamController<void>.broadcast();
-  final Map<String, DateTime> _validatedAt = {};
+  final Map<String, _LanTrust> _trusted = {};
   final HubAccountSequencer _accountSequencer = HubAccountSequencer();
-  DateTime? _cloudProbeAfter;
+  Duration? _lastProbeAt;
+  Duration? _nextProbeAfter;
   bool _stopped = false;
 
   Uri? get boundUri {
@@ -1057,13 +1103,21 @@ final class LanKdsNode {
             scopeLocation,
             deviceId,
           );
-    final lastValidated = _validatedAt[deviceId];
-    final validateNow =
-        lastValidated == null ||
-        DateTime.now().difference(lastValidated) > const Duration(seconds: 30);
-    final cloudProbeAfter = _cloudProbeAfter;
-    if (validateNow &&
-        (cloudProbeAfter == null || DateTime.now().isAfter(cloudProbeAfter))) {
+    final trust = _freshTrust(
+      deviceId: deviceId,
+      credentialHash: hash,
+      merchantId: scopeMerchant,
+      locationId: scopeLocation,
+    );
+    final now = _clock.monotonicNow();
+    final probeDue =
+        trust == null ||
+        _lastProbeAt == null ||
+        now - _lastProbeAt! >= _probePeriod;
+    final probeThrottled =
+        trust != null && _nextProbeAfter != null && now < _nextProbeAfter!;
+    if (probeDue && !probeThrottled) {
+      _lastProbeAt = now;
       try {
         final response = await _client
             .get(
@@ -1096,6 +1150,7 @@ final class LanKdsNode {
               'merchantMismatch=${merchantId != null && merchantId != device.merchantId} '
               'locationMismatch=${locationId != null && locationId != device.locationId}',
             );
+            _trusted.remove(deviceId);
             if (known != null) {
               await _local.deleteNetworkDevice(
                 known.merchantId,
@@ -1105,7 +1160,7 @@ final class LanKdsNode {
             }
             throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
           }
-          final now = _now();
+          final seenAt = _now();
           final peer = LocalNetworkDevice(
             merchantId: device.merchantId,
             locationId: device.locationId!,
@@ -1115,13 +1170,19 @@ final class LanKdsNode {
             address: request.connectionInfo?.remoteAddress.address,
             port: request.connectionInfo?.remotePort,
             credentialHash: hash,
-            pairedAt: known?.pairedAt ?? now,
-            lastSeenAt: now,
+            pairedAt: known?.pairedAt ?? seenAt,
+            lastSeenAt: seenAt,
             status: 'active',
           );
           await _local.writeNetworkDevice(peer);
-          _validatedAt[deviceId] = DateTime.now();
-          _cloudProbeAfter = null;
+          _trusted[deviceId] = _LanTrust(
+            credentialHash: hash,
+            merchantId: device.merchantId,
+            locationId: device.locationId!,
+            monotonicAt: _clock.monotonicNow(),
+            wallAt: _clock.wallNow(),
+          );
+          _nextProbeAfter = null;
           return _LanPeer(peer);
         }
         if (response.statusCode < 500) {
@@ -1129,6 +1190,7 @@ final class LanKdsNode {
             '[umipos] lan_peer_validation_refused '
             'status=${response.statusCode}',
           );
+          _trusted.remove(deviceId);
           if (known != null) {
             await _local.deleteNetworkDevice(
               known.merchantId,
@@ -1145,16 +1207,23 @@ final class LanKdsNode {
           '[umipos] lan_peer_validation_unavailable '
           'type=${error.runtimeType}',
         );
-        // No cloud answer. A stored credential hash is the only offline trust.
-        _cloudProbeAfter = DateTime.now().add(const Duration(seconds: 30));
+        _nextProbeAfter = _clock.monotonicNow() + _probePeriod;
       }
     }
-    if (known == null ||
+    final trusted = _freshTrust(
+      deviceId: deviceId,
+      credentialHash: hash,
+      merchantId: scopeMerchant,
+      locationId: scopeLocation,
+    );
+    if (trusted == null ||
+        known == null ||
         known.credentialHash != hash ||
         known.status != 'active') {
       debugPrint(
         '[umipos] lan_peer_trust_missing '
         'known=${known != null} '
+        'trusted=${trusted != null} '
         'hashMatch=${known?.credentialHash == hash} '
         'status=${known?.status}',
       );
@@ -1166,6 +1235,34 @@ final class LanKdsNode {
     );
     await _local.writeNetworkDevice(seen);
     return _LanPeer(seen);
+  }
+
+  _LanTrust? _freshTrust({
+    required String deviceId,
+    required String credentialHash,
+    required String? merchantId,
+    required String? locationId,
+  }) {
+    final trust = _trusted[deviceId];
+    if (trust == null || merchantId == null || locationId == null) {
+      return null;
+    }
+    if (trust.credentialHash != credentialHash ||
+        trust.merchantId != merchantId ||
+        trust.locationId != locationId) {
+      return null;
+    }
+    final wall = _clock.wallNow();
+    final monotonic = _clock.monotonicNow();
+    if (wall.isBefore(trust.wallAt) || monotonic < trust.monotonicAt) {
+      _trusted.remove(deviceId);
+      return null;
+    }
+    if (monotonic - trust.monotonicAt >= _trustPeriod) {
+      _trusted.remove(deviceId);
+      return null;
+    }
+    return trust;
   }
 
   void _recordClock(HttpRequest request) {

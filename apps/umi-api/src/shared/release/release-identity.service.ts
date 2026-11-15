@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CONTRACT_VERSION } from '@umi/contract';
+import { API_MAJOR_VERSION, CONTRACT_VERSION } from '@umi/contract';
 import type { AppConfig } from '../config/config.schema';
 
 export interface ReleaseIdentity {
@@ -9,6 +9,7 @@ export interface ReleaseIdentity {
   gitCommit: string;
   buildTimestamp: string;
   environment: AppConfig['UMI_ENVIRONMENT'];
+  apiMajorVersion: number;
   contractVersion: string;
   expectedSchemaVersion: string;
   configurationSchemaVersion: string;
@@ -27,6 +28,11 @@ export class ReleaseIdentityService {
       gitCommit: this.config.get('RELEASE_GIT_COMMIT', { infer: true }) ?? 'unavailable',
       buildTimestamp: this.config.get('RELEASE_BUILD_TIMESTAMP', { infer: true }) ?? 'unavailable',
       environment: this.config.get('UMI_ENVIRONMENT', { infer: true }),
+      // The URL major a client must check. This is a different axis from the
+      // artifact version below: the artifact can move to 3.x while the server
+      // still speaks /api/v1. A client that compares artifact majors treats a
+      // documentation-only release as a breaking API change.
+      apiMajorVersion: API_MAJOR_VERSION,
       // The contract's OWN version, not a value handed in at build time.
       //
       // `CONTRACT_VERSION` is an environment variable that at least three places

@@ -127,6 +127,169 @@ void main() {
   });
 
   test(
+    'each synthetic fixture bound accepts the limit and refuses the next value',
+    () async {
+      final now = DateTime.now().toUtc();
+      late DateTime trustedNow;
+      const engine = OfflineCheckoutEligibilityEngine();
+
+      Future<(EncryptedOfflineJournal, ValidatedOfflinePolicy)>
+      fixture() async {
+        final journal = EncryptedOfflineJournal(
+          _MemoryCipherStore(),
+          web: false,
+        );
+        final cache = OfflinePolicyCache(journal, web: false);
+        await cache.save(_policy(now), now);
+        trustedNow = DateTime.now().toUtc();
+        return (
+          journal,
+          await cache.validated(authority: _authority(), now: trustedNow),
+        );
+      }
+
+      OfflineCheckoutEligibility evaluate(
+        ValidatedOfflinePolicy policy,
+        OfflineJournalSnapshot journal, {
+        int amount = 1000,
+        DateTime? catalog,
+        DateTime? pricing,
+        DateTime? tax,
+      }) => engine.evaluate(
+        authority: _authority(),
+        policy: policy,
+        journal: journal,
+        facts: OfflineCheckoutFacts(
+          amountMinorUnits: amount,
+          catalogSnapshotAt: catalog ?? trustedNow,
+          pricingSnapshotAt: pricing ?? trustedNow,
+          taxSnapshotAt: tax ?? trustedNow,
+          connectivity: PosConnectivity.offline,
+          paymentMethod: 'cash',
+        ),
+        trustedNow: trustedNow,
+      );
+
+      // Accumulated MXN 300: 20,001 + 9,999 = 30,000, and the next peso refuses.
+      var (journal, policy) = await fixture();
+      await _appendCash(journal, 20001, 1);
+      expect(
+        evaluate(policy, await journal.load(), amount: 9999).status,
+        'eligible',
+      );
+      expect(
+        evaluate(policy, await journal.load(), amount: 10000).reason,
+        'accumulated_amount_limit',
+      );
+
+      // Three pending sales: the third fills the count, the fourth refuses.
+      (journal, policy) = await fixture();
+      await _appendCash(journal, 1, 2);
+      await _appendCash(journal, 1, 3);
+      expect(evaluate(policy, await journal.load()).status, 'eligible');
+      await _appendCash(journal, 1, 4);
+      expect(evaluate(policy, await journal.load()).reason, 'sale_count_limit');
+
+      // Ten queued commands: the tenth is allowed, the next request sees ten and refuses.
+      (journal, policy) = await fixture();
+      for (var index = 0; index < 9; index += 1) {
+        await _appendAck(journal, 10 + index);
+      }
+      expect(evaluate(policy, await journal.load()).status, 'eligible');
+      await _appendAck(journal, 19);
+      expect(evaluate(policy, await journal.load()).reason, 'queue_full');
+
+      // Catalog age 900 seconds, pricing and tax age 600 seconds.
+      (journal, policy) = await fixture();
+      expect(
+        evaluate(
+          policy,
+          await journal.load(),
+          catalog: trustedNow.subtract(const Duration(seconds: 900)),
+        ).status,
+        'eligible',
+      );
+      expect(
+        evaluate(
+          policy,
+          await journal.load(),
+          catalog: trustedNow.subtract(const Duration(seconds: 901)),
+        ).reason,
+        'catalog_stale',
+      );
+      expect(
+        evaluate(
+          policy,
+          await journal.load(),
+          pricing: trustedNow.subtract(const Duration(seconds: 600)),
+        ).status,
+        'eligible',
+      );
+      expect(
+        evaluate(
+          policy,
+          await journal.load(),
+          pricing: trustedNow.subtract(const Duration(seconds: 601)),
+        ).reason,
+        'pricing_stale',
+      );
+      expect(
+        evaluate(
+          policy,
+          await journal.load(),
+          tax: trustedNow.subtract(const Duration(seconds: 600)),
+        ).status,
+        'eligible',
+      );
+      expect(
+        evaluate(
+          policy,
+          await journal.load(),
+          tax: trustedNow.subtract(const Duration(seconds: 601)),
+        ).reason,
+        'tax_stale',
+      );
+
+      // Policy age 600 seconds. A new cache over the same journal proves the
+      // persisted trusted time survives a process restart.
+      final restartJournal = EncryptedOfflineJournal(
+        _MemoryCipherStore(),
+        web: false,
+      );
+      final restartCache = OfflinePolicyCache(restartJournal, web: false);
+      final refreshedAt = DateTime.now().toUtc();
+      await restartCache.save(
+        _policy(
+          refreshedAt,
+          expiresAt: refreshedAt.add(const Duration(days: 1)),
+        ),
+        refreshedAt,
+      );
+      final restarted = OfflinePolicyCache(restartJournal, web: false);
+      expect(
+        (await restarted.validated(
+          authority: _authority(),
+          now: refreshedAt.add(const Duration(seconds: 600)),
+        )).cash.version,
+        'policy-1',
+      );
+      await expectLater(
+        restarted.validated(
+          authority: _authority(),
+          now: refreshedAt.add(const Duration(seconds: 601)),
+        ),
+        throwsA(
+          isA<OfflineJournalException>().having(
+            (error) => error.category,
+            'category',
+            'policy_expired',
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
     'eligible cash checkout appends one encrypted provisional sale',
     () async {
       final store = _MemoryCipherStore();
@@ -239,6 +402,42 @@ void main() {
       expect((await journal.load()).entries, hasLength(1));
       expect(store.ciphertext, isNot(contains('catalog-1')));
     },
+  );
+}
+
+Future<void> _appendCash(
+  EncryptedOfflineJournal journal,
+  int amount,
+  int sequence,
+) async {
+  await journal.append(
+    commandId: _id(300 + sequence),
+    deviceId: _id(3),
+    credentialVersion: 1,
+    merchantId: _id(1),
+    locationId: _id(2),
+    operatorSessionId: _id(4),
+    idempotencyKey: _id(400 + sequence),
+    commandType: 'pos.checkout.cash',
+    payload: {
+      'snapshot': {'amountDueMinorUnits': amount},
+    },
+    maxPendingCashCount: 3,
+    maxPendingCashMinorUnits: 30000,
+    cashAmountMinorUnits: amount,
+  );
+}
+
+Future<void> _appendAck(EncryptedOfflineJournal journal, int sequence) async {
+  await journal.append(
+    commandId: _id(500 + sequence),
+    deviceId: _id(3),
+    credentialVersion: 1,
+    merchantId: _id(1),
+    locationId: _id(2),
+    operatorSessionId: _id(4),
+    idempotencyKey: _id(600 + sequence),
+    payload: {'acknowledgement': 'safe'},
   );
 }
 

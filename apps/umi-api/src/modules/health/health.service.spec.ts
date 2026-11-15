@@ -1,9 +1,15 @@
+import type { ConfigService } from '@nestjs/config';
+import { API_MAJOR_VERSION, CONTRACT_VERSION } from '@umi/contract';
 import type { Queue } from 'bullmq';
 import { describe, expect, it, vi } from 'vitest';
+import type { AppConfig } from '../../shared/config/config.schema';
 import type { PgService } from '../../shared/database/pg.service';
 import { MetricsService } from '../../shared/operations/metrics.service';
+import {
+  ReleaseIdentityService,
+  type ReleaseIdentity,
+} from '../../shared/release/release-identity.service';
 import { HealthService } from './health.service';
-import type { ReleaseIdentityService } from '../../shared/release/release-identity.service';
 
 const release = {
   current: vi.fn().mockReturnValue({
@@ -12,6 +18,7 @@ const release = {
     gitCommit: 'a'.repeat(40),
     buildTimestamp: '2026-08-11T12:00:00.000Z',
     environment: 'pilot',
+    apiMajorVersion: API_MAJOR_VERSION,
     contractVersion: '2.12.0',
     expectedSchemaVersion: 'build-v3-45',
     configurationSchemaVersion: '1',
@@ -41,8 +48,27 @@ describe('HealthService', () => {
       db: true,
       redis: true,
       schema: { current: 'build-v3-45', compatible: true },
-      release: { version: '6.0.0-pilot.1' },
+      release: { version: '6.0.0-pilot.1', apiMajorVersion: API_MAJOR_VERSION },
     });
+  });
+
+  it('reports the generated HTTP major and the generated artifact version', () => {
+    const values: Record<string, string> = {
+      UMI_ENVIRONMENT: 'pilot',
+      CONFIG_SCHEMA_VERSION: '1',
+      MINIMUM_POS_VERSION: '0.1.0',
+      MINIMUM_DASHBOARD_VERSION: '0.1.0',
+    };
+    const config = {
+      get: (key: string) => values[key],
+    };
+    const identity: ReleaseIdentity = new ReleaseIdentityService(
+      config as unknown as ConfigService<AppConfig, true>,
+    ).current();
+
+    expect(identity.apiMajorVersion).toBe(API_MAJOR_VERSION);
+    expect(identity.apiMajorVersion).toBe(1);
+    expect(identity.contractVersion).toBe(CONTRACT_VERSION);
   });
 
   it('reports degraded readiness without exposing dependency errors', async () => {
