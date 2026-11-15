@@ -24,9 +24,7 @@ import {
   Database,
   USERS,
   Checks,
-  canonical,
   ensureDir,
-  sha256,
   sha256File,
   sleep,
   writeJson,
@@ -191,6 +189,16 @@ async function main() {
     preflight.output = `${result.stdout || ''}${result.stderr || ''}`;
     preflight.status = result.status === 0 ? 'PASS' : 'FAIL';
   }
+  if (fixtures) {
+    try {
+      preflight.clock = await run.db.one(
+        "select i1_clock.now()::text as now, i1_clock.transaction_timestamp()::text as transaction_timestamp, current_setting('search_path') as search_path",
+      );
+      preflight.clockAnchor = '2026-11-08T20:00:00Z';
+    } catch (error) {
+      preflight.clock = { error: String(error) };
+    }
+  }
   writeJson(join(out, 'preflight.json'), preflight);
   run.log(`preflight ${preflight.status} (${preflight.exitCode})`);
 
@@ -317,7 +325,7 @@ async function main() {
     },
   };
   writeJson(join(out, 'manifest.json'), manifest);
-  const manifestHash = sha256(JSON.stringify(canonical(manifest)));
+  const manifestHash = sha256File(join(out, 'manifest.json'));
   writeFileSync(join(out, 'manifest.sha256'), `${manifestHash}  manifest.json\n`);
 
   const allFiles = listFiles(out)
