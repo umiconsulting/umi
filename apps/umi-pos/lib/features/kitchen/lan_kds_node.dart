@@ -98,10 +98,25 @@ final class LanKdsNode {
   final Map<String, _LanTrust> _trusted = {};
   final HubAccountSequencer _accountSequencer = HubAccountSequencer();
   Duration? _lastProbeAt;
-  Duration? _nextProbeAfter;
-  /// The credential hash that caused the backoff. A different credential for the
-  /// same device id may probe again: a stranger must not lock the real peer out.
-  String? _probeRefusedCredentialHash;
+  /// Per-credential probe backoff. Bounded: four refused credentials is enough
+  /// for a genuine change and keeps a stranger from growing the map.
+  static const int _probeBackoffCapacity = 4;
+  final Map<String, Duration> _probeBackoff = {};
+
+  void _armProbeBackoff(String credentialHash) {
+    final now = _clock.monotonicNow();
+    _probeBackoff.removeWhere((_, until) => until <= now);
+    if (!_probeBackoff.containsKey(credentialHash) &&
+        _probeBackoff.length >= _probeBackoffCapacity) {
+      _probeBackoff.remove(_probeBackoff.keys.first);
+    }
+    _probeBackoff[credentialHash] = now + _probePeriod;
+  }
+
+  bool _probeThrottled(String credentialHash, Duration now) {
+    final until = _probeBackoff[credentialHash];
+    return until != null && now < until;
+  }
   bool _stopped = false;
 
   Uri? get boundUri {
@@ -1117,10 +1132,7 @@ final class LanKdsNode {
         trust == null ||
         _lastProbeAt == null ||
         now - _lastProbeAt! >= _probePeriod;
-    final probeThrottled =
-        _nextProbeAfter != null &&
-        now < _nextProbeAfter! &&
-        _probeRefusedCredentialHash == hash;
+    final probeThrottled = _probeThrottled(hash, now);
     if (probeDue && !probeThrottled) {
       _lastProbeAt = now;
       try {
@@ -1166,8 +1178,7 @@ final class LanKdsNode {
             // Arm the backoff before the throw. `on _LanRefusal` rethrows
             // without the catch below, so a missing assignment probes again on
             // every request.
-            _nextProbeAfter = _clock.monotonicNow() + _probePeriod;
-            _probeRefusedCredentialHash = hash;
+            _armProbeBackoff(hash);
             throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
           }
           final seenAt = _now();
@@ -1192,8 +1203,7 @@ final class LanKdsNode {
             monotonicAt: _clock.monotonicNow(),
             wallAt: _clock.wallNow(),
           );
-          _nextProbeAfter = null;
-          _probeRefusedCredentialHash = null;
+          _probeBackoff.clear();
           return _LanPeer(peer);
         }
         if (response.statusCode < 500) {
@@ -1211,13 +1221,11 @@ final class LanKdsNode {
           }
           // The 4xx refusal leaves the device untrusted. Arm the backoff here:
           // the `on _LanRefusal` rethrow skips the catch that would arm it.
-          _nextProbeAfter = _clock.monotonicNow() + _probePeriod;
-          _probeRefusedCredentialHash = hash;
+          _armProbeBackoff(hash);
           throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
         }
         // A 5xx is a failed probe. Apply the same backoff as a transport failure.
-        _nextProbeAfter = _clock.monotonicNow() + _probePeriod;
-        _probeRefusedCredentialHash = hash;
+        _armProbeBackoff(hash);
       } on _LanRefusal {
         rethrow;
       } catch (error) {
@@ -1225,8 +1233,7 @@ final class LanKdsNode {
           '[umipos] lan_peer_validation_unavailable '
           'type=${error.runtimeType}',
         );
-        _nextProbeAfter = _clock.monotonicNow() + _probePeriod;
-        _probeRefusedCredentialHash = hash;
+        _armProbeBackoff(hash);
       }
     }
     final trusted = _freshTrust(

@@ -1210,6 +1210,34 @@ void main() {
   );
 
   test(
+    'alternating refused credentials cannot bypass the backoff',
+    () async {
+      final clock = _FakeClock();
+      final credentials = <String>[];
+      final client = MockClient((request) async {
+        credentials.add(request.headers['x-umi-device-credential'] ?? '');
+        return http.Response('{}', 403);
+      });
+      final harness = await _startControlled(
+        clock: clock,
+        client: client,
+        seedDevice: false,
+      );
+
+      for (var request = 0; request < 5; request += 1) {
+        clock.advance(const Duration(seconds: 1));
+        final credential = request.isEven ? 'refused-a' : 'refused-b';
+        expect(await _board(harness, headers: _headers(credential: credential)), 403);
+      }
+      expect(credentials, hasLength(2));
+      expect(
+        credentials.toSet(),
+        {'refused-a', 'refused-b'},
+      );
+    },
+  );
+
+  test(
     'a 2xx identity mismatch arms the backoff and probes once',
     () async {
       final clock = _FakeClock();
