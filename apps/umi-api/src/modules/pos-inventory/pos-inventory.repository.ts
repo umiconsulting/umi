@@ -319,11 +319,77 @@ export class PosInventoryRepository {
     );
   }
 
+  /** Provision a conservative policy and renew its lease without changing its rules. */
+  private async ensurePolicy(
+    client: PoolClient,
+    userId: string,
+    merchantId: string,
+    locationId: string,
+  ) {
+    const branch = await client.query(
+      `SELECT id FROM merchant.location WHERE merchant_id=$1::uuid AND id=$2::uuid AND status='active' FOR UPDATE`,
+      [merchantId, locationId],
+    );
+    if (!branch.rowCount) throw new ConflictException({ code: 'LOCATION_NOT_FOUND' });
+    const existing = await client.query<{
+      id: string;
+      expired: boolean;
+      rules: Record<string, unknown>;
+    }>(
+      `SELECT id::text, expires_at<=clock_timestamp() AS expired, to_jsonb(p) AS rules FROM merchant.inventory_policy p WHERE merchant_id=$1::uuid AND location_id=$2::uuid FOR UPDATE`,
+      [merchantId, locationId],
+    );
+    const prior = existing.rows[0];
+    if (prior && !prior.expired) return;
+    const version = `auto-v1:${randomUUID()}`;
+    const fingerprint = commandFingerprint('inventory.policy.lease', {
+      merchantId,
+      locationId,
+      version,
+      rules: prior?.rules ?? 'conservative-defaults-v1',
+    });
+    let policyId = prior?.id;
+    if (prior) {
+      await client.query(
+        `UPDATE merchant.inventory_policy SET version=$3, issued_at=clock_timestamp(), expires_at=clock_timestamp()+interval '1 day', fingerprint=$4 WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+        [merchantId, prior.id, version, fingerprint],
+      );
+    } else {
+      let stock = await client.query<{ id: string }>(
+        `SELECT id::text FROM merchant.inventory_location WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND active AND sale_fulfillment_eligible ORDER BY created_at,id LIMIT 1`,
+        [merchantId, locationId],
+      );
+      if (!stock.rowCount)
+        stock = await client.query<{ id: string }>(
+          `INSERT INTO merchant.inventory_location(merchant_id,location_id,public_reference,display_name,location_type) VALUES($1::uuid,$2::uuid,$3,'Inventario principal','business_location') RETURNING id::text`,
+          [merchantId, locationId, `AUTO-${randomUUID()}`],
+        );
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO merchant.inventory_policy(merchant_id,location_id,inventory_location_id,version,fingerprint) VALUES($1::uuid,$2::uuid,$3::uuid,$4,$5) RETURNING id::text`,
+        [merchantId, locationId, stock.rows[0].id, version, fingerprint],
+      );
+      policyId = inserted.rows[0].id;
+    }
+    await client.query(
+      `INSERT INTO merchant.audit_event(merchant_id,location_id,actor_user_id,event_type,entity_type,entity_id,outcome,public_data,correlation_id) VALUES($1::uuid,$2::uuid,$3::uuid,$4,'inventory_policy',$5::uuid,'success',$6::jsonb,$7)`,
+      [
+        merchantId,
+        locationId,
+        userId,
+        prior ? 'inventory.policy.renewed' : 'inventory.policy.created',
+        policyId,
+        JSON.stringify({ version, fingerprint }),
+        randomUUID(),
+      ],
+    );
+  }
+
   overview(userId: string, merchantId: string, query: InventoryQuery): Promise<InventoryOverview> {
     return this.pg.runWithMerchant(
       merchantId,
       userId,
       async (client) => {
+        await this.ensurePolicy(client, userId, merchantId, query.locationId);
         await client.query(`SELECT merchant.expire_inventory_reservations($1::uuid,$2::uuid)`, [
           merchantId,
           query.locationId,

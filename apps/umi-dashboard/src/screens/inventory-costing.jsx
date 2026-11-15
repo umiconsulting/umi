@@ -1,3 +1,4 @@
+import InventoryPlanning from './inventory-planning.jsx';
 import { useMemo, useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
@@ -90,6 +91,7 @@ const PLATE_VIEWS = [
  */
 const TABS = [
   { id: 'costing', label: msg`Costo` },
+  { id: 'planning', label: msg`Plan de compra` },
   { id: 'variance', label: msg`Variación` },
   { id: 'menu', label: msg`Ingeniería de menú` },
 ];
@@ -284,9 +286,18 @@ export default function InventoryCostingScreen() {
       ) ?? null)
     : null;
 
+  if (tab === 'planning')
+    return (
+      <div className="fade-up" style={{ display: 'grid', gap: 20 }}>
+        <HubTabs tabs={tabs} active={tab} onChange={setTab} ariaLabel={t`Costos y márgenes`} />
+        <InventoryPlanning />
+      </div>
+    );
+
   if (loading && !loaded) {
     return (
       <div className="fade-up" role="status" style={{ padding: 24, color: 'var(--ink-3)' }}>
+        <HubTabs tabs={tabs} active={tab} onChange={setTab} ariaLabel={t`Costos y márgenes`} />
         <Trans>Cargando el costo de lo que vendiste…</Trans>
       </div>
     );
@@ -295,6 +306,7 @@ export default function InventoryCostingScreen() {
   if (error) {
     return (
       <div className="fade-up card" style={{ padding: 20 }}>
+        <HubTabs tabs={tabs} active={tab} onChange={setTab} ariaLabel={t`Costos y márgenes`} />
         <div className="eyebrow">
           <Trans>Costos y márgenes</Trans>
         </div>

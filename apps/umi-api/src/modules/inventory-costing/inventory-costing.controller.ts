@@ -1,5 +1,7 @@
+import { InventoryPlanningService } from './inventory-planning.service';
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import {
+  InventoryPlanQuery,
   InventoryCostBasisQuery,
   InventoryCostingDayQuery,
   InventoryPlateQuery,
@@ -40,7 +42,18 @@ import { InventoryCostingService } from './inventory-costing.service';
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard)
 @Controller('api/merchants/:merchantId/inventory-costing')
 export class InventoryCostingController {
-  constructor(private readonly costing: InventoryCostingService) {}
+  constructor(
+    private readonly costing: InventoryCostingService,
+    private readonly planning: InventoryPlanningService,
+  ) {}
+
+  @Get('plan')
+  plan(
+    @Merchant() access: MerchantAccess,
+    @Query(new ZodValidationPipe(InventoryPlanQuery)) query: InventoryPlanQuery,
+  ) {
+    return this.planning.plan(access, query);
+  }
 
   /** What each item cost, weighted across the receipts it actually arrived on. */
   @Get('cost-basis')

@@ -814,6 +814,27 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
   {
+    id: 'inventoryCosting.plan',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/inventory-costing/plan',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'InventoryPlanQuery',
+      response: 'InventoryPlan',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+
+  {
     id: 'inventoryCosting.lowStock',
     method: 'GET',
     path: '/api/merchants/:merchantId/inventory-costing/low-stock',

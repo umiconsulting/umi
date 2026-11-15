@@ -18,6 +18,8 @@ import { canSwitchLocations } from '../auth/location-authority';
 
 export interface Capabilities {
   merchant: {
+    inventoryPlanningEmailEnabled: boolean;
+    purchaseDays: number[];
     id: string;
     /** The published URL key. Null for a café created after cutover — route by id. */
     handle: string | null;
@@ -130,6 +132,8 @@ export class MerchantsService {
     };
     const base = {
       merchant: {
+        inventoryPlanningEmailEnabled: branding.inventoryPlanningEmailEnabled ?? false,
+        purchaseDays: branding.purchaseDays ?? [],
         id: access.merchantId,
         handle: access.handle,
         name: access.name,
@@ -161,6 +165,8 @@ export class MerchantsService {
   buildSettings(capabilities: Capabilities): Record<string, unknown> {
     const dashboard = capabilities.products.dashboard;
     return {
+      inventoryPlanningEmailEnabled: capabilities.merchant.inventoryPlanningEmailEnabled,
+      purchaseDays: capabilities.merchant.purchaseDays,
       id: capabilities.merchant.id,
       name: capabilities.merchant.name,
       handle: capabilities.merchant.handle,

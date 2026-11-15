@@ -1,5 +1,9 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -8,6 +12,7 @@ import {
   Max,
   Min,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 
 /**
@@ -54,6 +59,19 @@ export class SegmentThresholdsDto {
 }
 
 export class UpdateSettingsDto {
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsBoolean()
+  inventoryPlanningEmailEnabled?: boolean;
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsArray()
+  @ArrayMaxSize(7)
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(6, { each: true })
+  purchaseDays?: number[];
+
   @IsOptional()
   @IsString()
   name?: string;
