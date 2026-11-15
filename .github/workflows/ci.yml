@@ -166,9 +166,15 @@ jobs:
             selected("pos"; .changes.outputs.pos == "true")
           ' <<< "$RESULTS"
 
+  # always() and !cancelled() suppress the default success() check. That check
+  # is false when a dependency of CI ready is skipped. The explicit needs
+  # results keep the deploy gate closed.
   deploy-api-staging:
     needs: [ready, changes]
     if: >-
+      always() && !cancelled() &&
+      needs.ready.result == 'success' &&
+      needs.changes.result == 'success' &&
       (github.event_name == 'push' || inputs.deploy) &&
       github.ref == 'refs/heads/staging' &&
       (needs.changes.outputs.api == 'true' || inputs.deploy)
@@ -185,6 +191,9 @@ jobs:
   deploy-api-production:
     needs: [ready, changes]
     if: >-
+      always() && !cancelled() &&
+      needs.ready.result == 'success' &&
+      needs.changes.result == 'success' &&
       (github.event_name == 'push' || inputs.deploy) &&
       github.ref == 'refs/heads/main' && vars.UMI_REWARD_RELEASE_HOLD != 'true' &&
       (needs.changes.outputs.api == 'true' || inputs.deploy)
@@ -201,6 +210,9 @@ jobs:
   deploy-dashboard:
     needs: [ready, changes]
     if: >-
+      always() && !cancelled() &&
+      needs.ready.result == 'success' &&
+      needs.changes.result == 'success' &&
       (needs.changes.outputs.dashboard == 'true' || inputs.deploy) &&
       (github.ref != 'refs/heads/main' || vars.UMI_REWARD_RELEASE_HOLD != 'true') &&
       (((github.event_name == 'push' || inputs.deploy) &&
@@ -215,6 +227,9 @@ jobs:
   deploy-landing:
     needs: [ready, changes]
     if: >-
+      always() && !cancelled() &&
+      needs.ready.result == 'success' &&
+      needs.changes.result == 'success' &&
       (needs.changes.outputs.landing == 'true' || inputs.deploy) &&
       (github.event_name == 'push' || inputs.deploy) &&
       github.ref == 'refs/heads/main'
