@@ -980,6 +980,7 @@ final class OfflineRecoveryController extends ChangeNotifier {
                 _isDefiniteNonFinancialCartRefusalGuidance(
                   entry.failure?['retryable'],
                   entry.command.commandType,
+                  entry.failure?['classification'],
                 ),
           )
           .firstOrNull;
@@ -1025,12 +1026,17 @@ final class OfflineRecoveryController extends ChangeNotifier {
   ) => _isDefiniteNonFinancialCartRefusalGuidance(
     result.failure?['retryable'],
     command.commandType,
+    result.failure?['classification'],
   );
 
   bool _isDefiniteNonFinancialCartRefusalGuidance(
     Object? retryable,
     String commandType,
+    Object? classification,
   ) {
+    // A payment hold is never auto-resolved. The account stream stays blocked
+    // until the operator finishes or cancels the payment.
+    if (classification == 'payment_unresolved') return false;
     const safeCommands = {
       'pos.cart.open',
       'pos.cart.line.add',

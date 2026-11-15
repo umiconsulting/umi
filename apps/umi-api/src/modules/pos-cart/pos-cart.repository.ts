@@ -4,6 +4,7 @@ import type {
   Cart,
   CartLineInput,
   PosIncomingOrder,
+  PosIncomingOrderDetail,
   SuspendCartRequest,
   SetCartAccountDetailsRequest,
   AssignCartTableRequest,
@@ -1268,31 +1269,79 @@ export class PosCartRepository {
     operatorSessionId: string,
     originOrderId: string | null,
   ): Promise<boolean> {
-    let channel: string | null = null;
-    if (originOrderId) {
-      // Only a real, still-open customer-channel order can be picked up. 'pos' is the till's own
-      // order and 'dashboard' is staff entry — neither is an incoming order to fulfil.
-      const order = await client.query<{ source: string }>(
-        `SELECT source FROM merchant.customer_order
-          WHERE id=$1::uuid AND merchant_id=$2::uuid
-            AND source NOT IN ('pos','dashboard')
-            AND status IN ('placed','preparing','ready')`,
-        [originOrderId, merchantId],
-      );
-      if (!order.rows[0]) return false;
-      channel = order.rows[0].source;
-    }
-    const { rowCount } = await client.query(
-      `UPDATE merchant.pos_cart
-          SET origin_order_id=$5::uuid,origin_channel=$6,
-              version=version+1,updated_at=now()
-        WHERE merchant_id=$1::uuid AND id=$2::uuid AND version=$3
-          AND operator_session_id=$4::uuid
-          AND lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
-          AND status IN ('draft','prepared')`,
-      [merchantId, cartId, expectedVersion, operatorSessionId, originOrderId, channel],
+    const current = await client.query<{
+      originOrderId: string | null;
+      firedOrderId: string | null;
+      version: number;
+      status: string;
+      lifecycleState: string;
+      lineCount: number;
+    }>(
+      `SELECT c.origin_order_id::text AS "originOrderId",
+              c.fired_order_id::text AS "firedOrderId",c.version,c.status,
+              c.lifecycle_state AS "lifecycleState",
+              (SELECT count(*) FROM merchant.pos_cart_line l
+                WHERE l.merchant_id=c.merchant_id AND l.cart_id=c.id)::int AS "lineCount"
+         FROM merchant.pos_cart c
+        WHERE c.merchant_id=$1::uuid AND c.id=$2::uuid
+          AND c.operator_session_id=$3::uuid
+        FOR UPDATE`,
+      [merchantId, cartId, operatorSessionId],
     );
-    return (rowCount ?? 0) > 0;
+    const row = current.rows[0];
+    if (
+      !row ||
+      row.version !== expectedVersion ||
+      !['building_cart', 'ready_for_checkout', 'recovered'].includes(row.lifecycleState) ||
+      !['draft', 'prepared'].includes(row.status)
+    ) {
+      return false;
+    }
+
+    if (!originOrderId) {
+      // Detach is allowed only before the first line and before fire. The origin
+      // stays open and returns to the incoming list.
+      if (row.firedOrderId || row.lineCount > 0) {
+        throw new ConflictException({ code: 'CART_ORIGIN_LOCKED' });
+      }
+      if (!row.originOrderId) return true;
+      await client.query(
+        `UPDATE merchant.pos_cart
+            SET origin_order_id=NULL,origin_channel=NULL,version=version+1,updated_at=now()
+          WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+        [merchantId, cartId],
+      );
+      return true;
+    }
+
+    if (row.firedOrderId) {
+      throw new ConflictException({ code: 'CART_ORIGIN_ALREADY_FIRED' });
+    }
+    // Same origin is idempotent: a repeated bind is a no-op.
+    if (row.originOrderId === originOrderId) return true;
+    if (row.lineCount > 0) {
+      throw new ConflictException({ code: 'CART_ORIGIN_CART_NOT_EMPTY' });
+    }
+
+    // Only a real, still-open customer-channel order can be picked up. 'pos' is
+    // the till's own order and 'dashboard' is staff entry.
+    const order = await client.query<{ source: string }>(
+      `SELECT source FROM merchant.customer_order
+        WHERE id=$1::uuid AND merchant_id=$2::uuid
+          AND source NOT IN ('pos','dashboard')
+          AND status IN ('placed','preparing','ready')`,
+      [originOrderId, merchantId],
+    );
+    if (!order.rows[0]) throw new ConflictException({ code: 'CART_ORIGIN_NOT_OPEN' });
+    const channel = order.rows[0].source;
+    await client.query(
+      `UPDATE merchant.pos_cart
+          SET origin_order_id=$3::uuid,origin_channel=$4,
+              version=version+1,updated_at=now()
+        WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [merchantId, cartId, originOrderId, channel],
+    );
+    return true;
   }
 
   // The order type (plan §8.2 F3, decision D5). The operator chooses how the order
@@ -1422,6 +1471,97 @@ export class PosCartRepository {
   }
 
   /**
+   * One incoming order with its live lines. Read-only: the settlement cart compares
+   * against this, and the POS shows it before "Atender".
+   */
+  async getIncomingOrder(
+    merchantId: string,
+    locationId: string,
+    userId: string,
+    orderId: string,
+  ): Promise<PosIncomingOrderDetail | null> {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const summary = await client.query<{
+          orderId: string;
+          channel: PosIncomingOrderDetail['channel'];
+          status: PosIncomingOrderDetail['status'];
+          reference: string | null;
+          customerName: string | null;
+          itemCount: string;
+          totalMinorUnits: string;
+          placedAt: Date | null;
+        }>(
+          `SELECT o.id::text AS "orderId",o.source AS channel,o.status,
+                  coalesce(o.external_ref,o.id::text) AS reference,
+                  c.name AS "customerName",
+                  coalesce(cnt.n,0)::bigint AS "itemCount",
+                  coalesce(ot.total,0)::bigint AS "totalMinorUnits",
+                  o.placed_at AS "placedAt"
+           FROM merchant.customer_order o
+           LEFT JOIN merchant.customer c ON c.id=o.customer_id AND c.merchant_id=o.merchant_id
+           LEFT JOIN merchant.order_total ot ON ot.order_id=o.id
+           LEFT JOIN LATERAL (
+             SELECT count(*) AS n FROM merchant.order_item i
+             WHERE i.order_id=o.id AND i.voided_at IS NULL
+           ) cnt ON true
+           WHERE o.merchant_id=$1::uuid AND o.id=$3::uuid
+             AND o.source NOT IN ('pos','dashboard')
+             AND o.status IN ('placed','preparing','ready')
+             AND (o.location_id=$2::uuid OR o.location_id IS NULL)`,
+          [merchantId, locationId, orderId],
+        );
+        const order = summary.rows[0];
+        if (!order) return null;
+        const lines = await client.query<{
+          lineId: string;
+          productId: string | null;
+          name: string;
+          variantName: string | null;
+          quantity: number;
+          unitPrice: string;
+          notes: string | null;
+          modifiers: Array<{ name: string; quantity: number }>;
+        }>(
+          `SELECT i.id::text AS "lineId",i.product_id::text AS "productId",i.name,
+                  i.variant_name AS "variantName",i.quantity,i.unit_price::text AS "unitPrice",
+                  i.notes,
+                  COALESCE(jsonb_agg(jsonb_build_object('name',m.name,'quantity',m.quantity)
+                    ORDER BY m.name) FILTER (WHERE m.id IS NOT NULL),'[]') AS modifiers
+             FROM merchant.order_item i
+             LEFT JOIN merchant.order_item_modifier m ON m.order_item_id=i.id
+            WHERE i.order_id=$1::uuid AND i.voided_at IS NULL
+            GROUP BY i.id ORDER BY i.display_order,i.id`,
+          [orderId],
+        );
+        return {
+          orderId: order.orderId,
+          channel: order.channel,
+          status: order.status,
+          reference: order.reference,
+          customerName: order.customerName,
+          itemCount: Number(order.itemCount),
+          totalMinorUnits: Number(order.totalMinorUnits),
+          placedAt: order.placedAt ? new Date(order.placedAt).toISOString() : null,
+          lines: lines.rows.map((line) => ({
+            lineId: line.lineId,
+            productId: line.productId,
+            name: line.name,
+            variantName: line.variantName,
+            quantity: line.quantity,
+            unitPriceMinorUnits: Number(line.unitPrice),
+            notes: line.notes,
+            modifiers: line.modifiers,
+          })),
+        };
+      },
+      locationId,
+    );
+  }
+
+  /**
    * Fire a cart: write its order and project the kitchen ticket WITHOUT taking money.
    *
    * THE TRICK IS THE `external_ref`. It is the same `pos-cart:<cartId>` the checkout
@@ -1447,7 +1587,7 @@ export class PosCartRepository {
     operatorSessionId: string,
   ): Promise<
     | {
-        state: 'fired' | 'already_fired';
+        state: 'fired' | 'already_fired' | 'already_prepared';
         orderId: string;
         reference: string | null;
         lineCount: number;
@@ -1458,12 +1598,13 @@ export class PosCartRepository {
     await this.assertFinanciallyMutable(client, merchantId, cart.id);
     const current = await client.query<{
       firedOrderId: string | null;
+      originOrderId: string | null;
       version: number;
       status: string;
       lifecycleState: string;
     }>(
-      `SELECT fired_order_id::text AS "firedOrderId",version,status,
-              lifecycle_state AS "lifecycleState"
+      `SELECT fired_order_id::text AS "firedOrderId",origin_order_id::text AS "originOrderId",
+              version,status,lifecycle_state AS "lifecycleState"
          FROM merchant.pos_cart
         WHERE merchant_id=$1::uuid AND id=$2::uuid AND operator_session_id=$3::uuid
         FOR UPDATE`,
@@ -1478,6 +1619,27 @@ export class PosCartRepository {
       !['draft', 'prepared'].includes(row.status)
     )
       return { state: 'rejected' };
+
+    if (row.originOrderId) {
+      // SETTLEMENT CART (decision 1.3). The origin already owns the kitchen ticket.
+      // Fire writes no POS order and sets no fired_order_id; it is a success.
+      const origin = await client.query<{ reference: string; lineCount: string }>(
+        `SELECT COALESCE(o.external_ref,o.id::text) AS reference,
+                (SELECT count(*) FROM merchant.order_item i
+                  WHERE i.order_id=o.id AND i.voided_at IS NULL)::text AS "lineCount"
+           FROM merchant.customer_order o
+          WHERE o.id=$1::uuid AND o.merchant_id=$2::uuid`,
+        [row.originOrderId, merchantId],
+      );
+      if (!origin.rows[0]) return { state: 'rejected' };
+      return {
+        state: 'already_prepared',
+        orderId: row.originOrderId,
+        reference: origin.rows[0].reference,
+        lineCount: Math.max(1, Number(origin.rows[0].lineCount)),
+        cartVersion: row.version,
+      };
+    }
 
     if (row.firedOrderId) {
       // THE SECOND ROUND (plan §8.2 F6). The cart already created its order; the
@@ -1722,6 +1884,8 @@ export class PosCartRepository {
       accountOwnerActive: boolean;
       version: number;
       firedOrderId: string | null;
+      originOrderId: string | null;
+      originChannel: 'whatsapp' | 'web' | 'aggregator' | null;
       tableId: string | null;
       tableName: string | null;
       tableVisitId: string | null;
@@ -1743,7 +1907,9 @@ export class PosCartRepository {
                 greatest(3,length(COALESCE(c.daily_account_number,c.account_number)::text)),'0') AS "accountFolio",
               creator.full_name AS "operatorName",c.table_id::text AS "tableId",c.table_name AS "tableName",
               c.table_visit_id::text AS "tableVisitId",c.lifecycle_state AS "lifecycleState",
-              c.fired_order_id::text AS "firedOrderId",c.fulfillment_type AS "fulfillmentType",
+              c.fired_order_id::text AS "firedOrderId",
+              c.origin_order_id::text AS "originOrderId",c.origin_channel AS "originChannel",
+              c.fulfillment_type AS "fulfillmentType",
               c.business_date::text AS "businessDate",c.updated_at::text AS "updatedAt",b.currency
        FROM merchant.pos_cart c JOIN merchant.merchant b ON b.id=c.merchant_id
        LEFT JOIN runtime.operator_session os ON os.id=c.operator_session_id AND os.merchant_id=c.merchant_id

@@ -130,6 +130,11 @@ export interface NewOrder {
   pickupPerson?: string | null;
   lines: NewOrderLine[];
   discounts?: NewOrderDiscount[];
+  /**
+   * A settlement cart does not project a kitchen ticket: the origin order owns
+   * the only one. Default true keeps every existing call unchanged.
+   */
+  projectKitchen?: boolean;
 }
 
 export interface WrittenOrder {
@@ -276,7 +281,10 @@ export async function writeOrder(client: PoolClient, order: NewOrder): Promise<W
 
   // Project only preparation lines. This call uses the caller transaction, so a
   // failed checkout cannot leave kitchen work and a committed sale cannot lose it.
-  await projectKitchenOrder(client, order.merchantId, orderId);
+  // A bound settlement cart owns no ticket: the origin order already has it.
+  if (order.projectKitchen !== false) {
+    await projectKitchenOrder(client, order.merchantId, orderId);
+  }
 
   return { orderId, lineIds, created: true };
 }

@@ -18,6 +18,14 @@ abstract interface class CartRepository {
   /// The incoming commercial orders (WhatsApp, web, …) this till can pick up.
   Future<PosIncomingOrders> incomingOrders(String merchantId, CartQuery query);
 
+  /// The live lines of one incoming order, read-only. The settlement cart shows
+  /// them before the operator rings.
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  );
+
   /// Bind the active cart to the incoming order it settles, so the committed sale
   /// freezes the channel. Pass [BindCartOriginRequest.originOrderId] = null to detach.
   Future<Cart> bindOrigin(String merchantId, BindCartOriginRequest input);
@@ -328,6 +336,24 @@ final class ApiCartRepository
       method: ApiMethod.get,
       path: Uri(
         path: UmiRoutes.posCartIncomingOrders(merchantId),
+        queryParameters: {
+          'locationId': query.locationId,
+          'operatorSessionId': query.operatorSessionId,
+        },
+      ).toString(),
+    ),
+  );
+
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => PosIncomingOrderDetail.fromJson(
+    await _api.request(
+      method: ApiMethod.get,
+      path: Uri(
+        path: UmiRoutes.posCartIncomingOrder(merchantId, orderId),
         queryParameters: {
           'locationId': query.locationId,
           'operatorSessionId': query.operatorSessionId,

@@ -555,6 +555,13 @@ final class _PartialCheckoutRepository
 }
 
 final class _CartRepository implements CartRepository {
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => throw UnimplementedError('incomingOrder');
+
   bool failRead = false;
   Cart cart = Cart(
     id: '00000000-0000-4000-8000-000000000004',

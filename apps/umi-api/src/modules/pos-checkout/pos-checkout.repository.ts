@@ -1035,6 +1035,9 @@ export class PosCheckoutRepository {
     summary: PaymentSummary,
     correlationId: string,
   ): Promise<PaymentOutcome[]> {
+    // A settlement cart must still match the live origin before any tender. A
+    // mismatch is refused before money moves; no payment attempt is written.
+    await this.assertCartMatchesOrigin(client, cart);
     const outcomes: PaymentOutcome[] = [];
     for (const [position, tender] of summary.tenders.entries()) {
       const tenderFact = await client.query<{ id: string }>(
@@ -1481,6 +1484,61 @@ export class PosCheckoutRepository {
     return ledgerId;
   }
 
+  /**
+   * Decision 1.3 rule 9. Compare the cart to the live origin lines by product,
+   * variant, quantity, and sorted modifier names. The first differing line names
+   * itself in the refusal so the operator knows what changed.
+   */
+  private async assertCartMatchesOrigin(client: PoolClient, cart: CheckoutCart): Promise<void> {
+    if (!cart.originOrderId) return;
+    const origin = await client.query<{
+      productId: string | null;
+      variantName: string | null;
+      quantity: number;
+      modifiers: string[];
+    }>(
+      `SELECT i.product_id::text AS "productId",i.variant_name AS "variantName",i.quantity,
+              COALESCE(array_agg(m.name ORDER BY m.name) FILTER (WHERE m.id IS NOT NULL),'{}')
+                AS modifiers
+         FROM merchant.order_item i
+         LEFT JOIN merchant.order_item_modifier m ON m.order_item_id=i.id
+        WHERE i.order_id=$1::uuid AND i.voided_at IS NULL
+        GROUP BY i.id ORDER BY i.display_order,i.id`,
+      [cart.originOrderId],
+    );
+    const expected = origin.rows.map((row) => ({
+      productId: row.productId,
+      variantName: row.variantName,
+      quantity: row.quantity,
+      modifiers: [...row.modifiers].sort(),
+    }));
+    const actual = cart.lines.map((line) => ({
+      productId: line.productId,
+      variantName: line.variantName,
+      quantity: line.quantity,
+      modifiers: line.modifiers.map((modifier) => modifier.name).sort(),
+    }));
+    const count = Math.max(expected.length, actual.length);
+    for (let index = 0; index < count; index += 1) {
+      const want = expected[index] ?? null;
+      const have = actual[index] ?? null;
+      const same =
+        want != null &&
+        have != null &&
+        want.productId === have.productId &&
+        want.variantName === have.variantName &&
+        want.quantity === have.quantity &&
+        want.modifiers.length === have.modifiers.length &&
+        want.modifiers.every((name, position) => name === have.modifiers[position]);
+      if (!same) {
+        throw new ConflictException({
+          code: 'CART_ORIGIN_MISMATCH',
+          details: { lineIndex: index, origin: want, cart: have },
+        });
+      }
+    }
+  }
+
   async commit(
     client: PoolClient,
     cart: CheckoutCart,
@@ -1628,11 +1686,14 @@ export class PosCheckoutRepository {
       if (!currentDay.rows[0]) throw new Error('MERCHANT_NOT_FOUND');
       businessDate = currentDay.rows[0].businessDate;
     }
+    await this.assertCartMatchesOrigin(client, cart);
     const writtenOrder = await writeOrder(client, {
       merchantId: cart.merchantId,
       locationId: cart.locationId,
       customerId: cart.customerId,
       source: 'pos',
+      // Settlement cart: the origin owns the only kitchen ticket.
+      projectKitchen: cart.originOrderId == null,
       // The order type is the cart's (plan §8.2 F3, decision D5). A non-fired
       // takeaway sale now reaches the order as a takeaway, not as a sale eaten in
       // the café. A fired cart already wrote this order, and `writeOrder` returns

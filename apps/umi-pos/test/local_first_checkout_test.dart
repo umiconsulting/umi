@@ -560,6 +560,13 @@ void main() {
 }
 
 final class _PendingFulfillment implements CartRepository {
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => throw UnimplementedError('incomingOrder');
+
   final started = Completer<void>();
   final response = Completer<Cart>();
 

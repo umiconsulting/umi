@@ -38,6 +38,23 @@ import 'support/fakes.dart';
 /// keyboard inset — the panel and the messages must scroll, not overflow.
 
 final class _IncomingRepo implements CartRepository {
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => PosIncomingOrderDetail.fromJson(const {
+    'orderId': 'order',
+    'channel': 'web',
+    'status': 'placed',
+    'reference': 'Web 12',
+    'customerName': 'Ana',
+    'itemCount': 2,
+    'totalMinorUnits': 5000,
+    'placedAt': null,
+    'lines': <Object?>[],
+  });
+
   int reads = 0;
   @override
   Future<PosIncomingOrders> incomingOrders(

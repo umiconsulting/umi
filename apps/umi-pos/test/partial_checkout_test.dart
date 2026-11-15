@@ -33,6 +33,13 @@ const _totals = <String, Object?>{
 };
 
 final class _CartRepo implements CartRepository {
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => throw UnimplementedError('incomingOrder');
+
   final cart = const Cart(
     id: _cartId,
     merchantId: _merchant,

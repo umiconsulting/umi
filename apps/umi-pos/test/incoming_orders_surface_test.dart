@@ -23,6 +23,29 @@ const Map<String, Object?> _orderJson = {
   'placedAt': null,
 };
 
+const Map<String, Object?> _detailJson = {
+  'orderId': '00000000-0000-4000-8000-0000000000a1',
+  'channel': 'whatsapp',
+  'status': 'placed',
+  'reference': 'wa-1',
+  'customerName': 'Ana',
+  'itemCount': 2,
+  'totalMinorUnits': 12000,
+  'placedAt': null,
+  'lines': [
+    {
+      'lineId': '00000000-0000-4000-8000-0000000000b1',
+      'productId': '00000000-0000-4000-8000-0000000000c1',
+      'name': 'Americano',
+      'variantName': null,
+      'quantity': 2,
+      'unitPriceMinorUnits': 6000,
+      'notes': null,
+      'modifiers': <Object?>[],
+    },
+  ],
+};
+
 Cart _cart() => const Cart(
   id: '00000000-0000-4000-8000-000000000001',
   merchantId: '00000000-0000-4000-8000-000000000002',
@@ -49,6 +72,13 @@ Cart _cart() => const Cart(
 );
 
 final class _Repo implements CartRepository {
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => PosIncomingOrderDetail.fromJson(_detailJson);
+
   BindCartOriginRequest? lastBind;
   bool failNextLoad = false;
   Completer<PosIncomingOrders>? pending;
@@ -238,7 +268,7 @@ void main() {
     expect(find.textContaining('Ana'), findsWidgets);
     expect(find.text('wa-1'), findsNWidgets(2));
     expect(find.textContaining('Recibido'), findsWidgets);
-    expect(find.textContaining('Al atender se vincula'), findsOneWidget);
+    expect(find.text('Líneas del pedido de origen'), findsOneWidget);
     expect(find.text('Total del pedido de origen'), findsOneWidget);
     expect(find.textContaining('líneas de productos'), findsOneWidget);
     expect(find.text('Atender'), findsOneWidget);
@@ -315,7 +345,7 @@ void main() {
         await tester.tap(find.text('wa-1'));
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('incoming-list')), findsNothing);
-        expect(find.textContaining('Al atender se vincula'), findsOneWidget);
+        expect(find.text('Líneas del pedido de origen'), findsOneWidget);
         expect(find.text('Total del pedido de origen'), findsOneWidget);
         expect(find.textContaining('líneas de productos'), findsOneWidget);
         await tester.ensureVisible(find.text('Atender'));

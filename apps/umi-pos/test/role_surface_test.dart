@@ -317,6 +317,13 @@ final class _CommandRepository implements KitchenCommandRepository {
 
 /// A cart with one line, and a fire that marks it as the server would.
 final class _SellerCartRepository implements CartRepository {
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => throw UnimplementedError('incomingOrder');
+
   _SellerCartRepository(this.cart);
   Cart cart;
   FireOrderRequest? lastFired;
@@ -355,6 +362,7 @@ final class _SellerCartRepository implements CartRepository {
       updatedAt: '2026-10-07T12:00:00.000Z',
     );
     return FireOrderResult(
+      state: 'fired',
       cartId: request.cartId,
       cartVersion: cart.version,
       orderId: cart.firedOrderId!,

@@ -95,6 +95,7 @@ final class CartController extends ChangeNotifier {
         onEvent: _event,
         onBusy: _setQueueBusy,
         onSettled: notifyListeners,
+        onPaymentHold: _reconcilePaymentHold,
         connectivity: connectivity,
         recovery: recovery,
         hub: hub,
@@ -1252,6 +1253,19 @@ final class CartController extends ChangeNotifier {
         (_busy && _queue == null)) {
       return null;
     }
+    // A settlement cart has no fire: the origin order owns the only kitchen
+    // ticket. The action is hidden in the UI; this guard keeps the controller safe.
+    if (cart.originOrderId != null) {
+      return FireOrderResult(
+        cartId: cart.id,
+        cartVersion: cart.version,
+        orderId: cart.originOrderId!,
+        reference: null,
+        lineCount: cart.items.isEmpty ? 1 : cart.items.length,
+        firedAt: DateTime.now().toUtc().toIso8601String(),
+        state: 'already_prepared',
+      );
+    }
     // Nothing new to send: a cart whose every line already reached the kitchen has
     // nothing to add to the ticket it owns.
     if (!cart.items.any((item) => item['fired'] != true)) return null;
@@ -1278,6 +1292,7 @@ final class CartController extends ChangeNotifier {
         reference: null,
         lineCount: lineCount,
         firedAt: DateTime.now().toUtc().toIso8601String(),
+        state: 'fired',
       );
     }
     _set(CartState(phase: CartPhase.loading, cart: cart));
@@ -1291,6 +1306,9 @@ final class CartController extends ChangeNotifier {
       _event('order_fired');
       return result;
     } on AppException catch (error) {
+      if (error.code == 'CART_PAYMENT_UNRESOLVED') {
+        await _reconcilePaymentHoldFromServer();
+      }
       _failure(error);
       return null;
     }
@@ -1651,6 +1669,32 @@ final class CartController extends ChangeNotifier {
     );
   }
 
+  /// A payment hold is a server refusal, not a prediction. Drop the refused
+  /// command and the later ones for this cart, re-read the server cart, and keep
+  /// only that snapshot. Predictions never reach the working copy.
+  Future<void> _reconcilePaymentHold(String commandId) async {
+    _queue?.dropRefused(commandId);
+    await _reconcilePaymentHoldFromServer();
+  }
+
+  Future<void> _reconcilePaymentHoldFromServer() async {
+    try {
+      final cart = await _readSelected();
+      if (_disposed) return;
+      await _persistCart(cart);
+      _set(
+        CartState(
+          phase: CartPhase.ready,
+          cart: cart,
+          errorCode: 'CART_PAYMENT_UNRESOLVED',
+        ),
+      );
+      _event('cart_payment_unresolved');
+    } on AppException catch (error) {
+      _failure(error);
+    }
+  }
+
   void _acceptQueuedCart(Cart cart) {
     if (_disposed) return;
     if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
@@ -1659,7 +1703,8 @@ final class CartController extends ChangeNotifier {
         'total=${cart.totals['grandTotal']}',
       );
     }
-    unawaited(_persistCart(cart));
+    // Never persist a predicted cart as the resumable cart. The journal holds
+    // the commands; the working copy holds only a server-acknowledged snapshot.
     _set(CartState(phase: CartPhase.ready, cart: cart));
   }
 

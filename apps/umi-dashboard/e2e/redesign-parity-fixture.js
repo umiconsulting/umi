@@ -124,6 +124,55 @@ export async function prepareDashboard(
         },
       });
     }
+    if (path.endsWith('/reports/sales/analysis/options')) {
+      // The analysis view reads these before it renders.
+      return route.fulfill({
+        json: {
+          products: [],
+          groups: [],
+          locations: locations.map(({ id, name }) => ({ id, name })),
+          canCompareLocations: true,
+          canManageGroups: true,
+          firstSaleDate: '2026-11-02',
+          today: '2026-11-02',
+          timezone: 'America/Mexico_City',
+        },
+      });
+    }
+    if (path.endsWith('/reports/sales/analysis')) {
+      const metrics = {
+        tickets: 0,
+        units: 0,
+        merchandiseMinorUnits: 0,
+        refundsMinorUnits: 0,
+        netMinorUnits: 0,
+        averageTicketMinorUnits: null,
+        unitsPerTicket: null,
+        tipsMinorUnits: 0,
+        discountsMinorUnits: 0,
+      };
+      return route.fulfill({
+        json: {
+          merchantId,
+          locationId: url.searchParams.get('locationId') || centroId,
+          from: '2026-11-02',
+          to: '2026-11-02',
+          timezone: 'America/Mexico_City',
+          currency: 'MXN',
+          refundView: url.searchParams.get('refundView') || 'sale_result',
+          basketUnit: url.searchParams.get('basketUnit') || 'ticket',
+          capturedAt: '2026-11-02T18:00:00.000Z',
+          firstSaleDate: '2026-11-02',
+          totals: metrics,
+          byHour: [],
+          byDay: [],
+          byWeekday: [],
+          byMonth: [],
+          byLocation: [],
+          basketState: { state: 'unavailable', code: 'BASKETS_TOO_COMPLEX' },
+        },
+      });
+    }
     if (path.endsWith('/reports/sales') || path.endsWith('/reports/sales/insight')) {
       const data = salesScope(url.searchParams.get('range'), url.searchParams.get('locationId'));
       return route.fulfill({

@@ -292,6 +292,13 @@ final class _Sales implements SaleRepository, CarriedOverSaleRepository {
 
 final class _Carts implements CartRepository {
   @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => throw UnimplementedError('incomingOrder');
+
+  @override
   Future<Cart> create(String merchantId, CreateCartRequest request) async =>
       cart();
   @override

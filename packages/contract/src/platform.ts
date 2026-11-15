@@ -486,6 +486,13 @@ export const API_ERROR_CODES = [
   'CART_ACCOUNT_BUSY',
   'CART_VERSION_CONFLICT',
   'CART_PAYMENT_UNRESOLVED',
+  // Settlement-cart refusals (decision 2026-11-15 §1.3). Each names a distinct
+  // operator action; a generic conflict hides it.
+  'CART_ORIGIN_CART_NOT_EMPTY',
+  'CART_ORIGIN_NOT_OPEN',
+  'CART_ORIGIN_ALREADY_FIRED',
+  'CART_ORIGIN_LOCKED',
+  'CART_ORIGIN_MISMATCH',
   'CART_TABLE_ACCOUNT_EXISTS',
   'CART_ALREADY_ASSIGNED',
   'TABLE_HAS_OPEN_ACCOUNT',
@@ -497,6 +504,7 @@ export const API_ERROR_CODES = [
   // by charging it or by the day close, never by unmaking the line.
   'CART_LINE_DAY_CLOSED',
   'PRODUCT_UNAVAILABLE',
+  'OFFLINE_ORIGIN_BOUND_BLOCKED',
   'VARIANT_NOT_AVAILABLE',
   'MODIFIER_SELECTION_INVALID',
   'CHECKOUT_GATE_NOT_AVAILABLE',

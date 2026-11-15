@@ -6150,9 +6150,35 @@ final class _CartPanelState extends State<_CartPanel> {
         permissions.allows('checkout.commit') &&
         checkout.supportsPartialPayments;
     final dispatch = <Widget>[
+      // A settled channel order is already in the kitchen. Hide the fire action
+      // and say where the ticket lives.
+      if (cart.originOrderId != null)
+        Padding(
+          padding: const EdgeInsets.only(top: UmiSpacing.sm),
+          child: Row(
+            children: [
+              PosIcon(
+                PosGlyphs.soupKitchenOutlined,
+                size: 18,
+                color: PosTheme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: UmiSpacing.sm),
+              Expanded(
+                child: Text(
+                  spanish
+                      ? 'Pedido web · ya en cocina · ${cart.originOrderId!.substring(0, 8)}'
+                      : 'Web order · already in the kitchen · ${cart.originOrderId!.substring(0, 8)}',
+                  style: PosTheme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ),
+        ),
       // Send to the kitchen before the money (ADR 2026-10-07 §5).
       // It only exists while there is something new to send.
-      if (permissions.allows('order.fire') && unfiredCount > 0) ...[
+      if (permissions.allows('order.fire') &&
+          unfiredCount > 0 &&
+          cart.originOrderId == null) ...[
         PosTooltip(
           message: l.fireOrderAction,
           // The arrow points the way the food goes — up, to the kitchen —

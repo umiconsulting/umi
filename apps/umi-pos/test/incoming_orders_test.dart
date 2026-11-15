@@ -41,6 +41,13 @@ Cart _cart() => const Cart(
 );
 
 final class _Repo implements CartRepository {
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => throw UnimplementedError('incomingOrder');
+
   BindCartOriginRequest? lastBind;
   int incomingCalls = 0;
 

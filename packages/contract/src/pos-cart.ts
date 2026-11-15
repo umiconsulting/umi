@@ -124,6 +124,13 @@ export const Cart = z
      */
     firedOrderId: Uuid.nullable(),
     /**
+     * The commercial order this cart settles, when the operator picked up an
+     * incoming channel order. A bound cart is a settlement cart: the origin
+     * owns the only kitchen ticket. Null for a walk-in cart.
+     */
+    originOrderId: Uuid.nullable().optional(),
+    originChannel: z.enum(['whatsapp', 'web', 'aggregator']).nullable().optional(),
+    /**
      * How the order leaves the counter (plan §8.2 F3, decision D5). The operator
      * chooses it in the POS top bar; the server writes it onto the order at fire
      * or checkout. Only the two values this café uses — no delivery yet.
@@ -305,6 +312,28 @@ export const PosIncomingOrder = z
   .strict();
 export const PosIncomingOrders = z.object({ orders: z.array(PosIncomingOrder).max(100) }).strict();
 
+// The read-only detail of one incoming order. The POS shows these lines before
+// the operator rings so a settlement cart matches the origin. It never writes.
+export const PosIncomingOrderLine = z
+  .object({
+    lineId: Uuid,
+    productId: Uuid.nullable(),
+    name: z.string().max(240),
+    variantName: z.string().max(160).nullable(),
+    quantity: z.number().int().positive(),
+    unitPriceMinorUnits: z.number().int().nonnegative(),
+    notes: z.string().max(500).nullable(),
+    modifiers: z
+      .array(
+        z.object({ name: z.string().max(160), quantity: z.number().int().positive() }).strict(),
+      )
+      .max(50),
+  })
+  .strict();
+export const PosIncomingOrderDetail = PosIncomingOrder.extend({
+  lines: z.array(PosIncomingOrderLine).max(250),
+}).strict();
+
 // The fired order (ADR 2026-10-07-pos-fired-order-adr). Firing writes the order and
 // projects its kitchen ticket WITHOUT taking money, and the checkout later settles that
 // same order instead of minting a second one — a second order projects a second ticket,
@@ -336,6 +365,11 @@ export const FireOrderResult = z
     reference: z.string().max(160).nullable(),
     lineCount: z.number().int().positive(),
     firedAt: Timestamp,
+    /**
+     * `already_prepared` is the settlement cart result: the origin order already
+     * has the kitchen ticket, so this fire wrote no POS order.
+     */
+    state: z.enum(['fired', 'already_fired', 'already_prepared']),
   })
   .strict();
 
@@ -352,6 +386,8 @@ export type CartFulfillmentType = z.infer<typeof CartFulfillmentType>;
 export type SetCartFulfillmentRequest = z.infer<typeof SetCartFulfillmentRequest>;
 export type PosIncomingOrder = z.infer<typeof PosIncomingOrder>;
 export type PosIncomingOrders = z.infer<typeof PosIncomingOrders>;
+export type PosIncomingOrderLine = z.infer<typeof PosIncomingOrderLine>;
+export type PosIncomingOrderDetail = z.infer<typeof PosIncomingOrderDetail>;
 export type FireOrderRequest = z.infer<typeof FireOrderRequest>;
 export type FireOrderResult = z.infer<typeof FireOrderResult>;
 export type OpenTableAccountRequest = z.infer<typeof OpenTableAccountRequest>;
@@ -387,6 +423,8 @@ export const posCartModels = {
   SetCartFulfillmentRequest,
   PosIncomingOrder,
   PosIncomingOrders,
+  PosIncomingOrderLine,
+  PosIncomingOrderDetail,
   FireOrderRequest,
   FireOrderResult,
 };

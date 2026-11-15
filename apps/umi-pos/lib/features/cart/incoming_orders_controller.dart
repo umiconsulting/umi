@@ -15,10 +15,12 @@ final class IncomingOrdersState {
     this.orders = const [],
     this.errorCode,
     this.binding = false,
+    this.detail,
   });
   final IncomingOrdersPhase phase;
   final List<PosIncomingOrder> orders;
   final String? errorCode;
+  final PosIncomingOrderDetail? detail;
 
   /// True while a pick-up (bind) request is in flight, so the UI can disable the row.
   final bool binding;
@@ -93,6 +95,36 @@ final class IncomingOrdersController extends ChangeNotifier {
       _event('incoming_orders_loaded');
     } on AppException catch (error) {
       if (_disposed || generation != _loadGeneration) return;
+      _failure(error);
+    }
+  }
+
+  /// Load the read-only detail for [order] so the surface can show its lines
+  /// before "Atender".
+  Future<void> select(PosIncomingOrder order) async {
+    if (_merchantId == null ||
+        _locationId == null ||
+        _operatorSessionId == null) {
+      return;
+    }
+    try {
+      final detail = await _repository.incomingOrder(
+        _merchantId!,
+        order.orderId,
+        CartQuery(
+          locationId: _locationId!,
+          operatorSessionId: _operatorSessionId!,
+        ),
+      );
+      if (_disposed) return;
+      _set(
+        IncomingOrdersState(
+          phase: _state.phase,
+          orders: _state.orders,
+          detail: detail,
+        ),
+      );
+    } on AppException catch (error) {
       _failure(error);
     }
   }

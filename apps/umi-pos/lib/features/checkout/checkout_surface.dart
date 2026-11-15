@@ -56,6 +56,7 @@ String checkoutFailureMessage(AppLocalizations l, String? code) {
     'discount_rejected' => l.discountRejectedMessage,
     'EXTERNAL_PAYMENT_NOT_COMMITTED' => l.externalPaymentNotCommittedMessage,
     'OFFLINE_ADVANCED_TENDER_BLOCKED' => l.offlineAdvancedTenderBlockedMessage,
+    'OFFLINE_ORIGIN_BOUND_BLOCKED' => l.offlineOriginBoundBlockedMessage,
     'CART_VERSION_CONFLICT' ||
     'CART_VALIDATION_FAILED' ||
     'CHECKOUT_CART_CHANGED' ||

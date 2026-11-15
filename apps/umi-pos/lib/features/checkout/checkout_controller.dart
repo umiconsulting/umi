@@ -1227,6 +1227,20 @@ final class CheckoutController extends ChangeNotifier {
         raw == null) {
       return false;
     }
+    // A bound settlement cart closes its origin order and writes the channel fact
+    // on the API. It cannot do that offline.
+    if (cart.originOrderId != null) {
+      if (!fallbackOnline) {
+        _set(
+          CheckoutState(
+            phase: CheckoutPhase.failure,
+            result: _state.result,
+            errorCode: 'OFFLINE_ORIGIN_BOUND_BLOCKED',
+          ),
+        );
+      }
+      return false;
+    }
     final unsupportedTender =
         _tenderDrafts.length != 1 ||
         _tenderDrafts.any((tender) => tender['type'] != 'cash');

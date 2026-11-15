@@ -65,6 +65,8 @@ export const ConflictClassification = z.enum([
   'policy_changed',
   'unsupported_offline_command',
   'ambiguous_payment_requires_query',
+  /** A payment is in progress; the account is frozen until it finishes or cancels. */
+  'payment_unresolved',
   'server_validation_failed',
   'reconciliation_required',
   'terminal_failure',

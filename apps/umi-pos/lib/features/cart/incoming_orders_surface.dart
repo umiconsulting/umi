@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
 
@@ -57,6 +59,7 @@ final class IncomingOrdersSurface extends StatefulWidget {
 
 final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
   String? _selectedId;
+  String? _detailRequested;
   @override
   void initState() {
     super.initState();
@@ -215,6 +218,15 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
                 .where((order) => order.orderId == _selectedId)
                 .firstOrNull;
             final effective = selected ?? (wide ? state.orders.first : null);
+            if (wide &&
+                effective != null &&
+                state.detail?.orderId != effective.orderId &&
+                _detailRequested != effective.orderId) {
+              _detailRequested = effective.orderId;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) unawaited(widget.incoming.select(effective));
+              });
+            }
             Widget detail(PosIncomingOrder order) => SingleChildScrollView(
               key: const ValueKey('incoming-detail'),
               child: Column(
@@ -237,6 +249,9 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
                     minHeight: wide ? box.maxHeight : 0,
                     order: order,
                     binding: state.binding,
+                    detail: state.detail?.orderId == order.orderId
+                        ? state.detail
+                        : null,
                     onTake: () => _take(order),
                   ),
                 ],
@@ -260,7 +275,11 @@ final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
                       _incomingStatus(order, context),
                     ].join(' · '),
                   ),
-                  onTap: () => setState(() => _selectedId = order.orderId),
+                  onTap: () {
+                    setState(() => _selectedId = order.orderId);
+                    _detailRequested = order.orderId;
+                    unawaited(widget.incoming.select(order));
+                  },
                   trailing: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 100),
                     child: Text(
@@ -334,10 +353,12 @@ final class _OrderCard extends StatelessWidget {
     required this.order,
     required this.binding,
     required this.onTake,
+    this.detail,
     this.minHeight = 0,
   });
   final PosIncomingOrder order;
   final bool binding;
+  final PosIncomingOrderDetail? detail;
   final VoidCallback onTake;
   final double minHeight;
 
@@ -346,6 +367,15 @@ final class _OrderCard extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final theme = PosTheme.of(context);
     final es = Localizations.localeOf(context).languageCode == 'es';
+    final lines = detail == null
+        ? const <PosIncomingOrderLine>[]
+        : detail!.lines
+              .map(
+                (raw) => PosIncomingOrderLine.fromJson(
+                  Map<String, Object?>.from(raw as Map),
+                ),
+              )
+              .toList(growable: false);
     return Container(
       constraints: BoxConstraints(minHeight: minHeight),
       padding: const EdgeInsets.all(24),
@@ -386,11 +416,61 @@ final class _OrderCard extends StatelessWidget {
                     : '${order.itemCount} product lines',
               ),
               const SizedBox(height: 16),
-              Text(
-                es
-                    ? 'El detalle de productos, notas y horario de entrega no está disponible en esta terminal. Al atender se vincula la referencia; captura y verifica los productos antes de cobrar.'
-                    : 'Product details, notes and pickup time are unavailable on this terminal. Taking the order links its reference; enter and verify the items before charging.',
-              ),
+              if (detail == null)
+                Text(
+                  es
+                      ? 'Cargando las líneas del pedido de origen…'
+                      : 'Loading the source order lines…',
+                )
+              else ...[
+                Text(
+                  es ? 'Líneas del pedido de origen' : 'Source order lines',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                for (final line in lines)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${line.quantity}× ${line.name}'
+                                '${line.variantName == null ? '' : ' · ${line.variantName}'}',
+                              ),
+                              if (line.modifiers.isNotEmpty)
+                                Text(
+                                  line.modifiers
+                                      .map((raw) {
+                                        final modifier =
+                                            Map<String, Object?>.from(
+                                              raw as Map,
+                                            );
+                                        return '${modifier['quantity']}× ${modifier['name']}';
+                                      })
+                                      .join(', '),
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              if (line.notes != null)
+                                Text(
+                                  line.notes!,
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          formatMinorUnits(line.unitPriceMinorUnits, 'MXN'),
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ],
           ),
           Padding(

@@ -6,6 +6,13 @@ import 'package:umi_pos/features/cart/cart_controller.dart';
 import 'package:umi_pos/features/cart/cart_repository.dart';
 
 final class _CartRepository implements CartRepository {
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => throw UnimplementedError('incomingOrder');
+
   Cart cart = _cart();
   CartLineInput? lastAdded;
   FireOrderRequest? lastFired;
@@ -93,6 +100,7 @@ final class _CartRepository implements CartRepository {
     final orderId = '00000000-0000-4000-8000-0000000000f1';
     cart = _withFired(cart, orderId);
     return FireOrderResult(
+      state: 'fired',
       cartId: request.cartId,
       cartVersion: cart.version,
       orderId: orderId,
@@ -114,7 +122,9 @@ final class _CartRepository implements CartRepository {
   }
 }
 
-Cart _cart() => Cart(
+Cart _cart({String? originOrderId, String? originChannel}) => Cart(
+  originOrderId: originOrderId,
+  originChannel: originChannel,
   id: '00000000-0000-4000-8000-000000000001',
   merchantId: '00000000-0000-4000-8000-000000000002',
   locationId: '00000000-0000-4000-8000-000000000003',
@@ -256,6 +266,29 @@ CartItem _line({required int courseNumber}) => CartItem(
 );
 
 void main() {
+  test(
+    'a bound settlement cart does not fire a second kitchen order',
+    () async {
+      final repository = _CartRepository();
+      repository.cart = _cart(
+        originOrderId: '00000000-0000-4000-8000-0000000000aa',
+        originChannel: 'web',
+      );
+      final controller = _controller(repository);
+      await controller.open(
+        repository.cart.merchantId,
+        repository.cart.locationId,
+        repository.cart.operatorSessionId,
+      );
+
+      final result = await controller.fire();
+
+      expect(result?.state, 'already_prepared');
+      expect(result?.orderId, '00000000-0000-4000-8000-0000000000aa');
+      expect(repository.fires, 0);
+    },
+  );
+
   test(
     'a refused add answers false and keeps the reason — the rail counts adds, not taps',
     () async {

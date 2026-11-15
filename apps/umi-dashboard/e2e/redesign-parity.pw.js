@@ -8,6 +8,19 @@ import {
   norteId,
 } from './redesign-parity-fixture.js';
 
+async function openSummary(page) {
+  // The combined /reportes route opens on the analysis view. The sales summary
+  // lives on "Cobros originales". The tab bar appears after options load.
+  const tab = page.getByRole('button', { name: 'Cobros originales', exact: true });
+  await tab.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
+  if (await tab.count()) await tab.click();
+  await page
+    .getByText('Ventas cobradas con propina', { exact: true })
+    .first()
+    .waitFor({ state: 'visible', timeout: 15000 })
+    .catch(() => {});
+}
+
 async function assertScope(page, server, range, locationId) {
   const scope = salesScope(range, locationId);
   await expect(page.getByText('Resumen del periodo', { exact: true })).toBeVisible();
@@ -15,7 +28,9 @@ async function assertScope(page, server, range, locationId) {
   const money = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(
     scope.totals.netSalesMinorUnits / 100,
   );
-  await expect(page.getByText('Ventas netas', { exact: true }).locator('..')).toContainText(money);
+  await expect(
+    page.getByText('Ventas cobradas con propina', { exact: true }).locator('..'),
+  ).toContainText(money);
   await expect(page.getByText('Órdenes', { exact: true }).locator('..')).toHaveText(
     `Órdenes${scope.totals.orders}`,
   );
@@ -35,6 +50,7 @@ test('sales narrative and totals follow the period and branch controls', async (
 }, testInfo) => {
   const server = await prepareDashboard(page);
   await page.goto('/reportes');
+  await openSummary(page);
   await assertScope(page, server, 'today', centroId);
   await screenshot(page, testInfo, 'sales-desktop');
   for (const [label, range] of [
@@ -58,9 +74,10 @@ test('sales narrative and totals follow the period and branch controls', async (
 test('sales summary remains complete when the optional narrative is absent', async ({ page }) => {
   const server = await prepareDashboard(page, { narrative: false });
   await page.goto('/reportes');
-  await expect(page.getByText('Ventas netas', { exact: true }).locator('..')).toContainText(
-    '$1,234.00',
-  );
+  await openSummary(page);
+  await expect(
+    page.getByText('Ventas cobradas con propina', { exact: true }).locator('..'),
+  ).toContainText('$1,234.00');
   await expect
     .poll(() => server.requests.some((entry) => entry.path.endsWith('/sales/insight')))
     .toBe(true);
@@ -82,6 +99,7 @@ for (const viewport of [
     const server = await prepareDashboard(page);
     await page.setViewportSize(viewport);
     await page.goto('/reportes');
+    await openSummary(page);
     await assertScope(page, server, 'today', centroId);
     await screenshot(page, testInfo, 'summary');
     await page.getByRole('button', { name: 'Tabla dinámica', exact: true }).click();
@@ -106,10 +124,7 @@ for (const viewport of [
     await expect(detail.getByRole('button', { name: 'Reimprimir', exact: true })).toBeVisible();
     await screenshot(page, testInfo, 'receipt-detail');
     await detail.getByRole('button', { name: 'Cerrar', exact: true }).click();
-    await page
-      .getByRole('group', { name: 'Vista', exact: true })
-      .getByRole('button', { name: 'Resumen', exact: true })
-      .click();
+    await openSummary(page);
     await assertScope(page, server, 'today', centroId);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
       true,
@@ -124,6 +139,7 @@ test('drawer navigation and tablet rotation retain the sales view and period', a
   const server = await prepareDashboard(page);
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.goto('/reportes');
+  await openSummary(page);
   await page.getByRole('button', { name: 'Ayer', exact: true }).click();
   await page.getByRole('button', { name: 'Tabla dinámica', exact: true }).click();
   for (const viewport of [
@@ -155,7 +171,7 @@ test('drawer navigation and tablet rotation retain the sales view and period', a
   );
   await page.getByRole('button', { name: 'Menú', exact: true }).click();
   await page.getByRole('button', { name: 'Resumen', exact: true }).first().click();
-  await expect(page).toHaveURL('/');
+  await expect(page).toHaveURL(/\/\?home=1$/);
   await expect(page.locator('.app')).not.toHaveClass(/nav-open/);
   expect(server.errors).toEqual([]);
 });
@@ -163,6 +179,7 @@ test('drawer navigation and tablet rotation retain the sales view and period', a
 test('the original theme and locale controls persist their choices', async ({ page }, testInfo) => {
   const server = await prepareDashboard(page);
   await page.goto('/reportes');
+  await openSummary(page);
   for (const [label, value] of [
     ['Oscuro', 'dark'],
     ['Medianoche', 'midnight'],
@@ -176,23 +193,11 @@ test('the original theme and locale controls persist their choices', async ({ pa
     await expect(page.locator('html')).toHaveAttribute('data-theme', value);
   }
   await choose(page, 'Idioma', 'English');
-  await expect(
-    page
-      .getByRole('group', { name: 'View', exact: true })
-      .getByRole('button', { name: 'Overview', exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText('Overview', { exact: true }).first()).toBeVisible();
   await page.reload();
-  await expect(
-    page
-      .getByRole('group', { name: 'View', exact: true })
-      .getByRole('button', { name: 'Overview', exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText('Overview', { exact: true }).first()).toBeVisible();
   await choose(page, 'Language', 'Español');
-  await expect(
-    page
-      .getByRole('group', { name: 'Vista', exact: true })
-      .getByRole('button', { name: 'Resumen', exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText('Resumen', { exact: true }).first()).toBeVisible();
   expect(server.errors).toEqual([]);
 });
 

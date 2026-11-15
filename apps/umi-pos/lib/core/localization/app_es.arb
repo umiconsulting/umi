@@ -188,7 +188,11 @@
   "manualTerminalConfirmTitle": "Confirmar cobro en la terminal",
   "manualTerminalConfirmBody": "Confirma sólo si la terminal externa aprobó el cargo de {amount}. Si no conoces el resultado, cierra este aviso y revisa la terminal antes de intentar otro cobro.",
   "@manualTerminalConfirmBody": {
-    "placeholders": {"amount": {"type": "String"}}
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
   },
   "manualTerminalConfirmAction": "Confirmar cargo y cobrar",
   "terminalSuccessAction": "Confirmar éxito",
@@ -1204,5 +1208,6 @@
         "type": "int"
       }
     }
-  }
+  },
+  "offlineOriginBoundBlockedMessage": "Un pedido web ya está en cocina. Reconecta para cobrarlo."
 }

@@ -2547,4 +2547,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String kitchenAllDayCount(int ordered) {
     return 'Hoy: $ordered';
   }
+
+  @override
+  String get offlineOriginBoundBlockedMessage =>
+      'Un pedido web ya está en cocina. Reconecta para cobrarlo.';
 }

@@ -217,8 +217,8 @@ String operatorErrorMessage(
           : 'The account changed. Refresh it before you continue.',
     'CART_PAYMENT_UNRESOLVED' =>
       spanish
-          ? 'Esta cuenta tiene un cobro sin confirmar. Consulta el estado del cobro antes de guardar o recuperar la cuenta.'
-          : 'This account has an unconfirmed payment. Check the payment status before saving or recovering the account.',
+          ? 'Esta cuenta tiene un cobro en curso. Termina el cobro o cancélalo antes de cambiar la cuenta. La cuenta muestra sus últimas líneas confirmadas.'
+          : 'This account has a payment in progress. Finish the payment or cancel it before you change the account. The account shows its last confirmed lines.',
     'TABLE_HAS_OPEN_ACCOUNT' =>
       spanish
           ? 'Esta mesa tiene una cuenta abierta. Cierra la cuenta antes de liberar, mover o separar la mesa.'

@@ -21,6 +21,7 @@ import type {
   CreateCartRequest,
   FireOrderRequest,
   FireOrderResult,
+  PosIncomingOrderDetail,
   PosIncomingOrders,
   PrepareSaleRequest,
   RemoveCartLineRequest,
@@ -462,6 +463,7 @@ export class PosCartService {
             reference: fired.reference,
             lineCount: fired.lineCount,
             firedAt: new Date().toISOString(),
+            state: fired.state,
           },
         };
       },
@@ -483,6 +485,21 @@ export class PosCartService {
     await this.authorize(user, merchantId, locationId, operatorSessionId);
     const orders = await this.repo.listIncomingOrders(merchantId, locationId, user.id);
     return { orders };
+  }
+
+  // The read-only detail of one incoming order, under the same authorization as
+  // the list. The settlement cart shows these lines before the operator rings.
+  async incomingOrder(
+    user: AuthUser,
+    merchantId: string,
+    locationId: string,
+    operatorSessionId: string,
+    orderId: string,
+  ): Promise<PosIncomingOrderDetail> {
+    await this.authorize(user, merchantId, locationId, operatorSessionId);
+    const order = await this.repo.getIncomingOrder(merchantId, locationId, user.id, orderId);
+    if (!order) throw new NotFoundException({ code: 'RESOURCE_NOT_FOUND' });
+    return order;
   }
 
   private async command(

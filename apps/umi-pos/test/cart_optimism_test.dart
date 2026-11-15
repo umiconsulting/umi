@@ -359,6 +359,13 @@ void main() {
 /// A repository whose `add` answers only when the test says so, which is what makes
 /// the gap between "painted" and "confirmed" observable.
 final class _GatedRepository implements CartRepository {
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => throw UnimplementedError('incomingOrder');
+
   final Cart cart = _cart();
   Completer<void>? _gate;
   Object? refuse;

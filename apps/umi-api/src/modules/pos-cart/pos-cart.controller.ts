@@ -196,6 +196,22 @@ export class PosCartController {
     return this.cart.incomingOrders(user, merchantId, query.locationId, query.operatorSessionId);
   }
 
+  @Get('incoming-orders/:orderId')
+  incomingOrder(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('orderId') orderId: string,
+    @Query(new ZodValidationPipe(CartQuery)) query: CartQuery,
+  ) {
+    return this.cart.incomingOrder(
+      user,
+      merchantId,
+      query.locationId,
+      query.operatorSessionId,
+      orderId,
+    );
+  }
+
   @Post('origin')
   bindOrigin(
     @CurrentUser() user: AuthUser,

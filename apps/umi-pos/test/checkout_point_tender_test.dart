@@ -411,6 +411,13 @@ final class _PointRepository
 }
 
 final class _CartRepository implements CartRepository {
+  @override
+  Future<PosIncomingOrderDetail> incomingOrder(
+    String merchantId,
+    String orderId,
+    CartQuery query,
+  ) async => throw UnimplementedError('incomingOrder');
+
   final cart = const Cart(
     id: _cartId,
     merchantId: _merchantId,
