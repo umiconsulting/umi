@@ -99,7 +99,8 @@ export const API_CASES = {
               refundView: 'sale_result',
               basketUnit: 'ticket',
             });
-      const response = await api.get(path, { allowError: true });
+      const client = name === 'group' ? await t.api(USERS.owner) : api;
+      const response = await client.get(path, { allowError: true });
       responses[name] = { status: response.status, code: errorCode(response.body), body: response.body };
       t.writeJson(`response-${name}.json`, response.body);
       t.checks.eq(`${name} status`, response.status, status);
@@ -192,7 +193,7 @@ export const API_CASES = {
     t.checks.check('M2 options have no group G', !names.includes('Grupo G'), false, names);
     t.checks.eq('M2 group list is empty', names.length, 0);
 
-    const rlsPool = new Database(t.run.dbName);
+    const rlsPool = new Database(t.run.dbName, { user: 'api_login', password: 'i1_local_api' });
     let rlsRows;
     try {
       const client = await rlsPool.pool.connect();
@@ -569,8 +570,6 @@ export const API_CASES = {
       }
     })();
     const status = execFileSync('git', ['status', '--porcelain'], { cwd: t.run.worktree, encoding: 'utf8' });
-    t.writeJson('gate.json', { head, candidate: t.run.candidate, checkedOut, baseline: t.run.baseline, ancestor, candidateAncestor, clean: status.trim() === '' });
-    (await import('node:fs')).writeFileSync(join(t.dir, 'git-status.txt'), status);
     let candidateAncestor = 1;
     try {
       execFileSync('git', ['merge-base', '--is-ancestor', t.run.candidate, head], { cwd: t.run.worktree });
@@ -578,6 +577,8 @@ export const API_CASES = {
     } catch {
       candidateAncestor = 1;
     }
+    t.writeJson('gate.json', { head, candidate: t.run.candidate, checkedOut, baseline: t.run.baseline, ancestor, candidateAncestor, clean: status.trim() === '' });
+    (await import('node:fs')).writeFileSync(join(t.dir, 'git-status.txt'), status);
     t.checks.eq('local head equals the checked-out head', head, checkedOut);
     t.checks.eq('the candidate is an ancestor of the local head', candidateAncestor, 0);
     t.checks.eq('baseline is an ancestor', ancestor, 0);

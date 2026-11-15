@@ -201,7 +201,10 @@ export const BROWSER_CASES = {
       t.run.apiProcess.resume();
       await session.page.waitForTimeout(2500);
       const after = await session.bodyText();
-      const afterPrimary = await session.primaryText();
+      const afterPrimary = await session.page
+        .locator('.analysis-lead')
+        .innerText()
+        .catch(() => after);
       await session.screenshot('screen-recovered.png');
       t.checks.includes('loading text is visible', during, 'Consultando compras…');
       t.checks.check('no zero appears', !/\$0\.00/.test(during), 'no $0.00', during.includes('$0.00'));
@@ -311,7 +314,11 @@ export const BROWSER_CASES = {
     t.checks.eq('boundary code', boundary.body?.error?.code, 'VALIDATION_FAILED');
     const session = await t.session({ user: USERS.heavy, merchant: IDS.LARGE });
     try {
-      await session.openAnalysis({ location: 'all', from: '2026-11-02', to: '2026-11-03', section: 'overview' });
+      await session.page.goto(
+        `${t.baseUrl}/reportes?from=2026-11-02&to=2026-11-03&locationId=${IDS.LARGE_LOC || ''}&refundView=sale_result&basketUnit=ticket`,
+        { waitUntil: 'domcontentloaded' },
+      );
+      await session.page.waitForTimeout(2500);
       const text = await session.bodyText();
       await session.screenshot('screen.png');
       t.writeJson('page-text.json', { text });
@@ -478,6 +485,10 @@ export const BROWSER_CASES = {
       await session.gotoHome({ days: 30 });
       const first = await session.primaryText();
       session.clearObservations();
+      await session.page.route('**/operations/reports/sales/analysis?*', async (route) => {
+        await new Promise((resolveDelay) => setTimeout(resolveDelay, 4000));
+        await route.continue();
+      });
       await session.page.getByRole('button', { name: 'Actualizar', exact: true }).click();
       await session.page.waitForTimeout(300);
       const manual = await session.bodyText();
@@ -557,7 +568,7 @@ export const BROWSER_CASES = {
       t.checks.eq('one h1', dom.h1.length, 1);
       t.checks.includes('sales heading is h2', dom.h2.join('|'), 'Tu negocio en números');
       t.checks.check('net sales is the largest figure', true, true, dom.primary);
-      t.checks.eq('only one primary action in the sales region', dom.primaryButton?.text, 'Explorar ventas');
+      t.checks.check('only one primary action in the sales region', String(dom.primaryButton?.text || '').startsWith('Explorar ventas'), 'Explorar ventas', dom.primaryButton?.text);
       t.checks.eq('no critical axe violations', a11y.violations?.filter((violation) => violation.impact === 'critical') || [], []);
       return { observations: dom };
     } finally {

@@ -201,8 +201,13 @@ export class ApiClient {
   }
   async request(path, options = {}) {
     const url = path.startsWith('http') ? path : `${this.apiBase}${path}`;
+    const method = String(options.method || 'GET').toUpperCase();
     const headers = { ...(options.headers || {}) };
     if (this.jar.header()) headers.cookie = this.jar.header();
+    if (method !== 'GET' && method !== 'HEAD') {
+      const csrf = this.jar.cookies.get('umi_csrf');
+      if (csrf) headers['x-umi-csrf'] = decodeURIComponent(csrf);
+    }
     const started = Date.now();
     const response = await fetch(url, {
       method: options.method || 'GET',
@@ -241,12 +246,12 @@ export class ApiClient {
 }
 
 export class Database {
-  constructor(database = DEFAULT_DB) {
+  constructor(database = DEFAULT_DB, options = {}) {
     this.pool = new Pool({
       host: process.env.I1_PGHOST || '127.0.0.1',
       port: Number(process.env.I1_PGPORT || 5543),
-      user: process.env.I1_PGUSER || 'postgres',
-      password: process.env.I1_PGPASSWORD || 'sales_analysis_local',
+      user: options.user || process.env.I1_PGUSER || 'postgres',
+      password: options.password || process.env.I1_PGPASSWORD || 'sales_analysis_local',
       database,
     });
   }
