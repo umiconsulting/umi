@@ -1237,6 +1237,62 @@ void main() {
     },
   );
 
+  for (final refusedCount in [2, 3, 4, 6, 8]) {
+    for (final order in ['refused-first', 'genuine-first', 'rotated']) {
+      test(
+        'genuine probes within 45s with $refusedCount refused, $order',
+        () async {
+          final clock = _FakeClock();
+          final credentials = <String>[];
+          var firstGenuineSecond = -1;
+          final client = MockClient((request) async {
+            final credential =
+                request.headers['x-umi-device-credential'] ?? '';
+            credentials.add(credential);
+            if (credential == 'genuine' && firstGenuineSecond < 0) {
+              firstGenuineSecond = clock.monotonicNow().inSeconds;
+            }
+            return http.Response('{}', 403);
+          });
+          final harness = await _startControlled(
+            clock: clock,
+            client: client,
+            seedDevice: false,
+          );
+
+          for (var second = 0; second < 90; second += 1) {
+            clock.advance(const Duration(seconds: 1));
+            final refused = List.generate(
+              refusedCount,
+              (index) => order == 'rotated'
+                  ? 'refused-${refusedCount - index}'
+                  : 'refused-${index + 1}',
+            );
+            final batch = switch (order) {
+              'genuine-first' => ['genuine', ...refused],
+              _ => [...refused, 'genuine'],
+            };
+            for (final credential in batch) {
+              expect(
+                await _board(
+                  harness,
+                  headers: _headers(credential: credential),
+                ),
+                403,
+              );
+            }
+          }
+
+          expect(firstGenuineSecond, greaterThanOrEqualTo(0));
+          expect(firstGenuineSecond, lessThanOrEqualTo(45));
+          if (refusedCount == 8) {
+            expect(credentials, hasLength(lessThanOrEqualTo(20)));
+          }
+        },
+      );
+    }
+  }
+
   test(
     'a genuine credential probes within three windows of sustained rotation',
     () async {
@@ -1279,7 +1335,9 @@ void main() {
           .length;
       expect(genuineProbes, greaterThan(0));
       expect(genuineProbes, lessThanOrEqualTo(3));
-      expect(credentials, hasLength(lessThanOrEqualTo(8)));
+      // The fairness rate is burst 2, then one probe per 5s after 15s.
+      // A 90s run cannot exceed 20 probes.
+      expect(credentials, hasLength(lessThanOrEqualTo(20)));
       expect(firstGenuineSecond, lessThanOrEqualTo(45));
     },
   );
