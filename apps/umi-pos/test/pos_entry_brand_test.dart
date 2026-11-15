@@ -1,6 +1,6 @@
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/shared/widgets/station_document.dart';

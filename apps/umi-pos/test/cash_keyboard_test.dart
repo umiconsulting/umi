@@ -59,8 +59,9 @@ bool _hasFocusRing(WidgetTester tester, Finder region) => tester
     )
     .any((widget) {
       final decoration = widget.decoration;
-      if (decoration is! BoxDecoration || decoration.border is! Border)
+      if (decoration is! BoxDecoration || decoration.border is! Border) {
         return false;
+      }
       final side = (decoration.border! as Border).top;
       return side.width >= 2 && side.color.a == 1;
     });
