@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -53,6 +54,27 @@ final class _LanTrust {
   final DateTime wallAt;
 }
 
+/// One admitted identity tuple. Membership survives for the node process.
+final class _LanAdmission {
+  _LanAdmission({
+    required this.key,
+    required this.headers,
+    required this.credentialHash,
+    required this.deviceId,
+    required this.merchantId,
+    required this.locationId,
+  });
+
+  final String key;
+  final Map<String, String> headers;
+  final String credentialHash;
+  final String deviceId;
+  final String? merchantId;
+  final String? locationId;
+  bool demand = false;
+  Duration? lastStart;
+}
+
 /// The local API of the main station.
 ///
 /// It serves the kitchen surface only. A peer is trusted by the hash of the
@@ -97,123 +119,250 @@ final class LanKdsNode {
   final StreamController<void> _changed = StreamController<void>.broadcast();
   final Map<String, _LanTrust> _trusted = {};
   final HubAccountSequencer _accountSequencer = HubAccountSequencer();
-  Duration? _lastProbeAt;
-  /// Probe rate: a burst of two, then one probe after 5 seconds, then one
-  /// every 2 seconds. The rate is fixed. Fairness uses a Bloom filter for
-  /// "has asked" and a bounded FIFO for "asked, not probed": an eviction from
-  /// the FIFO cannot make an old refused hash look new again.
-  static const int _probeBurst = 2;
-  static const Duration _probeFirstRefill = Duration(seconds: 5);
-  static const Duration _probeRefill = Duration(seconds: 2);
-  static const int _probeCredentialCapacity = 128;
-  static const Duration _probePendingTtl = Duration(seconds: 10);
-  static const int _probeBloomBits = 8192;
-  final List<int> _probeBloom = List<int>.filled(_probeBloomBits ~/ 64, 0);
-  double _probeTokens = _probeBurst.toDouble();
-  Duration? _probeNextRefill;
-  final Map<String, Duration> _probeLastAt = {};
-  /// Asked and not probed yet, in arrival order. These go before repeaters.
-  final Map<String, Duration> _probePending = {};
+  static const int _maxAdmissions = 257;
+  static const int _maxSnapshotBytes = 4096;
+  static const int _maxResponseBytes = 65536;
+  static const Duration _minStartSpacing = Duration(seconds: 2);
 
-  int _bloomIndex(String value, int salt) {
-    var hash = 0x811c9dc5;
-    for (final unit in value.codeUnits) {
-      hash ^= unit;
-      hash = (hash * 0x01000193) & 0xffffffff;
+  final Map<String, _LanAdmission> _admissions = {};
+  final List<String> _ring = [];
+  int _cursor = 0;
+  bool _probeActive = false;
+  Duration? _nextStartNotBefore;
+  Timer? _probeTimer;
+  int _generation = 0;
+
+  _LanAdmission _admit({
+    required String key,
+    required Map<String, String> headers,
+    required String credentialHash,
+    required String deviceId,
+    required String? merchantId,
+    required String? locationId,
+    required int snapshotBytes,
+  }) {
+    final existing = _admissions[key];
+    if (existing != null) {
+      existing.demand = true;
+      return existing;
     }
-    hash = (hash ^ salt) & 0xffffffff;
-    return hash % _probeBloomBits;
+    if (snapshotBytes > _maxSnapshotBytes) {
+      throw const _LanRefusal(
+        'PAYLOAD_TOO_LARGE',
+        HttpStatus.requestEntityTooLarge,
+      );
+    }
+    if (_admissions.length >= _maxAdmissions) {
+      // Exact admission is full. No record, no cloud request, no turn change.
+      throw const _LanRefusal(
+        'LAN_PROBE_CAPACITY_EXCEEDED',
+        HttpStatus.serviceUnavailable,
+      );
+    }
+    final admission = _LanAdmission(
+      key: key,
+      headers: headers,
+      credentialHash: credentialHash,
+      deviceId: deviceId,
+      merchantId: merchantId,
+      locationId: locationId,
+    )..demand = true;
+    _admissions[key] = admission;
+    _ring.add(key);
+    return admission;
   }
 
-  bool _probeSeen(String value) {
-    for (final salt in const [1, 7]) {
-      final bit = _bloomIndex(value, salt);
-      if ((_probeBloom[bit ~/ 64] & (1 << (bit % 64))) == 0) return false;
+  _LanAdmission? _selectNext(Duration now) {
+    if (_ring.isEmpty) return null;
+    for (var offset = 0; offset < _ring.length; offset += 1) {
+      final index = (_cursor + offset) % _ring.length;
+      final admission = _admissions[_ring[index]];
+      if (admission == null || !admission.demand) continue;
+      final last = admission.lastStart;
+      if (last != null && now - last < _probePeriod) continue;
+      _cursor = (index + 1) % _ring.length;
+      admission
+        ..demand = false
+        ..lastStart = now;
+      return admission;
     }
-    return true;
+    return null;
   }
 
-  void _markProbeSeen(String value) {
-    for (final salt in const [1, 7]) {
-      final bit = _bloomIndex(value, salt);
-      _probeBloom[bit ~/ 64] |= 1 << (bit % 64);
-    }
-  }
-
-  void _refillProbeTokens(Duration now) {
-    final startNext = _probeNextRefill;
-    if (startNext == null) return;
-    var next = startNext;
-    while (now >= next && _probeTokens < _probeBurst) {
-      _probeTokens += 1;
-      next = next + _probeRefill;
-    }
-    _probeNextRefill = _probeTokens >= _probeBurst ? null : next;
-  }
-
-  void _markProbePending(String credentialHash, Duration now) {
-    final firstSight = !_probeSeen(credentialHash);
-    _markProbeSeen(credentialHash);
-    if (_probePending.containsKey(credentialHash)) {
-      _probePending[credentialHash] = now;
-      return;
-    }
-    // Only a first sight enters the priority queue. A hash evicted from the
-    // queue or the cooldown map is still "seen" in the Bloom filter, so it
-    // cannot look new again and take a fresh priority slot.
-    if (!firstSight || _probeLastAt.containsKey(credentialHash)) return;
-    _probePending[credentialHash] = now;
-    if (_probePending.length > _probeCredentialCapacity) {
-      _probePending.remove(_probePending.keys.first);
-    }
-  }
-
-  bool _probeThrottled(String credentialHash, Duration now) {
-    _refillProbeTokens(now);
-    _markProbePending(credentialHash, now);
-    _probePending.removeWhere(
-      (_, at) => now - at > _probePendingTtl,
-    );
-    // Keep a probed hash visible until the bounded map evicts it. A time
-    // eviction makes an old refused hash look unprobed again and lets it
-    // take the next token ahead of a newcomer.
-    final mine = _probeLastAt[credentialHash];
-    if (mine != null && now - mine < _probePeriod) return true;
-    if (_probeTokens < 1) return true;
-    if (mine != null) {
-      // Any credential that has asked and not probed goes first.
-      if (_probePending.isNotEmpty) return true;
-      // Among repeaters, the oldest probe goes first.
-      for (final other in _probeLastAt.values) {
-        if (other < mine) return true;
+  void _scheduleProbe() {
+    if (_probeActive || _probeTimer?.isActive == true) return;
+    final now = _clock.monotonicNow();
+    final next = _nextStartNotBefore;
+    final delay = next != null && next > now
+        ? next - now
+        : Duration.zero;
+    _probeTimer = Timer(delay, () {
+      _probeTimer = null;
+      final at = _clock.monotonicNow();
+      final earliest = _nextStartNotBefore;
+      if (earliest != null && at < earliest) {
+        _scheduleProbe();
+        return;
       }
+      final admission = _selectNext(at);
+      if (admission == null) return;
+      _probeActive = true;
+      _nextStartNotBefore = at + _minStartSpacing;
+      unawaited(
+        _runProbe(admission).whenComplete(() {
+          _probeActive = false;
+          _scheduleProbe();
+        }),
+      );
+    });
+  }
+
+  Future<bool> _tryProbeTurn(String requesterKey) async {
+    final now = _clock.monotonicNow();
+    final earliest = _nextStartNotBefore;
+    if (_probeActive || (earliest != null && now < earliest)) {
+      _scheduleProbe();
+      return false;
     }
+    final admission = _selectNext(now);
+    if (admission == null) return false;
+    _probeActive = true;
+    _nextStartNotBefore = now + _minStartSpacing;
+    if (admission.key == requesterKey) {
+      try {
+        await _runProbe(admission);
+      } finally {
+        _probeActive = false;
+        _scheduleProbe();
+      }
+      return true;
+    }
+    unawaited(
+      _runProbe(admission).whenComplete(() {
+        _probeActive = false;
+        _scheduleProbe();
+      }),
+    );
     return false;
   }
 
-  void _consumeProbe(String credentialHash, Duration now) {
-    _refillProbeTokens(now);
-    _probeTokens = (_probeTokens - 1)
-        .clamp(0, _probeBurst)
-        .toDouble();
-    if (_probeTokens < 1 && _probeNextRefill == null) {
-      _probeNextRefill = now + _probeFirstRefill;
+  Future<void> _runProbe(_LanAdmission admission) async {
+    final generation = _generation;
+    final abort = Completer<void>();
+    final deadline = Timer(const Duration(seconds: 2), abort.complete);
+    try {
+      final request = http.AbortableRequest(
+        'GET',
+        _cloudBase.resolve('/api/v1/devices/status'),
+        abortTrigger: abort.future,
+      );
+      request.headers.addAll(admission.headers);
+      final response = await _client
+          .send(request)
+          .timeout(const Duration(seconds: 2));
+      final body = BytesBuilder(copy: false);
+      await for (final chunk in response.stream.timeout(
+        const Duration(seconds: 2),
+      )) {
+        body.add(chunk);
+        if (body.length > _maxResponseBytes) {
+          throw StateError('response_too_large');
+        }
+      }
+      if (generation != _generation) return;
+      final status = response.statusCode;
+      if (status >= 200 && status < 300) {
+        final device = DeviceSummary.fromJson(
+          jsonDecode(utf8.decode(body.takeBytes())) as Map<String, Object?>,
+        );
+        final mismatch =
+            device.state != 'active' ||
+            device.locationId == null ||
+            (admission.merchantId != null &&
+                admission.merchantId != device.merchantId) ||
+            (admission.locationId != null &&
+                admission.locationId != device.locationId);
+        if (mismatch) {
+          _trusted.remove(admission.deviceId);
+          final known = admission.merchantId == null ||
+                  admission.locationId == null
+              ? null
+              : await _local.readNetworkDevice(
+                  admission.merchantId!,
+                  admission.locationId!,
+                  admission.deviceId,
+                );
+          if (known != null) {
+            await _local.deleteNetworkDevice(
+              known.merchantId,
+              known.locationId,
+              known.deviceId,
+            );
+          }
+          _generation += 1;
+          return;
+        }
+        final seenAt = _now();
+        final known = admission.merchantId == null ||
+                admission.locationId == null
+            ? null
+            : await _local.readNetworkDevice(
+                admission.merchantId!,
+                admission.locationId!,
+                admission.deviceId,
+              );
+        await _local.writeNetworkDevice(
+          LocalNetworkDevice(
+            merchantId: device.merchantId,
+            locationId: device.locationId!,
+            deviceId: device.id,
+            role: device.type,
+            stationId: null,
+            address: null,
+            port: null,
+            credentialHash: admission.credentialHash,
+            pairedAt: known?.pairedAt ?? seenAt,
+            lastSeenAt: seenAt,
+            status: 'active',
+          ),
+        );
+        _trusted[admission.deviceId] = _LanTrust(
+          credentialHash: admission.credentialHash,
+          merchantId: device.merchantId,
+          locationId: device.locationId!,
+          monotonicAt: _clock.monotonicNow(),
+          wallAt: _clock.wallNow(),
+        );
+        return;
+      }
+      if (status >= 400 && status < 500) {
+        _trusted.remove(admission.deviceId);
+        if (admission.merchantId != null && admission.locationId != null) {
+          final known = await _local.readNetworkDevice(
+            admission.merchantId!,
+            admission.locationId!,
+            admission.deviceId,
+          );
+          if (known != null) {
+            await _local.deleteNetworkDevice(
+              known.merchantId,
+              known.locationId,
+              known.deviceId,
+            );
+          }
+          _generation += 1;
+        }
+      }
+    } on _LanRefusal {
+      rethrow;
+    } catch (error) {
+      debugPrint(
+        '[umipos] lan_peer_validation_unavailable '
+        'type=${error.runtimeType}',
+      );
+    } finally {
+      deadline.cancel();
     }
-    _probePending.remove(credentialHash);
-    _markProbeSeen(credentialHash);
-    if (!_probeLastAt.containsKey(credentialHash) &&
-        _probeLastAt.length >= _probeCredentialCapacity) {
-      _probeLastAt.remove(_probeLastAt.keys.first);
-    }
-    _probeLastAt[credentialHash] = now;
-  }
-
-  void _clearProbeBackoff() {
-    _probeTokens = _probeBurst.toDouble();
-    _probeNextRefill = null;
-    _probeLastAt.clear();
-    _probePending.clear();
-    _probeBloom.fillRange(0, _probeBloom.length, 0);
   }
 
   bool _stopped = false;
@@ -1220,142 +1369,84 @@ final class LanKdsNode {
             scopeLocation,
             deviceId,
           );
+    final headers = <String, String>{
+      'accept': 'application/json',
+      'x-umi-device-id': deviceId,
+      'x-umi-device-public-id': publicId,
+      'x-umi-installation-id': installationId,
+      'x-umi-device-credential': credential,
+      'x-umi-merchant-id': ?headerMerchant,
+      'x-umi-location-id': ?headerLocation,
+    };
+    final key = [
+      hash,
+      deviceId,
+      publicId,
+      installationId,
+      headerMerchant ?? '',
+      headerLocation ?? '',
+      scopeMerchant ?? '',
+      scopeLocation ?? '',
+    ].join('\u0000');
+    final admission = _admit(
+      key: key,
+      headers: headers,
+      credentialHash: hash,
+      deviceId: deviceId,
+      merchantId: scopeMerchant,
+      locationId: scopeLocation,
+      snapshotBytes: utf8.encode(key).length + utf8.encode(credential).length,
+    );
     final trust = _freshTrust(
       deviceId: deviceId,
       credentialHash: hash,
       merchantId: scopeMerchant,
       locationId: scopeLocation,
     );
-    final now = _clock.monotonicNow();
-    final probeDue =
-        trust == null ||
-        _lastProbeAt == null ||
-        now - _lastProbeAt! >= _probePeriod;
-    final probeThrottled = _probeThrottled(hash, now);
-    if (probeDue && !probeThrottled) {
-      _lastProbeAt = now;
-      _consumeProbe(hash, now);
-      try {
-        final response = await _client
-            .get(
-              _cloudBase.resolve('/api/v1/devices/status'),
-              headers: {
-                'accept': 'application/json',
-                'x-umi-device-id': deviceId,
-                'x-umi-device-public-id': publicId,
-                'x-umi-installation-id': installationId,
-                'x-umi-device-credential': credential,
-                'x-umi-merchant-id': ?headerMerchant,
-                'x-umi-location-id': ?headerLocation,
-              },
-            )
-            .timeout(const Duration(seconds: 2));
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          final device = DeviceSummary.fromJson(
-            jsonDecode(response.body) as Map<String, Object?>,
-          );
-          if (device.state != 'active' ||
-              device.locationId == null ||
-              (merchantId != null && merchantId != device.merchantId) ||
-              (locationId != null && locationId != device.locationId) ||
-              (headerMerchant != null && headerMerchant != device.merchantId) ||
-              (headerLocation != null && headerLocation != device.locationId)) {
-            debugPrint(
-              '[umipos] lan_peer_validation_mismatch '
-              'state=${device.state} '
-              'hasLocation=${device.locationId != null} '
-              'merchantMismatch=${merchantId != null && merchantId != device.merchantId} '
-              'locationMismatch=${locationId != null && locationId != device.locationId}',
+    final trustAgeOk =
+        admission.lastStart != null &&
+        _clock.monotonicNow() - admission.lastStart! < _probePeriod;
+    if (trust != null &&
+        trustAgeOk &&
+        known != null &&
+        known.credentialHash == hash &&
+        known.status == 'active') {
+      final seen = known.seen(
+        address: request.connectionInfo?.remoteAddress.address,
+        port: request.connectionInfo?.remotePort,
+      );
+      await _local.writeNetworkDevice(seen);
+      return _LanPeer(seen);
+    }
+    admission.demand = true;
+    final probed = await _tryProbeTurn(key);
+    if (probed) {
+      final validated = _freshTrust(
+        deviceId: deviceId,
+        credentialHash: hash,
+        merchantId: scopeMerchant,
+        locationId: scopeLocation,
+      );
+      final refreshed = scopeMerchant == null || scopeLocation == null
+          ? null
+          : await _local.readNetworkDevice(
+              scopeMerchant,
+              scopeLocation,
+              deviceId,
             );
-            _trusted.remove(deviceId);
-            if (known != null) {
-              await _local.deleteNetworkDevice(
-                known.merchantId,
-                known.locationId,
-                known.deviceId,
-              );
-            }
-            // The probe rate and cooldown were recorded when this probe
-            // started. This throw leaves the device untrusted.
-            throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
-          }
-          final seenAt = _now();
-          final peer = LocalNetworkDevice(
-            merchantId: device.merchantId,
-            locationId: device.locationId!,
-            deviceId: device.id,
-            role: device.type,
-            stationId: null,
-            address: request.connectionInfo?.remoteAddress.address,
-            port: request.connectionInfo?.remotePort,
-            credentialHash: hash,
-            pairedAt: known?.pairedAt ?? seenAt,
-            lastSeenAt: seenAt,
-            status: 'active',
-          );
-          await _local.writeNetworkDevice(peer);
-          _trusted[deviceId] = _LanTrust(
-            credentialHash: hash,
-            merchantId: device.merchantId,
-            locationId: device.locationId!,
-            monotonicAt: _clock.monotonicNow(),
-            wallAt: _clock.wallNow(),
-          );
-          _clearProbeBackoff();
-          return _LanPeer(peer);
-        }
-        if (response.statusCode < 500) {
-          debugPrint(
-            '[umipos] lan_peer_validation_refused '
-            'status=${response.statusCode}',
-          );
-          _trusted.remove(deviceId);
-          if (known != null) {
-            await _local.deleteNetworkDevice(
-              known.merchantId,
-              known.locationId,
-              known.deviceId,
-            );
-          }
-          // The 4xx refusal leaves the device untrusted. The probe rate and
-          // cooldown were recorded when this probe started.
-          throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
-        }
-        // A 5xx is a failed probe. Its rate cost was recorded when it started.
-      } on _LanRefusal {
-        rethrow;
-      } catch (error) {
-        debugPrint(
-          '[umipos] lan_peer_validation_unavailable '
-          'type=${error.runtimeType}',
+      if (validated != null &&
+          refreshed != null &&
+          refreshed.credentialHash == hash &&
+          refreshed.status == 'active') {
+        final seen = refreshed.seen(
+          address: request.connectionInfo?.remoteAddress.address,
+          port: request.connectionInfo?.remotePort,
         );
+        await _local.writeNetworkDevice(seen);
+        return _LanPeer(seen);
       }
     }
-    final trusted = _freshTrust(
-      deviceId: deviceId,
-      credentialHash: hash,
-      merchantId: scopeMerchant,
-      locationId: scopeLocation,
-    );
-    if (trusted == null ||
-        known == null ||
-        known.credentialHash != hash ||
-        known.status != 'active') {
-      debugPrint(
-        '[umipos] lan_peer_trust_missing '
-        'known=${known != null} '
-        'trusted=${trusted != null} '
-        'hashMatch=${known?.credentialHash == hash} '
-        'status=${known?.status}',
-      );
-      throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
-    }
-    final seen = known.seen(
-      address: request.connectionInfo?.remoteAddress.address,
-      port: request.connectionInfo?.remotePort,
-    );
-    await _local.writeNetworkDevice(seen);
-    return _LanPeer(seen);
+    throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
   }
 
   _LanTrust? _freshTrust({
