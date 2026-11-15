@@ -274,6 +274,23 @@ table th {
 .app.collapsed {
   --side-w: 72px;
 }
+.skip-link {
+  position: fixed;
+  left: 12px;
+  top: -80px;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-min);
+  padding: 8px 16px;
+  background: var(--surface);
+  color: var(--ink-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+}
+.skip-link:focus {
+  top: 8px;
+}
 
 /* Sidebar */
 .side {
@@ -490,6 +507,11 @@ table th {
 /* Note: the native <select> popup highlight cannot be recolored by CSS in this
    Chromium, so the white-in-dark-mode highlight lives on the custom <Select>
    listbox instead (see .ui-select-option rules). */
+@media (max-width: 600px) {
+  .side-foot .ui-select-trigger {
+    min-height: 44px;
+  }
+}
 
 /* The rail's collapse handle. The visible circle stays 24px — it is a quiet
    discovery affordance, not a banner — but the BUTTON around it is a pointer
@@ -3707,31 +3729,20 @@ time,
     width: auto;
     margin-left: auto;
     justify-content: flex-end;
-    overflow-x: auto;
-    /* The cluster has to be able to SHRINK, not wrap. At 360px its controls plus
-       the drawer button were wider than the line, so it wrapped to a row of its
-       own and pushed the title onto a third: a 200px masthead, and the screen's
-       own actions below it out of reach. `flex: 1 1 auto` with `min-width: 0`
-       lets it take whatever is left and scroll internally, which keeps the
-       masthead at two rows all the way down. */
+    flex-wrap: wrap;
+    /* At 360px the controls plus the drawer button are wider than one line. Wrap
+       the cluster inside its own width instead of scrolling it. The masthead
+       grows by one control row, and the page has no third horizontal scroll box. */
     /* Basis 0, not auto. A wrapping flex container decides where to break using
-       each item's flex BASE size, so `auto` meant the cluster was measured at its
-       332px of content and pushed onto a line of its own even though `flex-shrink`
-       could have taken it down. With a basis of 0 it takes the space that is left
-       (278px at 360px) and scrolls the remainder internally. */
+       each item's flex BASE size. With a basis of 0 it takes the space that is
+       left (278px at 360px), then wraps the controls inside that width. */
     flex: 1 1 0;
     min-width: 0;
-    /* A scroll container clips on BOTH axes. The cluster keeps its scroll for the
-       cases that need it, but the couple of pixels its controls' focus rings and
-       the avatar's edge occupy are clipped without this, so the row reads as
-       misaligned. The negative margin means the row's own height is unchanged. */
+    /* Keep the focus rings visible. The old scroll container clipped them on the
+       horizontal axis; the negative block margin keeps the row height unchanged. */
+    overflow: visible;
     padding-block: 4px;
     margin-block: -4px;
-    /* The bar is sticky: a rail scrolling inside it is noise, not an affordance. */
-    scrollbar-width: none;
-  }
-  .top-actions::-webkit-scrollbar {
-    display: none;
   }
   .masthead-row .h-page {
     order: 3;
@@ -3842,6 +3853,12 @@ time,
   .ventas-grid,
   .cash-detail-grid {
     grid-template-columns: 1fr !important;
+  }
+  /* The report chart must keep the viewport as its containing block. `1fr` uses
+     the chart's min-content width (991px with 30 days), so the grid grows past
+     the phone. `minmax(0, 1fr)` lets the chart column shrink and scroll. */
+  .ventas-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 }
 
@@ -5578,4 +5595,40 @@ time,
   font-weight: 600;
   color: var(--ink-1);
   font-variant-numeric: tabular-nums;
+}
+
+/* Scoped report fixes: the series chart is the allowed scroll box; the pivot
+   table fits its card at phone width. */
+.series-chart-scroll:focus {
+  outline: 2px solid var(--umi-blue);
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .report-pivot-scroll {
+    overflow-x: auto;
+  }
+  .report-pivot-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 10px !important;
+  }
+  .report-pivot-table th,
+  .report-pivot-table td {
+    height: 44px;
+    min-width: 44px;
+    padding: 1px 2px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    box-sizing: border-box;
+  }
+  .report-pivot-table th button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 1px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    box-sizing: border-box;
+  }
 }

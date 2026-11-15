@@ -36,7 +36,7 @@
   color: var(--ink-2);
 }
 .sales-period select {
-  min-height: 36px;
+  min-height: 44px;
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   padding: 6px 10px;
@@ -326,6 +326,19 @@
   }
   .sales-toolbar-actions {
     width: 100%;
+  }
+  .sales-toolbar .sales-period select,
+  .sales-detail-widget h2 a,
+  .sales-detail-link,
+  .operational-summary h3 a {
+    min-height: 44px;
+  }
+  .sales-detail-widget h2 a {
+    align-items: center;
+  }
+  .operational-summary h3 a {
+    display: inline-flex;
+    align-items: center;
   }
 }
 

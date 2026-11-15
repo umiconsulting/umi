@@ -2,6 +2,7 @@ import { t } from '@lingui/core/macro';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { COOKIE_AUTH, LOCAL_SESSION, apiUrl, withCreds, errMessage } from './config.js';
 import { routes } from '@umi/contract/routes';
+import { queryClient } from './query-client.js';
 
 const AuthContext = createContext(null);
 const LOCAL_SESSION_KEY = 'umi-dashboard-local-session';
@@ -579,6 +580,7 @@ export function handleSessionExpired() {
   clearRetryTimer();
   refreshRetryAttempt = 0;
   accessExpiresAt = 0;
+  queryClient.clear();
   window.localStorage.removeItem(LOCAL_SESSION_KEY);
   if (!window.location.pathname.startsWith('/login')) {
     window.location.assign('/login');
@@ -772,6 +774,7 @@ export async function signOut() {
   } catch (err) {
     console.warn('logout request failed; auth cookie may persist server-side', err);
   }
+  queryClient.clear();
   window.localStorage.removeItem(LOCAL_SESSION_KEY);
   window.location.assign('/login');
 }

@@ -79,7 +79,7 @@ function HexagonMosaic({ rows, selected, categoryName }) {
   );
 }
 
-export default function CategorySalesCard({ report, query, detail = false }) {
+export default function CategorySalesCard({ report, query, detail = false, onRetry }) {
   const { t } = useLingui();
   const [selected, setSelected] = useState(null);
   const [visible, setVisible] = useState(20);
@@ -127,11 +127,16 @@ export default function CategorySalesCard({ report, query, detail = false }) {
         {formatOperationMoney(total, report.currency)} <small>{report.currency}</small>
       </p>
       {state === 'unavailable' ? (
-        <p role="status">
-          <Trans>
-            El desglose por categoría no está disponible. Actualiza la consulta para reintentar.
-          </Trans>
-        </p>
+        <div role="status">
+          <p>
+            <Trans>El desglose por categoría no está disponible.</Trans>
+          </p>
+          {onRetry && (
+            <button type="button" className="btn btn-secondary" onClick={onRetry}>
+              <Trans>Reintentar</Trans>
+            </button>
+          )}
+        </div>
       ) : (
         <>
           {state === 'ready' ? (

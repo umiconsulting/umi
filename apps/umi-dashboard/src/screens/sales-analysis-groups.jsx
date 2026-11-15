@@ -117,7 +117,7 @@ function GroupForm({ merchantId, group, products, onSaved, onCancel }) {
   );
 }
 
-export default function SalesAnalysisGroups({ merchantId, options, onSaved, onRefresh }) {
+export default function SalesAnalysisGroups({ merchantId, options, onRefresh }) {
   const [editing, setEditing] = useState(undefined);
   return (
     <details className="analysis-panel surface">
@@ -177,7 +177,6 @@ export default function SalesAnalysisGroups({ merchantId, options, onSaved, onRe
           onCancel={() => setEditing(undefined)}
           onSaved={() => {
             setEditing(undefined);
-            onSaved();
           }}
         />
       )}
