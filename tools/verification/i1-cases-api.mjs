@@ -1,14 +1,7 @@
 // API-first cases: optional analysis, isolation, group races, and metric reads.
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
-import {
-  ApiClient,
-  Database,
-  IDS,
-  USERS,
-  equalJson,
-  salesPath,
-} from './i1-lib.mjs';
+import { ApiClient, Database, IDS, USERS, equalJson, salesPath } from './i1-lib.mjs';
 
 const errorCode = (body) => body?.error?.code ?? body?.code ?? null;
 const errorMessage = (body) => body?.error?.message ?? body?.message ?? null;
@@ -30,7 +23,8 @@ function moneyEntries(value, prefix = '', output = []) {
   } else if (value && typeof value === 'object') {
     for (const [key, item] of Object.entries(value)) {
       const next = prefix ? `${prefix}.${key}` : key;
-      if (/MinorUnits$/.test(key) && typeof item === 'number') output.push({ key: next, value: item });
+      if (/MinorUnits$/.test(key) && typeof item === 'number')
+        output.push({ key: next, value: item });
       moneyEntries(item, next, output);
     }
   }
@@ -56,7 +50,12 @@ export const API_CASES = {
       code: 'BASKETS_TOO_COMPLEX',
     });
     for (const key of ['coverage', 'unitsDistribution', 'pairs', 'selectedGroups']) {
-      t.checks.check(`${key} is absent`, !(key in response.body), 'absent', key in response.body ? 'present' : 'absent');
+      t.checks.check(
+        `${key} is absent`,
+        !(key in response.body),
+        'absent',
+        key in response.body ? 'present' : 'absent',
+      );
     }
     t.checks.eq('totals', response.body.totals, {
       tickets: 3,
@@ -69,8 +68,18 @@ export const API_CASES = {
       tipsMinorUnits: 0,
       discountsMinorUnits: 0,
     });
-    t.checks.check('no top-level error', !('error' in response.body), 'absent', 'error' in response.body);
-    t.checks.check('no top-level code', !('code' in response.body), 'absent', 'code' in response.body);
+    t.checks.check(
+      'no top-level error',
+      !('error' in response.body),
+      'absent',
+      'error' in response.body,
+    );
+    t.checks.check(
+      'no top-level code',
+      !('code' in response.body),
+      'absent',
+      'code' in response.body,
+    );
     return { observations: { basketState: response.body.basketState } };
   },
 
@@ -101,11 +110,20 @@ export const API_CASES = {
             });
       const client = name === 'group' ? await t.api(USERS.owner) : api;
       const response = await client.get(path, { allowError: true });
-      responses[name] = { status: response.status, code: errorCode(response.body), body: response.body };
+      responses[name] = {
+        status: response.status,
+        code: errorCode(response.body),
+        body: response.body,
+      };
       t.writeJson(`response-${name}.json`, response.body);
       t.checks.eq(`${name} status`, response.status, status);
       t.checks.eq(`${name} code`, errorCode(response.body), code);
-      t.checks.check(`${name} has no totals`, !('totals' in response.body), 'absent', 'totals' in response.body);
+      t.checks.check(
+        `${name} has no totals`,
+        !('totals' in response.body),
+        'absent',
+        'totals' in response.body,
+      );
     }
     const heavy = await api.get(
       salesPath(IDS.HEAVY, {
@@ -124,10 +142,9 @@ export const API_CASES = {
 
   'I1-ISO-01': async (t) => {
     const api = await t.api(USERS.owner);
-    const response = await api.get(
-      salesPath(IDS.M2, { from: '2026-11-02', to: '2026-11-04' }),
-      { allowError: true },
-    );
+    const response = await api.get(salesPath(IDS.M2, { from: '2026-11-02', to: '2026-11-04' }), {
+      allowError: true,
+    });
     t.writeJson('response.json', response.body);
     t.checks.eq('status', response.status, 404);
     t.checks.eq('message', errorMessage(response.body), 'merchant_not_found');
@@ -174,10 +191,9 @@ export const API_CASES = {
 
   'I1-ISO-03': async (t) => {
     const api = await t.api(USERS.denied);
-    const response = await api.get(
-      salesPath(IDS.M1, { from: '2026-11-02', to: '2026-11-04' }),
-      { allowError: true },
-    );
+    const response = await api.get(salesPath(IDS.M1, { from: '2026-11-02', to: '2026-11-04' }), {
+      allowError: true,
+    });
     t.writeJson('response.json', response.body);
     t.checks.eq('status', response.status, 403);
     t.checks.eq('code', errorCode(response.body), 'PERMISSION_DENIED');
@@ -187,7 +203,9 @@ export const API_CASES = {
 
   'I1-ISO-06': async (t) => {
     const other = await t.api(USERS.other);
-    const options = await other.get(`/api/merchants/${IDS.M2}/operations/reports/sales/analysis/options`);
+    const options = await other.get(
+      `/api/merchants/${IDS.M2}/operations/reports/sales/analysis/options`,
+    );
     t.writeJson('options.json', options.body);
     const names = (options.body.groups || []).map((group) => group.name);
     t.checks.check('M2 options have no group G', !names.includes('Grupo G'), false, names);
@@ -267,8 +285,7 @@ export const API_CASES = {
     const a = await t.api(USERS.owner);
     const b = await t.api(USERS.owner);
     const url = `/api/merchants/${IDS.M1}/operations/reports/sales/analysis/groups/${group.id}`;
-    const body = (name) =>
-      JSON.stringify({ name, productIds, expectedVersion: group.version });
+    const body = (name) => JSON.stringify({ name, productIds, expectedVersion: group.version });
     const first = await a.request(url, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
@@ -293,7 +310,11 @@ export const API_CASES = {
     );
     t.writeJson('options.json', { stored, groupId: group.id });
     t.checks.eq('stored version is 2', stored.version, 2);
-    t.checks.eq('stored name is the winning write', stored.name, first.status === 200 ? 'Ganador A' : 'Ganador B');
+    t.checks.eq(
+      'stored name is the winning write',
+      stored.name,
+      first.status === 200 ? 'Ganador A' : 'Ganador B',
+    );
     await t.db.query(
       `update merchant.sales_analysis_group set name=$2, version=$3, updated_at=pg_catalog.now() where id=$1`,
       [group.id, group.name, group.version],
@@ -316,7 +337,8 @@ export const API_CASES = {
       "TOTAL {'tickets': 0, 'units': -3, 'merch': 0, 'refunds': 17000, 'net': -17000, 'tips': -2000, 'disc': 0, 'avg': None, 'upt': None}",
       "TOTAL {'tickets': 4, 'units': 3, 'merch': 47000, 'refunds': 24000, 'net': 23000, 'tips': 500, 'disc': 3000, 'avg': 5750, 'upt': 0.75}",
     ];
-    for (const line of expected) t.checks.includes(`oracle line: ${line.slice(7, 40)}`, output, line);
+    for (const line of expected)
+      t.checks.includes(`oracle line: ${line.slice(7, 40)}`, output, line);
     t.checks.includes(
       'Ventas summary values',
       output,
@@ -356,10 +378,14 @@ export const API_CASES = {
       );
       await session.page.waitForTimeout(2500);
       const text = await session.bodyText();
-        (await import('node:fs')).writeFileSync(join(t.dir, 'page-text.txt'), text);
+      (await import('node:fs')).writeFileSync(join(t.dir, 'page-text.txt'), text);
       await session.screenshot('screen-c.png');
       t.checks.includes('negative money is visible', text, '-$170.00');
-      t.checks.includes('average uses the unavailable mark', text, 'Ticket promedio sin propina\n—');
+      t.checks.includes(
+        'average uses the unavailable mark',
+        text,
+        'Ticket promedio sin propina\n—',
+      );
       t.checks.check(
         'average is not zero',
         !/Ticket promedio sin propina\n\$0\.00/.test(text),
@@ -492,11 +518,8 @@ export const API_CASES = {
       ['E', '2026-11-01', '2026-11-30', 'period_movements'],
     ]) {
       bodies.push(
-        (
-          await api.get(
-            salesPath(IDS.METRIC, { from, to, refundView: view, basketUnit: 'ticket' }),
-          )
-        ).body,
+        (await api.get(salesPath(IDS.METRIC, { from, to, refundView: view, basketUnit: 'ticket' })))
+          .body,
       );
     }
     const summary = (
@@ -559,25 +582,46 @@ export const API_CASES = {
 
   'I1-GATE-01': async (t) => {
     const { execFileSync } = await import('node:child_process');
-    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: t.run.worktree, encoding: 'utf8' }).trim();
-    const checkedOut = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: t.run.worktree, encoding: 'utf8' }).trim();
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: t.run.worktree,
+      encoding: 'utf8',
+    }).trim();
+    const checkedOut = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: t.run.worktree,
+      encoding: 'utf8',
+    }).trim();
     const ancestor = (() => {
       try {
-        execFileSync('git', ['merge-base', '--is-ancestor', t.run.baseline, head], { cwd: t.run.worktree });
+        execFileSync('git', ['merge-base', '--is-ancestor', t.run.baseline, head], {
+          cwd: t.run.worktree,
+        });
         return 0;
       } catch {
         return 1;
       }
     })();
-    const status = execFileSync('git', ['status', '--porcelain'], { cwd: t.run.worktree, encoding: 'utf8' });
+    const status = execFileSync('git', ['status', '--porcelain'], {
+      cwd: t.run.worktree,
+      encoding: 'utf8',
+    });
     let candidateAncestor = 1;
     try {
-      execFileSync('git', ['merge-base', '--is-ancestor', t.run.candidate, head], { cwd: t.run.worktree });
+      execFileSync('git', ['merge-base', '--is-ancestor', t.run.candidate, head], {
+        cwd: t.run.worktree,
+      });
       candidateAncestor = 0;
     } catch {
       candidateAncestor = 1;
     }
-    t.writeJson('gate.json', { head, candidate: t.run.candidate, checkedOut, baseline: t.run.baseline, ancestor, candidateAncestor, clean: status.trim() === '' });
+    t.writeJson('gate.json', {
+      head,
+      candidate: t.run.candidate,
+      checkedOut,
+      baseline: t.run.baseline,
+      ancestor,
+      candidateAncestor,
+      clean: status.trim() === '',
+    });
     (await import('node:fs')).writeFileSync(join(t.dir, 'git-status.txt'), status);
     t.checks.eq('local head equals the checked-out head', head, checkedOut);
     t.checks.eq('the candidate is an ancestor of the local head', candidateAncestor, 0);

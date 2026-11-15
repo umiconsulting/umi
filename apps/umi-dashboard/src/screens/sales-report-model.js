@@ -20,6 +20,18 @@ export function salesReportLink(query, section = 'overview') {
   return `/reportes?${params}`;
 }
 
+export function catalogCategories(options) {
+  const categories = new Map();
+  for (const product of options?.products ?? []) {
+    if (product.categoryId && product.category)
+      categories.set(`category:${product.categoryId}`, {
+        key: `category:${product.categoryId}`,
+        label: product.category,
+      });
+  }
+  return [...categories.values()];
+}
+
 export function initialAnalysisQuery(options, locationId, params = new URLSearchParams()) {
   const fallback = reportPeriod(options.today, 7);
   const from = params.get('from');

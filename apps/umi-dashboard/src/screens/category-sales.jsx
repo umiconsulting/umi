@@ -79,7 +79,13 @@ function HexagonMosaic({ rows, selected, categoryName }) {
   );
 }
 
-export default function CategorySalesCard({ report, query, detail = false, onRetry }) {
+export default function CategorySalesCard({
+  report,
+  query,
+  detail = false,
+  onRetry,
+  catalog = [],
+}) {
   const { t } = useLingui();
   const [selected, setSelected] = useState(null);
   const [visible, setVisible] = useState(20);
@@ -88,6 +94,7 @@ export default function CategorySalesCard({ report, query, detail = false, onRet
   const rows = [...(report.byCategory ?? [])].sort(
     (a, b) => b.netMinorUnits - a.netMinorUnits || a.key.localeCompare(b.key),
   );
+  const missing = catalog.filter((entry) => !rows.some((row) => row.key === entry.key));
   const activeSelected = rows.some((row) => row.key === selected) ? selected : null;
   const categoryName = (row) =>
     row.key === 'unattributed'
@@ -119,7 +126,7 @@ export default function CategorySalesCard({ report, query, detail = false, onRet
         </h2>
         {!detail && (
           <Link className="category-sales-report" to={salesReportLink(query, 'categories')}>
-            <Trans>Ver informe</Trans> →
+            <Trans>Ver las {rows.length} categorías</Trans> →
           </Link>
         )}
       </header>
@@ -176,6 +183,15 @@ export default function CategorySalesCard({ report, query, detail = false, onRet
                       {formatOperationMoney(row.netMinorUnits, report.currency)}
                     </strong>
                   </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {missing.length > 0 && (
+            <ul className="category-sales-notice" aria-label={t`Categorías sin ventas`}>
+              {missing.map((entry) => (
+                <li key={entry.key}>
+                  <Trans>{entry.label}: sin ventas en el periodo.</Trans>
                 </li>
               ))}
             </ul>

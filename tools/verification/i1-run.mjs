@@ -60,14 +60,20 @@ function parseArgs(argv) {
     else if (arg === '--cdp') args.cdp = next();
     else if (arg === '--db') args.db = next();
     else if (arg === '--out') args.out = next();
-    else if (arg === '--only') args.only = next().split(',').map((value) => value.trim()).filter(Boolean);
+    else if (arg === '--only')
+      args.only = next()
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
     else if (arg === '--fixtures') args.fixtures = next();
     else if (arg === '--baseline-api') args.baselineApi = next();
     else if (arg === '--start-api') args.startApi = true;
     else if (arg === '--skip-perf') args.skipPerf = true;
     else if (arg === '--allow-failures') args.allowFailures = true;
     else if (arg === '--help') {
-      console.log('i1-run.mjs [--base-url URL] [--api-url URL] [--dev-url URL] [--cdp URL] [--db NAME] [--out DIR] [--only ID,ID] [--start-api] [--fixtures DIR]');
+      console.log(
+        'i1-run.mjs [--base-url URL] [--api-url URL] [--dev-url URL] [--cdp URL] [--db NAME] [--out DIR] [--only ID,ID] [--start-api] [--fixtures DIR]',
+      );
       process.exit(0);
     } else {
       throw new Error(`unknown argument: ${arg}`);
@@ -94,9 +100,14 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const worktree = resolve(new URL('../..', import.meta.url).pathname);
   const head = gitHead(worktree);
-  const out = ensureDir(args.out || join(worktree, '.i1-run', new Date().toISOString().replace(/[:.]/g, '-')));
+  const out = ensureDir(
+    args.out || join(worktree, '.i1-run', new Date().toISOString().replace(/[:.]/g, '-')),
+  );
   const casesDir = ensureDir(join(out, 'cases'));
-  const fixtures = args.fixtures || process.env.I1_FIXTURES || resolve(worktree, '../../.analytics-i1-exec-2f52a6d5-20261115/fixtures');
+  const fixtures =
+    args.fixtures ||
+    process.env.I1_FIXTURES ||
+    resolve(worktree, '../../.analytics-i1-exec-2f52a6d5-20261115/fixtures');
 
   const run = {
     head,
@@ -167,16 +178,12 @@ async function main() {
     output: '',
   };
   if (fixtures) {
-    const result = spawnSync(
-      process.execPath,
-      [join(fixtures, 'verify-fixtures.mjs')],
-      {
-        cwd: fixtures,
-        env: { ...process.env, I1_DB: args.db, I1_WORKTREE: worktree },
-        encoding: 'utf8',
-        timeout: 300000,
-      },
-    );
+    const result = spawnSync(process.execPath, [join(fixtures, 'verify-fixtures.mjs')], {
+      cwd: fixtures,
+      env: { ...process.env, I1_DB: args.db, I1_WORKTREE: worktree },
+      encoding: 'utf8',
+      timeout: 300000,
+    });
     preflight.exitCode = result.status;
     preflight.output = `${result.stdout || ''}${result.stderr || ''}`;
     preflight.status = result.status === 0 ? 'PASS' : 'FAIL';
@@ -278,7 +285,14 @@ async function main() {
       .sort();
     const lines = files.map((path) => `${sha256File(path)}  ${path.slice(caseDir.length + 1)}`);
     writeFileSync(join(caseDir, 'sha256.txt'), `${lines.join('\n')}\n`);
-    summary.push({ id, status, dir: caseDir, checks: checks.items.length, failed: checks.failed.length, durationMs: result.durationMs });
+    summary.push({
+      id,
+      status,
+      dir: caseDir,
+      checks: checks.items.length,
+      failed: checks.failed.length,
+      durationMs: result.durationMs,
+    });
     run.log(`${id} ${status} (${checks.failed.length} failed checks)`);
   }
 
@@ -310,10 +324,7 @@ async function main() {
     join(out, 'SHA256SUMS'),
     `${allFiles.map((path) => `${sha256File(path)}  ${path.slice(out.length + 1)}`).join('\n')}\n`,
   );
-  writeFileSync(
-    join(out, 'console.log'),
-    `${run.console.join('\n')}\n`,
-  );
+  writeFileSync(join(out, 'console.log'), `${run.console.join('\n')}\n`);
 
   await run.browser.close().catch(() => {});
   await run.db.close();

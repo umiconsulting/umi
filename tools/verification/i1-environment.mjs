@@ -56,7 +56,9 @@ const environment = {
     git: exec('git', ['--version']),
     playwright: (() => {
       try {
-        return JSON.parse(readFileSync(join(worktree, 'node_modules/@playwright/test/package.json'), 'utf8')).version;
+        return JSON.parse(
+          readFileSync(join(worktree, 'node_modules/@playwright/test/package.json'), 'utf8'),
+        ).version;
       } catch {
         return null;
       }
@@ -69,8 +71,12 @@ const environment = {
     name: database,
     clock: pg("select pg_get_functiondef('i1_clock.now()'::regprocedure)"),
     searchPath: pg('show search_path'),
-    migrationHead: pg('select filename from runtime.migration_ledger order by filename desc limit 1'),
-    schemaVersion: pg("select version from runtime.schema_migration where status='applied' order by applied_at desc limit 1"),
+    migrationHead: pg(
+      'select filename from runtime.migration_ledger order by filename desc limit 1',
+    ),
+    schemaVersion: pg(
+      "select version from runtime.schema_migration where status='applied' order by applied_at desc limit 1",
+    ),
     perfTickets: pg(
       "select count(*) from merchant.pos_committed_sale where merchant_id='44444444-4444-4444-8444-000000000001'",
     ),

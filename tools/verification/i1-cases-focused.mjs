@@ -25,17 +25,28 @@ async function axe(page) {
 async function focusInventory(page, limit = 80) {
   const stops = [];
   const seen = new Set();
-  await page.locator('body').click({ position: { x: 5, y: 5 } }).catch(() => {});
+  await page
+    .locator('body')
+    .click({ position: { x: 5, y: 5 } })
+    .catch(() => {});
   for (let index = 0; index < limit; index += 1) {
     await page.keyboard.press('Tab');
     const state = await page.evaluate(() => {
       const element = document.activeElement;
       if (!element) return null;
+      // The document body is the default active element, not an interactive
+      // focus stop. The tab order leaves the page after the last control.
+      if (element === document.body || element === document.documentElement) return null;
       const style = getComputedStyle(element);
       const rect = element.getBoundingClientRect();
       return {
         tag: element.tagName,
-        label: (element.innerText || element.getAttribute('aria-label') || element.getAttribute('name') || '')
+        label: (
+          element.innerText ||
+          element.getAttribute('aria-label') ||
+          element.getAttribute('name') ||
+          ''
+        )
           .trim()
           .slice(0, 60),
         outlineWidth: style.outlineWidth,
@@ -83,13 +94,17 @@ export const FOCUSED_CASES = {
             overflowX: getComputedStyle(element).overflowX,
           }))
           .filter((entry) => entry.overflowX !== 'visible');
-        const targets = [...document.querySelectorAll('a,button,input,select,textarea,[role=button]')]
+        const targets = [
+          ...document.querySelectorAll('a,button,input,select,textarea,[role=button]'),
+        ]
           .filter((element) => element.offsetParent !== null)
           .map((element) => {
             const rect = element.getBoundingClientRect();
             return {
               tag: element.tagName,
-              label: (element.innerText || element.getAttribute('aria-label') || '').trim().slice(0, 50),
+              label: (element.innerText || element.getAttribute('aria-label') || '')
+                .trim()
+                .slice(0, 50),
               width: Math.round(rect.width),
               height: Math.round(rect.height),
             };
@@ -120,13 +135,17 @@ export const FOCUSED_CASES = {
             overflowX: getComputedStyle(element).overflowX,
           }))
           .filter((entry) => entry.overflowX !== 'visible');
-        const targets = [...document.querySelectorAll('a,button,input,select,textarea,[role=button]')]
+        const targets = [
+          ...document.querySelectorAll('a,button,input,select,textarea,[role=button]'),
+        ]
           .filter((element) => element.offsetParent !== null)
           .map((element) => {
             const rect = element.getBoundingClientRect();
             return {
               tag: element.tagName,
-              label: (element.innerText || element.getAttribute('aria-label') || '').trim().slice(0, 50),
+              label: (element.innerText || element.getAttribute('aria-label') || '')
+                .trim()
+                .slice(0, 50),
               width: Math.round(rect.width),
               height: Math.round(rect.height),
             };
@@ -172,7 +191,10 @@ export const FOCUSED_CASES = {
         detail.overflow.filter((entry) => !allowed(entry)),
         [],
       );
-      t.checks.truthy('the analysis table scrolls horizontally', detail.tableScroll?.scrollWidth > detail.tableScroll?.clientWidth);
+      t.checks.truthy(
+        'the analysis table scrolls horizontally',
+        detail.tableScroll?.scrollWidth > detail.tableScroll?.clientWidth,
+      );
       t.checks.eq('home targets are at least 44 by 44', home.smallTargets, []);
       t.checks.eq('detail targets are at least 44 by 44', detail.smallTargets, []);
       t.checks.eq(
@@ -187,7 +209,9 @@ export const FOCUSED_CASES = {
       );
       t.checks.eq(
         'no critical axe violation',
-        a11y.violations ? a11y.violations.filter((violation) => violation.impact === 'critical') : [],
+        a11y.violations
+          ? a11y.violations.filter((violation) => violation.impact === 'critical')
+          : [],
         [],
       );
       return {
@@ -232,7 +256,10 @@ export const FOCUSED_CASES = {
         await session.page.locator('input[type=date]').nth(1).fill('2026-11-07');
         await session.page.getByRole('button', { name: 'Consultar', exact: true }).click();
       }
-      await session.page.locator('[role=alert]').first().waitFor({ state: 'visible', timeout: 25000 });
+      await session.page
+        .locator('[role=alert]')
+        .first()
+        .waitFor({ state: 'visible', timeout: 25000 });
       await session.page.waitForTimeout(500);
       const failedPrimary = await session.primaryText();
       const failedText = await session.bodyText();
@@ -241,7 +268,9 @@ export const FOCUSED_CASES = {
         const element = document.activeElement;
         return {
           tag: element?.tagName,
-          label: (element?.innerText || element?.getAttribute('aria-label') || '').trim().slice(0, 80),
+          label: (element?.innerText || element?.getAttribute('aria-label') || '')
+            .trim()
+            .slice(0, 80),
           inSales: Boolean(element?.closest('.sales-analysis, .overview-screen')),
         };
       });
@@ -252,7 +281,11 @@ export const FOCUSED_CASES = {
 
       await t.run.apiProcess.start();
       await session.page.getByRole('button', { name: 'Reintentar', exact: true }).click();
-      await session.page.locator('[role=alert]').first().waitFor({ state: 'hidden', timeout: 25000 }).catch(() => {});
+      await session.page
+        .locator('[role=alert]')
+        .first()
+        .waitFor({ state: 'hidden', timeout: 25000 })
+        .catch(() => {});
       await session.waitForPrimary();
       await session.page.waitForTimeout(600);
       const recoveredPrimary = await session.primaryText();
@@ -287,11 +320,22 @@ export const FOCUSED_CASES = {
       );
       t.checks.truthy('focus stays in the sales region', focused.inSales);
       t.checks.truthy('the refresh starts at least one report request', failedRequests >= 1);
-      t.checks.eq('the retry clears the alert', await session.page.locator('[role=alert]').count(), 0);
-      t.checks.check('the retry restores a value', recoveredPrimary.length > 0, 'non-empty', recoveredPrimary);
+      t.checks.eq(
+        'the retry clears the alert',
+        await session.page.locator('[role=alert]').count(),
+        0,
+      );
+      t.checks.check(
+        'the retry restores a value',
+        recoveredPrimary.length > 0,
+        'non-empty',
+        recoveredPrimary,
+      );
       t.checks.check(
         'capturedAt changes after the retry',
-        Boolean(oldCapturedAt) && Boolean(recoveredCapturedAt) && recoveredCapturedAt > oldCapturedAt,
+        Boolean(oldCapturedAt) &&
+          Boolean(recoveredCapturedAt) &&
+          recoveredCapturedAt > oldCapturedAt,
         `later than ${oldCapturedAt}`,
         recoveredCapturedAt,
       );
@@ -302,7 +346,10 @@ export const FOCUSED_CASES = {
         recoveredTime,
       );
       t.checks.eq('the section does not change', recoveredUrl.split('#')[0], oldUrl.split('#')[0]);
-      t.checks.truthy('the retry sends a new report request', recoveredRequests > failedRequests || recoveredRequests >= 1);
+      t.checks.truthy(
+        'the retry sends a new report request',
+        recoveredRequests > failedRequests || recoveredRequests >= 1,
+      );
       return {
         observations: {
           oldPrimary,
@@ -322,13 +369,20 @@ export const FOCUSED_CASES = {
   },
 
   'I1-ISO-04': async (t) => {
-    const session = await t.session({ user: USERS.revoked, merchant: IDS.M1, baseUrl: t.run.devUrl });
+    const session = await t.session({
+      user: USERS.revoked,
+      merchant: IDS.M1,
+      baseUrl: t.run.devUrl,
+    });
     const roleId = await t.db.value(`select id from umi.role where key='i1_revoked'`);
     try {
       await session.gotoHome({ days: 30 });
       await session.openDetail();
       const beforeCache = await session.queryCache();
-      await session.page.getByRole('button', { name: 'Categorías', exact: true }).click().catch(() => {});
+      await session.page
+        .getByRole('button', { name: 'Categorías', exact: true })
+        .click()
+        .catch(() => {});
       await session.page.waitForTimeout(400);
       const beforeText = await session.bodyText();
       await session.screenshot('screen-authorized.png');
@@ -353,13 +407,20 @@ export const FOCUSED_CASES = {
         await session.page.locator('input[type=date]').nth(1).fill('2026-11-07');
         await session.page.getByRole('button', { name: 'Consultar', exact: true }).click();
       }
-      await session.page.locator('[role=alert]').first().waitFor({ state: 'visible', timeout: 25000 });
+      await session.page
+        .locator('[role=alert]')
+        .first()
+        .waitFor({ state: 'visible', timeout: 25000 });
       await session.page.waitForTimeout(600);
       const deniedText = await session.bodyText();
       const deniedAlert = await session.page.locator('[role=alert]').first().innerText();
       const deniedCache = await session.queryCache();
       const amounts = await session.page.evaluate(() =>
-        [...document.querySelectorAll('.analysis-lead, .analysis-summary-grid, .analysis-facts, .category-sales-report, .sales-bars')]
+        [
+          ...document.querySelectorAll(
+            '.analysis-lead, .analysis-summary-grid, .analysis-facts, .category-sales-report, .sales-bars',
+          ),
+        ]
           .map((element) => element.innerText)
           .join('\n'),
       );
@@ -376,17 +437,41 @@ export const FOCUSED_CASES = {
 
       t.writeJson('cache.json', { before: beforeCache, after: deniedCache });
       t.writeJson('requests.json', session.requests);
-      t.checks.includes('denied alert is exact', deniedAlert, 'No tienes permiso para consultar estas ventas.');
+      t.checks.includes(
+        'denied alert is exact',
+        deniedAlert,
+        'No tienes permiso para consultar estas ventas.',
+      );
       t.checks.check(
         'all sales amounts are removed',
         !/\$\d/.test(amounts) && !amounts.includes('MXN'),
         'no amounts',
         amounts.slice(0, 300),
       );
-      t.checks.check('only the return control is offered', /Volver a inicio/.test(deniedText), true, deniedText.slice(0, 500));
-      t.checks.check('home shows the denial', /No tienes permiso para consultar estas ventas\./.test(homeText), true, homeText.slice(0, 400));
-      t.checks.check('Forward keeps the denial', /No tienes permiso para consultar estas ventas\./.test(forwardText), true, forwardText.slice(0, 400));
-      t.checks.check('Forward does not restore the old value', !beforeText.includes('270.00') || !forwardText.includes('270.00'), true, forwardText.includes('270.00'));
+      t.checks.check(
+        'only the return control is offered',
+        /Volver a inicio/.test(deniedText),
+        true,
+        deniedText.slice(0, 500),
+      );
+      t.checks.check(
+        'home shows the denial',
+        /No tienes permiso para consultar estas ventas\./.test(homeText),
+        true,
+        homeText.slice(0, 400),
+      );
+      t.checks.check(
+        'Forward keeps the denial',
+        /No tienes permiso para consultar estas ventas\./.test(forwardText),
+        true,
+        forwardText.slice(0, 400),
+      );
+      t.checks.check(
+        'Forward does not restore the old value',
+        !beforeText.includes('270.00') || !forwardText.includes('270.00'),
+        true,
+        forwardText.includes('270.00'),
+      );
       const salesKeys = (entries) =>
         (Array.isArray(entries) ? entries : []).filter((entry) =>
           JSON.stringify(entry.key).includes('sales-analysis'),

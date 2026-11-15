@@ -61,7 +61,12 @@ const allowedWhitespace = new Set(
     (finding) => `${finding.path}:${finding.line}: ${finding.message}`,
   ),
 );
-const rangeFindings = rangeCheck.split('\n').filter((line) => /^[^+].+:\d+: /u.test(line));
+const rangeFindings = rangeCheck
+  .split('\n')
+  .filter((line) => /^[^+].+:\d+: /u.test(line))
+  // Evidence packets are generated logs. A trailing blank line in a captured
+  // command output is not a source whitespace defect.
+  .filter((line) => !line.startsWith('scripts/evidence/runs/'));
 const newRangeFindings = rangeFindings.filter((finding) => !allowedWhitespace.has(finding));
 if (newRangeFindings.length > 0) {
   throw new Error(`New Git whitespace finding:\n${newRangeFindings.join('\n')}`);

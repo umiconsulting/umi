@@ -1,24 +1,75 @@
 import { chromium } from '@playwright/test';
 const browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
-const context = await browser.newContext({ viewport: { width: 360, height: 800 }, locale: 'es-MX' });
-await context.addInitScript(() => localStorage.setItem('umi.dashboard.locale','es'));
+const context = await browser.newContext({
+  viewport: { width: 360, height: 800 },
+  locale: 'es-MX',
+});
+await context.addInitScript(() => localStorage.setItem('umi.dashboard.locale', 'es'));
 const page = await context.newPage();
-await page.goto('http://127.0.0.1:4000/login',{waitUntil:'domcontentloaded'});
+await page.goto('http://127.0.0.1:4000/login', { waitUntil: 'domcontentloaded' });
 await page.locator('input[type=email]').fill('verifier.owner@local.test');
 await page.locator('input[type=password]').fill('I1Local2026!');
-await page.getByRole('button',{name:'Entrar'}).click();
+await page.getByRole('button', { name: 'Entrar' }).click();
 await page.waitForTimeout(1200);
-await page.goto('http://127.0.0.1:4000/reportes?from=2026-10-10&to=2026-11-08&locationId=11111111-1111-4111-8111-000000000011&refundView=sale_result&basketUnit=ticket&section=categories',{waitUntil:'domcontentloaded'});
+await page.goto(
+  'http://127.0.0.1:4000/reportes?from=2026-10-10&to=2026-11-08&locationId=11111111-1111-4111-8111-000000000011&refundView=sale_result&basketUnit=ticket&section=categories',
+  { waitUntil: 'domcontentloaded' },
+);
 await page.waitForTimeout(3500);
-console.log('URL',page.url());
-console.log('BUTTONS', await page.getByRole('button').evaluateAll(els=>els.filter(e=>e.offsetParent!==null).map(e=>{const r=e.getBoundingClientRect();return {t:(e.innerText||e.getAttribute('aria-label')||'').trim().slice(0,30),w:Math.round(r.width),h:Math.round(r.height)}})));
-console.log('LINKS', await page.getByRole('link').evaluateAll(els=>els.filter(e=>e.offsetParent!==null).map(e=>{const r=e.getBoundingClientRect();return {t:(e.innerText||e.getAttribute('aria-label')||'').trim().slice(0,30),w:Math.round(r.width),h:Math.round(r.height)}})));
-const m = await page.evaluate(()=>{
- const doc=document.documentElement;
- const s=[...document.querySelectorAll('*')].filter(e=>e.scrollWidth>e.clientWidth+1).map(e=>({tag:e.tagName,cls:e.className?.toString?.().slice(0,70),sw:e.scrollWidth,cw:e.clientWidth,ox:getComputedStyle(e).overflowX}));
- return {sw:doc.scrollWidth,iw:innerWidth,scroll:s.filter(x=>x.ox!=='visible').slice(0,20), all:s.slice(0,20)};
+console.log('URL', page.url());
+console.log(
+  'BUTTONS',
+  await page.getByRole('button').evaluateAll((els) =>
+    els
+      .filter((e) => e.offsetParent !== null)
+      .map((e) => {
+        const r = e.getBoundingClientRect();
+        return {
+          t: (e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 30),
+          w: Math.round(r.width),
+          h: Math.round(r.height),
+        };
+      }),
+  ),
+);
+console.log(
+  'LINKS',
+  await page.getByRole('link').evaluateAll((els) =>
+    els
+      .filter((e) => e.offsetParent !== null)
+      .map((e) => {
+        const r = e.getBoundingClientRect();
+        return {
+          t: (e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 30),
+          w: Math.round(r.width),
+          h: Math.round(r.height),
+        };
+      }),
+  ),
+);
+const m = await page.evaluate(() => {
+  const doc = document.documentElement;
+  const s = [...document.querySelectorAll('*')]
+    .filter((e) => e.scrollWidth > e.clientWidth + 1)
+    .map((e) => ({
+      tag: e.tagName,
+      cls: e.className?.toString?.().slice(0, 70),
+      sw: e.scrollWidth,
+      cw: e.clientWidth,
+      ox: getComputedStyle(e).overflowX,
+    }));
+  return {
+    sw: doc.scrollWidth,
+    iw: innerWidth,
+    scroll: s.filter((x) => x.ox !== 'visible').slice(0, 20),
+    all: s.slice(0, 20),
+  };
 });
-console.log(JSON.stringify(m,null,1));
-console.log('BODYTEXT', (await page.locator('body').innerText()).slice(0,1800));
-await page.screenshot({path:'/home/juan/Projects/umiconsulting/umi/.analytics-i1-exec-2f52a6d5-20261115/run/probe-ux04-cat.png',fullPage:true});
-await context.close();await browser.close();
+console.log(JSON.stringify(m, null, 1));
+console.log('BODYTEXT', (await page.locator('body').innerText()).slice(0, 1800));
+await page.screenshot({
+  path: '/home/juan/Projects/umiconsulting/umi/.analytics-i1-exec-2f52a6d5-20261115/run/probe-ux04-cat.png',
+  fullPage: true,
+});
+await context.close();
+await browser.close();

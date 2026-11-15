@@ -5,6 +5,7 @@ import { useSalesAnalysis, useSalesAnalysisOptions, useOverviewData } from '@/da
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { getStoredSession } from '@/lib/auth.jsx';
 import { formatNumber, formatTime } from '@/lib/format.js';
+import { SALES_AUTO_REFRESH_MS } from '@/lib/sales-analysis-query.js';
 import {
   SalesCoverageNotice,
   SalesDataNote,
@@ -16,6 +17,7 @@ import {
 import {
   AVAILABLE_WIDGETS,
   DEFAULT_WIDGETS,
+  catalogCategories,
   loadWidgetPreferences,
   previousReportPeriod,
   reportPeriod,
@@ -133,10 +135,19 @@ function BusinessWidgets({ options, context }) {
   };
   const report = useSalesAnalysis(query);
   const prior = useSalesAnalysis({ ...query, ...previousReportPeriod(query) });
+  const refetchReport = report.refetch;
+  const refetchPrior = prior.refetch;
   function refreshReports() {
-    report.refetch();
-    prior.refetch();
+    refetchReport();
+    refetchPrior();
   }
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      refetchReport();
+      refetchPrior();
+    }, SALES_AUTO_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [refetchReport, refetchPrior]);
   const scope =
     options.locations.find((location) => location.id === query.locationId)?.name ??
     t`Todas las sucursales`;
@@ -151,14 +162,13 @@ function BusinessWidgets({ options, context }) {
   }
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
   }, []);
   const stale = Boolean(
     report.data &&
     report.dataUpdatedAt &&
-    !report.refreshing &&
-    now - report.dataUpdatedAt > 60_000,
+    (report.refreshError || now - report.dataUpdatedAt >= 60_000),
   );
   return (
     <>
@@ -238,6 +248,7 @@ function BusinessWidgets({ options, context }) {
               capturedAt={report.data.capturedAt}
               timezone={report.data.timezone}
               onRetry={refreshReports}
+              network={!report.refreshErrorStatus}
             />
           )}
           {report.data.totals.tickets === 0 && report.data.totals.netMinorUnits === 0 && (
@@ -267,7 +278,7 @@ function BusinessWidgets({ options, context }) {
               </button>
             </div>
           )}
-          <SalesCoverageNotice coverage={report.data.coverage} />
+          <SalesCoverageNotice coverage={report.data.coverage} basketUnit={query.basketUnit} />
           {prior.error && (
             <p role="status">
               <Trans>
@@ -293,6 +304,8 @@ function BusinessWidgets({ options, context }) {
                     report={report.data}
                     query={query}
                     onRetry={refreshReports}
+                    catalog={catalogCategories(options)}
+                    network={Boolean(report.refreshError) && !report.refreshErrorStatus}
                   />
                 ),
               )}

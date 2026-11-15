@@ -64,7 +64,11 @@ export const BROWSER_CASES = {
       await mzSession.screenshot('screen-mz.png');
       t.writeJson('page-text-mz.json', { text });
       t.checks.includes('MZ shows its zero amount', text, '$0.00');
-      t.checks.notIncludes('MZ is not the no-ticket state', text, 'No hay tickets de venta en este periodo.');
+      t.checks.notIncludes(
+        'MZ is not the no-ticket state',
+        text,
+        'No hay tickets de venta en este periodo.',
+      );
     } finally {
       await mzSession.close();
     }
@@ -75,7 +79,11 @@ export const BROWSER_CASES = {
       const text = await mnSession.bodyText();
       await mnSession.screenshot('screen-mn.png');
       t.writeJson('page-text.json', { mn: text });
-      t.checks.includes('MN shows the no-ticket state', text, 'No hay tickets de venta en este periodo.');
+      t.checks.includes(
+        'MN shows the no-ticket state',
+        text,
+        'No hay tickets de venta en este periodo.',
+      );
       t.checks.notIncludes('MN does not show a zero sales total', text, 'Venta neta\n$0.00');
     } finally {
       await mnSession.close();
@@ -150,7 +158,11 @@ export const BROWSER_CASES = {
       await session.screenshot('screen.png');
       t.checks.includes('partial coverage label', text, 'Cobertura parcial');
       t.checks.includes('exclusion count', text, '1');
-      t.checks.notIncludes('does not claim all tickets have a visit', text, 'Todas las compras tienen una visita');
+      t.checks.notIncludes(
+        'does not claim all tickets have a visit',
+        text,
+        'Todas las compras tienen una visita',
+      );
     } finally {
       await session.close();
     }
@@ -207,8 +219,18 @@ export const BROWSER_CASES = {
         .catch(() => after);
       await session.screenshot('screen-recovered.png');
       t.checks.includes('loading text is visible', during, 'Consultando compras…');
-      t.checks.check('no zero appears', !/\$0\.00/.test(during), 'no $0.00', during.includes('$0.00'));
-      t.checks.check('no error appears', !/No se pudo cargar/.test(during), 'no error', during.includes('No se pudo cargar'));
+      t.checks.check(
+        'no zero appears',
+        !/\$0\.00/.test(during),
+        'no $0.00',
+        during.includes('$0.00'),
+      );
+      t.checks.check(
+        'no error appears',
+        !/No se pudo cargar/.test(during),
+        'no error',
+        during.includes('No se pudo cargar'),
+      );
       t.checks.check('new totals appear', afterPrimary.length > 0, 'non-empty', afterPrimary);
       return { observations: { afterPrimary } };
     } finally {
@@ -230,10 +252,24 @@ export const BROWSER_CASES = {
       const text = await session.bodyText();
       await session.screenshot('screen-auto.png');
       t.writeJson('requests.json', reports);
-      t.checks.check('a new request starts between 58 and 65 seconds', delta !== null && delta >= 58 && delta <= 68, '58..65', delta);
-      t.checks.check('the new capturedAt is later', Boolean(firstCaptured) && capturedAt(session) > firstCaptured, `later than ${firstCaptured}`, capturedAt(session));
+      t.checks.check(
+        'a new request starts between 58 and 65 seconds',
+        delta !== null && delta >= 58 && delta <= 68,
+        '58..65',
+        delta,
+      );
+      t.checks.check(
+        'the new capturedAt is later',
+        Boolean(firstCaptured) && capturedAt(session) > firstCaptured,
+        `later than ${firstCaptured}`,
+        capturedAt(session),
+      );
       t.checks.includes('the data note shows the capture time', text, 'Consulta:');
-      t.checks.includes('the note carries the current-day caveat', text, 'día actual puede estar incompleto');
+      t.checks.includes(
+        'the note carries the current-day caveat',
+        text,
+        'día actual puede estar incompleto',
+      );
       t.checks.check('values stay visible', /Venta neta/.test(text), true, text.slice(0, 200));
       return { observations: { delta, firstCaptured, secondCaptured: capturedAt(session) } };
     } finally {
@@ -250,20 +286,37 @@ export const BROWSER_CASES = {
       const old = await session.primaryText();
       await t.run.apiProcess.stop();
       await session.page.getByRole('button', { name: 'Actualizar', exact: true }).click();
-      await session.page.locator('[role=alert]').first().waitFor({ state: 'visible', timeout: 25000 });
+      await session.page
+        .locator('[role=alert]')
+        .first()
+        .waitFor({ state: 'visible', timeout: 25000 });
       await session.page.waitForTimeout(400);
       const errorText = await session.bodyText();
       await session.screenshot('screen-error.png');
-      t.checks.includes('error text is exact', errorText, 'No se pudieron cargar las ventas. Los importes no están disponibles.');
+      t.checks.includes(
+        'error text is exact',
+        errorText,
+        'No se pudieron cargar las ventas. Los importes no están disponibles.',
+      );
       t.checks.includes('retry button is offered', errorText, 'Reintentar');
-      t.checks.check('no zero appears', !/\$0\.00/.test(errorText), 'no $0.00', errorText.includes('$0.00'));
+      t.checks.check(
+        'no zero appears',
+        !/\$0\.00/.test(errorText),
+        'no $0.00',
+        errorText.includes('$0.00'),
+      );
       await t.run.apiProcess.start();
       await session.page.getByRole('button', { name: 'Reintentar', exact: true }).click();
       await session.waitForPrimary();
       await session.page.waitForTimeout(500);
       const recovered = await session.primaryText();
       await session.screenshot('screen-recovered.png');
-      t.checks.check('retry restores the values', amount(recovered) === amount(old), amount(old), amount(recovered));
+      t.checks.check(
+        'retry restores the values',
+        amount(recovered) === amount(old),
+        amount(old),
+        amount(recovered),
+      );
       return { observations: { old, recovered } };
     } finally {
       await session.close();
@@ -271,25 +324,40 @@ export const BROWSER_CASES = {
   },
 
   'I1-ST-08': async (t) => {
-    const session = await t.session({ user: USERS.denied, merchant: IDS.M1, cookies: [], uiLogin: true });
+    const session = await t.session({
+      user: USERS.denied,
+      merchant: IDS.M1,
+      cookies: [],
+      uiLogin: true,
+    });
     try {
       await session.gotoHome({ days: 30, wait: false });
       await session.page.waitForTimeout(2000);
       const home = await session.bodyText();
       await session.screenshot('screen-home.png');
-      await session.page.goto(`${t.baseUrl}/reportes?from=2026-11-02&to=2026-11-04&refundView=sale_result&basketUnit=ticket`, { waitUntil: 'domcontentloaded' });
+      await session.page.goto(
+        `${t.baseUrl}/reportes?from=2026-11-02&to=2026-11-04&refundView=sale_result&basketUnit=ticket`,
+        { waitUntil: 'domcontentloaded' },
+      );
       await session.page.waitForTimeout(2500);
       const detail = await session.bodyText();
       await session.screenshot('screen-detail.png');
       t.writeJson('page-text.json', { home, detail });
       const api = await t.api(USERS.denied);
-      const response = await api.get(salesPath(IDS.M1, { from: '2026-11-02', to: '2026-11-04' }), { allowError: true });
+      const response = await api.get(salesPath(IDS.M1, { from: '2026-11-02', to: '2026-11-04' }), {
+        allowError: true,
+      });
       t.writeJson('response.json', response.body);
       t.checks.eq('API status', response.status, 403);
       t.checks.eq('API code', response.body?.error?.code, 'PERMISSION_DENIED');
       t.checks.includes('home denial', home, 'No tienes permiso para consultar estas ventas.');
       t.checks.includes('detail denial', detail, 'No tienes permiso para consultar estas ventas.');
-      t.checks.check('no sales values on either screen', !/\$\d/.test(home) && !/\$\d/.test(detail), 'no amounts', { home: /\$\d/.test(home), detail: /\$\d/.test(detail) });
+      t.checks.check(
+        'no sales values on either screen',
+        !/\$\d/.test(home) && !/\$\d/.test(detail),
+        'no amounts',
+        { home: /\$\d/.test(home), detail: /\$\d/.test(detail) },
+      );
       return { observations: { status: response.status } };
     } finally {
       await session.close();
@@ -299,11 +367,21 @@ export const BROWSER_CASES = {
   'I1-ST-09': async (t) => {
     const api = await t.api(USERS.heavy);
     const large = await api.get(
-      salesPath(IDS.LARGE, { from: '2026-11-01', to: '2026-11-30', refundView: 'sale_result', basketUnit: 'ticket' }),
+      salesPath(IDS.LARGE, {
+        from: '2026-11-01',
+        to: '2026-11-30',
+        refundView: 'sale_result',
+        basketUnit: 'ticket',
+      }),
       { allowError: true },
     );
     const boundary = await api.get(
-      salesPath(IDS.LARGE, { from: '2024-11-08', to: '2026-11-09', refundView: 'sale_result', basketUnit: 'ticket' }),
+      salesPath(IDS.LARGE, {
+        from: '2024-11-08',
+        to: '2026-11-09',
+        refundView: 'sale_result',
+        basketUnit: 'ticket',
+      }),
       { allowError: true },
     );
     t.writeJson('response-large.json', large.body);
@@ -322,8 +400,18 @@ export const BROWSER_CASES = {
       const text = await session.bodyText();
       await session.screenshot('screen.png');
       t.writeJson('page-text.json', { text });
-      t.checks.check('range message is shown', /rango menor|731 días|20,000/.test(text), true, text.slice(0, 600));
-      t.checks.check('no totals are visible', !/\$[\d,]+\.\d\d/.test(text), 'no amount', text.match(/\$[\d,]+\.\d\d/)?.[0] ?? null);
+      t.checks.check(
+        'range message is shown',
+        /rango menor|731 días|20,000/.test(text),
+        true,
+        text.slice(0, 600),
+      );
+      t.checks.check(
+        'no totals are visible',
+        !/\$[\d,]+\.\d\d/.test(text),
+        'no amount',
+        text.match(/\$[\d,]+\.\d\d/)?.[0] ?? null,
+      );
     } finally {
       await session.close();
     }
@@ -367,8 +455,15 @@ export const BROWSER_CASES = {
       t.checks.eq('exactly two report requests start', reports.length, 2);
       t.checks.check('value stays visible', amount(during).length > 0, 'non-empty', during);
       t.checks.eq('cache entry count does not grow', after.length, before.length);
-      t.checks.check('capturedAt changes', Boolean(capturedAt(session)), 'a capture time', capturedAt(session));
-      return { observations: { before: before.length, after: after.length, requests: reports.length } };
+      t.checks.check(
+        'capturedAt changes',
+        Boolean(capturedAt(session)),
+        'a capture time',
+        capturedAt(session),
+      );
+      return {
+        observations: { before: before.length, after: after.length, requests: reports.length },
+      };
     } finally {
       await session.close();
     }
@@ -384,7 +479,10 @@ export const BROWSER_CASES = {
       const oldCaptured = capturedAt(session);
       await t.run.apiProcess.stop();
       await session.page.getByRole('button', { name: 'Actualizar', exact: true }).click();
-      await session.page.locator('.sales-primary').click().catch(() => {});
+      await session.page
+        .locator('.sales-primary')
+        .click()
+        .catch(() => {});
       await session.page.waitForTimeout(500);
       await t.run.apiProcess.start();
       await session.page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {});
@@ -395,7 +493,12 @@ export const BROWSER_CASES = {
       t.writeJson('requests.json', reportRequests(session));
       t.checks.eq('old amount survives', amount(after), amount(old));
       t.checks.eq('old capturedAt survives', capturedAt(session), oldCaptured);
-      t.checks.check('no error replaces the value', !/No se pudo/.test(await session.bodyText()), true, 'no error');
+      t.checks.check(
+        'no error replaces the value',
+        !/No se pudo/.test(await session.bodyText()),
+        true,
+        'no error',
+      );
       return { observations: { old, after, oldCaptured } };
     } finally {
       await session.close();
@@ -418,7 +521,12 @@ export const BROWSER_CASES = {
       t.writeJson('requests.json', reports);
       t.checks.eq('two new report requests', reports.length, 2);
       t.checks.eq('entry count is unchanged', after.length, before.length);
-      t.checks.check('capturedAt is later', Boolean(capturedAt(session)), 'a capture time', capturedAt(session));
+      t.checks.check(
+        'capturedAt is later',
+        Boolean(capturedAt(session)),
+        'a capture time',
+        capturedAt(session),
+      );
       return { observations: { requests: reports.length } };
     } finally {
       await session.close();
@@ -430,7 +538,11 @@ export const BROWSER_CASES = {
     try {
       await session.gotoHome({ days: 30 });
       await session.page.route('**/operations/reports/sales/analysis?*', (route) =>
-        route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":{"code":"INTERNAL_ERROR"}}' }),
+        route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: '{"error":{"code":"INTERNAL_ERROR"}}',
+        }),
       );
       await session.page.getByRole('button', { name: 'Actualizar', exact: true }).click();
       await session.page.waitForTimeout(1500);
@@ -445,8 +557,18 @@ export const BROWSER_CASES = {
       const delta = last ? (Date.now() - Date.parse(last.at)) / 1000 : null;
       t.writeJson('requests.json', reportRequests(session));
       t.checks.eq('count is stable for 10 seconds', secondCount, firstCount);
-      t.checks.check('the next automatic attempt starts at 60 seconds or later', thirdCount > secondCount, '> first count', thirdCount);
-      t.checks.check('the next attempt is not a tight poll', thirdCount === secondCount || Date.parse(last.at) - firstAt >= 55000, '>= 55 s', delta);
+      t.checks.check(
+        'the next automatic attempt starts at 60 seconds or later',
+        thirdCount > secondCount,
+        '> first count',
+        thirdCount,
+      );
+      t.checks.check(
+        'the next attempt is not a tight poll',
+        thirdCount === secondCount || Date.parse(last.at) - firstAt >= 55000,
+        '>= 55 s',
+        delta,
+      );
       return { observations: { firstCount, secondCount, thirdCount } };
     } finally {
       await session.page.unroute('**/operations/reports/sales/analysis?*').catch(() => {});
@@ -455,7 +577,12 @@ export const BROWSER_CASES = {
   },
 
   'I1-UX-01': async (t) => {
-    const session = await t.session({ user: USERS.owner, merchant: IDS.M1, cookies: [], uiLogin: true });
+    const session = await t.session({
+      user: USERS.owner,
+      merchant: IDS.M1,
+      cookies: [],
+      uiLogin: true,
+    });
     try {
       await session.gotoHome({ days: 30 });
       session.clearObservations();
@@ -499,8 +626,18 @@ export const BROWSER_CASES = {
       t.writeJson('requests.json', reportRequests(session));
       t.checks.includes('manual status is visible', manual, 'Actualizando ventas…');
       t.checks.includes('auto status is visible', auto, 'Actualizando ventas…');
-      t.checks.check('values remain visible', amount(await session.primaryText()).length > 0, 'non-empty', first);
-      t.checks.check('timestamp changes', Boolean(capturedAt(session)), 'a capture time', capturedAt(session));
+      t.checks.check(
+        'values remain visible',
+        amount(await session.primaryText()).length > 0,
+        'non-empty',
+        first,
+      );
+      t.checks.check(
+        'timestamp changes',
+        Boolean(capturedAt(session)),
+        'a capture time',
+        capturedAt(session),
+      );
       return { observations: { first } };
     } finally {
       await session.close();
@@ -516,7 +653,10 @@ export const BROWSER_CASES = {
       const old = await session.primaryText();
       await t.run.apiProcess.stop();
       await session.page.getByRole('button', { name: 'Actualizar', exact: true }).click();
-      await session.page.locator('[role=alert]').first().waitFor({ state: 'visible', timeout: 25000 });
+      await session.page
+        .locator('[role=alert]')
+        .first()
+        .waitFor({ state: 'visible', timeout: 25000 });
       const error = await session.bodyText();
       await session.screenshot('screen-error.png');
       await t.run.apiProcess.start();
@@ -527,7 +667,12 @@ export const BROWSER_CASES = {
       t.writeJson('console.json', session.errors);
       t.checks.includes('error text is visible', error, 'No se pudieron cargar las ventas');
       t.checks.eq('old values remain', amount(error), amount(old));
-      t.checks.check('retry restores the values', amount(recovered) === amount(old), amount(old), amount(recovered));
+      t.checks.check(
+        'retry restores the values',
+        amount(recovered) === amount(old),
+        amount(old),
+        amount(recovered),
+      );
       return { observations: { old, recovered } };
     } finally {
       await session.close();
@@ -542,7 +687,9 @@ export const BROWSER_CASES = {
         const h1 = [...document.querySelectorAll('h1')].map((element) => element.innerText.trim());
         const h2 = [...document.querySelectorAll('h2')].map((element) => element.innerText.trim());
         const primary = document.querySelector('.sales-primary')?.innerText || '';
-        const figures = [...document.querySelectorAll('.figures')].map((element) => element.innerText);
+        const figures = [...document.querySelectorAll('.figures')].map(
+          (element) => element.innerText,
+        );
         const primaryButton = document.querySelector('.overview-screen .btn-primary');
         const headings = [...document.querySelectorAll('h1,h2')].map((element) => ({
           tag: element.tagName,
@@ -568,8 +715,17 @@ export const BROWSER_CASES = {
       t.checks.eq('one h1', dom.h1.length, 1);
       t.checks.includes('sales heading is h2', dom.h2.join('|'), 'Tu negocio en números');
       t.checks.check('net sales is the largest figure', true, true, dom.primary);
-      t.checks.check('only one primary action in the sales region', String(dom.primaryButton?.text || '').startsWith('Explorar ventas'), 'Explorar ventas', dom.primaryButton?.text);
-      t.checks.eq('no critical axe violations', a11y.violations?.filter((violation) => violation.impact === 'critical') || [], []);
+      t.checks.check(
+        'only one primary action in the sales region',
+        String(dom.primaryButton?.text || '').startsWith('Explorar ventas'),
+        'Explorar ventas',
+        dom.primaryButton?.text,
+      );
+      t.checks.eq(
+        'no critical axe violations',
+        a11y.violations?.filter((violation) => violation.impact === 'critical') || [],
+        [],
+      );
       return { observations: dom };
     } finally {
       await session.close();
@@ -583,16 +739,29 @@ export const BROWSER_CASES = {
       await session.page.waitForTimeout(2500);
       const home = await session.bodyText();
       await session.screenshot('screen-home.png');
-      await session.page.goto(`${t.baseUrl}/reportes?from=2026-11-02&to=2026-11-04&refundView=sale_result&basketUnit=ticket`, { waitUntil: 'domcontentloaded' });
+      await session.page.goto(
+        `${t.baseUrl}/reportes?from=2026-11-02&to=2026-11-04&refundView=sale_result&basketUnit=ticket`,
+        { waitUntil: 'domcontentloaded' },
+      );
       await session.page.waitForTimeout(2200);
       const detail = await session.bodyText();
       await session.screenshot('screen-detail.png');
       t.writeJson('page-text.json', { home, detail });
       t.checks.includes('home status message', home, 'No hay tickets de venta en este periodo.');
       t.checks.includes('home offers 30 days', home, 'Consultar 30 días');
-      t.checks.check('no alert appears', !/role="alert"/.test(home) && !/No se pudo/.test(home), true, 'no alert');
+      t.checks.check(
+        'no alert appears',
+        !/role="alert"/.test(home) && !/No se pudo/.test(home),
+        true,
+        'no alert',
+      );
       t.checks.includes('average names no tickets', home, 'Sin tickets para calcular');
-      t.checks.check('detail pivot has a zero total', detail.includes('$0.00') || detail.includes('0'), true, detail.slice(0, 200));
+      t.checks.check(
+        'detail pivot has a zero total',
+        detail.includes('$0.00') || detail.includes('0'),
+        true,
+        detail.slice(0, 200),
+      );
       return { observations: { home: home.slice(0, 200) } };
     } finally {
       await session.close();
@@ -603,7 +772,10 @@ export const BROWSER_CASES = {
     const empty = await t.session({ user: USERS.heavy, merchant: IDS.MN });
     const partial = await t.session({ user: USERS.heavy, merchant: IDS.MC });
     try {
-      await empty.page.goto(`${t.baseUrl}/reportes?from=2026-11-02&to=2026-11-04&refundView=sale_result&basketUnit=ticket`, { waitUntil: 'domcontentloaded' });
+      await empty.page.goto(
+        `${t.baseUrl}/reportes?from=2026-11-02&to=2026-11-04&refundView=sale_result&basketUnit=ticket`,
+        { waitUntil: 'domcontentloaded' },
+      );
       await empty.page.waitForTimeout(2200);
       const emptyText = await empty.bodyText();
       await empty.screenshot('screen-empty.png');
@@ -618,9 +790,20 @@ export const BROWSER_CASES = {
       await partial.screenshot('screen-partial.png');
       t.writeJson('page-text.json', { emptyText, partialText });
       t.checks.includes('empty average label', emptyText, 'Sin tickets para calcular');
-      t.checks.check('empty averages use a dash', /—/.test(emptyText), '—', emptyText.includes('—'));
+      t.checks.check(
+        'empty averages use a dash',
+        /—/.test(emptyText),
+        '—',
+        emptyText.includes('—'),
+      );
       t.checks.includes('partial coverage label', partialText, 'Cobertura parcial');
-      t.checks.check('the labels differ', emptyText.includes('Sin tickets para calcular') && !partialText.includes('Sin tickets para calcular'), true, 'different');
+      t.checks.check(
+        'the labels differ',
+        emptyText.includes('Sin tickets para calcular') &&
+          !partialText.includes('Sin tickets para calcular'),
+        true,
+        'different',
+      );
       return { observations: {} };
     } finally {
       await empty.close();
@@ -633,28 +816,49 @@ export const BROWSER_CASES = {
     try {
       await session.gotoHome({ days: 30 });
       await session.page.route('**/operations/reports/sales/analysis?*', (route) =>
-        route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":{"code":"INTERNAL_ERROR"}}' }),
+        route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: '{"error":{"code":"INTERNAL_ERROR"}}',
+        }),
       );
       await session.page.waitForTimeout(61000);
       const stale = await session.bodyText();
       await session.screenshot('screen-stale.png');
       t.checks.includes('stale label is exact', stale, 'Datos de las');
-      t.checks.includes('stale label asks for a refresh', stale, 'Actualiza para ver el estado actual.');
+      t.checks.includes(
+        'stale label asks for a refresh',
+        stale,
+        'Actualiza para ver el estado actual.',
+      );
       t.checks.check('values stay visible', /Venta neta/.test(stale), true, 'Venta neta');
       await session.page.unroute('**/operations/reports/sales/analysis?*');
       await session.page.getByRole('button', { name: 'Actualizar', exact: true }).click();
       await session.page.waitForTimeout(2500);
       const success = await session.bodyText();
       await session.screenshot('screen-success.png');
-      t.checks.check('success clears the stale label', !success.includes('Actualiza para ver el estado actual.'), true, 'cleared');
+      t.checks.check(
+        'success clears the stale label',
+        !success.includes('Actualiza para ver el estado actual.'),
+        true,
+        'cleared',
+      );
       await session.page.route('**/operations/reports/sales/analysis?*', (route) =>
-        route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":{"code":"INTERNAL_ERROR"}}' }),
+        route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: '{"error":{"code":"INTERNAL_ERROR"}}',
+        }),
       );
       await session.page.getByRole('button', { name: 'Actualizar', exact: true }).click();
       await session.page.waitForTimeout(2000);
       const failed = await session.bodyText();
       await session.screenshot('screen-failed.png');
-      t.checks.includes('failed refresh keeps the stale label', failed, 'Actualiza para ver el estado actual.');
+      t.checks.includes(
+        'failed refresh keeps the stale label',
+        failed,
+        'Actualiza para ver el estado actual.',
+      );
       t.checks.includes('failed refresh shows the error', failed, 'No se pudo actualizar');
       return { observations: { stale: stale.slice(0, 300) } };
     } finally {

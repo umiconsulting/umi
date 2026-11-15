@@ -46,6 +46,7 @@ function memorySnapshot() {
 }
 
 import { ApiClient, IDS, USERS, distribution, sha256File, sleep, writeJson } from './i1-lib.mjs';
+import { assertConformingBinding, describeBinding } from './i1-browser-binding.mjs';
 
 function argsOf(argv) {
   const args = {
@@ -318,6 +319,8 @@ async function main() {
   );
   mkdirSync(out, { recursive: true });
   const browser = await chromium.connectOverCDP(args.cdp);
+  const browserBinding = await describeBinding(browser, args.cdp);
+  assertConformingBinding(browserBinding);
   const { context, page, probe } = await openContext(browser, args);
 
   await page.goto(`${args.baseUrl}/?home=1&days=30`, {
@@ -355,6 +358,7 @@ async function main() {
     label: args.label,
     scope,
     buildIdentity,
+    browserBinding,
     method: {
       warmupsPerTargetPerRun: args.warmups,
       samplesPerRun: args.samples,

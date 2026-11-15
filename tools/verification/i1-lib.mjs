@@ -287,18 +287,21 @@ export function optionsPath(merchantId, locationId) {
 }
 
 export class BrowserSession {
-  static async open(run, {
-    user = USERS.owner,
-    password = PASSWORD,
-    viewport = { width: 1440, height: 900 },
-    merchant,
-    location,
-    baseUrl = run.baseUrl,
-    locale = 'es',
-    cookies = null,
-    uiLogin = false,
-    caseDir = null,
-  } = {}) {
+  static async open(
+    run,
+    {
+      user = USERS.owner,
+      password = PASSWORD,
+      viewport = { width: 1440, height: 900 },
+      merchant,
+      location,
+      baseUrl = run.baseUrl,
+      locale = 'es',
+      cookies = null,
+      uiLogin = false,
+      caseDir = null,
+    } = {},
+  ) {
     const context = await run.browser.newContext({
       viewport,
       locale: 'es-MX',
@@ -372,12 +375,36 @@ export class BrowserSession {
         failure: request.failure()?.errorText ?? 'failed',
       });
     });
-    const session = new BrowserSession({ run, context, page, errors, requests, responses, failedRequests, reportBodies, baseUrl, user, caseDir });
+    const session = new BrowserSession({
+      run,
+      context,
+      page,
+      errors,
+      requests,
+      responses,
+      failedRequests,
+      reportBodies,
+      baseUrl,
+      user,
+      caseDir,
+    });
     if (uiLogin) await session.login(user, password);
     return session;
   }
 
-  constructor({ run, context, page, errors, requests, responses, failedRequests, reportBodies, baseUrl, user, caseDir }) {
+  constructor({
+    run,
+    context,
+    page,
+    errors,
+    requests,
+    responses,
+    failedRequests,
+    reportBodies,
+    baseUrl,
+    user,
+    caseDir,
+  }) {
     this.run = run;
     this.context = context;
     this.page = page;
@@ -400,7 +427,10 @@ export class BrowserSession {
   }
 
   async login(email = this.user, password = PASSWORD) {
-    await this.page.goto(`${this.baseUrl}/login`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await this.page.goto(`${this.baseUrl}/login`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
     await this.page.locator('input[type=email]').waitFor({ state: 'visible', timeout: 15000 });
     await this.page.locator('input[type=email]').fill(email);
     await this.page.locator('input[type=password]').fill(password);
@@ -498,7 +528,9 @@ export class BrowserSession {
 
   async openDetail() {
     await this.page.locator('.sales-primary').click();
-    await this.page.waitForURL(/\/analisis|\/analisis-compra|\/sales-analysis|\/reportes/, { timeout: 15000 }).catch(() => {});
+    await this.page
+      .waitForURL(/\/analisis|\/analisis-compra|\/sales-analysis|\/reportes/, { timeout: 15000 })
+      .catch(() => {});
     await this.page.locator('.sales-analysis').waitFor({ state: 'visible', timeout: 25000 });
     await this.page.waitForTimeout(600);
   }

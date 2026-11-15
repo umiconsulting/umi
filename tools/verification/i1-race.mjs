@@ -21,7 +21,10 @@
 //     }));
 //   });
 
-export async function openGate(page, { delayMs = 2000, match = '**/operations/reports/sales/analysis?*' } = {}) {
+export async function openGate(
+  page,
+  { delayMs = 2000, match = '**/operations/reports/sales/analysis?*' } = {},
+) {
   let release;
   const released = new Promise((resolveRelease) => {
     release = resolveRelease;

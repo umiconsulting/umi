@@ -28,8 +28,11 @@ function buildBaskets(sales: AnalysisSale[], query: SalesAnalysisQuery) {
     const lines = retainedLines(sale, query);
     const units = lines.reduce((sum, line) => sum + line.quantity, 0);
     distribution.set(units, (distribution.get(units) ?? 0) + 1);
-    const products = lines.filter((line) => line.productId && line.quantity > 0);
-    if (products.length === 0) ticketsWithoutProducts++;
+    const retainedProducts = lines.filter((line) => line.productId && line.quantity > 0);
+    // A pair describes what the customer bought together. A refund removes the
+    // money, not the purchase event, so pair counting uses the original lines.
+    const products = sale.lines.filter((line) => line.productId && line.quantity > 0);
+    if (retainedProducts.length === 0) ticketsWithoutProducts++;
     if (query.basketUnit === 'table_visit' && !sale.visitId) continue;
     const key = query.basketUnit === 'table_visit' ? `${sale.locationId}:${sale.visitId}` : sale.id;
     const basket = baskets.get(key) ?? new Set<string>();

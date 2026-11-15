@@ -12103,3 +12103,15 @@ msgstr "reintentar"
 #: src/shell.jsx
 msgid "Secciones"
 msgstr "Secciones"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Volver a inicio"
+msgstr "Volver a inicio"
+
+#: src/screens/sales-widgets.jsx
+msgid "{0} tickets no tienen una visita de mesa identificada."
+msgstr "{0} tickets no tienen una visita de mesa identificada."
+
+#: src/screens/category-sales.jsx
+msgid "{0}: sin ventas en el periodo."
+msgstr "{0}: sin ventas en el periodo."

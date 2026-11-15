@@ -14,7 +14,8 @@ function moneyFields(value, path = '', output = []) {
   } else if (value && typeof value === 'object') {
     for (const [key, item] of Object.entries(value)) {
       const next = path ? `${path}.${key}` : key;
-      if (/MinorUnits$/.test(key) && typeof item === 'number') output.push({ path: next, value: item });
+      if (/MinorUnits$/.test(key) && typeof item === 'number')
+        output.push({ path: next, value: item });
       moneyFields(item, next, output);
     }
   }
@@ -56,9 +57,15 @@ export const FIN_CASES = {
       pairsAvailable: 1,
       categoriesUseCurrentCatalog: true,
     });
-    t.checks.eq('byHour keys', body.byHour.map((row) => row.key), ['03', '09', '10']);
-    const categories = Object.fromEntries(body.byCategory.map((row) => [row.label, row.netMinorUnits]));
-    t.checks.eq('byCategory net', categories, { 'Café': 18000, Pan: 9000 });
+    t.checks.eq(
+      'byHour keys',
+      body.byHour.map((row) => row.key),
+      ['03', '09', '10'],
+    );
+    const categories = Object.fromEntries(
+      body.byCategory.map((row) => [row.label, row.netMinorUnits]),
+    );
+    t.checks.eq('byCategory net', categories, { Café: 18000, Pan: 9000 });
     t.checks.eq('pairs length', body.pairs.length, 1);
     const money = moneyFields(body);
     t.checks.truthy(
@@ -66,7 +73,9 @@ export const FIN_CASES = {
       money.every((entry) => Number.isSafeInteger(entry.value)),
     );
     t.log(`money fields: ${money.length}`);
-    return { observations: { totals: body.totals, coverage: body.coverage, pairs: body.pairs.length } };
+    return {
+      observations: { totals: body.totals, coverage: body.coverage, pairs: body.pairs.length },
+    };
   },
 
   'I1-FIN-02': async (t) => {
@@ -138,11 +147,21 @@ export const FIN_CASES = {
     t.writeJson('baseline-period-movements.json', normalized(baselineMovements.body));
     t.writeJson('candidate-sale-result.json', normalized(sale.body));
     t.writeJson('candidate-period-movements.json', normalized(movements.body));
-    const dimensions = ['byHour', 'byDay', 'byWeekday', 'byMonth', 'byLocation', 'unitsDistribution', 'pairs', 'selectedGroups'];
+    const dimensions = [
+      'byHour',
+      'byDay',
+      'byWeekday',
+      'byMonth',
+      'byLocation',
+      'unitsDistribution',
+      'pairs',
+      'selectedGroups',
+    ];
     const failures = [];
     for (const key of dimensions) {
       if (!equalJson(sale.body[key], baselineSale.body[key])) failures.push(`sale_result.${key}`);
-      if (!equalJson(movements.body[key], baselineMovements.body[key])) failures.push(`period_movements.${key}`);
+      if (!equalJson(movements.body[key], baselineMovements.body[key]))
+        failures.push(`period_movements.${key}`);
     }
     t.checks.eq('all dimensions match in both views', failures, []);
     return { observations: { failures } };
@@ -170,7 +189,10 @@ export const FIN_CASES = {
     );
     t.checks.eq('units per ticket', totals.unitsPerTicket, totals.units / totals.tickets);
     const money = moneyFields(body);
-    t.checks.truthy('all money is integer', money.every((entry) => Number.isInteger(entry.value)));
+    t.checks.truthy(
+      'all money is integer',
+      money.every((entry) => Number.isInteger(entry.value)),
+    );
     t.checks.truthy(
       'all money is below Number.MAX_SAFE_INTEGER',
       money.every((entry) => entry.value <= Number.MAX_SAFE_INTEGER),
@@ -199,7 +221,10 @@ export const FIN_CASES = {
     const panMovements = movements.byCategory.find((row) => row.label === 'Pan');
     const cafeMovements = movements.byCategory.find((row) => row.label === 'Café');
     t.checks.eq('Pan period_movements net', panMovements?.netMinorUnits, -9000);
-    t.checks.truthy('Café period_movements is absent or zero', !cafeMovements || cafeMovements.netMinorUnits === 0);
+    t.checks.truthy(
+      'Café period_movements is absent or zero',
+      !cafeMovements || cafeMovements.netMinorUnits === 0,
+    );
     let saleSum = 0n;
     for (const row of sale.byCategory) {
       t.checks.eq(
@@ -209,7 +234,11 @@ export const FIN_CASES = {
       );
       saleSum += BigInt(row.netMinorUnits);
     }
-    t.checks.eq('BigInt category sum equals total', String(saleSum), String(sale.totals.netMinorUnits));
+    t.checks.eq(
+      'BigInt category sum equals total',
+      String(saleSum),
+      String(sale.totals.netMinorUnits),
+    );
     let movementSum = 0n;
     for (const row of movements.byCategory) movementSum += BigInt(row.netMinorUnits);
     t.checks.eq(
@@ -230,7 +259,11 @@ export const FIN_CASES = {
     );
     t.writeJson('response-1.json', normalized(first.body));
     t.writeJson('response-2.json', normalized(second.body));
-    t.checks.eq('reversed parameter order returns the same body', normalized(first.body), normalized(second.body));
+    t.checks.eq(
+      'reversed parameter order returns the same body',
+      normalized(first.body),
+      normalized(second.body),
+    );
 
     const makeKey = (query) => {
       const params = new URLSearchParams(
@@ -241,9 +274,25 @@ export const FIN_CASES = {
       return JSON.stringify(['sales-analysis', IDS.M1, '', IDS.U1, '', null, params]);
     };
     const keys = [
-      makeKey({ from: '2026-11-02', to: '2026-11-04', refundView: 'sale_result', basketUnit: 'ticket' }),
-      makeKey({ from: '2026-11-02', to: '2026-11-04', refundView: 'sale_result', basketUnit: 'ticket', locationId: '' }),
-      makeKey({ basketUnit: 'ticket', refundView: 'sale_result', to: '2026-11-04', from: '2026-11-02' }),
+      makeKey({
+        from: '2026-11-02',
+        to: '2026-11-04',
+        refundView: 'sale_result',
+        basketUnit: 'ticket',
+      }),
+      makeKey({
+        from: '2026-11-02',
+        to: '2026-11-04',
+        refundView: 'sale_result',
+        basketUnit: 'ticket',
+        locationId: '',
+      }),
+      makeKey({
+        basketUnit: 'ticket',
+        refundView: 'sale_result',
+        to: '2026-11-04',
+        from: '2026-11-02',
+      }),
     ];
     t.writeJson('cache-keys.json', keys);
     t.checks.truthy('three cache keys are equal', keys[0] === keys[1] && keys[1] === keys[2]);
@@ -256,7 +305,11 @@ export const FIN_CASES = {
       `${salesPath(IDS.M1, {})}?from=2024-11-08&to=2026-11-09&refundView=sale_result&basketUnit=ticket`,
       { allowError: true },
     );
-    t.writeJson('boundary.json', { ok: boundaryOk.status, bad: boundaryBad.status, badBody: boundaryBad.body });
+    t.writeJson('boundary.json', {
+      ok: boundaryOk.status,
+      bad: boundaryBad.status,
+      badBody: boundaryBad.body,
+    });
     t.checks.eq('731-day boundary returns 200', boundaryOk.status, 200);
     t.checks.eq('732-day boundary returns 400', boundaryBad.status, 400);
     t.checks.eq('732-day code', boundaryBad.body?.error?.code, 'VALIDATION_FAILED');

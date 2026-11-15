@@ -11,9 +11,14 @@ const amount = (text) => (text.match(/-?\$[\d,.]+/) || [])[0] || '';
 
 async function colors(page) {
   return page.evaluate(() => {
-    const dots = [...document.querySelectorAll('.category-sales-card [aria-hidden="true"], .category-sales-report [aria-hidden="true"], .category-legend [aria-hidden="true"], .category-dot')]
-      .map((element) => getComputedStyle(element).backgroundColor);
-    const cells = [...document.querySelectorAll('.category-sales-report [fill], .category-mosaic [fill]')]
+    const dots = [
+      ...document.querySelectorAll(
+        '.category-sales-card [aria-hidden="true"], .category-sales-report [aria-hidden="true"], .category-legend [aria-hidden="true"], .category-dot',
+      ),
+    ].map((element) => getComputedStyle(element).backgroundColor);
+    const cells = [
+      ...document.querySelectorAll('.category-sales-report [fill], .category-mosaic [fill]'),
+    ]
       .map((element) => element.getAttribute('fill'))
       .filter(Boolean);
     return { dots, cells };
@@ -42,9 +47,19 @@ export const EXTRA_CASES = {
       t.checks.includes('retry control', text, 'Reintentar análisis');
       t.checks.includes('hide control', text, 'Ocultar afinidad');
       t.checks.check('no page-level alert', !/No se pudo cargar/.test(text), true, 'no load error');
-      t.checks.check('no zero replaces totals', !/Venta neta\n\$0\.00/.test(text), true, amount(text));
+      t.checks.check(
+        'no zero replaces totals',
+        !/Venta neta\n\$0\.00/.test(text),
+        true,
+        amount(text),
+      );
       const roleStatus = await session.page.locator('[role=status]').allInnerTexts();
-      t.checks.check('the notice is a status region', roleStatus.some((entry) => entry.includes('La afinidad de compras')), true, roleStatus);
+      t.checks.check(
+        'the notice is a status region',
+        roleStatus.some((entry) => entry.includes('La afinidad de compras')),
+        true,
+        roleStatus,
+      );
       return { observations: { text: text.slice(0, 400) } };
     } finally {
       await session.close();
@@ -73,8 +88,16 @@ export const EXTRA_CASES = {
       t.writeJson('requests.json', reportRequests(session));
       t.checks.eq('no poll during 10 seconds', afterWait, 0);
       t.checks.eq('retry sends one composition request', afterRetry, 1);
-      t.checks.includes('notice stays after the failed retry', retryText, 'La afinidad de compras no está disponible');
-      t.checks.notIncludes('notice clears on the successful day-2 query', successText, 'La afinidad de compras no está disponible');
+      t.checks.includes(
+        'notice stays after the failed retry',
+        retryText,
+        'La afinidad de compras no está disponible',
+      );
+      t.checks.notIncludes(
+        'notice clears on the successful day-2 query',
+        successText,
+        'La afinidad de compras no está disponible',
+      );
       t.checks.includes('the successful query shows totals', successText, '$40.00');
       return { observations: { before: before.slice(0, 200), afterWait, afterRetry } };
     } finally {
@@ -96,13 +119,22 @@ export const EXTRA_CASES = {
       writeFileSync(join(t.dir, 'page-text.txt'), text);
       const api = await t.api(USERS.heavy);
       const response = await api.get(
-        salesPath(IDS.HEAVY, { from: '2026-11-03', to: '2026-11-03', refundView: 'sale_result', basketUnit: 'ticket' }),
+        salesPath(IDS.HEAVY, {
+          from: '2026-11-03',
+          to: '2026-11-03',
+          refundView: 'sale_result',
+          basketUnit: 'ticket',
+        }),
       );
       t.writeJson('response.json', response.body);
       t.checks.eq('day-2 tickets', response.body.totals.tickets, 2);
       t.checks.eq('day-2 merchandise', response.body.totals.merchandiseMinorUnits, 4000);
       t.checks.includes('partial message is absent', text, 'Productos que se compran juntos');
-      t.checks.notIncludes('affinity notice is gone', text, 'La afinidad de compras no está disponible');
+      t.checks.notIncludes(
+        'affinity notice is gone',
+        text,
+        'La afinidad de compras no está disponible',
+      );
       return { observations: { totals: response.body.totals } };
     } finally {
       await session.close();
@@ -112,12 +144,22 @@ export const EXTRA_CASES = {
   'I1-CAT-01': async (t) => {
     const api = await t.api(USERS.owner);
     const response = await api.get(
-      salesPath(IDS.M1, { from: '2026-11-02', to: '2026-11-04', refundView: 'sale_result', basketUnit: 'ticket' }),
+      salesPath(IDS.M1, {
+        from: '2026-11-02',
+        to: '2026-11-04',
+        refundView: 'sale_result',
+        basketUnit: 'ticket',
+      }),
     );
     t.writeJson('response.json', response.body);
     const session = await t.session({ user: USERS.owner, merchant: IDS.M1 });
     try {
-      await session.openAnalysis({ location: 'all', from: '2026-11-02', to: '2026-11-04', section: 'categories' });
+      await session.openAnalysis({
+        location: 'all',
+        from: '2026-11-02',
+        to: '2026-11-04',
+        section: 'categories',
+      });
       const text = await session.bodyText();
       await session.screenshot('screen.png');
       writeFileSync(join(t.dir, 'page-text.txt'), text);
@@ -125,8 +167,15 @@ export const EXTRA_CASES = {
       t.checks.includes('Pan amount', text, '$90.00');
       t.checks.includes('total row', text, 'Total\t$270.00');
       const rows = response.body.byCategory.map((row) => [row.label, row.netMinorUnits]);
-      t.checks.eq('rows match the API', rows, [['Café', 18000], ['Pan', 9000]]);
-      t.checks.eq('sum equals total', rows.reduce((sum, row) => sum + row[1], 0), response.body.totals.netMinorUnits);
+      t.checks.eq('rows match the API', rows, [
+        ['Café', 18000],
+        ['Pan', 9000],
+      ]);
+      t.checks.eq(
+        'sum equals total',
+        rows.reduce((sum, row) => sum + row[1], 0),
+        response.body.totals.netMinorUnits,
+      );
       return { observations: { rows } };
     } finally {
       await session.close();
@@ -140,23 +189,52 @@ export const EXTRA_CASES = {
       [IDS.M1],
     );
     try {
-      await session.openAnalysis({ location: 'all', from: '2026-11-02', to: '2026-11-04', section: 'categories' });
+      await session.openAnalysis({
+        location: 'all',
+        from: '2026-11-02',
+        to: '2026-11-04',
+        section: 'categories',
+      });
       const before = await colors(session.page);
-      await t.db.query(`update merchant.product_category set color='#123456' where merchant_id=$1 and name='Pan'`, [IDS.M1]);
+      await t.db.query(
+        `update merchant.product_category set color='#123456' where merchant_id=$1 and name='Pan'`,
+        [IDS.M1],
+      );
       await session.page.reload({ waitUntil: 'domcontentloaded' });
       await session.page.waitForTimeout(2500);
       const after = await colors(session.page);
       await session.screenshot('screen-after.png');
-      const invalid = { skipped: 'the database check constraint rejects not-a-color; the component fallback needs a component fixture' };
+      const invalid = {
+        skipped:
+          'the database check constraint rejects not-a-color; the component fallback needs a component fixture',
+      };
       writeFileSync(join(t.dir, 'invalid-color.txt'), JSON.stringify(invalid, null, 2));
       t.writeJson('colors.json', { before, after, invalid });
-      t.checks.check('before uses #D97706', before.dots.some((color) => color.includes('217, 119, 6') || color === '#D97706'), true, before);
-      t.checks.check('after uses #123456', after.dots.some((color) => color.includes('18, 52, 86') || color === '#123456'), true, after);
-      t.checks.check('no M2 color appears', !JSON.stringify([before, after]).includes('#7a5af8'), true, 'no M2 color');
+      t.checks.check(
+        'before uses #D97706',
+        before.dots.some((color) => color.includes('217, 119, 6') || color === '#D97706'),
+        true,
+        before,
+      );
+      t.checks.check(
+        'after uses #123456',
+        after.dots.some((color) => color.includes('18, 52, 86') || color === '#123456'),
+        true,
+        after,
+      );
+      t.checks.check(
+        'no M2 color appears',
+        !JSON.stringify([before, after]).includes('#7a5af8'),
+        true,
+        'no M2 color',
+      );
       return { observations: { before, after, invalid } };
     } finally {
       for (const row of original) {
-        await t.db.query(`update merchant.product_category set color=$2 where id=$1`, [row.id, row.color]);
+        await t.db.query(`update merchant.product_category set color=$2 where id=$1`, [
+          row.id,
+          row.color,
+        ]);
       }
       await session.close();
     }
@@ -166,11 +244,17 @@ export const EXTRA_CASES = {
     const zero = await t.session({ user: USERS.heavy, merchant: IDS.MZ });
     const negative = await t.session({ user: USERS.owner, merchant: IDS.M1 });
     try {
-      await zero.page.goto(`${t.baseUrl}/reportes?from=2026-11-02&to=2026-11-02&refundView=sale_result&basketUnit=ticket&section=categories`, { waitUntil: 'domcontentloaded' });
+      await zero.page.goto(
+        `${t.baseUrl}/reportes?from=2026-11-02&to=2026-11-02&refundView=sale_result&basketUnit=ticket&section=categories`,
+        { waitUntil: 'domcontentloaded' },
+      );
       await zero.page.waitForTimeout(2200);
       const zeroText = await zero.bodyText();
       await zero.screenshot('screen-zero.png');
-      await negative.page.goto(`${t.baseUrl}/reportes?from=2026-11-03&to=2026-11-03&refundView=period_movements&basketUnit=ticket&section=categories`, { waitUntil: 'domcontentloaded' });
+      await negative.page.goto(
+        `${t.baseUrl}/reportes?from=2026-11-03&to=2026-11-03&refundView=period_movements&basketUnit=ticket&section=categories`,
+        { waitUntil: 'domcontentloaded' },
+      );
       await negative.page.waitForTimeout(2200);
       const negativeText = await negative.bodyText();
       await negative.screenshot('screen-negative.png');
@@ -185,15 +269,28 @@ export const EXTRA_CASES = {
       const missingText = await negative.bodyText();
       await negative.screenshot('screen-missing.png');
       t.writeJson('page-text.json', { zeroText, negativeText, missingText });
-      t.checks.includes('zero net message', zeroText, 'La venta neta es cero. No hay una participación porcentual que mostrar.');
+      t.checks.includes(
+        'zero net message',
+        zeroText,
+        'La venta neta es cero. No hay una participación porcentual que mostrar.',
+      );
       t.checks.includes(
         'negative message',
         negativeText,
         'Las devoluciones generan importes negativos. Consulta los importes por categoría; no se muestra una distribución porcentual.',
       );
-      t.checks.includes('missing array message', missingText, 'El desglose por categoría no está disponible.');
+      t.checks.includes(
+        'missing array message',
+        missingText,
+        'El desglose por categoría no está disponible.',
+      );
       t.checks.includes('missing array retry', missingText, 'Reintentar');
-      t.checks.check('no percentage mosaic in the unavailable state', !/Participación/.test(missingText), true, 'no mosaic');
+      t.checks.check(
+        'no percentage mosaic in the unavailable state',
+        !/Participación/.test(missingText),
+        true,
+        'no mosaic',
+      );
       return { observations: {} };
     } finally {
       await negative.page.unroute('**/operations/reports/sales/analysis?*').catch(() => {});
@@ -207,8 +304,14 @@ export const EXTRA_CASES = {
     try {
       await session.gotoHome({ days: 30 });
       const before = await session.page.evaluate(() => {
-        const svg = document.querySelector('.category-sales-card svg, .category-sales-report svg, .category-mosaic svg');
-        const buttons = [...document.querySelectorAll('.category-sales-card button, .category-sales-report button, .category-legend button')];
+        const svg = document.querySelector(
+          '.category-sales-card svg, .category-sales-report svg, .category-mosaic svg',
+        );
+        const buttons = [
+          ...document.querySelectorAll(
+            '.category-sales-card button, .category-sales-report button, .category-legend button',
+          ),
+        ];
         return {
           svgRole: svg?.getAttribute('role'),
           svgName: svg?.getAttribute('aria-label'),
@@ -218,32 +321,55 @@ export const EXTRA_CASES = {
           })),
         };
       });
-      const first = session.page.locator('.category-sales-card button, .category-sales-report button, .category-legend button').first();
+      const first = session.page
+        .locator(
+          '.category-sales-card button, .category-sales-report button, .category-legend button',
+        )
+        .first();
       await first.focus();
       await session.page.keyboard.press('Space');
       await session.page.waitForTimeout(400);
       const pressed = await first.getAttribute('aria-pressed');
       const cells = await session.page.evaluate(() => {
-        const dot = document.querySelector('.category-sales-card [aria-hidden="true"], .category-sales-report [aria-hidden="true"]');
-        const group = document.querySelector('.category-sales-report [data-selected="true"], .category-sales-report .selected');
-        return { dotHidden: dot?.getAttribute('aria-hidden'), opacity: group ? getComputedStyle(group).opacity : null };
+        const dot = document.querySelector(
+          '.category-sales-card [aria-hidden="true"], .category-sales-report [aria-hidden="true"]',
+        );
+        const group = document.querySelector(
+          '.category-sales-report [data-selected="true"], .category-sales-report .selected',
+        );
+        return {
+          dotHidden: dot?.getAttribute('aria-hidden'),
+          opacity: group ? getComputedStyle(group).opacity : null,
+        };
       });
       await session.page.keyboard.press('Space');
       await session.page.waitForTimeout(300);
       const cleared = await first.getAttribute('aria-pressed');
-      await session.openAnalysis({ location: 'all', from: '2026-11-02', to: '2026-11-04', section: 'categories' });
+      await session.openAnalysis({
+        location: 'all',
+        from: '2026-11-02',
+        to: '2026-11-04',
+        section: 'categories',
+      });
       const table = await session.page.evaluate(() => {
         const table = document.querySelector('.analysis-table table, table.analysis-table');
         return {
           caption: table?.querySelector('caption')?.innerText || null,
-          rowHeaders: [...(table?.querySelectorAll('th[scope=row]') || [])].map((cell) => cell.innerText),
+          rowHeaders: [...(table?.querySelectorAll('th[scope=row]') || [])].map(
+            (cell) => cell.innerText,
+          ),
         };
       });
       t.writeJson('aria.json', { before, pressed, cleared, cells, table });
       await session.screenshot('screen.png');
       t.checks.eq('SVG role is img', before.svgRole, 'img');
       t.checks.eq('SVG name', before.svgName, 'Participación de venta neta por categoría');
-      t.checks.check('legend names include category share and amount', before.buttons.every((button) => /\d+%/.test(button.name) && /\$/.test(button.name)), true, before.buttons);
+      t.checks.check(
+        'legend names include category share and amount',
+        before.buttons.every((button) => /\d+%/.test(button.name) && /\$/.test(button.name)),
+        true,
+        before.buttons,
+      );
       t.checks.eq('Space selects the legend', pressed, 'true');
       t.checks.eq('Space clears the selection', cleared, 'false');
       t.checks.eq('colour dot is aria-hidden', cells.dotHidden, 'true');
@@ -264,15 +390,30 @@ export const EXTRA_CASES = {
       await session.page.waitForTimeout(400);
       const settings = await session.bodyText();
       await session.screenshot('screen-settings.png');
-      await session.openAnalysis({ location: 'all', from: '2026-11-02', to: '2026-11-04', section: 'categories' });
+      await session.openAnalysis({
+        location: 'all',
+        from: '2026-11-02',
+        to: '2026-11-04',
+        section: 'categories',
+      });
       const detail = await session.bodyText();
       const caption = await session.page.evaluate(
         () => document.querySelector('.analysis-table table caption')?.innerText || null,
       );
       t.writeJson('page-text.json', { settings, home, detail });
-      writeFileSync(join(t.dir, 'small-share.txt'), '<0.1% (model fixture; see category-sales unit test)\n');
-      writeFileSync(join(t.dir, 'many-categories.txt'), '7 rows requires the component fixture; golden has 2 rows\n');
-      t.checks.includes('indicator list includes the category widget', settings, 'Venta neta por categoría');
+      writeFileSync(
+        join(t.dir, 'small-share.txt'),
+        '<0.1% (model fixture; see category-sales unit test)\n',
+      );
+      writeFileSync(
+        join(t.dir, 'many-categories.txt'),
+        '7 rows requires the component fixture; golden has 2 rows\n',
+      );
+      t.checks.includes(
+        'indicator list includes the category widget',
+        settings,
+        'Venta neta por categoría',
+      );
       t.checks.eq('detail table caption', caption, 'Importes exactos por categoría');
       t.checks.includes('home link describes the row count', home, 'Ver las 2 categorías');
       return { observations: { caption } };
@@ -282,15 +423,27 @@ export const EXTRA_CASES = {
   },
 
   'I1-CAT-06': async (t) => {
-    const original = await t.db.one(`select category_id from merchant.product where id=$1`, [IDS.P1]);
+    const original = await t.db.one(`select category_id from merchant.product where id=$1`, [
+      IDS.P1,
+    ]);
     const session = await t.session({ user: USERS.owner, merchant: IDS.M1 });
     try {
       await t.db.query(`update merchant.product set category_id=$2 where id=$1`, [IDS.P1, IDS.C2]);
-      await session.openAnalysis({ location: 'all', from: '2026-11-02', to: '2026-11-04', section: 'categories' });
+      await session.openAnalysis({
+        location: 'all',
+        from: '2026-11-02',
+        to: '2026-11-04',
+        section: 'categories',
+      });
       const text = await session.bodyText();
       const api = await t.api(USERS.owner);
       const response = await api.get(
-        salesPath(IDS.M1, { from: '2026-11-02', to: '2026-11-04', refundView: 'sale_result', basketUnit: 'ticket' }),
+        salesPath(IDS.M1, {
+          from: '2026-11-02',
+          to: '2026-11-04',
+          refundView: 'sale_result',
+          basketUnit: 'ticket',
+        }),
       );
       t.writeJson('response.json', response.body);
       await session.screenshot('screen.png');
@@ -298,11 +451,19 @@ export const EXTRA_CASES = {
       const pan = response.body.byCategory.find((row) => row.label === 'Pan');
       const cafe = response.body.byCategory.find((row) => row.label === 'Café');
       t.checks.eq('Café now holds 27000', cafe?.netMinorUnits, 27000);
-      t.checks.check('Pan is absent or zero', !pan || pan.netMinorUnits === 0, 'absent or 0', pan ?? null);
+      t.checks.check(
+        'Pan is absent or zero',
+        !pan || pan.netMinorUnits === 0,
+        'absent or 0',
+        pan ?? null,
+      );
       t.checks.includes('current-catalog note', text, 'Categorías y colores del catálogo actual.');
       return { observations: { categories: response.body.byCategory } };
     } finally {
-      await t.db.query(`update merchant.product set category_id=$2 where id=$1`, [IDS.P1, original.category_id]);
+      await t.db.query(`update merchant.product set category_id=$2 where id=$1`, [
+        IDS.P1,
+        original.category_id,
+      ]);
       await session.close();
     }
   },
@@ -313,20 +474,37 @@ export const EXTRA_CASES = {
       await owner.gotoHome({ days: 30 });
       const ownerText = await owner.bodyText();
       await owner.screenshot('screen-owner.png');
-      t.checks.check('owner sees a sales amount', /\$\d/.test(ownerText), 'an amount', amount(ownerText));
+      t.checks.check(
+        'owner sees a sales amount',
+        /\$\d/.test(ownerText),
+        'an amount',
+        amount(ownerText),
+      );
     } finally {
       await owner.close();
     }
-    const denied = await t.session({ user: USERS.denied, merchant: IDS.M1, cookies: [], uiLogin: true });
+    const denied = await t.session({
+      user: USERS.denied,
+      merchant: IDS.M1,
+      cookies: [],
+      uiLogin: true,
+    });
     try {
       await denied.gotoHome({ days: 30, wait: false });
       await denied.page.waitForTimeout(1800);
-      await denied.page.goto(`${t.baseUrl}/reportes?from=2026-11-02&to=2026-11-04&refundView=sale_result&basketUnit=ticket`, { waitUntil: 'domcontentloaded' });
+      await denied.page.goto(
+        `${t.baseUrl}/reportes?from=2026-11-02&to=2026-11-04&refundView=sale_result&basketUnit=ticket`,
+        { waitUntil: 'domcontentloaded' },
+      );
       await denied.page.waitForTimeout(1800);
       const text = await denied.bodyText();
       writeFileSync(join(t.dir, 'page-text.txt'), text);
       await denied.screenshot('screen.png');
-      t.checks.includes('denied state is visible', text, 'No tienes permiso para consultar estas ventas.');
+      t.checks.includes(
+        'denied state is visible',
+        text,
+        'No tienes permiso para consultar estas ventas.',
+      );
       t.checks.notIncludes('old amount is absent', text, '270.00');
       t.checks.notIncludes('owner name is absent', text, 'I1 Owner');
       return { observations: {} };
@@ -351,17 +529,29 @@ export const EXTRA_CASES = {
       await session.page.waitForTimeout(2500);
       const text = await session.bodyText();
       const requests = reportRequests(session);
-      const options = session.requests.filter((request) => request.url.includes('/analysis/options'));
+      const options = session.requests.filter((request) =>
+        request.url.includes('/analysis/options'),
+      );
       await session.screenshot('screen.png');
       t.writeJson('requests.json', { reports: requests, options });
       t.checks.includes('group button appears', text, 'Grupo verificador');
       t.checks.eq('one options request', options.length, 1);
       t.checks.eq('one report request', requests.length, 1);
-      t.checks.eq('totals do not change', amount(await session.page.locator('.analysis-lead').innerText()), amount(before));
+      t.checks.eq(
+        'totals do not change',
+        amount(await session.page.locator('.analysis-lead').innerText()),
+        amount(before),
+      );
       return { observations: { reports: requests.length, options: options.length } };
     } finally {
-      await t.db.query(`delete from merchant.sales_analysis_group_product where merchant_id=$1 and group_id in (select id from merchant.sales_analysis_group where merchant_id=$1 and name='Grupo verificador')`, [IDS.M1]);
-      await t.db.query(`delete from merchant.sales_analysis_group where merchant_id=$1 and name='Grupo verificador'`, [IDS.M1]);
+      await t.db.query(
+        `delete from merchant.sales_analysis_group_product where merchant_id=$1 and group_id in (select id from merchant.sales_analysis_group where merchant_id=$1 and name='Grupo verificador')`,
+        [IDS.M1],
+      );
+      await t.db.query(
+        `delete from merchant.sales_analysis_group where merchant_id=$1 and name='Grupo verificador'`,
+        [IDS.M1],
+      );
       await session.close();
     }
   },
@@ -385,11 +575,21 @@ export const EXTRA_CASES = {
       t.writeJson('requests.json', reportRequests(session));
       t.checks.notIncludes('group is absent', text, group.name);
       t.checks.check('the query has no deleted group key', !url.includes('groupA='), true, url);
-      t.checks.check('the report response is 200', session.responses.filter((response) => response.url.includes('/analysis?')).every((response) => response.status === 200), true, session.responses.filter((response) => response.url.includes('/analysis?')));
+      t.checks.check(
+        'the report response is 200',
+        session.responses
+          .filter((response) => response.url.includes('/analysis?'))
+          .every((response) => response.status === 200),
+        true,
+        session.responses.filter((response) => response.url.includes('/analysis?')),
+      );
       return { observations: { url } };
     } finally {
       await session.close();
-      const existing = await t.db.one(`select id from merchant.sales_analysis_group where merchant_id=$1 and name=$2`, [IDS.M1, group.name]);
+      const existing = await t.db.one(
+        `select id from merchant.sales_analysis_group where merchant_id=$1 and name=$2`,
+        [IDS.M1, group.name],
+      );
       if (!existing) {
         await t.db.query(
           `insert into merchant.sales_analysis_group(id,merchant_id,name,version,created_at,updated_at) values($1,$2,$3,1,pg_catalog.now(),pg_catalog.now())`,
@@ -413,7 +613,9 @@ export const EXTRA_CASES = {
       await session.openAnalysis({ location: 'all', from: '2026-11-02', to: '2026-11-04' });
       await session.page.getByText('Grupos de productos', { exact: true }).click();
       await session.page.getByRole('button', { name: group.name, exact: true }).click();
-      await session.page.getByLabel('Nombre del grupo').waitFor({ state: 'visible', timeout: 10000 });
+      await session.page
+        .getByLabel('Nombre del grupo')
+        .waitFor({ state: 'visible', timeout: 10000 });
       const products = await t.db.query(
         `select product_id from merchant.sales_analysis_group_product where merchant_id=$1 and group_id=$2 order by product_id`,
         [IDS.M1, group.id],
@@ -424,7 +626,11 @@ export const EXTRA_CASES = {
         {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ name: 'Grupo G otra sesión', productIds: products.map((row) => row.product_id), expectedVersion: group.version }),
+          body: JSON.stringify({
+            name: 'Grupo G otra sesión',
+            productIds: products.map((row) => row.product_id),
+            expectedVersion: group.version,
+          }),
         },
       );
       session.clearObservations();
@@ -433,12 +639,19 @@ export const EXTRA_CASES = {
       const text = await session.bodyText();
       await session.screenshot('screen.png');
       t.writeJson('requests.json', reportRequests(session));
-      t.checks.includes('conflict text is exact', text, 'El grupo cambió en otra sesión. Cierra el editor y actualiza los grupos.');
+      t.checks.includes(
+        'conflict text is exact',
+        text,
+        'El grupo cambió en otra sesión. Cierra el editor y actualiza los grupos.',
+      );
       t.checks.eq('no report request starts', reportRequests(session).length, 0);
       t.checks.includes('prior values are visible', text, 'Venta neta');
       return { observations: {} };
     } finally {
-      await t.db.query(`update merchant.sales_analysis_group set name=$2, version=1 where id=$1`, [group.id, group.name]);
+      await t.db.query(`update merchant.sales_analysis_group set name=$2, version=1 where id=$1`, [
+        group.id,
+        group.name,
+      ]);
       await session.close();
     }
   },
@@ -470,7 +683,11 @@ export const EXTRA_CASES = {
     );
     t.writeJson('response.json', summary.body);
     t.checks.eq('net sales', summary.body.totals.netSalesMinorUnits, 49500);
-    t.checks.eq('product mix sum', summary.body.productMix.reduce((sum, row) => sum + row.netMinorUnits, 0), 50000);
+    t.checks.eq(
+      'product mix sum',
+      summary.body.productMix.reduce((sum, row) => sum + row.netMinorUnits, 0),
+      50000,
+    );
     t.checks.eq('items sold', summary.body.totals.itemsSold, 7);
     t.checks.eq('tips', summary.body.totals.tipsMinorUnits, 2500);
     const session = await t.session({ user: USERS.owner, merchant: IDS.METRIC });
@@ -510,7 +727,11 @@ export const EXTRA_CASES = {
         label: (text.match(/Descuento[^\n]*\n?[^\n]*/) || [])[0] || null,
       };
       t.writeJson('discount.json', record);
-      t.checks.eq('the value or the unavailable reason is recorded', Number.isInteger(record.value), true);
+      t.checks.eq(
+        'the value or the unavailable reason is recorded',
+        Number.isInteger(record.value),
+        true,
+      );
       t.checks.check(
         'the value is not a silent zero while receipts hold 3000',
         record.value !== 0 || /no disponible/i.test(record.label || ''),
@@ -527,7 +748,18 @@ export const EXTRA_CASES = {
     const { execFileSync } = await import('node:child_process');
     const grep = spawnSync(
       'rg',
-      ['-n', 'Ganancia|Utilidad|Contribución|availableCash|efectivoDisponible|disponible en caja', 'apps/umi-dashboard/src', 'apps/umi-api/src', '-g', '*.jsx', '-g', '*.js', '-g', '*.ts'],
+      [
+        '-n',
+        'Ganancia|Utilidad|Contribución|availableCash|efectivoDisponible|disponible en caja',
+        'apps/umi-dashboard/src',
+        'apps/umi-api/src',
+        '-g',
+        '*.jsx',
+        '-g',
+        '*.js',
+        '-g',
+        '*.ts',
+      ],
       { cwd: t.run.worktree, encoding: 'utf8' },
     );
     writeFileSync(join(t.dir, 'grep.txt'), grep.stdout + grep.stderr);
@@ -547,11 +779,24 @@ export const EXTRA_CASES = {
       t.checks.notIncludes('no cash label on a sales figure', home, 'efectivo disponible');
       t.checks.notIncludes('no profit label', home, 'Ganancia');
       t.checks.includes('Ventas lead label', ventas, 'Ventas cobradas con propina');
-      t.checks.includes('net sales qualifier', home, 'sin propina, después de descuentos y devoluciones');
-      t.checks.check('average ticket names the tip basis', /Ticket promedio (con|sin) propina/.test(home), true, (home.match(/Ticket promedio[^\n]*/) || [])[0]);
+      t.checks.includes(
+        'net sales qualifier',
+        home,
+        'sin propina, después de descuentos y devoluciones',
+      );
+      t.checks.check(
+        'average ticket names the tip basis',
+        /Ticket promedio (con|sin) propina/.test(home),
+        true,
+        (home.match(/Ticket promedio[^\n]*/) || [])[0],
+      );
       t.checks.notIncludes('no product column says Neto', ventas, 'Neto');
       t.checks.notIncludes('no settled label', ventas, 'liquidado');
-      t.checks.notIncludes('no zero stands for no sales', home, 'No hay ventas registradas en este periodo.');
+      t.checks.notIncludes(
+        'no zero stands for no sales',
+        home,
+        'No hay ventas registradas en este periodo.',
+      );
       return { observations: { grep: grep.stdout.slice(0, 500) } };
     } finally {
       await session.close();
@@ -559,23 +804,59 @@ export const EXTRA_CASES = {
   },
 
   'I1-GATE-02': async (t) => {
-    const result = spawnSync('pnpm', ['check:pr'], { cwd: t.run.worktree, encoding: 'utf8', timeout: 600000 });
+    const result = spawnSync('pnpm', ['check:pr'], {
+      cwd: t.run.worktree,
+      encoding: 'utf8',
+      timeout: 600000,
+    });
     writeFileSync(join(t.dir, 'check-pr.log'), `$ pnpm check:pr\n${result.stdout}${result.stderr}`);
     t.checks.eq('check:pr exit code', result.status, 0);
-    t.checks.check('no lint, format, PR data or freeze error', !/error|ERR_|failed/i.test(result.stdout + result.stderr), true, result.status);
+    t.checks.check(
+      'no lint, format, PR data or freeze error',
+      !/error|ERR_|failed/i.test(result.stdout + result.stderr),
+      true,
+      result.status,
+    );
     return { observations: { exitCode: result.status } };
   },
 
   'I1-GATE-03': async (t) => {
     const { execFileSync } = await import('node:child_process');
-    const catalog = execFileSync('rg', ['-n', '2\\.5[0-9]\\.[0-9]', 'packages/contract/src/catalog.ts'], { cwd: t.run.worktree, encoding: 'utf8' });
-    const contract = execFileSync('rg', ['-n', 'basketState|SalesAnalysisBasketState|BASKETS_TOO_COMPLEX', 'packages/contract/src/sales-analysis.ts'], { cwd: t.run.worktree, encoding: 'utf8' });
+    const catalog = execFileSync(
+      'rg',
+      ['-n', '2\\.5[0-9]\\.[0-9]', 'packages/contract/src/catalog.ts'],
+      { cwd: t.run.worktree, encoding: 'utf8' },
+    );
+    const contract = execFileSync(
+      'rg',
+      [
+        '-n',
+        'basketState|SalesAnalysisBasketState|BASKETS_TOO_COMPLEX',
+        'packages/contract/src/sales-analysis.ts',
+      ],
+      { cwd: t.run.worktree, encoding: 'utf8' },
+    );
     writeFileSync(join(t.dir, 'contract-invariants.txt'), catalog + contract);
-    writeFileSync(join(t.dir, 'contract-sha.txt'), execFileSync('sha256sum', ['packages/contract/src/sales-analysis.ts'], { cwd: t.run.worktree, encoding: 'utf8' }));
-    const generate = spawnSync('pnpm', ['--filter', '@umi/contract', 'generate:check'], { cwd: t.run.worktree, encoding: 'utf8', timeout: 300000 });
+    writeFileSync(
+      join(t.dir, 'contract-sha.txt'),
+      execFileSync('sha256sum', ['packages/contract/src/sales-analysis.ts'], {
+        cwd: t.run.worktree,
+        encoding: 'utf8',
+      }),
+    );
+    const generate = spawnSync('pnpm', ['--filter', '@umi/contract', 'generate:check'], {
+      cwd: t.run.worktree,
+      encoding: 'utf8',
+      timeout: 300000,
+    });
     writeFileSync(join(t.dir, 'generate-check.txt'), generate.stdout + generate.stderr);
     t.writeJson('contract.json', { version: catalog.trim(), invariants: contract.trim() });
-    t.checks.check('contract version is 2.54.0 or later', /2\.5[4-9]\./.test(catalog), true, catalog.trim());
+    t.checks.check(
+      'contract version is 2.54.0 or later',
+      /2\.5[4-9]\./.test(catalog),
+      true,
+      catalog.trim(),
+    );
     t.checks.includes('basket state exists', contract, 'basketState');
     t.checks.includes('basket code exists', contract, 'BASKETS_TOO_COMPLEX');
     t.checks.eq('generate:check exits 0', generate.status, 0);
@@ -596,16 +877,20 @@ export const EXTRA_CASES = {
         cwd: t.run.worktree,
         encoding: 'utf8',
         timeout: 900000,
-        env: name === 'dashboard-build'
-          ? {
-              ...process.env,
-              VITE_UMI_ENVIRONMENT: 'development',
-              VITE_AUTH_MODE: 'cookie',
-              VITE_API_BASE: 'http://127.0.0.1:4001',
-            }
-          : process.env,
+        env:
+          name === 'dashboard-build'
+            ? {
+                ...process.env,
+                VITE_UMI_ENVIRONMENT: 'development',
+                VITE_AUTH_MODE: 'cookie',
+                VITE_API_BASE: 'http://127.0.0.1:4001',
+              }
+            : process.env,
       });
-      writeFileSync(join(t.dir, `${name}.txt`), `$ pnpm ${args.join(' ')}\n${result.stdout}${result.stderr}`);
+      writeFileSync(
+        join(t.dir, `${name}.txt`),
+        `$ pnpm ${args.join(' ')}\n${result.stdout}${result.stderr}`,
+      );
       results.push({ name, status: result.status });
       t.checks.eq(`${name} exits 0`, result.status, 0);
     }
@@ -613,12 +898,7 @@ export const EXTRA_CASES = {
   },
 
   'I1-GATE-05': async (t) => {
-    const files = [
-      'manifest.json',
-      'manifest.sha256',
-      'verdict.md',
-      'verdict.json',
-    ];
+    const files = ['manifest.json', 'manifest.sha256', 'verdict.md', 'verdict.json'];
     const present = files.map((name) => ({ name, path: join(t.run.out, name), exists: false }));
     for (const entry of present) {
       try {
@@ -631,7 +911,9 @@ export const EXTRA_CASES = {
     t.writeJson('manifest.json', present);
     return {
       status: 'BLOCKED',
-      failure: { message: 'GATE-05 needs the verifier verdict and verdict.json after all case results.' },
+      failure: {
+        message: 'GATE-05 needs the verifier verdict and verdict.json after all case results.',
+      },
       observations: { present },
     };
   },
