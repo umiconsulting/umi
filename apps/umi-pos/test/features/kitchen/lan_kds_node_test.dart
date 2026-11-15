@@ -1688,11 +1688,13 @@ final class _ControlledHarness {
     required this.local,
     required this.journal,
     required this.base,
+    required this.client,
   });
 
   final _MemoryLocal local;
   final EncryptedOfflineJournal journal;
   final Uri base;
+  final http.Client client;
 }
 
 Future<_ControlledHarness> _startControlled({
@@ -1742,10 +1744,15 @@ Future<_ControlledHarness> _startControlled({
   );
   final bound = await node.start();
   addTearDown(node.stop);
+  // One client keeps one connection. A new client per request exhausts the
+  // ephemeral ports on the macOS runner after a few thousand requests.
+  final httpClient = http.Client();
+  addTearDown(httpClient.close);
   return _ControlledHarness(
     local: resolvedLocal,
     journal: resolvedJournal,
     base: Uri.parse('http://127.0.0.1:${bound.port}'),
+    client: httpClient,
   );
 }
 
@@ -1753,7 +1760,7 @@ Future<int> _board(
   _ControlledHarness harness, {
   Map<String, String>? headers,
 }) async {
-  final response = await http.post(
+  final response = await harness.client.post(
     harness.base.resolve('/api/kds/board'),
     headers: headers ?? _headers(),
     body: jsonEncode({'action': 'snapshot'}),
