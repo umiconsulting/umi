@@ -596,8 +596,14 @@ function runCapture({
       exitCode: 127,
     };
   }
-  const stdout = result.stdout ?? Buffer.alloc(0);
-  const stderr = result.stderr ?? Buffer.alloc(0);
+  // A captured text log keeps one final newline. Extra blank lines at the end
+  // make `git diff --check` report a whitespace defect in an evidence packet.
+  const normalizeLog = (buffer) => {
+    if (buffer.length === 0) return buffer;
+    return Buffer.from(buffer.toString('utf8').replace(/\n{2,}$/u, '\n'));
+  };
+  const stdout = normalizeLog(result.stdout ?? Buffer.alloc(0));
+  const stderr = normalizeLog(result.stderr ?? Buffer.alloc(0));
   fs.writeFileSync(stdoutPath, stdout);
   fs.writeFileSync(stderrPath, stderr);
 

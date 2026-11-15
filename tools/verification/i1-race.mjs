@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Delayed-response gate for the I1 group races (GRP-04 and GRP-05).
 //
-// The gate holds one report response after its request reaches the server, lets
-// the test save or delete a group, then releases the old response. This is the
-// "start the report request with a 2-second delay, save/delete before it returns,
-// release the old response" action. A browser screenshot alone cannot prove the
-// cache result, so the caller reads queryClient.dataUpdatedAt from the dev build.
+// The gate holds every report response after its request reaches the server,
+// lets the test save or delete a group, then releases the held responses. This
+// is the "start the report request with a 2-second delay, save/delete before it
+// returns, release the old response" action. A browser screenshot alone cannot
+// prove the cache result, so the caller reads queryClient state from the dev
+// build.
 //
 // Usage as a library:
 //   const gate = await openGate(page, { delayMs: 2000 });
@@ -25,40 +26,66 @@ export async function openGate(
   page,
   { delayMs = 2000, match = '**/operations/reports/sales/analysis?*' } = {},
 ) {
-  let release;
+  let releaseGate;
   const released = new Promise((resolveRelease) => {
-    release = resolveRelease;
-  });
-  let held;
-  const heldOnce = new Promise((resolveHeld) => {
-    held = resolveHeld;
+    releaseGate = resolveRelease;
   });
   let heldCount = 0;
-  await page.route(match, async (route) => {
+  let finishedCount = 0;
+  const handler = async (route) => {
     heldCount += 1;
-    held();
     await released;
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, delayMs));
-    await route.continue();
-  });
+    if (delayMs > 0) {
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, delayMs));
+    }
+    try {
+      await route.continue();
+    } catch {
+      // The app cancels the in-flight query when a group write invalidates it.
+      // A cancelled request cannot continue, and that is the expected path.
+    }
+    finishedCount += 1;
+  };
+  await page.route(match, handler);
+  const waitFor = async (predicate, timeoutMs, message) => {
+    const deadline = Date.now() + timeoutMs;
+    while (!predicate()) {
+      if (Date.now() >= deadline) throw new Error(message);
+      await new Promise((resolveWait) => setTimeout(resolveWait, 50));
+    }
+  };
   return {
+    get heldCount() {
+      return heldCount;
+    },
+    get finishedCount() {
+      return finishedCount;
+    },
     async waitForHeld(timeoutMs = 15000) {
-      await Promise.race([
-        heldOnce,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('the report request was not held')), timeoutMs),
-        ),
-      ]);
+      await waitFor(() => heldCount > 0, timeoutMs, 'the report request was not held');
+      return heldCount;
+    },
+    async waitForHeldCount(count, timeoutMs = 15000) {
+      await waitFor(
+        () => heldCount >= count,
+        timeoutMs,
+        `fewer than ${count} report requests reached the gate`,
+      );
       return heldCount;
     },
     async release() {
-      release();
+      releaseGate();
     },
-    async waitForReleased() {
-      await page.unroute(match);
+    async waitForReleased(timeoutMs = 30000) {
+      await waitFor(
+        () => finishedCount >= heldCount,
+        timeoutMs,
+        'the held report responses did not finish',
+      );
+      await page.unroute(match).catch(() => {});
     },
     async close() {
-      release();
+      releaseGate();
       await page.unroute(match).catch(() => {});
     },
   };

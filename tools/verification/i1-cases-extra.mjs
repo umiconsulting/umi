@@ -1,9 +1,11 @@
 // Optional analysis UI, category widget, isolation switch, group editor, metric
 // labels, and the mechanical gates.
 import { spawnSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { IDS, USERS, salesPath } from './i1-lib.mjs';
+import { REQUIRED_CASE_IDS } from './i1-inventory.mjs';
+import { openGate } from './i1-race.mjs';
 
 const reportRequests = (session) =>
   session.requests.filter((request) => request.url.includes('/operations/reports/sales/analysis?'));
@@ -657,23 +659,253 @@ export const EXTRA_CASES = {
   },
 
   'I1-GRP-04': async (t) => {
-    return {
-      status: 'BLOCKED',
-      failure: {
-        message:
-          'The delayed-response race needs the i1-race.mjs release gate. The current browser route cannot prove the cache timestamp after release.',
-      },
-    };
+    const name = 'Grupo carrera guardar';
+    const session = await t.session({ user: USERS.owner, merchant: IDS.M1, baseUrl: t.devUrl });
+    let gate = null;
+    try {
+      await session.openAnalysis({ location: 'all', from: '2026-11-02', to: '2026-11-04' });
+      await session.page.getByText('Grupos de productos', { exact: true }).click();
+      await session.page.getByRole('button', { name: 'Crear grupo', exact: true }).click();
+      await session.page.getByLabel('Nombre del grupo').fill(name);
+      const products = session.page.locator('.analysis-products input[type=checkbox]');
+      await products.nth(0).check();
+      await products.nth(1).check();
+
+      gate = await openGate(session.page, { delayMs: 2000 });
+      session.clearObservations();
+      await session.page.locator('input[type=date]').nth(0).fill('2026-11-03');
+      await session.page.getByRole('button', { name: 'Consultar', exact: true }).click();
+      const heldBeforeSave = await gate.waitForHeld();
+      const cacheBeforeSave = await session.queryCache();
+
+      const saveStartedAt = Date.now();
+      await session.page.getByRole('button', { name: 'Guardar grupo', exact: true }).click();
+      let saved = null;
+      const deadline = Date.now() + 15000;
+      while (Date.now() < deadline && !saved) {
+        saved = await t.db.one(
+          `select id, version from merchant.sales_analysis_group where merchant_id=$1 and name=$2`,
+          [IDS.M1, name],
+        );
+        if (!saved) await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+      }
+      const saveFinishedAt = Date.now();
+      const finishedBeforeRelease = gate.finishedCount;
+      const editorStillOpen = await session.page
+        .getByLabel('Nombre del grupo')
+        .isVisible()
+        .catch(() => false);
+
+      await gate.release();
+      await gate.waitForReleased();
+      await session.page.waitForTimeout(2500);
+      await session.page
+        .getByLabel('Nombre del grupo')
+        .waitFor({ state: 'detached', timeout: 15000 })
+        .catch(() => {});
+
+      const cacheAfterSave = await session.queryCache();
+      const text = await session.bodyText();
+      const reports = reportRequests(session);
+      await session.screenshot('screen.png');
+      t.writeJson('cache.json', {
+        cacheBeforeSave,
+        cacheAfterSave,
+        saveStartedAt,
+        saveFinishedAt,
+        heldBeforeSave,
+        finishedBeforeRelease,
+        editorStillOpen,
+      });
+      t.writeJson('requests.json', reports);
+
+      const entries = (Array.isArray(cacheAfterSave) ? cacheAfterSave : []).filter(
+        (entry) =>
+          Array.isArray(entry.key) &&
+          entry.key[0] === 'sales-analysis' &&
+          JSON.stringify(entry.key).includes('from=2026-11-03') &&
+          JSON.stringify(entry.key).includes('to=2026-11-04'),
+      );
+      const fresh = entries.filter(
+        (entry) => entry.hasData && entry.status === 'success' && !entry.error,
+      );
+      const updatedAt = Math.max(0, ...fresh.map((entry) => entry.dataUpdatedAt));
+      t.checks.check('the report request was held', heldBeforeSave >= 1, '>= 1', heldBeforeSave);
+      t.checks.eq('the old response stayed held through the save', finishedBeforeRelease, 0);
+      t.checks.truthy('the save committed during the hold', saved);
+      t.checks.truthy('the editor stayed open during the hold', editorStillOpen);
+      t.checks.check(
+        'the report was requested again after the save',
+        reports.length >= 2,
+        '>= 2',
+        reports.length,
+      );
+      t.checks.truthy('the report cache has data after the race', fresh.length > 0);
+      t.checks.check(
+        'the cache timestamp is after the save',
+        updatedAt >= saveFinishedAt,
+        `>= ${saveFinishedAt}`,
+        updatedAt,
+      );
+      t.checks.includes('the saved group is visible', text, name);
+      return {
+        observations: {
+          heldBeforeSave,
+          finishedBeforeRelease,
+          reports: reports.length,
+          updatedAt,
+          saveFinishedAt,
+          editorStillOpen,
+        },
+      };
+    } finally {
+      if (gate) await gate.close();
+      await t.db.query(
+        `delete from merchant.sales_analysis_group_product where merchant_id=$1 and group_id in (select id from merchant.sales_analysis_group where merchant_id=$1 and name=$2)`,
+        [IDS.M1, name],
+      );
+      await t.db.query(
+        `delete from merchant.sales_analysis_group where merchant_id=$1 and name=$2`,
+        [IDS.M1, name],
+      );
+      await session.close();
+    }
   },
 
   'I1-GRP-05': async (t) => {
-    return {
-      status: 'BLOCKED',
-      failure: {
-        message:
-          'The delayed-response delete race needs the i1-race.mjs release gate. The current browser route cannot prove invalidation after release.',
-      },
-    };
+    const group = await t.db.one(
+      `select id, name, version from merchant.sales_analysis_group where merchant_id=$1 order by name limit 1`,
+      [IDS.M1],
+    );
+    const products = await t.db.query(
+      `select product_id from merchant.sales_analysis_group_product where merchant_id=$1 and group_id=$2 order by product_id`,
+      [IDS.M1, group.id],
+    );
+    const session = await t.session({ user: USERS.owner, merchant: IDS.M1, baseUrl: t.devUrl });
+    let gate = null;
+    try {
+      await session.openAnalysis({ location: 'all', from: '2026-11-02', to: '2026-11-04' });
+      await session.page.getByText('Grupos de productos', { exact: true }).click();
+      await session.page.getByRole('button', { name: group.name, exact: true }).click();
+      await session.page
+        .getByLabel('Nombre del grupo')
+        .waitFor({ state: 'visible', timeout: 10000 });
+
+      gate = await openGate(session.page, { delayMs: 2000 });
+      session.clearObservations();
+      await session.page.locator('input[type=date]').nth(0).fill('2026-11-03');
+      await session.page.getByRole('button', { name: 'Consultar', exact: true }).click();
+      const heldBeforeDelete = await gate.waitForHeld();
+      const cacheBeforeDelete = await session.queryCache();
+
+      const deleteStartedAt = Date.now();
+      await session.page.getByRole('button', { name: 'Eliminar grupo', exact: true }).click();
+      let deleted = false;
+      const deadline = Date.now() + 15000;
+      while (Date.now() < deadline && !deleted) {
+        const row = await t.db.one(
+          `select id from merchant.sales_analysis_group where merchant_id=$1 and id=$2`,
+          [IDS.M1, group.id],
+        );
+        deleted = !row;
+        if (!deleted) await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+      }
+      const deleteFinishedAt = Date.now();
+      const finishedBeforeRelease = gate.finishedCount;
+
+      await gate.release();
+      await gate.waitForReleased();
+      await session.page.waitForTimeout(2500);
+
+      const cacheAfterDelete = await session.queryCache();
+      const text = await session.bodyText();
+      const url = session.page.url();
+      const reports = reportRequests(session);
+      const options = session.requests.filter((request) =>
+        request.url.includes('/analysis/options'),
+      );
+      await session.screenshot('screen.png');
+      t.writeJson('cache.json', {
+        cacheBeforeDelete,
+        cacheAfterDelete,
+        deleteStartedAt,
+        deleteFinishedAt,
+        heldBeforeDelete,
+        finishedBeforeRelease,
+      });
+      t.writeJson('requests.json', { reports, options });
+
+      const entries = (Array.isArray(cacheAfterDelete) ? cacheAfterDelete : []).filter(
+        (entry) =>
+          Array.isArray(entry.key) &&
+          entry.key[0] === 'sales-analysis' &&
+          JSON.stringify(entry.key).includes('from=2026-11-03') &&
+          JSON.stringify(entry.key).includes('to=2026-11-04'),
+      );
+      const fresh = entries.filter(
+        (entry) => entry.hasData && entry.status === 'success' && !entry.error,
+      );
+      const updatedAt = Math.max(0, ...fresh.map((entry) => entry.dataUpdatedAt));
+      t.checks.check(
+        'the report request was held',
+        heldBeforeDelete >= 1,
+        '>= 1',
+        heldBeforeDelete,
+      );
+      t.checks.eq('the old response stayed held through the delete', finishedBeforeRelease, 0);
+      t.checks.truthy('the delete committed during the hold', deleted);
+      t.checks.check(
+        'the report was requested again after the delete',
+        reports.length >= 2,
+        '>= 2',
+        reports.length,
+      );
+      t.checks.truthy('the report cache has data after the race', fresh.length > 0);
+      t.checks.check(
+        'the report cache was invalidated after the delete',
+        updatedAt >= deleteFinishedAt,
+        `>= ${deleteFinishedAt}`,
+        updatedAt,
+      );
+      t.checks.check(
+        'the options query was invalidated after the delete',
+        options.length >= 1,
+        '>= 1',
+        options.length,
+      );
+      t.checks.notIncludes('the deleted group is absent', text, group.name);
+      t.checks.check('the query has no deleted group key', !url.includes('groupA='), true, url);
+      return {
+        observations: {
+          heldBeforeDelete,
+          finishedBeforeRelease,
+          reports: reports.length,
+          options: options.length,
+          updatedAt,
+          deleteFinishedAt,
+          url,
+        },
+      };
+    } finally {
+      if (gate) await gate.close();
+      await session.close();
+      const existing = await t.db.one(
+        `select id from merchant.sales_analysis_group where merchant_id=$1 and id=$2`,
+        [IDS.M1, group.id],
+      );
+      if (!existing) {
+        await t.db.query(
+          `insert into merchant.sales_analysis_group(id,merchant_id,name,version,created_at,updated_at) values($1,$2,$3,1,pg_catalog.now(),pg_catalog.now())`,
+          [group.id, IDS.M1, group.name],
+        );
+        for (const row of products) {
+          await t.db.query(
+            `insert into merchant.sales_analysis_group_product(merchant_id,group_id,product_id) values($1,$2,$3) on conflict do nothing`,
+            [IDS.M1, group.id, row.product_id],
+          );
+        }
+      }
+    }
   },
 
   'I1-MET-05': async (t) => {
@@ -898,23 +1130,100 @@ export const EXTRA_CASES = {
   },
 
   'I1-GATE-05': async (t) => {
-    const files = ['manifest.json', 'manifest.sha256', 'verdict.md', 'verdict.json'];
-    const present = files.map((name) => ({ name, path: join(t.run.out, name), exists: false }));
-    for (const entry of present) {
+    const path = t.run.verdictPath || join(t.run.out, 'verdict.json');
+    const present = existsSync(path);
+    let verdict = null;
+    let parseError = null;
+    if (present) {
       try {
-        const { statSync } = await import('node:fs');
-        entry.exists = statSync(entry.path).isFile();
-      } catch {
-        entry.exists = false;
+        verdict = JSON.parse(readFileSync(path, 'utf8'));
+      } catch (error) {
+        parseError = error.message;
       }
     }
-    t.writeJson('manifest.json', present);
-    return {
-      status: 'BLOCKED',
-      failure: {
-        message: 'GATE-05 needs the verifier verdict and verdict.json after all case results.',
-      },
-      observations: { present },
+    const casesRoot = join(t.run.out, 'cases');
+    const caseIds = existsSync(casesRoot)
+      ? readdirSync(casesRoot, { withFileTypes: true })
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => entry.name)
+      : [];
+    const withResult = REQUIRED_CASE_IDS.filter((id) =>
+      existsSync(join(casesRoot, id, 'result.json')),
+    );
+    const missing = REQUIRED_CASE_IDS.filter(
+      (id) => !existsSync(join(casesRoot, id, 'result.json')),
+    );
+    const extra = caseIds.filter((id) => !REQUIRED_CASE_IDS.includes(id));
+    const headResolvable = Boolean(
+      verdict?.head &&
+      spawnSync('git', ['cat-file', '-e', `${verdict.head}^{commit}`], {
+        cwd: t.run.worktree,
+        encoding: 'utf8',
+      }).status === 0,
+    );
+    const counts = verdict?.counts ?? null;
+    const countsSum =
+      (counts?.pass ?? 0) + (counts?.fail ?? 0) + (counts?.blocked ?? 0) + (counts?.checkOnly ?? 0);
+    const headMatches = Boolean(verdict?.head && verdict.head === t.run.head);
+    const checks = {
+      present,
+      parseError,
+      verdictHead: verdict?.head ?? null,
+      runHead: t.run.head,
+      headResolvable,
+      headMatches,
+      signedBy: verdict?.signedBy ?? null,
+      signedAt: verdict?.signedAt ?? null,
+      counts,
+      countsSum,
+      productFail: verdict?.productFail ?? null,
+      caseResults: withResult.length,
+      missing,
+      extra,
     };
+    t.writeJson('verdict-check.json', checks);
+
+    if (!present) {
+      return {
+        status: 'BLOCKED',
+        failure: {
+          message: `No verdict.json at ${path}. The verifier signs the verdict after the 66 results. Pass --verdict <path> to check a signed verdict.`,
+        },
+        observations: checks,
+      };
+    }
+    if (parseError) {
+      return {
+        status: 'FAIL',
+        failure: { message: `verdict.json is not valid JSON: ${parseError}` },
+        observations: checks,
+      };
+    }
+
+    t.checks.eq('verdict schema', verdict.schema, 'umi.i1.verdict/v1');
+    t.checks.truthy('verdict is signed', verdict.signedBy);
+    t.checks.truthy(
+      'verdict signing time is valid',
+      Boolean(verdict.signedAt) && !Number.isNaN(Date.parse(verdict.signedAt)),
+    );
+    t.checks.truthy('the signed head is a commit', headResolvable);
+    t.checks.eq('66 case results are present', withResult.length, 66);
+    t.checks.eq('no case result is missing', missing, []);
+    t.checks.eq('no extra case result is present', extra, []);
+    t.checks.eq('the verdict counts 66 cases', counts?.total, 66);
+    t.checks.eq('the verdict status counts sum to 66', countsSum, 66);
+    t.checks.eq('the verdict has no product failure', verdict.productFail, 0);
+    t.checks.eq('the signed head is the run head', verdict.head, t.run.head);
+
+    if (!headMatches) {
+      return {
+        status: 'BLOCKED',
+        failure: {
+          message: `verdict.json covers ${verdict.head}, not ${t.run.head}. The verifier must sign the verdict at this head, then rerun this case with --verdict ${path}.`,
+        },
+        observations: checks,
+      };
+    }
+    return { status: t.checks.failed.length ? 'FAIL' : 'PASS', observations: checks };
   },
 };

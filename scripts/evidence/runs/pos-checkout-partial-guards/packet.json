@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1",
-  "runId": "pos-checkout-partial-guards-1794772974975",
-  "createdAt": "2026-11-15T20:02:54.975Z",
+  "runId": "pos-checkout-partial-guards-1794777906234",
+  "createdAt": "2026-11-15T21:25:06.234Z",
   "contentView": "working-tree",
   "policySha256": "dcc6c649ce210c15a4ecb351bb04bfa68e3f326f46cc651d04e3b4aa5a704835",
   "check": {
@@ -24,8 +24,8 @@
   "logs": {
     "stdout": {
       "path": "scripts/evidence/runs/pos-checkout-partial-guards/stdout.log",
-      "sha256": "82b6bc60a3307c1d0327db3f7d44286096f59ec4610e593f829192bb2442f964",
-      "bytes": 652
+      "sha256": "e02e3c78711d266237418b2283fc0d75fcd18886a7edfff0a84f52c9fe386d48",
+      "bytes": 651
     },
     "stderr": {
       "path": "scripts/evidence/runs/pos-checkout-partial-guards/stderr.log",

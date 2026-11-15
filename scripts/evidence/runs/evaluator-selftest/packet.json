@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1",
-  "runId": "evaluator-selftest-1794731206788",
-  "createdAt": "2026-11-15T08:26:46.788Z",
+  "runId": "evaluator-selftest-1794777915195",
+  "createdAt": "2026-11-15T21:25:15.195Z",
   "contentView": "working-tree",
   "policySha256": "dcc6c649ce210c15a4ecb351bb04bfa68e3f326f46cc651d04e3b4aa5a704835",
   "check": {
@@ -16,8 +16,8 @@
   "logs": {
     "stdout": {
       "path": "scripts/evidence/runs/evaluator-selftest/stdout.log",
-      "sha256": "dcaa45d43a987c6db0058321b7503a598701eb5dc1110f069382cd49c8a90909",
-      "bytes": 2411
+      "sha256": "6aab16688f1c2a096ddcc64691d30fe723ee3458d23d81a0213864e625317513",
+      "bytes": 2412
     },
     "stderr": {
       "path": "scripts/evidence/runs/evaluator-selftest/stderr.log",
@@ -32,8 +32,8 @@
   "tested": [
     {
       "path": "scripts/evidence/evidence.mjs",
-      "sha256": "1eb4944d0b11cc04967aea37a5c4fa9d0bf822299bf2b49d9a9991b3d3a782ee",
-      "bytes": 28728
+      "sha256": "aea582ed84536f10f84a18dcd8696088e12dea32beb5b74d7c6d94787fe4dbfb",
+      "bytes": 29075
     },
     {
       "path": "scripts/evidence/schema.mjs",

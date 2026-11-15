@@ -47,6 +47,7 @@ function parseArgs(argv) {
     allowFailures: false,
     fixtures: null,
     baselineApi: null,
+    verdict: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -67,12 +68,13 @@ function parseArgs(argv) {
         .filter(Boolean);
     else if (arg === '--fixtures') args.fixtures = next();
     else if (arg === '--baseline-api') args.baselineApi = next();
+    else if (arg === '--verdict') args.verdict = next();
     else if (arg === '--start-api') args.startApi = true;
     else if (arg === '--skip-perf') args.skipPerf = true;
     else if (arg === '--allow-failures') args.allowFailures = true;
     else if (arg === '--help') {
       console.log(
-        'i1-run.mjs [--base-url URL] [--api-url URL] [--dev-url URL] [--cdp URL] [--db NAME] [--out DIR] [--only ID,ID] [--start-api] [--fixtures DIR]',
+        'i1-run.mjs [--base-url URL] [--api-url URL] [--dev-url URL] [--cdp URL] [--db NAME] [--out DIR] [--only ID,ID] [--start-api] [--fixtures DIR] [--verdict FILE]',
       );
       process.exit(0);
     } else {
@@ -123,6 +125,7 @@ async function main() {
     fixtures,
     out,
     worktree,
+    verdictPath: args.verdict ? resolve(args.verdict) : join(out, 'verdict.json'),
     env: process.env,
     startedAt: new Date().toISOString(),
     browser: null,
