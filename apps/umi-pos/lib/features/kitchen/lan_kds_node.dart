@@ -98,7 +98,124 @@ final class LanKdsNode {
   final Map<String, _LanTrust> _trusted = {};
   final HubAccountSequencer _accountSequencer = HubAccountSequencer();
   Duration? _lastProbeAt;
-  Duration? _nextProbeAfter;
+  /// Probe rate: a burst of two, then one probe after 5 seconds, then one
+  /// every 2 seconds. The rate is fixed. Fairness uses a Bloom filter for
+  /// "has asked" and a bounded FIFO for "asked, not probed": an eviction from
+  /// the FIFO cannot make an old refused hash look new again.
+  static const int _probeBurst = 2;
+  static const Duration _probeFirstRefill = Duration(seconds: 5);
+  static const Duration _probeRefill = Duration(seconds: 2);
+  static const int _probeCredentialCapacity = 128;
+  static const Duration _probePendingTtl = Duration(seconds: 10);
+  static const int _probeBloomBits = 8192;
+  final List<int> _probeBloom = List<int>.filled(_probeBloomBits ~/ 64, 0);
+  double _probeTokens = _probeBurst.toDouble();
+  Duration? _probeNextRefill;
+  final Map<String, Duration> _probeLastAt = {};
+  /// Asked and not probed yet, in arrival order. These go before repeaters.
+  final Map<String, Duration> _probePending = {};
+
+  int _bloomIndex(String value, int salt) {
+    var hash = 0x811c9dc5;
+    for (final unit in value.codeUnits) {
+      hash ^= unit;
+      hash = (hash * 0x01000193) & 0xffffffff;
+    }
+    hash = (hash ^ salt) & 0xffffffff;
+    return hash % _probeBloomBits;
+  }
+
+  bool _probeSeen(String value) {
+    for (final salt in const [1, 7]) {
+      final bit = _bloomIndex(value, salt);
+      if ((_probeBloom[bit ~/ 64] & (1 << (bit % 64))) == 0) return false;
+    }
+    return true;
+  }
+
+  void _markProbeSeen(String value) {
+    for (final salt in const [1, 7]) {
+      final bit = _bloomIndex(value, salt);
+      _probeBloom[bit ~/ 64] |= 1 << (bit % 64);
+    }
+  }
+
+  void _refillProbeTokens(Duration now) {
+    final startNext = _probeNextRefill;
+    if (startNext == null) return;
+    var next = startNext;
+    while (now >= next && _probeTokens < _probeBurst) {
+      _probeTokens += 1;
+      next = next + _probeRefill;
+    }
+    _probeNextRefill = _probeTokens >= _probeBurst ? null : next;
+  }
+
+  void _markProbePending(String credentialHash, Duration now) {
+    final firstSight = !_probeSeen(credentialHash);
+    _markProbeSeen(credentialHash);
+    if (_probePending.containsKey(credentialHash)) {
+      _probePending[credentialHash] = now;
+      return;
+    }
+    // Only a first sight enters the priority queue. A hash evicted from the
+    // queue or the cooldown map is still "seen" in the Bloom filter, so it
+    // cannot look new again and take a fresh priority slot.
+    if (!firstSight || _probeLastAt.containsKey(credentialHash)) return;
+    _probePending[credentialHash] = now;
+    if (_probePending.length > _probeCredentialCapacity) {
+      _probePending.remove(_probePending.keys.first);
+    }
+  }
+
+  bool _probeThrottled(String credentialHash, Duration now) {
+    _refillProbeTokens(now);
+    _markProbePending(credentialHash, now);
+    _probePending.removeWhere(
+      (_, at) => now - at > _probePendingTtl,
+    );
+    // Keep a probed hash visible until the bounded map evicts it. A time
+    // eviction makes an old refused hash look unprobed again and lets it
+    // take the next token ahead of a newcomer.
+    final mine = _probeLastAt[credentialHash];
+    if (mine != null && now - mine < _probePeriod) return true;
+    if (_probeTokens < 1) return true;
+    if (mine != null) {
+      // Any credential that has asked and not probed goes first.
+      if (_probePending.isNotEmpty) return true;
+      // Among repeaters, the oldest probe goes first.
+      for (final other in _probeLastAt.values) {
+        if (other < mine) return true;
+      }
+    }
+    return false;
+  }
+
+  void _consumeProbe(String credentialHash, Duration now) {
+    _refillProbeTokens(now);
+    _probeTokens = (_probeTokens - 1)
+        .clamp(0, _probeBurst)
+        .toDouble();
+    if (_probeTokens < 1 && _probeNextRefill == null) {
+      _probeNextRefill = now + _probeFirstRefill;
+    }
+    _probePending.remove(credentialHash);
+    _markProbeSeen(credentialHash);
+    if (!_probeLastAt.containsKey(credentialHash) &&
+        _probeLastAt.length >= _probeCredentialCapacity) {
+      _probeLastAt.remove(_probeLastAt.keys.first);
+    }
+    _probeLastAt[credentialHash] = now;
+  }
+
+  void _clearProbeBackoff() {
+    _probeTokens = _probeBurst.toDouble();
+    _probeNextRefill = null;
+    _probeLastAt.clear();
+    _probePending.clear();
+    _probeBloom.fillRange(0, _probeBloom.length, 0);
+  }
+
   bool _stopped = false;
 
   Uri? get boundUri {
@@ -1114,10 +1231,10 @@ final class LanKdsNode {
         trust == null ||
         _lastProbeAt == null ||
         now - _lastProbeAt! >= _probePeriod;
-    final probeThrottled =
-        trust != null && _nextProbeAfter != null && now < _nextProbeAfter!;
+    final probeThrottled = _probeThrottled(hash, now);
     if (probeDue && !probeThrottled) {
       _lastProbeAt = now;
+      _consumeProbe(hash, now);
       try {
         final response = await _client
             .get(
@@ -1158,6 +1275,8 @@ final class LanKdsNode {
                 known.deviceId,
               );
             }
+            // The probe rate and cooldown were recorded when this probe
+            // started. This throw leaves the device untrusted.
             throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
           }
           final seenAt = _now();
@@ -1182,7 +1301,7 @@ final class LanKdsNode {
             monotonicAt: _clock.monotonicNow(),
             wallAt: _clock.wallNow(),
           );
-          _nextProbeAfter = null;
+          _clearProbeBackoff();
           return _LanPeer(peer);
         }
         if (response.statusCode < 500) {
@@ -1198,8 +1317,11 @@ final class LanKdsNode {
               known.deviceId,
             );
           }
+          // The 4xx refusal leaves the device untrusted. The probe rate and
+          // cooldown were recorded when this probe started.
           throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
         }
+        // A 5xx is a failed probe. Its rate cost was recorded when it started.
       } on _LanRefusal {
         rethrow;
       } catch (error) {
@@ -1207,7 +1329,6 @@ final class LanKdsNode {
           '[umipos] lan_peer_validation_unavailable '
           'type=${error.runtimeType}',
         );
-        _nextProbeAfter = _clock.monotonicNow() + _probePeriod;
       }
     }
     final trusted = _freshTrust(

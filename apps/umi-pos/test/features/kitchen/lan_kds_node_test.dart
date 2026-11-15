@@ -1187,6 +1187,370 @@ void main() {
   });
 
   test(
+    'five 403 refusals within 30 seconds start exactly one cloud probe',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(() async => http.Response('{}', 403));
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        seedDevice: false,
+      );
+
+      for (var request = 0; request < 5; request += 1) {
+        clock.advance(const Duration(seconds: 1));
+        expect(await _board(harness), 403);
+      }
+      expect(cloud.calls, 1);
+      expect(
+        await harness.local.readNetworkDevice(_merchant, _location, _peer),
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'alternating refused credentials cannot bypass the backoff',
+    () async {
+      final clock = _FakeClock();
+      final credentials = <String>[];
+      final client = MockClient((request) async {
+        credentials.add(request.headers['x-umi-device-credential'] ?? '');
+        return http.Response('{}', 403);
+      });
+      final harness = await _startControlled(
+        clock: clock,
+        client: client,
+        seedDevice: false,
+      );
+
+      for (var request = 0; request < 5; request += 1) {
+        clock.advance(const Duration(seconds: 1));
+        final credential = request.isEven ? 'refused-a' : 'refused-b';
+        expect(await _board(harness, headers: _headers(credential: credential)), 403);
+      }
+      expect(credentials, hasLength(2));
+      expect(
+        credentials.toSet(),
+        {'refused-a', 'refused-b'},
+      );
+    },
+  );
+
+  for (final refusedCount in [2, 3, 4, 6, 8, 16, 32]) {
+    for (final order in ['refused-first', 'genuine-first', 'rotated']) {
+      test(
+        'genuine probes within the fairness bound with '
+        '$refusedCount refused, $order',
+        () async {
+          final clock = _FakeClock();
+          final credentials = <String>[];
+          var firstGenuineSecond = -1;
+          final client = MockClient((request) async {
+            final credential =
+                request.headers['x-umi-device-credential'] ?? '';
+            credentials.add(credential);
+            if (credential == 'genuine' && firstGenuineSecond < 0) {
+              firstGenuineSecond = clock.monotonicNow().inSeconds;
+            }
+            return http.Response('{}', 403);
+          });
+          final harness = await _startControlled(
+            clock: clock,
+            client: client,
+            seedDevice: false,
+          );
+
+          for (var second = 0; second < 90; second += 1) {
+            clock.advance(const Duration(seconds: 1));
+            // The refused set is the same N hashes. Rotated moves the whole
+            // batch, so the genuine does not always send last. It does not
+            // fall through to refused-first.
+            final refused = List.generate(
+              refusedCount,
+              (index) => 'refused-${index + 1}',
+            );
+            final base = switch (order) {
+              'genuine-first' => ['genuine', ...refused],
+              _ => [...refused, 'genuine'],
+            };
+            final shift = order == 'rotated' ? second % base.length : 0;
+            final batch = [
+              ...base.skip(shift),
+              ...base.take(shift),
+            ];
+            for (final credential in batch) {
+              expect(
+                await _board(
+                  harness,
+                  headers: _headers(credential: credential),
+                ),
+                403,
+              );
+            }
+          }
+
+          final genuineProbes = credentials
+              .where((credential) => credential == 'genuine')
+              .length;
+          expect(firstGenuineSecond, greaterThanOrEqualTo(0));
+          if (refusedCount <= 16) {
+            expect(genuineProbes, greaterThanOrEqualTo(2));
+            expect(firstGenuineSecond, lessThanOrEqualTo(45));
+          } else {
+            expect(genuineProbes, greaterThanOrEqualTo(1));
+            expect(firstGenuineSecond, lessThanOrEqualTo(70));
+          }
+          expect(credentials, hasLength(lessThanOrEqualTo(46)));
+        },
+      );
+    }
+  }
+
+  // Anchors for the accepted bound. The refused set repeats every second.
+  // The bound is 2N+10s: measured first genuine is 2N+2s at N=64 and N=128.
+  for (final refusedCount in [64, 128]) {
+    for (final order in ['refused-first', 'genuine-first']) {
+      test(
+        'genuine probes within 2N+10s with $refusedCount refused, $order',
+        () async {
+          final clock = _FakeClock();
+          final credentials = <String>[];
+          var firstGenuineSecond = -1;
+          final client = MockClient((request) async {
+            final credential =
+                request.headers['x-umi-device-credential'] ?? '';
+            credentials.add(credential);
+            if (credential == 'genuine' && firstGenuineSecond < 0) {
+              firstGenuineSecond = clock.monotonicNow().inSeconds;
+            }
+            return http.Response('{}', 403);
+          });
+          final harness = await _startControlled(
+            clock: clock,
+            client: client,
+            seedDevice: false,
+          );
+          final seconds = refusedCount * 2 + 30;
+
+          for (var second = 0; second < seconds; second += 1) {
+            clock.advance(const Duration(seconds: 1));
+            final refused = List.generate(
+              refusedCount,
+              (index) => 'refused-${index + 1}',
+            );
+            final batch = order == 'genuine-first'
+                ? ['genuine', ...refused]
+                : [...refused, 'genuine'];
+            for (final credential in batch) {
+              expect(
+                await _board(
+                  harness,
+                  headers: _headers(credential: credential),
+                ),
+                403,
+              );
+            }
+          }
+
+          final genuineProbes = credentials
+              .where((credential) => credential == 'genuine')
+              .length;
+          expect(firstGenuineSecond, greaterThanOrEqualTo(0));
+          expect(
+            firstGenuineSecond,
+            lessThanOrEqualTo(refusedCount * 2 + 10),
+          );
+          expect(genuineProbes, greaterThanOrEqualTo(1));
+          // Rate is 0.5 probes per second after the burst. At most 46 probes
+          // in 90 seconds was measured. Keep that rate for longer windows.
+          expect(
+            credentials,
+            hasLength(lessThanOrEqualTo(seconds ~/ 2 + 6)),
+          );
+        },
+        timeout: const Timeout(Duration(minutes: 5)),
+      );
+    }
+  }
+
+  test(
+    'a genuine credential probes within three windows of sustained rotation',
+    () async {
+      final clock = _FakeClock();
+      final credentials = <String>[];
+      var firstGenuineSecond = -1;
+      final client = MockClient((request) async {
+        final credential =
+            request.headers['x-umi-device-credential'] ?? '';
+        credentials.add(credential);
+        if (credential == 'genuine' && firstGenuineSecond < 0) {
+          firstGenuineSecond = clock.monotonicNow().inSeconds;
+        }
+        return http.Response('{}', 403);
+      });
+      final harness = await _startControlled(
+        clock: clock,
+        client: client,
+        seedDevice: false,
+      );
+
+      // Three 30s windows. Each second, in order: refused-a, refused-b,
+      // genuine. The same two attackers repeat in every window.
+      for (var second = 0; second < 90; second += 1) {
+        clock.advance(const Duration(seconds: 1));
+        for (final credential in [
+          'refused-a',
+          'refused-b',
+          'genuine',
+        ]) {
+          expect(
+            await _board(harness, headers: _headers(credential: credential)),
+            403,
+          );
+        }
+      }
+
+      final genuineProbes = credentials
+          .where((credential) => credential == 'genuine')
+          .length;
+      expect(genuineProbes, greaterThan(0));
+      expect(genuineProbes, lessThanOrEqualTo(3));
+      // Rate is burst 2, then one probe per 2s after 5s.
+      expect(credentials, hasLength(lessThanOrEqualTo(46)));
+      expect(firstGenuineSecond, lessThanOrEqualTo(45));
+    },
+  );
+
+  test(
+    'five distinct refused credentials and a repeat stay within two probes',
+    () async {
+      final clock = _FakeClock();
+      final credentials = <String>[];
+      final client = MockClient((request) async {
+        credentials.add(request.headers['x-umi-device-credential'] ?? '');
+        return http.Response('{}', 403);
+      });
+      final harness = await _startControlled(
+        clock: clock,
+        client: client,
+        seedDevice: false,
+      );
+
+      for (final credential in [
+        'refused-a',
+        'refused-b',
+        'refused-c',
+        'refused-d',
+        'refused-e',
+        'refused-a',
+      ]) {
+        clock.advance(const Duration(seconds: 1));
+        expect(await _board(harness, headers: _headers(credential: credential)), 403);
+      }
+      expect(credentials, hasLength(2));
+    },
+  );
+
+  test(
+    'a 2xx identity mismatch arms the backoff and probes once',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(
+        () async => http.Response(
+          jsonEncode({
+            ..._deviceJson(),
+            'locationId': '00000000-0000-4000-8000-000000000099',
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        seedDevice: false,
+      );
+
+      for (var request = 0; request < 5; request += 1) {
+        clock.advance(const Duration(seconds: 1));
+        expect(await _board(harness), 403);
+      }
+      expect(cloud.calls, 1);
+      expect(
+        await harness.local.readNetworkDevice(_merchant, _location, _peer),
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'a refused device probes again only after the 30 second backoff',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(() async => http.Response('{}', 403));
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        seedDevice: false,
+      );
+
+      expect(await _board(harness), 403);
+      expect(cloud.calls, 1);
+      clock.advance(const Duration(seconds: 30));
+      expect(await _board(harness), 403);
+      expect(cloud.calls, 2);
+    },
+  );
+
+  test(
+    'an unknown device starts at most one cloud probe in 30 seconds',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(_Cloud.unavailable);
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        seedDevice: false,
+      );
+
+      for (var request = 0; request < 5; request += 1) {
+        expect(await _board(harness), 403);
+      }
+      expect(cloud.calls, 1);
+    },
+  );
+
+  test('a failed probe holds the backoff for the next request', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.unavailable);
+    final harness = await _startControlled(
+      clock: clock,
+      client: cloud.client,
+      seedDevice: false,
+    );
+
+    expect(await _board(harness), 403);
+    expect(await _board(harness), 403);
+    expect(cloud.calls, 1);
+  });
+
+  test('the next cloud probe occurs after 30 seconds', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.unavailable);
+    final harness = await _startControlled(
+      clock: clock,
+      client: cloud.client,
+      seedDevice: false,
+    );
+
+    expect(await _board(harness), 403);
+    clock.advance(const Duration(seconds: 30));
+    expect(await _board(harness), 403);
+    expect(cloud.calls, 2);
+  });
+
+  test(
     'an explicit cloud rejection removes trust and keeps the node',
     () async {
       final clock = _FakeClock();
@@ -1324,11 +1688,13 @@ final class _ControlledHarness {
     required this.local,
     required this.journal,
     required this.base,
+    required this.client,
   });
 
   final _MemoryLocal local;
   final EncryptedOfflineJournal journal;
   final Uri base;
+  final http.Client client;
 }
 
 Future<_ControlledHarness> _startControlled({
@@ -1336,27 +1702,30 @@ Future<_ControlledHarness> _startControlled({
   required http.Client client,
   _MemoryLocal? local,
   EncryptedOfflineJournal? journal,
+  bool seedDevice = true,
 }) async {
   final resolvedLocal = local ?? _MemoryLocal();
   final resolvedJournal =
       journal ?? EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
   final store = LanKdsStore(resolvedLocal);
   await store.saveCloudBoard(_merchant, _location, [_ticketMap()]);
-  await resolvedLocal.writeNetworkDevice(
-    LocalNetworkDevice(
-      merchantId: _merchant,
-      locationId: _location,
-      deviceId: _peer,
-      role: 'kds',
-      stationId: null,
-      address: null,
-      port: null,
-      credentialHash: sha256.convert(utf8.encode(_credential)).toString(),
-      pairedAt: DateTime.now().toUtc().toIso8601String(),
-      lastSeenAt: DateTime.now().toUtc().toIso8601String(),
-      status: 'active',
-    ),
-  );
+  if (seedDevice) {
+    await resolvedLocal.writeNetworkDevice(
+      LocalNetworkDevice(
+        merchantId: _merchant,
+        locationId: _location,
+        deviceId: _peer,
+        role: 'kds',
+        stationId: null,
+        address: null,
+        port: null,
+        credentialHash: sha256.convert(utf8.encode(_credential)).toString(),
+        pairedAt: DateTime.now().toUtc().toIso8601String(),
+        lastSeenAt: DateTime.now().toUtc().toIso8601String(),
+        status: 'active',
+      ),
+    );
+  }
   final node = LanKdsNode(
     local: resolvedLocal,
     journal: resolvedJournal,
@@ -1375,10 +1744,15 @@ Future<_ControlledHarness> _startControlled({
   );
   final bound = await node.start();
   addTearDown(node.stop);
+  // One client keeps one connection. A new client per request exhausts the
+  // ephemeral ports on the macOS runner after a few thousand requests.
+  final httpClient = http.Client();
+  addTearDown(httpClient.close);
   return _ControlledHarness(
     local: resolvedLocal,
     journal: resolvedJournal,
     base: Uri.parse('http://127.0.0.1:${bound.port}'),
+    client: httpClient,
   );
 }
 
@@ -1386,7 +1760,7 @@ Future<int> _board(
   _ControlledHarness harness, {
   Map<String, String>? headers,
 }) async {
-  final response = await http.post(
+  final response = await harness.client.post(
     harness.base.resolve('/api/kds/board'),
     headers: headers ?? _headers(),
     body: jsonEncode({'action': 'snapshot'}),
