@@ -7,7 +7,15 @@
  * The --self-test mode injects each fault into a temporary copy and proves the
  * guard fails on it.
  */
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,7 +31,6 @@ const FILES = {
 };
 
 const RETIRED_REGISTRY_MARKER = '## Retired selection rules';
-const RESOLVER_HISTORY_MARKER = '## Applicability check before an effect';
 
 const LIVE_FORBIDDEN = [
   ['apps/umi-conversaflow', 'retired owner path'],
@@ -81,7 +88,7 @@ const ROUTING_CASES = [
   {
     task: 'Triage the pending work item',
     owner: 'run record',
-    rule: 'named run record',
+    rule: 'Current requirements and pending work',
   },
 ];
 
@@ -95,8 +102,15 @@ function liveRegistry(text) {
 }
 
 function liveResolver(text) {
-  const at = text.indexOf(RESOLVER_HISTORY_MARKER);
-  return at === -1 ? text : text.slice(0, at);
+  // Scan the whole file. The stale-path rejection sits below the old cut point.
+  // Drop the explicit history sentence: it names the retired paths to forbid them.
+  return text
+    .split('\n')
+    .filter(
+      (line) =>
+        !/are not in the current tree\. Do not use them as owners\./i.test(line),
+    )
+    .join('\n');
 }
 
 function checkLinks(root, errors) {
@@ -155,10 +169,17 @@ export function checkRepo(root) {
 
   const linkCount = checkLinks(root, errors);
 
+  const ruleLines = live.registry
+    .split('\n')
+    .map((line) => line.toLowerCase())
+    .filter((line) => line.trimStart().startsWith('- '));
   const cases = ROUTING_CASES.map((item) => {
-    const rulePresent = live.registry.toLowerCase().includes(item.rule.toLowerCase());
-    const ownerPresent = live.registry.toLowerCase().includes(item.owner.toLowerCase());
-    const pass = rulePresent && ownerPresent;
+    const line = ruleLines.find(
+      (candidate) =>
+        candidate.includes(item.rule.toLowerCase()) &&
+        candidate.includes(item.owner.toLowerCase()),
+    );
+    const pass = Boolean(line);
     if (!pass) {
       errors.push(`routing case "${item.task}": expected ${item.owner} via "${item.rule}"`);
     }
@@ -178,6 +199,17 @@ function copyRepo(src, dst) {
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, readFileSync(path.join(src, file)));
   }
+  const osFile = path.join(src, FILES.agentOs);
+  const osDir = path.dirname(osFile);
+  for (const [, link] of readFileSync(osFile, 'utf8').matchAll(/\]\(([^)]+)\)/g)) {
+    if (/^(https?:|#|mailto:)/.test(link)) continue;
+    const relative = link.split('#')[0];
+    const source = path.resolve(osDir, relative);
+    if (!existsSync(source)) continue;
+    const target = path.resolve(dst, FILES.agentOs, '..', relative);
+    mkdirSync(path.dirname(target), { recursive: true });
+    copyFileSync(source, target);
+  }
 }
 
 function writeFixture(root, file, text) {
@@ -186,14 +218,35 @@ function writeFixture(root, file, text) {
 
 export function selfTest() {
   const results = [];
-  const run = (name, mutate) => {
+  const baseline = checkRepo(REPO_ROOT);
+  if (baseline.errors.length > 0) {
+    return [
+      {
+        name: 'clean fixture baseline',
+        pass: false,
+        error: `clean tree has ${baseline.errors.length} error(s): ${baseline.errors[0]}`,
+      },
+    ];
+  }
+  const run = (name, mutate, expected) => {
     const dir = mkdtempSync(path.join(tmpdir(), 'task-router-fault-'));
     try {
       copyRepo(REPO_ROOT, dir);
       mutate(dir);
       const result = checkRepo(dir);
-      const pass = result.errors.length > 0;
-      results.push({ name, pass, error: result.errors[0] ?? 'no failure detected' });
+      const hit = result.errors.find((error) => error.includes(expected));
+      const unrelatedLinkFault =
+        expected !== 'broken link' && result.errors.some((error) => error.includes('broken link'));
+      const pass = Boolean(hit) && !unrelatedLinkFault;
+      results.push({
+        name,
+        pass,
+        error: pass
+          ? hit
+          : hit
+            ? `unrelated fault: ${result.errors.find((error) => error.includes('broken link'))}`
+            : `expected "${expected}"; got ${result.errors[0] ?? 'no failure'}`,
+      });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -210,7 +263,7 @@ export function selfTest() {
         '## Selection rules\n\n- Shared backend: `apps/umi-conversaflow`.',
       ),
     );
-  });
+  }, 'retired owner path');
 
   run('retired tracker is rejected', (dir) => {
     const file = FILES.agents;
@@ -223,19 +276,32 @@ export function selfTest() {
         'Work items and specs live in **Azure Boards**.',
       ),
     );
-  });
+  }, 'retired tracker instruction');
 
   run('missing canonical owner is rejected', (dir) => {
     const file = FILES.resolver;
     const text = readFileSync(path.join(dir, file), 'utf8');
     writeFixture(dir, file, text.replace('`apps/umi-api`: canonical backend', '`apps/umi-api`'));
-  });
+  }, 'missing canonical backend owner');
 
   run('broken legacy link is rejected', (dir) => {
     const file = FILES.agentOs;
     const text = readFileSync(path.join(dir, file), 'utf8');
     writeFixture(dir, file, text.replace('](../../AGENTS.md)', '](../../AGENTS-MISSING.md)'));
-  });
+  }, 'broken link');
+
+  run('weakened triage rule is rejected', (dir) => {
+    const file = FILES.registry;
+    const text = readFileSync(path.join(dir, file), 'utf8');
+    writeFixture(
+      dir,
+      file,
+      text.replace(
+        'Current requirements and pending work: the user\'s current instruction, the active task brief, and the run record.',
+        'Current requirements and pending work: the user\'s current instruction.',
+      ),
+    );
+  }, 'routing case "Triage the pending work item"');
 
   return results;
 }
