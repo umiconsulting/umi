@@ -21,6 +21,34 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-11-15 - Staging routing correction and method guard
+
+- task type: routing correction and operating method
+- request summary: Align the live routing inputs with the current Umi owners. Reject retired tracker and owner paths. Prove the guard detects each fault.
+- filesystem slice inspected: `AGENTS.md`, `docs/agents/issue-tracker.md`, `docs/agents/run-contract.md`, `docs/architecture/agent-operating-system.md`, `.agents/skills/task-router/`, `apps/`, `scripts/`.
+- chosen owner: root procedure layer for routing. Product owners stay `apps/umi-api`, `apps/umi-pos`, `apps/umi-dashboard`, `apps/umi-cash`, and `apps/umi-landing-page`.
+- chosen path: `fix/task-router-current-context-20261115`, based on `origin/staging` `11bc120d`.
+- skill or subagent used: `task-router`; bounded material review assigned to umi-researcher.
+- files touched: `AGENTS.md`, `docs/agents/issue-tracker.md`, `docs/agents/run-contract.md`, `docs/architecture/agent-operating-system.md`, `.agents/skills/task-router/SKILL.md`, `registry.md`, `node-resolver.md`, `scripts/check-task-router.mjs`, this ledger.
+- tools used: Git, Node.js, Prettier, ripgrep, and the repository file tools.
+- outcome: Live routing inputs now name the current owners. Retired paths stay in a marked history section. The routing guard passes. The fault proof rejects a stale owner, a retired tracker, a missing canonical owner, and a broken link.
+- reusable pattern observed: A live routing file needs a deterministic guard. The guard must read the live section, keep history separate, and prove failure on an injected fault.
+- promotion follow-up: Add the guard to the standard PR check after the workflow owner lands the CI change. Do not add a second registry.
+- evidence: commit `a726cc0d`; `node scripts/check-task-router.mjs` exit 0; `node scripts/check-task-router.mjs --self-test` exit 0; live stale-term count 38 before, 0 after; formatting check exit 0.
+
+Representative routes:
+
+| Request | Chosen owner | Result |
+| --- | --- | --- |
+| Add a shared backend endpoint for customer identity | `apps/umi-api` | PASS |
+| Add a Customers tab to the owner dashboard | `apps/umi-dashboard` | PASS |
+| Fix Cash wallet-pass forwarding | `apps/umi-cash` | PASS |
+| Reproduce an offline POS checkout replay | `apps/umi-pos` | PASS |
+| Capture a new landing-page lead | `apps/umi-landing-page` | PASS |
+| Triage the pending work item | The named run record | PASS |
+
+Rejected stale context: `apps/umi-conversaflow`, `apps/umi-logs`, `static Umi owner dashboard prototype`, `loyalty-only logic`, Azure Boards work-item routing, and the retired `triage-work-items-with-codegraph` selection.
+
 ### 2026-11-07 - Category sales hexagon widget
 
 - task type: product implementation and verification
