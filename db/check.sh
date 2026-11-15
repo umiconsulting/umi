@@ -35,9 +35,10 @@ policies="$(query 'select count(*) from pg_policies')"
 ledger="$(query 'select filename, checksum, applied_at from runtime.migration_ledger order by filename')"
 psql -X -v ON_ERROR_STOP=1 -d "$GATE_DB" -f db/test/ledger-seed.sql
 
-# Prove db/90_rls.sql is idempotent without keeping its revokes. A persistent
-# second application revoked INSERT/UPDATE on merchant.kitchen_order that
-# db/47_checkout_kitchen_projection.sql grants after 90_rls in the 00_run order.
+# Stopgap: prove db/90_rls.sql is idempotent inside a rollback. The durable
+# checkout grants now live in 90_rls, so a persistent second application keeps
+# INSERT/UPDATE on merchant.kitchen_order. This rollback remains only as a
+# stopgap until the second-apply proof moves out of check.sh.
 policies_before="$(psql -X -qAt -d "$GATE_DB" -c 'select count(*) from pg_policies')"
 policies_same="$(psql -X -qAt -v ON_ERROR_STOP=1 -v before="$policies_before" -d "$GATE_DB" <<'SQL'
 begin;

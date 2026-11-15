@@ -107,6 +107,11 @@ grant select on
   merchant.kitchen_device_station
 to api;
 
+-- The checkout transaction writes the kitchen projection with the request-path
+-- role. Keep db/47_checkout_kitchen_projection.sql as the record.
+grant insert, update on merchant.kitchen_order to api;
+grant insert on merchant.kitchen_order_item, merchant.kitchen_event to api;
+
 -- Gate 3F permits points and stored-value facts only through command boundaries.
 revoke insert, update, delete on
   merchant.customer_consent_history,
