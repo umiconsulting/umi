@@ -224,6 +224,18 @@ jobs:
         # suite that CI does not name runs nowhere at all.
         run: pnpm run test:integration:schema
 
+      # ONCA incident 001: the payment attempt is captured before the commit. The
+      # suite installs its own failed-commit trigger and removes it. It needs no
+      # Redis. The trigger uses DATABASE_URL_ADMIN because the harness roles have no
+      # DDL authority.
+      - name: Checkout payment recovery (incident 001)
+        working-directory: apps/umi-api
+        env:
+          DATABASE_URL_APP: postgresql://api_login:harness_api@localhost:5432/umi_ci
+          DATABASE_URL_WORKER: postgresql://worker_login:harness_worker@localhost:5432/umi_ci
+          DATABASE_URL_ADMIN: postgresql://postgres:postgres@localhost:5432/umi_ci
+        run: pnpm run test:integration:checkout
+
       # The REALTIME family runs against the same from-scratch schema but needs
       # Redis (device-pairing nudges go over pub/sub), so it is its own step with
       # the `redis` service wired in — kept out of the schema family above, which
@@ -295,3 +307,13 @@ jobs:
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
             -f db/security_gate.sql
+
+      # The release acceptance gate for ONCA incident 001. It must fail while the
+      # product defect remains. No failure masking and no exit conversion.
+      - name: Checkout payment acceptance (incident 001)
+        if: '!cancelled()'
+        working-directory: apps/umi-api
+        env:
+          DATABASE_URL_APP: postgresql://api_login:harness_api@localhost:5432/umi_ci
+          DATABASE_URL_WORKER: postgresql://worker_login:harness_worker@localhost:5432/umi_ci
+        run: pnpm run test:acceptance:checkout
