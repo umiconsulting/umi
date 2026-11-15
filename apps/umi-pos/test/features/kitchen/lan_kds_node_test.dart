@@ -1187,6 +1187,53 @@ void main() {
   });
 
   test(
+    'an unknown device starts at most one cloud probe in 30 seconds',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(_Cloud.unavailable);
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        seedDevice: false,
+      );
+
+      for (var request = 0; request < 5; request += 1) {
+        expect(await _board(harness), 403);
+      }
+      expect(cloud.calls, 1);
+    },
+  );
+
+  test('a failed probe holds the backoff for the next request', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.unavailable);
+    final harness = await _startControlled(
+      clock: clock,
+      client: cloud.client,
+      seedDevice: false,
+    );
+
+    expect(await _board(harness), 403);
+    expect(await _board(harness), 403);
+    expect(cloud.calls, 1);
+  });
+
+  test('the next cloud probe occurs after 30 seconds', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.unavailable);
+    final harness = await _startControlled(
+      clock: clock,
+      client: cloud.client,
+      seedDevice: false,
+    );
+
+    expect(await _board(harness), 403);
+    clock.advance(const Duration(seconds: 30));
+    expect(await _board(harness), 403);
+    expect(cloud.calls, 2);
+  });
+
+  test(
     'an explicit cloud rejection removes trust and keeps the node',
     () async {
       final clock = _FakeClock();
@@ -1336,27 +1383,30 @@ Future<_ControlledHarness> _startControlled({
   required http.Client client,
   _MemoryLocal? local,
   EncryptedOfflineJournal? journal,
+  bool seedDevice = true,
 }) async {
   final resolvedLocal = local ?? _MemoryLocal();
   final resolvedJournal =
       journal ?? EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
   final store = LanKdsStore(resolvedLocal);
   await store.saveCloudBoard(_merchant, _location, [_ticketMap()]);
-  await resolvedLocal.writeNetworkDevice(
-    LocalNetworkDevice(
-      merchantId: _merchant,
-      locationId: _location,
-      deviceId: _peer,
-      role: 'kds',
-      stationId: null,
-      address: null,
-      port: null,
-      credentialHash: sha256.convert(utf8.encode(_credential)).toString(),
-      pairedAt: DateTime.now().toUtc().toIso8601String(),
-      lastSeenAt: DateTime.now().toUtc().toIso8601String(),
-      status: 'active',
-    ),
-  );
+  if (seedDevice) {
+    await resolvedLocal.writeNetworkDevice(
+      LocalNetworkDevice(
+        merchantId: _merchant,
+        locationId: _location,
+        deviceId: _peer,
+        role: 'kds',
+        stationId: null,
+        address: null,
+        port: null,
+        credentialHash: sha256.convert(utf8.encode(_credential)).toString(),
+        pairedAt: DateTime.now().toUtc().toIso8601String(),
+        lastSeenAt: DateTime.now().toUtc().toIso8601String(),
+        status: 'active',
+      ),
+    );
+  }
   final node = LanKdsNode(
     local: resolvedLocal,
     journal: resolvedJournal,

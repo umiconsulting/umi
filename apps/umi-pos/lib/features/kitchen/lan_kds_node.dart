@@ -1114,8 +1114,7 @@ final class LanKdsNode {
         trust == null ||
         _lastProbeAt == null ||
         now - _lastProbeAt! >= _probePeriod;
-    final probeThrottled =
-        trust != null && _nextProbeAfter != null && now < _nextProbeAfter!;
+    final probeThrottled = _nextProbeAfter != null && now < _nextProbeAfter!;
     if (probeDue && !probeThrottled) {
       _lastProbeAt = now;
       try {
@@ -1200,6 +1199,8 @@ final class LanKdsNode {
           }
           throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
         }
+        // A 5xx is a failed probe. Apply the same backoff as a transport failure.
+        _nextProbeAfter = _clock.monotonicNow() + _probePeriod;
       } on _LanRefusal {
         rethrow;
       } catch (error) {
