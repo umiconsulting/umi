@@ -1187,6 +1187,80 @@ void main() {
   });
 
   test(
+    'five 403 refusals within 30 seconds start exactly one cloud probe',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(() async => http.Response('{}', 403));
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        seedDevice: false,
+      );
+
+      for (var request = 0; request < 5; request += 1) {
+        clock.advance(const Duration(seconds: 1));
+        expect(await _board(harness), 403);
+      }
+      expect(cloud.calls, 1);
+      expect(
+        await harness.local.readNetworkDevice(_merchant, _location, _peer),
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'a 2xx identity mismatch arms the backoff and probes once',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(
+        () async => http.Response(
+          jsonEncode({
+            ..._deviceJson(),
+            'locationId': '00000000-0000-4000-8000-000000000099',
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        seedDevice: false,
+      );
+
+      for (var request = 0; request < 5; request += 1) {
+        clock.advance(const Duration(seconds: 1));
+        expect(await _board(harness), 403);
+      }
+      expect(cloud.calls, 1);
+      expect(
+        await harness.local.readNetworkDevice(_merchant, _location, _peer),
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'a refused device probes again only after the 30 second backoff',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(() async => http.Response('{}', 403));
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        seedDevice: false,
+      );
+
+      expect(await _board(harness), 403);
+      expect(cloud.calls, 1);
+      clock.advance(const Duration(seconds: 30));
+      expect(await _board(harness), 403);
+      expect(cloud.calls, 2);
+    },
+  );
+
+  test(
     'an unknown device starts at most one cloud probe in 30 seconds',
     () async {
       final clock = _FakeClock();
