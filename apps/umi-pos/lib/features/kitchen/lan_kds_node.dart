@@ -98,37 +98,67 @@ final class LanKdsNode {
   final Map<String, _LanTrust> _trusted = {};
   final HubAccountSequencer _accountSequencer = HubAccountSequencer();
   Duration? _lastProbeAt;
-  /// One probe window for the device: the first credential, plus one credential
-  /// change. The total is two probes per window, whatever number of distinct
-  /// hashes arrives. The state is three fields, not a map.
-  Duration? _probeWindowUntil;
-  String? _probeWindowHash;
-  bool _probeChangeUsed = false;
+  /// Probe rate: a burst of two, then one refill every 15 seconds. The rate is
+  /// independent of the number of distinct refused credentials. Each credential
+  /// also has a 30s cooldown, and the credential with the oldest probe goes
+  /// first, so a genuine change cannot be starved by repeating attackers.
+  static const int _probeBurst = 2;
+  static const Duration _probeRefill = Duration(seconds: 15);
+  static const int _probeCredentialCapacity = 8;
+  double _probeTokens = _probeBurst.toDouble();
+  Duration? _probeRefilledAt;
+  final Map<String, Duration> _probeLastAt = {};
 
-  void _armProbeBackoff(String credentialHash) {
-    final now = _clock.monotonicNow();
-    final until = _probeWindowUntil;
-    if (until == null || now >= until) {
-      _probeWindowUntil = now + _probePeriod;
-      _probeWindowHash = credentialHash;
-      _probeChangeUsed = false;
+  void _refillProbeTokens(Duration now) {
+    final last = _probeRefilledAt;
+    if (last == null) {
+      _probeRefilledAt = now;
       return;
     }
-    if (_probeWindowHash != credentialHash) _probeChangeUsed = true;
+    if (now <= last) return;
+    final gained =
+        (now - last).inMilliseconds / _probeRefill.inMilliseconds;
+    _probeTokens = (_probeTokens + gained)
+        .clamp(0, _probeBurst)
+        .toDouble();
+    _probeRefilledAt = now;
   }
 
   bool _probeThrottled(String credentialHash, Duration now) {
-    final until = _probeWindowUntil;
-    if (until == null || now >= until) return false;
-    if (_probeWindowHash == credentialHash) return true;
-    return _probeChangeUsed;
+    _refillProbeTokens(now);
+    // A credential that stops asking must not hold the oldest-first priority
+    // forever. Two windows is enough to cover its 30s cooldown.
+    _probeLastAt.removeWhere((_, at) => now - at >= _probePeriod * 2);
+    final mine = _probeLastAt[credentialHash];
+    if (mine != null && now - mine < _probePeriod) return true;
+    if (_probeTokens < 1) return true;
+    // Oldest probe goes first. A newcomer has no entry, so it is oldest.
+    if (mine != null) {
+      for (final other in _probeLastAt.values) {
+        if (other < mine) return true;
+      }
+    }
+    return false;
+  }
+
+  void _consumeProbe(String credentialHash, Duration now) {
+    _refillProbeTokens(now);
+    _probeTokens = (_probeTokens - 1)
+        .clamp(0, _probeBurst)
+        .toDouble();
+    if (!_probeLastAt.containsKey(credentialHash) &&
+        _probeLastAt.length >= _probeCredentialCapacity) {
+      _probeLastAt.remove(_probeLastAt.keys.first);
+    }
+    _probeLastAt[credentialHash] = now;
   }
 
   void _clearProbeBackoff() {
-    _probeWindowUntil = null;
-    _probeWindowHash = null;
-    _probeChangeUsed = false;
+    _probeTokens = _probeBurst.toDouble();
+    _probeRefilledAt = null;
+    _probeLastAt.clear();
   }
+
   bool _stopped = false;
 
   Uri? get boundUri {
@@ -1147,6 +1177,7 @@ final class LanKdsNode {
     final probeThrottled = _probeThrottled(hash, now);
     if (probeDue && !probeThrottled) {
       _lastProbeAt = now;
+      _consumeProbe(hash, now);
       try {
         final response = await _client
             .get(
@@ -1190,7 +1221,6 @@ final class LanKdsNode {
             // Arm the backoff before the throw. `on _LanRefusal` rethrows
             // without the catch below, so a missing assignment probes again on
             // every request.
-            _armProbeBackoff(hash);
             throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
           }
           final seenAt = _now();
@@ -1233,11 +1263,9 @@ final class LanKdsNode {
           }
           // The 4xx refusal leaves the device untrusted. Arm the backoff here:
           // the `on _LanRefusal` rethrow skips the catch that would arm it.
-          _armProbeBackoff(hash);
           throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
         }
         // A 5xx is a failed probe. Apply the same backoff as a transport failure.
-        _armProbeBackoff(hash);
       } on _LanRefusal {
         rethrow;
       } catch (error) {
@@ -1245,7 +1273,6 @@ final class LanKdsNode {
           '[umipos] lan_peer_validation_unavailable '
           'type=${error.runtimeType}',
         );
-        _armProbeBackoff(hash);
       }
     }
     final trusted = _freshTrust(

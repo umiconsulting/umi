@@ -1238,6 +1238,53 @@ void main() {
   );
 
   test(
+    'a genuine credential probes within three windows of sustained rotation',
+    () async {
+      final clock = _FakeClock();
+      final credentials = <String>[];
+      var firstGenuineSecond = -1;
+      final client = MockClient((request) async {
+        final credential =
+            request.headers['x-umi-device-credential'] ?? '';
+        credentials.add(credential);
+        if (credential == 'genuine' && firstGenuineSecond < 0) {
+          firstGenuineSecond = clock.monotonicNow().inSeconds;
+        }
+        return http.Response('{}', 403);
+      });
+      final harness = await _startControlled(
+        clock: clock,
+        client: client,
+        seedDevice: false,
+      );
+
+      // Three 30s windows. Each second, in order: refused-a, refused-b,
+      // genuine. The same two attackers repeat in every window.
+      for (var second = 0; second < 90; second += 1) {
+        clock.advance(const Duration(seconds: 1));
+        for (final credential in [
+          'refused-a',
+          'refused-b',
+          'genuine',
+        ]) {
+          expect(
+            await _board(harness, headers: _headers(credential: credential)),
+            403,
+          );
+        }
+      }
+
+      final genuineProbes = credentials
+          .where((credential) => credential == 'genuine')
+          .length;
+      expect(genuineProbes, greaterThan(0));
+      expect(genuineProbes, lessThanOrEqualTo(3));
+      expect(credentials, hasLength(lessThanOrEqualTo(8)));
+      expect(firstGenuineSecond, lessThanOrEqualTo(45));
+    },
+  );
+
+  test(
     'five distinct refused credentials and a repeat stay within two probes',
     () async {
       final clock = _FakeClock();
