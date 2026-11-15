@@ -21,8 +21,8 @@ large append-mostly logs, not routing inputs:
 
 ## Decision order
 1. Check `registry.md`.
-2. Inspect the narrowest existing repo or root slice that already owns the responsibility.
-3. Use `node-resolver.md` to decide whether the task belongs to root docs, a product repo, the platform backend, or a subagent.
+2. Inspect the narrowest existing repo or root slice that already owns the responsibility. Confirm that its path exists at the target commit.
+3. Use `node-resolver.md` to decide whether the task belongs to root docs, a product repo, the canonical backend, or a subagent.
 4. If the task is project-specific, follow that repo's local `AGENTS.md` and its agent adapter layer (e.g. `.claude/`).
 5. If one existing skill fits, use it.
 6. If the task needs independent judgment across repos or architecture tradeoffs, use a subagent.
@@ -30,6 +30,10 @@ large append-mostly logs, not routing inputs:
 8. Record the trace in `routing-ledger.md` (append-only; see context budget).
 9. Plant patterns that look reusable but do not yet pass promotion in `skill-seeds.md`.
 10. Only promote a new reusable artifact if `promotion-criteria.md` passes (checkpoint-time read).
+
+After you change `registry.md` or `node-resolver.md`, run `node scripts/check-task-router.mjs`.
+The check rejects a retired tracker, a retired owner path, and a stale owner description.
+Run `node scripts/check-task-router.mjs --self-test` to prove the guard detects these faults.
 
 ## Output
 Return only:

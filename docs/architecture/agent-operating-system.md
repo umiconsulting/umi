@@ -23,11 +23,11 @@ The Umi agent system has three layers:
 
 The neutral contract lives in:
 
-- [AGENTS.md](/Users/juanlopez1/Documents/Repositories/Umi/AGENTS.md:1)
-- [WORKSPACE.md](/Users/juanlopez1/Documents/Repositories/Umi/WORKSPACE.md:1)
-- [docs/architecture/maps/workspace-map.md](/Users/juanlopez1/Documents/Repositories/Umi/docs/architecture/maps/workspace-map.md:1)
-- [docs/architecture/maps/retrieval-map.md](/Users/juanlopez1/Documents/Repositories/Umi/docs/architecture/maps/retrieval-map.md:1)
-- [docs/governance/authority.md](/Users/juanlopez1/Documents/Repositories/Umi/docs/governance/authority.md:1)
+- [AGENTS.md](../../AGENTS.md)
+- [WORKSPACE.md](../../WORKSPACE.md)
+- [docs/architecture/maps/workspace-map.md](maps/workspace-map.md)
+- [docs/architecture/maps/retrieval-map.md](maps/retrieval-map.md)
+- [docs/governance/authority.md](../governance/authority.md)
 
 These are the neutral files any agent should be able to consume without assuming Claude, Codex, or another tool.
 
@@ -102,32 +102,32 @@ For meaningful technical decisions:
 
 ### Root procedures
 
-- [task-router](/Users/juanlopez1/Documents/Repositories/Umi/.claude/skills/task-router/SKILL.md:1)
-- [workspace-boundary-check](/Users/juanlopez1/Documents/Repositories/Umi/.claude/skills/workspace-boundary-check/SKILL.md:1)
-- [scientific-research-check](/Users/juanlopez1/Documents/Repositories/Umi/.claude/skills/scientific-research-check/SKILL.md:1)
+- [task-router](../../.claude/skills/task-router/SKILL.md)
+- [workspace-boundary-check](../../.claude/skills/workspace-boundary-check/SKILL.md)
+- [scientific-research-check](../../.claude/skills/scientific-research-check/SKILL.md)
 
 ### Workspace maps
 
-- [workspace-map](/Users/juanlopez1/Documents/Repositories/Umi/docs/architecture/maps/workspace-map.md:1)
-- [retrieval-map](/Users/juanlopez1/Documents/Repositories/Umi/docs/architecture/maps/retrieval-map.md:1)
-- [runtime-map](/Users/juanlopez1/Documents/Repositories/Umi/docs/architecture/maps/runtime-map.md:1)
+- [workspace-map](maps/workspace-map.md)
+- [retrieval-map](maps/retrieval-map.md)
+- [runtime-map](maps/runtime-map.md)
 
 ### Governance
 
-- [authority](/Users/juanlopez1/Documents/Repositories/Umi/docs/governance/authority.md:1)
-- [ownership](/Users/juanlopez1/Documents/Repositories/Umi/docs/governance/ownership.md:1)
-- [agent-safe boundaries](/Users/juanlopez1/Documents/Repositories/Umi/docs/governance/agent-safe-boundaries.md:1)
-- [adapter policy](/Users/juanlopez1/Documents/Repositories/Umi/docs/governance/adapter-policy.md:1)
-- [cognitive lifecycle](/Users/juanlopez1/Documents/Repositories/Umi/docs/governance/cognitive-lifecycle.md:1)
+- [authority](../governance/authority.md)
+- [ownership](../governance/ownership.md)
+- [agent-safe boundaries](../governance/agent-safe-boundaries.md)
+- [adapter policy](../governance/adapter-policy.md)
+- [cognitive lifecycle](../governance/cognitive-lifecycle.md)
 
 ### Product-local systems
 
-- [apps/umi-cash/CLAUDE.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-cash/CLAUDE.md:1)
-- [apps/umi-conversaflow/CLAUDE.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-conversaflow/CLAUDE.md:1)
-- [apps/umi-conversaflow/REPO_CONTEXT.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-conversaflow/REPO_CONTEXT.md:1)
-- [apps/umi-cash/REPO_CONTEXT.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-cash/REPO_CONTEXT.md:1)
-- [apps/umi-logs/REPO_CONTEXT.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-logs/REPO_CONTEXT.md:1)
-- [apps/umi-dashboard/REPO_CONTEXT.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-dashboard/REPO_CONTEXT.md:1)
+- [apps/umi-cash/CLAUDE.md](../../apps/umi-cash/CLAUDE.md)
+- [apps/umi-cash/REPO_CONTEXT.md](../../apps/umi-cash/REPO_CONTEXT.md)
+- [apps/umi-dashboard/REPO_CONTEXT.md](../../apps/umi-dashboard/REPO_CONTEXT.md)
+
+Historical only: `apps/umi-conversaflow` and `apps/umi-logs` are not in the current tree.
+Do not use them as owners. The canonical backend is `apps/umi-api`; owner-facing views are in `apps/umi-dashboard`.
 
 ## Maintenance rule
 

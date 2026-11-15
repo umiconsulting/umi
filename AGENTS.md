@@ -8,6 +8,7 @@ This file defines product boundaries, ownership, architecture rules, and the res
 - `WORKSPACE.md` — workspace map and cognitive layers
 - `docs/architecture/agent-operating-system.md` — neutral agent OS
 - `docs/architecture/maps/retrieval-map.md` — bounded progressive disclosure
+- `docs/agents/run-contract.md` — run contract for task, files, bar, return, and verifier
 
 ## Product boundaries
 
@@ -177,19 +178,18 @@ changes. Use the skill's evidence, UX, reliability, and verification rules.
 
 ### Issue tracker
 
-Work items and specs live in **Azure Boards** — organization `https://dev.azure.com/umiconsulting`,
-project `Umi Consulting` — through the Azure DevOps MCP. GitHub PRs are the review surface. A
-commit or PR that names `AB#<id>` links the work item; `Fixes AB#<id>` links it AND moves it, so
-use the bare form unless the merge truly completes the item. The `to-tickets` / `to-spec` /
-`triage` skills publish there; `code-review` checks a PR against its linked item when one is
-present. Agents raise work items as issues surface, rather than waiting for a person to file them.
-Trello and Plane are retired as trackers.
+Umi no longer uses Azure Boards.
+Trello and Plane also remain retired as trackers.
+No replacement external tracker is confirmed in this documentation.
+Use the local task brief and the run's named record for current requirements and pending work.
+Do not infer a tracker or require Azure access from an old `AB#` reference.
+GitHub PRs remain the code review surface when the user authorizes publication.
 See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
 
 ## Current stance
 
-- `apps/umi-api` owns authoritative business writes.
-- PostgreSQL uses `umi`, `merchant`, and `runtime` as its canonical schemas.
+- `apps/umi-api` is the canonical backend for build-v3 and owns authoritative business writes.
+- Build-v3 uses `umi`, `merchant`, and `runtime` as its canonical schemas.
 - KDS reads the API-owned kitchen projection. KDS does not own commercial order truth.
 - UmiPOS consumes the typed contract from `packages/contract`.
 - The workspace uses one Git repository at `git@github.com:umiconsulting/umi.git`.
