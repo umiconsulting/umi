@@ -2812,11 +2812,12 @@ Future<void> _count(BuildContext context, CashController controller) async {
       ),
     ),
   );
+  final typedMinorUnits = parseMinorUnits(total.text);
   total.dispose();
   if (accepted ?? false) {
     await controller.submitCount(
       amountMinorUnits: totalOnly
-          ? totalMinorUnits ?? 0
+          ? (typedMinorUnits ?? totalMinorUnits ?? 0)
           : tally.totalMinorUnits,
       denominations: totalOnly ? const [] : tally.lines,
     );
