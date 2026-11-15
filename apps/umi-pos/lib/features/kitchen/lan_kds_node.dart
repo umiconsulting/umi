@@ -98,24 +98,36 @@ final class LanKdsNode {
   final Map<String, _LanTrust> _trusted = {};
   final HubAccountSequencer _accountSequencer = HubAccountSequencer();
   Duration? _lastProbeAt;
-  /// Per-credential probe backoff. Bounded: four refused credentials is enough
-  /// for a genuine change and keeps a stranger from growing the map.
-  static const int _probeBackoffCapacity = 4;
-  final Map<String, Duration> _probeBackoff = {};
+  /// One probe window for the device: the first credential, plus one credential
+  /// change. The total is two probes per window, whatever number of distinct
+  /// hashes arrives. The state is three fields, not a map.
+  Duration? _probeWindowUntil;
+  String? _probeWindowHash;
+  bool _probeChangeUsed = false;
 
   void _armProbeBackoff(String credentialHash) {
     final now = _clock.monotonicNow();
-    _probeBackoff.removeWhere((_, until) => until <= now);
-    if (!_probeBackoff.containsKey(credentialHash) &&
-        _probeBackoff.length >= _probeBackoffCapacity) {
-      _probeBackoff.remove(_probeBackoff.keys.first);
+    final until = _probeWindowUntil;
+    if (until == null || now >= until) {
+      _probeWindowUntil = now + _probePeriod;
+      _probeWindowHash = credentialHash;
+      _probeChangeUsed = false;
+      return;
     }
-    _probeBackoff[credentialHash] = now + _probePeriod;
+    if (_probeWindowHash != credentialHash) _probeChangeUsed = true;
   }
 
   bool _probeThrottled(String credentialHash, Duration now) {
-    final until = _probeBackoff[credentialHash];
-    return until != null && now < until;
+    final until = _probeWindowUntil;
+    if (until == null || now >= until) return false;
+    if (_probeWindowHash == credentialHash) return true;
+    return _probeChangeUsed;
+  }
+
+  void _clearProbeBackoff() {
+    _probeWindowUntil = null;
+    _probeWindowHash = null;
+    _probeChangeUsed = false;
   }
   bool _stopped = false;
 
@@ -1203,7 +1215,7 @@ final class LanKdsNode {
             monotonicAt: _clock.monotonicNow(),
             wallAt: _clock.wallNow(),
           );
-          _probeBackoff.clear();
+          _clearProbeBackoff();
           return _LanPeer(peer);
         }
         if (response.statusCode < 500) {

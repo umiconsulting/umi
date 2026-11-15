@@ -1238,6 +1238,36 @@ void main() {
   );
 
   test(
+    'five distinct refused credentials and a repeat stay within two probes',
+    () async {
+      final clock = _FakeClock();
+      final credentials = <String>[];
+      final client = MockClient((request) async {
+        credentials.add(request.headers['x-umi-device-credential'] ?? '');
+        return http.Response('{}', 403);
+      });
+      final harness = await _startControlled(
+        clock: clock,
+        client: client,
+        seedDevice: false,
+      );
+
+      for (final credential in [
+        'refused-a',
+        'refused-b',
+        'refused-c',
+        'refused-d',
+        'refused-e',
+        'refused-a',
+      ]) {
+        clock.advance(const Duration(seconds: 1));
+        expect(await _board(harness, headers: _headers(credential: credential)), 403);
+      }
+      expect(credentials, hasLength(2));
+    },
+  );
+
+  test(
     'a 2xx identity mismatch arms the backoff and probes once',
     () async {
       final clock = _FakeClock();
