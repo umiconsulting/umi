@@ -1,0 +1,32 @@
+import { chromium } from '@playwright/test';
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
+const context =
+  browser.contexts()[0] ?? (await browser.newContext({ viewport: { width: 1440, height: 900 } }));
+const page = await context.newPage();
+const errors = [];
+page.on('console', (m) => {
+  if (m.type() === 'error') errors.push(m.text());
+});
+page.on('pageerror', (e) => errors.push(e.message));
+await page.goto('http://127.0.0.1:4000/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+await page.waitForTimeout(1500);
+console.log('URL', page.url());
+console.log('TEXT', (await page.locator('body').innerText()).slice(0, 800));
+console.log(
+  'INPUTS',
+  await page.locator('input').evaluateAll((els) =>
+    els.map((e) => ({
+      type: e.type,
+      name: e.name,
+      placeholder: e.placeholder,
+      aria: e.getAttribute('aria-label'),
+    })),
+  ),
+);
+console.log('ERRORS', errors);
+await page.screenshot({
+  path: '/home/juan/Projects/umiconsulting/umi/.analytics-i1-exec-2f52a6d5-20261115/run/probe-login.png',
+  fullPage: true,
+});
+await page.close();
+await browser.close();

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1",
-  "runId": "pos-checkout-partial-guards-1794731208272",
-  "createdAt": "2026-11-15T08:26:48.272Z",
+  "runId": "pos-checkout-partial-guards-1794777906234",
+  "createdAt": "2026-11-15T21:25:06.234Z",
   "contentView": "working-tree",
   "policySha256": "dcc6c649ce210c15a4ecb351bb04bfa68e3f326f46cc651d04e3b4aa5a704835",
   "check": {
@@ -24,8 +24,8 @@
   "logs": {
     "stdout": {
       "path": "scripts/evidence/runs/pos-checkout-partial-guards/stdout.log",
-      "sha256": "9ee90841e786de388ebf831a3067e33b6b5439f6f9d9a93cb2104435cdd48cab",
-      "bytes": 649
+      "sha256": "e02e3c78711d266237418b2283fc0d75fcd18886a7edfff0a84f52c9fe386d48",
+      "bytes": 651
     },
     "stderr": {
       "path": "scripts/evidence/runs/pos-checkout-partial-guards/stderr.log",
@@ -45,8 +45,8 @@
     },
     {
       "path": "apps/umi-api/src/modules/pos-cart/pos-cart.repository.ts",
-      "sha256": "0fdf6c18200cf5f993c54ba4fd49e3b15d99ffc6f8d7d6d4452234afe884da4c",
-      "bytes": 79639
+      "sha256": "c650acadda4ef2935cbf31e2e456317592d7efa4ac4ca0430b7d15275d8dac42",
+      "bytes": 86228
     },
     {
       "path": "apps/umi-api/src/modules/table-map/table-map.repository.ts",
@@ -85,8 +85,8 @@
     },
     {
       "path": "packages/contract/src/platform.ts",
-      "sha256": "ff133580c86c729eb8db8eb96645e75aafd9fce3bc188a060f2189c70d4db712",
-      "bytes": 27638
+      "sha256": "2f0d3c50c4e3586c481f962138651ac07942dcf4421819362a7a406666484963",
+      "bytes": 27943
     }
   ],
   "required": true

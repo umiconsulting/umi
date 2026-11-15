@@ -79,7 +79,13 @@ function HexagonMosaic({ rows, selected, categoryName }) {
   );
 }
 
-export default function CategorySalesCard({ report, query, detail = false, onRetry }) {
+export default function CategorySalesCard({
+  report,
+  query,
+  detail = false,
+  onRetry,
+  catalog = [],
+}) {
   const { t } = useLingui();
   const [selected, setSelected] = useState(null);
   const [visible, setVisible] = useState(20);
@@ -88,6 +94,7 @@ export default function CategorySalesCard({ report, query, detail = false, onRet
   const rows = [...(report.byCategory ?? [])].sort(
     (a, b) => b.netMinorUnits - a.netMinorUnits || a.key.localeCompare(b.key),
   );
+  const missing = catalog.filter((entry) => !rows.some((row) => row.key === entry.key));
   const activeSelected = rows.some((row) => row.key === selected) ? selected : null;
   const categoryName = (row) =>
     row.key === 'unattributed'
@@ -119,7 +126,7 @@ export default function CategorySalesCard({ report, query, detail = false, onRet
         </h2>
         {!detail && (
           <Link className="category-sales-report" to={salesReportLink(query, 'categories')}>
-            <Trans>Ver informe</Trans> →
+            <Trans>Ver las {rows.length} categorías</Trans> →
           </Link>
         )}
       </header>
@@ -180,6 +187,15 @@ export default function CategorySalesCard({ report, query, detail = false, onRet
               ))}
             </ul>
           )}
+          {missing.length > 0 && (
+            <ul className="category-sales-notice" aria-label={t`Categorías sin ventas`}>
+              {missing.map((entry) => (
+                <li key={entry.key}>
+                  <Trans>{entry.label}: sin ventas en el periodo.</Trans>
+                </li>
+              ))}
+            </ul>
+          )}
           {!detail && rows.length > 6 && (
             <Link className="category-sales-more" to={salesReportLink(query, 'categories')}>
               <Trans>Ver las {rows.length} categorías</Trans> →
@@ -198,13 +214,13 @@ export default function CategorySalesCard({ report, query, detail = false, onRet
                         <Trans>Categoría</Trans>
                       </th>
                       <th>
+                        <Trans>Venta neta</Trans>
+                      </th>
+                      <th>
                         <Trans>Ventas antes de devoluciones</Trans>
                       </th>
                       <th>
                         <Trans>Devoluciones</Trans>
-                      </th>
-                      <th>
-                        <Trans>Venta neta</Trans>
                       </th>
                       <th>
                         <Trans>Participación</Trans>
@@ -229,9 +245,9 @@ export default function CategorySalesCard({ report, query, detail = false, onRet
                             {categoryName(row)}
                           </button>
                         </th>
+                        <td>{formatOperationMoney(row.netMinorUnits, report.currency)}</td>
                         <td>{formatOperationMoney(row.merchandiseMinorUnits, report.currency)}</td>
                         <td>{formatOperationMoney(row.refundsMinorUnits, report.currency)}</td>
-                        <td>{formatOperationMoney(row.netMinorUnits, report.currency)}</td>
                         <td>{percentage(row)}</td>
                       </tr>
                     ))}
@@ -241,13 +257,13 @@ export default function CategorySalesCard({ report, query, detail = false, onRet
                       <th scope="row">
                         <Trans>Total</Trans>
                       </th>
+                      <td>{formatOperationMoney(total, report.currency)}</td>
                       <td>
                         {formatOperationMoney(report.totals.merchandiseMinorUnits, report.currency)}
                       </td>
                       <td>
                         {formatOperationMoney(report.totals.refundsMinorUnits, report.currency)}
                       </td>
-                      <td>{formatOperationMoney(total, report.currency)}</td>
                       <td>{state === 'ready' ? formatNumber(1, { style: 'percent' }) : '—'}</td>
                     </tr>
                   </tfoot>

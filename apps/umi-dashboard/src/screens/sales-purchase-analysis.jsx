@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { initialAnalysisQuery } from './sales-report-model.js';
+import { Link, useSearchParams } from 'react-router-dom';
+import { catalogCategories, initialAnalysisQuery } from './sales-report-model.js';
 import {
   SalesBars,
   SalesCoverageNotice,
@@ -8,6 +8,7 @@ import {
   SalesDetailWidget,
 } from './sales-widgets.jsx';
 import { formatNumber, formatTime } from '@/lib/format.js';
+import { SALES_AUTO_REFRESH_MS } from '@/lib/sales-analysis-query.js';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { useSalesAnalysis, useSalesAnalysisOptions } from '@/data.jsx';
@@ -36,6 +37,9 @@ function ReportError({ code, onRetry }) {
         <p>
           <Trans>No tienes permiso para consultar estas ventas.</Trans>
         </p>
+        <Link className="btn btn-secondary" to="/">
+          <Trans>Volver a inicio</Trans>
+        </Link>
       </div>
     );
   return (
@@ -204,6 +208,11 @@ function Totals({ report }) {
   return (
     <Panel title={<Trans>Ventas y ticket promedio</Trans>}>
       <div className="analysis-lead figures">{money(totals.netMinorUnits)}</div>
+      {totals.tickets === 0 && (
+        <p className="analysis-note">
+          <Trans>Sin tickets para calcular</Trans>
+        </p>
+      )}
       <p>
         <Trans>
           Venta neta de productos, después de descuentos y devoluciones. Excluye propinas.
@@ -530,7 +539,7 @@ function AffinityUnavailable({ onRetry }) {
   );
 }
 
-function AnalysisResults({ report, query, section, setSection, onRetry }) {
+function AnalysisResults({ report, query, section, setSection, onRetry, options }) {
   const { t } = useLingui();
   const [affinityHidden, setAffinityHidden] = useState(false);
   const basketsAvailable = report.basketState?.state !== 'unavailable';
@@ -546,7 +555,7 @@ function AnalysisResults({ report, query, section, setSection, onRetry }) {
   return (
     <>
       <SalesDataNote report={report} />
-      <SalesCoverageNotice coverage={report.coverage} />
+      <SalesCoverageNotice coverage={report.coverage} basketUnit={query.basketUnit} />
       {report.totals.tickets === 0 && (
         <p role="status">
           <Trans>
@@ -602,15 +611,20 @@ function AnalysisResults({ report, query, section, setSection, onRetry }) {
           </button>
         ))}
       </nav>
+      <Totals report={report} />
       {active === 'overview' && (
-        <>
-          <Totals report={report} />
-          <div className="analysis-summary-grid">
-            {['trend', 'hours', 'pairs', 'distribution'].map((id) => (
-              <SalesDetailWidget key={id} id={id} report={report} query={query} onRetry={onRetry} />
-            ))}
-          </div>
-        </>
+        <div className="analysis-summary-grid">
+          {['trend', 'hours', 'pairs', 'distribution'].map((id) => (
+            <SalesDetailWidget
+              key={id}
+              id={id}
+              report={report}
+              query={query}
+              onRetry={onRetry}
+              catalog={catalogCategories(options)}
+            />
+          ))}
+        </div>
       )}
       {active === 'pairs' &&
         (basketsAvailable ? (
@@ -619,7 +633,13 @@ function AnalysisResults({ report, query, section, setSection, onRetry }) {
           <AffinityUnavailable onRetry={onRetry} />
         ))}
       {active === 'categories' && (
-        <CategorySalesCard report={report} query={query} detail onRetry={onRetry} />
+        <CategorySalesCard
+          report={report}
+          query={query}
+          detail
+          onRetry={onRetry}
+          catalog={catalogCategories(options)}
+        />
       )}
       {active === 'time' && <TimeComparisons report={report} />}
       {active === 'locations' && (
@@ -709,7 +729,9 @@ function AnalysisWorkspace({ merchantId, locationId, options, reloadOptions }) {
           section: params.get('section') || 'overview',
           dimension: params.get('dimension'),
           metric: params.get('metric'),
-        }).filter(([, value]) => value != null && value !== ''),
+        }).filter(([key, value]) =>
+          key === 'locationId' ? value != null : value != null && value !== '',
+        ),
       ),
     );
   }
@@ -721,6 +743,11 @@ function AnalysisWorkspace({ merchantId, locationId, options, reloadOptions }) {
     });
   }
   const result = useSalesAnalysis(availableGroupsQuery(query, options));
+  const refetchResult = result.refetch;
+  useEffect(() => {
+    const timer = window.setInterval(() => refetchResult(), SALES_AUTO_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [refetchResult]);
   function reloadGroups() {
     reloadOptions();
   }
@@ -771,6 +798,7 @@ function AnalysisWorkspace({ merchantId, locationId, options, reloadOptions }) {
             section={params.get('section')}
             setSection={setSection}
             onRetry={result.refetch}
+            options={options}
           />
         </>
       ) : null}

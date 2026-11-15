@@ -12103,3 +12103,19 @@ msgstr "retry"
 #: src/shell.jsx
 msgid "Secciones"
 msgstr "Sections"
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Volver a inicio"
+msgstr "Go to home"
+
+#: src/screens/sales-widgets.jsx
+msgid "{0} tickets no tienen una visita de mesa identificada."
+msgstr "{0} tickets have no identified table visit."
+
+#: src/screens/category-sales.jsx
+msgid "{0}: sin ventas en el periodo."
+msgstr "{0}: no sales in this period."
+
+#: src/screens/overview.jsx
+msgid "La comparación con el periodo anterior no está disponible."
+msgstr "The comparison with the previous period is not available."

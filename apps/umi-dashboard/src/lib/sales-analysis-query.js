@@ -1,11 +1,14 @@
 import { routes } from '@umi/contract/routes';
 
 const FRESH_MS = 60_000;
+export const SALES_AUTO_REFRESH_MS = 59_000;
 
 export function permissionFingerprint(permissions) {
   if (!Array.isArray(permissions)) return permissions ?? '';
   return [...new Set(permissions)].sort().join(',');
 }
+
+const isStale = (query) => Date.now() - (query.state.dataUpdatedAt || 0) >= FRESH_MS;
 
 export function salesRefreshInterval(query, now = Date.now()) {
   // The summary is valid while the affinity capability is not. Do not poll it.
@@ -17,8 +20,11 @@ export function salesRefreshInterval(query, now = Date.now()) {
 export const salesCachePolicy = {
   staleTime: FRESH_MS,
   gcTime: 5 * 60_000,
-  refetchOnWindowFocus: true,
-  refetchInterval: salesRefreshInterval,
+  // A focus or mount refetch is useful only after the report is stale. The page
+  // owns the auto-refresh cadence so a manual refresh does not move the timer.
+  refetchOnWindowFocus: isStale,
+  refetchOnMount: isStale,
+  refetchInterval: false,
   retry: false,
 };
 
@@ -65,9 +71,10 @@ export function salesResult(result) {
     data: denied ? null : result.data,
     loading: denied ? false : !result.data && result.isFetching,
     refreshing: denied ? false : Boolean(result.data && result.isFetching),
-    error: result.error?.message,
+    error: denied ? result.error?.message : result.data ? undefined : result.error?.message,
     errorCode: denied ? 'PERMISSION_DENIED' : result.error?.code,
     refreshError: denied ? false : Boolean(result.data && result.error),
+    refreshErrorStatus: denied ? null : (result.error?.status ?? null),
     dataUpdatedAt: denied ? 0 : result.dataUpdatedAt,
     refetch: result.refetch,
   };

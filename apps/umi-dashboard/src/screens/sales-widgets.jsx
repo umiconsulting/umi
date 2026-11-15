@@ -35,7 +35,7 @@ export function SalesReportState({ loading, error, code, onRetry }) {
   );
 }
 
-export function SalesRefreshError({ capturedAt, timezone, onRetry }) {
+export function SalesRefreshError({ capturedAt, timezone, onRetry, network = false }) {
   return (
     <div className="sales-state surface" role="alert">
       <p>
@@ -44,6 +44,11 @@ export function SalesRefreshError({ capturedAt, timezone, onRetry }) {
           {formatTime(capturedAt, { timeZone: timezone })}.
         </Trans>
       </p>
+      {network && (
+        <p>
+          <Trans>No se pudieron cargar las ventas. Los importes no están disponibles.</Trans>
+        </p>
+      )}
       <button type="button" className="btn btn-secondary" onClick={onRetry}>
         <Trans>Reintentar</Trans>
       </button>
@@ -51,7 +56,7 @@ export function SalesRefreshError({ capturedAt, timezone, onRetry }) {
   );
 }
 
-export function SalesCoverageNotice({ coverage }) {
+export function SalesCoverageNotice({ coverage, basketUnit = 'ticket' }) {
   if (!coverage) return null;
   const gaps = [];
   if (coverage.ticketsWithoutProducts > 0)
@@ -60,6 +65,14 @@ export function SalesCoverageNotice({ coverage }) {
         <Trans>
           {coverage.ticketsWithoutProducts} tickets carecen de productos identificados. Permanecen
           en el total de tickets.
+        </Trans>
+      </li>,
+    );
+  if (basketUnit === 'table_visit' && coverage.ticketsWithoutVisit > 0)
+    gaps.push(
+      <li key="visits">
+        <Trans>
+          {coverage.ticketsWithoutVisit} tickets no tienen una visita de mesa identificada.
         </Trans>
       </li>,
     );
@@ -85,7 +98,13 @@ export function SalesCoverageNotice({ coverage }) {
   );
 }
 
-export function SalesBars({ rows, currency, metric = 'netMinorUnits', count = false }) {
+export function SalesBars({
+  rows,
+  currency,
+  metric = 'netMinorUnits',
+  count = false,
+  zeroAsDash = false,
+}) {
   const max = Math.max(...rows.map((row) => Math.abs(row[metric] ?? 0)), 1);
   return (
     <div>
@@ -108,7 +127,11 @@ export function SalesBars({ rows, currency, metric = 'netMinorUnits', count = fa
               />
             </span>
             <span className="figures">
-              {count ? formatNumber(row[metric]) : formatOperationMoney(row[metric], currency)}
+              {zeroAsDash && (row[metric] ?? 0) === 0
+                ? '—'
+                : count
+                  ? formatNumber(row[metric])
+                  : formatOperationMoney(row[metric], currency)}
             </span>
           </li>
         ))}
@@ -153,7 +176,7 @@ export function SalesMetric({ id, report, prior, query }) {
       field: 'tickets',
     },
     average: {
-      title: t`Ticket promedio`,
+      title: t`Ticket promedio sin propina`,
       value: formatOperationMoney(report.totals.averageTicketMinorUnits, report.currency),
       field: 'averageTicketMinorUnits',
     },
@@ -216,10 +239,10 @@ export function SalesMetric({ id, report, prior, query }) {
   );
 }
 
-export function SalesDetailWidget({ id, report, query, onRetry }) {
+export function SalesDetailWidget({ id, report, query, onRetry, catalog = [], network = false }) {
   const { t } = useLingui();
   if (id === 'categories')
-    return <CategorySalesCard report={report} query={query} onRetry={onRetry} />;
+    return <CategorySalesCard report={report} query={query} onRetry={onRetry} catalog={catalog} />;
   const basketsAvailable = report.basketState?.state !== 'unavailable';
   const titles = {
     trend: t`Venta por día`,
@@ -298,6 +321,7 @@ export function SalesDetailWidget({ id, report, query, onRetry }) {
           currency={report.currency}
           count={id === 'distribution'}
           metric={id === 'distribution' ? 'tickets' : 'netMinorUnits'}
+          zeroAsDash={id === 'trend' && network}
         />
       ) : (
         <p>

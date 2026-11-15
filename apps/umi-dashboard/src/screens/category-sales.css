@@ -157,7 +157,8 @@
   }
   .category-sales-heading h2 a,
   .category-sales-report,
-  .category-sales-legend-row {
+  .category-sales-legend-row,
+  .category-sales-category {
     min-height: 44px;
   }
   .category-sales-heading h2 a,

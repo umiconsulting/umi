@@ -5,6 +5,7 @@ import { useSalesAnalysis, useSalesAnalysisOptions, useOverviewData } from '@/da
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { getStoredSession } from '@/lib/auth.jsx';
 import { formatNumber, formatTime } from '@/lib/format.js';
+import { SALES_AUTO_REFRESH_MS } from '@/lib/sales-analysis-query.js';
 import {
   SalesCoverageNotice,
   SalesDataNote,
@@ -16,11 +17,14 @@ import {
 import {
   AVAILABLE_WIDGETS,
   DEFAULT_WIDGETS,
+  catalogCategories,
   loadWidgetPreferences,
   previousReportPeriod,
   reportPeriod,
   salesReportLink,
 } from './sales-report-model.js';
+
+const SALES_REFRESH_ERROR_KEY = 'umi-sales-refresh-error';
 
 function WidgetSettings({ widgets, onChange, onClose }) {
   const { t } = useLingui();
@@ -133,10 +137,19 @@ function BusinessWidgets({ options, context }) {
   };
   const report = useSalesAnalysis(query);
   const prior = useSalesAnalysis({ ...query, ...previousReportPeriod(query) });
+  const refetchReport = report.refetch;
+  const refetchPrior = prior.refetch;
   function refreshReports() {
-    report.refetch();
-    prior.refetch();
+    refetchReport();
+    refetchPrior();
   }
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      refetchReport();
+      refetchPrior();
+    }, SALES_AUTO_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [refetchReport, refetchPrior]);
   const scope =
     options.locations.find((location) => location.id === query.locationId)?.name ??
     t`Todas las sucursales`;
@@ -150,15 +163,31 @@ function BusinessWidgets({ options, context }) {
     }
   }
   const [now, setNow] = useState(() => Date.now());
+  const [storedErrorEpoch] = useState(() => {
+    try {
+      return window.sessionStorage.getItem(SALES_REFRESH_ERROR_KEY);
+    } catch {
+      return null;
+    }
+  });
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    try {
+      if (report.refreshError)
+        window.sessionStorage.setItem(SALES_REFRESH_ERROR_KEY, String(report.dataUpdatedAt));
+      else window.sessionStorage.removeItem(SALES_REFRESH_ERROR_KEY);
+    } catch {
+      // Storage can be unavailable on a locked profile.
+    }
+  }, [report.refreshError, report.dataUpdatedAt]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
   }, []);
+  const showRefreshError = report.refreshError && storedErrorEpoch !== String(report.dataUpdatedAt);
   const stale = Boolean(
     report.data &&
     report.dataUpdatedAt &&
-    !report.refreshing &&
-    now - report.dataUpdatedAt > 60_000,
+    (showRefreshError || now - report.dataUpdatedAt >= 60_000),
   );
   return (
     <>
@@ -215,7 +244,7 @@ function BusinessWidgets({ options, context }) {
       {stale && !report.error && (
         <p role="status">
           <Trans>
-            Datos de las {formatTime(report.dataUpdatedAt, { timeZone: options.timezone })}.
+            Datos de las {formatTime(report.data.capturedAt, { timeZone: options.timezone })}.
             Actualiza para ver el estado actual.
           </Trans>
         </p>
@@ -233,11 +262,12 @@ function BusinessWidgets({ options, context }) {
         <SalesReportState error={report.error} code={report.errorCode} onRetry={refreshReports} />
       ) : report.data ? (
         <>
-          {report.refreshError && (
+          {showRefreshError && (
             <SalesRefreshError
               capturedAt={report.data.capturedAt}
               timezone={report.data.timezone}
               onRetry={refreshReports}
+              network={!report.refreshErrorStatus}
             />
           )}
           {report.data.totals.tickets === 0 && report.data.totals.netMinorUnits === 0 && (
@@ -267,12 +297,10 @@ function BusinessWidgets({ options, context }) {
               </button>
             </div>
           )}
-          <SalesCoverageNotice coverage={report.data.coverage} />
+          <SalesCoverageNotice coverage={report.data.coverage} basketUnit={query.basketUnit} />
           {prior.error && (
             <p role="status">
-              <Trans>
-                No se pudo cargar el periodo anterior. La comparación no está disponible.
-              </Trans>
+              <Trans>La comparación con el periodo anterior no está disponible.</Trans>
             </p>
           )}
           {widgets.length ? (
@@ -293,6 +321,8 @@ function BusinessWidgets({ options, context }) {
                     report={report.data}
                     query={query}
                     onRetry={refreshReports}
+                    catalog={catalogCategories(options)}
+                    network={Boolean(report.refreshError) && !report.refreshErrorStatus}
                   />
                 ),
               )}

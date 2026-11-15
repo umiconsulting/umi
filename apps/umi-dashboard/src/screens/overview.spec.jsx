@@ -129,8 +129,8 @@ describe('Business overview', () => {
     state.report = loaded(report(), { error: 'Failed to fetch', refreshError: true });
     const html = render();
     expect(html).toContain('Venta neta');
+    expect(html).toContain('No se pudieron cargar las ventas');
     expect(html).toContain('No se pudo actualizar');
-    expect(html).not.toContain('No se pudieron cargar las ventas');
   });
   it('shows a distinct no-tickets state and a zero-sales state', () => {
     state.report = loaded(

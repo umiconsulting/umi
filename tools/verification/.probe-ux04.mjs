@@ -1,0 +1,100 @@
+import { chromium } from '@playwright/test';
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
+const context = await browser.newContext({
+  viewport: { width: 360, height: 800 },
+  locale: 'es-MX',
+});
+await context.addInitScript(() => localStorage.setItem('umi.dashboard.locale', 'es'));
+const page = await context.newPage();
+await page.goto('http://127.0.0.1:4000/login', { waitUntil: 'domcontentloaded' });
+await page.locator('input[type=email]').fill('verifier.owner@local.test');
+await page.locator('input[type=password]').fill('I1Local2026!');
+await page.getByRole('button', { name: 'Entrar' }).click();
+await page.waitForTimeout(1500);
+await page.goto('http://127.0.0.1:4000/?home=1&days=30', { waitUntil: 'domcontentloaded' });
+await page.locator('.sales-primary').waitFor({ state: 'visible', timeout: 20000 });
+await page.waitForTimeout(1000);
+const layout = await page.evaluate(() => {
+  const doc = document.documentElement;
+  const scrollables = [...document.querySelectorAll('*')]
+    .filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX !== 'visible')
+    .map((e) => ({
+      tag: e.tagName,
+      cls: e.className?.toString?.().slice(0, 80),
+      sw: e.scrollWidth,
+      cw: e.clientWidth,
+      ox: getComputedStyle(e).overflowX,
+    }));
+  const targets = [
+    ...document.querySelectorAll('a,button,input,select,textarea,[role=button],[tabindex]'),
+  ]
+    .filter((e) => e.offsetParent !== null)
+    .map((e) => {
+      const r = e.getBoundingClientRect();
+      return {
+        tag: e.tagName,
+        cls: e.className?.toString?.().slice(0, 60),
+        text: (e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 40),
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+      };
+    })
+    .filter((t) => t.w < 44 || t.h < 44);
+  return {
+    scrollWidth: doc.scrollWidth,
+    innerWidth: window.innerWidth,
+    scrollables,
+    targets: targets.slice(0, 30),
+    targetCount: targets.length,
+  };
+});
+console.log(JSON.stringify(layout, null, 1));
+await page.screenshot({
+  path: '/home/juan/Projects/umiconsulting/umi/.analytics-i1-exec-2f52a6d5-20261115/run/probe-ux04-home.png',
+  fullPage: true,
+});
+await page.locator('.sales-primary').click();
+await page.locator('.sales-analysis').waitFor({ state: 'visible', timeout: 20000 });
+await page.waitForTimeout(800);
+const detail = await page.evaluate(() => {
+  const doc = document.documentElement;
+  const scrollables = [...document.querySelectorAll('*')]
+    .filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX !== 'visible')
+    .map((e) => ({
+      tag: e.tagName,
+      cls: e.className?.toString?.().slice(0, 80),
+      sw: e.scrollWidth,
+      cw: e.clientWidth,
+      ox: getComputedStyle(e).overflowX,
+    }));
+  const targets = [
+    ...document.querySelectorAll('a,button,input,select,textarea,[role=button],[tabindex]'),
+  ]
+    .filter((e) => e.offsetParent !== null)
+    .map((e) => {
+      const r = e.getBoundingClientRect();
+      return {
+        tag: e.tagName,
+        cls: e.className?.toString?.().slice(0, 60),
+        text: (e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 40),
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+      };
+    })
+    .filter((t) => t.w < 44 || t.h < 44);
+  return {
+    url: location.href,
+    scrollWidth: doc.scrollWidth,
+    innerWidth: window.innerWidth,
+    scrollables,
+    targets: targets.slice(0, 30),
+    targetCount: targets.length,
+  };
+});
+console.log(JSON.stringify(detail, null, 1));
+await page.screenshot({
+  path: '/home/juan/Projects/umiconsulting/umi/.analytics-i1-exec-2f52a6d5-20261115/run/probe-ux04-detail.png',
+  fullPage: true,
+});
+await context.close();
+await browser.close();

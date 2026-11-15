@@ -169,13 +169,18 @@ textarea:focus,
 button:focus {
   outline: none;
 }
+body:focus {
+  outline: 2px solid var(--umi-blue);
+  outline-offset: -2px;
+}
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible,
-.focusable:focus-visible {
+.focusable:focus-visible,
+body:focus-visible {
   outline: 2px solid var(--umi-blue);
   outline-offset: 2px;
   box-shadow: 0 0 0 3px rgba(118, 146, 203, 0.32);
@@ -498,11 +503,15 @@ table th {
    sidebar foot. */
 .side-foot .select,
 .side-foot .select:hover,
-.side-foot .select:focus,
-.side-foot .select:focus-visible {
+.side-foot .select:focus {
   border-color: transparent;
   box-shadow: none;
   outline: none;
+}
+.side-foot .select:focus-visible {
+  outline: 2px solid var(--umi-blue);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(118, 146, 203, 0.32);
 }
 /* Note: the native <select> popup highlight cannot be recolored by CSS in this
    Chromium, so the white-in-dark-mode highlight lives on the custom <Select>
