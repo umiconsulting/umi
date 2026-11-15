@@ -14,6 +14,33 @@ void main() {
     expect(await gateway.check(), ReleaseCompatibility.compatible);
   });
 
+  test('rejects a server that speaks a different HTTP major', () async {
+    final gateway = ApiReleaseCompatibilityGateway(
+      api: _ReleaseApi(apiMajorVersion: 2),
+      config: pilotTestConfig,
+    );
+    expect(await gateway.check(), ReleaseCompatibility.unsupported);
+  });
+
+  test('rejects a release identity with no HTTP major', () async {
+    final gateway = ApiReleaseCompatibilityGateway(
+      api: _ReleaseApi(apiMajorVersion: null),
+      config: pilotTestConfig,
+    );
+    expect(await gateway.check(), ReleaseCompatibility.unsupported);
+  });
+
+  test(
+    'an artifact-major change alone does not fail the HTTP-major check',
+    () async {
+      final gateway = ApiReleaseCompatibilityGateway(
+        api: _ReleaseApi(contractVersion: '3.0.0'),
+        config: pilotTestConfig,
+      );
+      expect(await gateway.check(), ReleaseCompatibility.compatible);
+    },
+  );
+
   test('requires an update below the server minimum', () async {
     final gateway = ApiReleaseCompatibilityGateway(
       api: _ReleaseApi(minimumPosVersion: '1.0.0'),
@@ -58,11 +85,15 @@ void main() {
 final class _ReleaseApi implements ApiClient {
   _ReleaseApi({
     this.environment = 'pilot',
+    this.apiMajorVersion = 1,
+    this.contractVersion = '2.12.0',
     this.minimumPosVersion = '0.1.0',
     this.error,
   });
 
   final String environment;
+  final int? apiMajorVersion;
+  final String contractVersion;
   final String minimumPosVersion;
   final AppException? error;
 
@@ -79,7 +110,8 @@ final class _ReleaseApi implements ApiClient {
     if (error != null) throw error!;
     return {
       'environment': environment,
-      'contractVersion': '2.12.0',
+      if (apiMajorVersion != null) 'apiMajorVersion': apiMajorVersion,
+      'contractVersion': contractVersion,
       'minimumPosVersion': minimumPosVersion,
     };
   }
