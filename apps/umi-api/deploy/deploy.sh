@@ -5,7 +5,7 @@
 # Invoked over SSH by .github/workflows/deploy-backend.yml, e.g.:
 #   ssh vps "APP_NAME='umi-api' bash -s 'sha-<gitsha>'" < apps/umi-api/deploy/deploy.sh
 #
-# Args:   $1  image tag to deploy (default: latest)
+# Args:   $1  image tag to deploy (sha-<40-character commit>)
 # Env:    APP_NAME          service / apps-subdir name      (default: umi-api)
 #         UMI_REPO_DIR      repo checkout on the VPS        (default: $HOME/umi)
 #         UMI_DEPLOY_BRANCH branch that checkout tracks     (default: main)
@@ -16,7 +16,7 @@
 #                           from        (default: dirname of the compose file)
 #         RELEASE_SHA       exact 40-hex commit to deploy. When set, the branch
 #                           tip must match it and the checkout is reset to it.
-#                           Empty uses the branch-tip path (default: empty).
+#                           Empty uses the image tag commit.
 #
 # Prereq (one-time, see docs/deploy-pipeline.md): the VPS has run
 #   registry credentials through DOCKER_CONFIG or `docker login ghcr.io`, and
@@ -26,24 +26,29 @@
 #   script and docker-compose.yml on one box).
 set -euo pipefail
 
+TAG="${1:?Pass the immutable image tag sha-<40-character commit>}"
+if [[ ! "$TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
+  echo "FATAL: deployment requires an immutable sha-<40-character commit> tag" >&2
+  exit 1
+fi
+RELEASE_COMMIT="${TAG#sha-}"
 RELEASE_SHA="${RELEASE_SHA:-}"
-TAG="${1:-latest}"
+if [ -n "$RELEASE_SHA" ]; then
+  if ! [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "FATAL: RELEASE_SHA must be 40 lowercase hex characters: $RELEASE_SHA" >&2
+    exit 1
+  fi
+  if [ "$RELEASE_SHA" != "$RELEASE_COMMIT" ]; then
+    echo "FATAL: tag commit $RELEASE_COMMIT does not match RELEASE_SHA $RELEASE_SHA" >&2
+    exit 1
+  fi
+fi
 APP_NAME="${APP_NAME:-umi-api}"
 REPO_DIR="${UMI_REPO_DIR:-$HOME/umi}"
 BRANCH="${UMI_DEPLOY_BRANCH:-main}"
 APP_DIR="$REPO_DIR/apps/$APP_NAME"
 # umi-api -> UMI_API_TAG (the var docker-compose.yml interpolates)
 TAG_VAR="$(printf '%s' "$APP_NAME" | tr '[:lower:]-' '[:upper:]_')_TAG"
-
-if [ -n "$RELEASE_SHA" ]; then
-  if ! [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "FATAL: RELEASE_SHA must be 40 lowercase hex characters: $RELEASE_SHA" >&2
-    exit 1
-  fi
-  # The image tag is derived from the same SHA, so it cannot drift from the
-  # checkout and the migrations.
-  TAG="sha-$RELEASE_SHA"
-fi
 
 # Compose file + project directory. Prod keeps both inside $APP_DIR, which is
 # why they default to it. A second environment on the same box (the staging QA
@@ -69,7 +74,7 @@ compose() {
 echo "==> Deploying $APP_NAME  tag=$TAG  ($TAG_VAR)  branch=$BRANCH"
 echo "    compose=$COMPOSE_FILE  project_dir=$PROJECT_DIR"
 
-# 1) Sync the checkout so compose/Caddyfile match the shipped code.
+# 1) Use the image commit for deployment files and migrations.
 #    .env is gitignored, so the reset never touches local secrets/config.
 #
 #    With RELEASE_SHA, the branch tip must still be the commit that CI
@@ -91,7 +96,8 @@ if [ -n "$RELEASE_SHA" ]; then
     exit 1
   fi
 else
-  git fetch --depth=1 origin "$BRANCH"
+  git fetch --depth=1 origin "$RELEASE_COMMIT"
+  test "$(git rev-parse FETCH_HEAD)" = "$RELEASE_COMMIT"
   git reset --hard FETCH_HEAD
 fi
 

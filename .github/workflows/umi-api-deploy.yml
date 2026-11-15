@@ -1,34 +1,18 @@
-# Builds and ships umi-api to the VPS on every merge to main. Thin caller of the
-# reusable deploy-backend workflow — see .github/workflows/deploy-backend.yml.
-name: umi-api deploy
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/umi-api/**'
-      - 'packages/contract/**'
-      - 'db/migrations/**'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'package.json'
-      - 'turbo.json'
-      - '.github/workflows/umi-api-deploy.yml'
-      - '.github/workflows/deploy-backend.yml'
-
-# Never run two umi-api deploys at once; let an in-flight one finish.
-concurrency:
-  group: deploy-umi-api
-  cancel-in-progress: false
-
-# The repo's default GITHUB_TOKEN is read-only, so grant this caller the
-# packages:write it needs to push to GHCR (plus contents:read for checkout).
-# Without this, the reusable workflow's packages:write request exceeds the
-# caller's permission ceiling and the run fails at startup.
+name: Deploy API to production
+'on':
+  workflow_call:
+    secrets:
+      VPS_HOST:
+        required: true
+      VPS_USER:
+        required: true
+      VPS_SSH_KEY:
+        required: true
+      VPS_SSH_PORT:
+        required: false
 permissions:
   contents: read
   packages: write
-
 jobs:
   deploy:
     if: ${{ vars.UMI_REWARD_RELEASE_HOLD != 'true' }}
@@ -36,7 +20,13 @@ jobs:
     with:
       app_name: umi-api
       app_dir: apps/umi-api
-      package_name: '@umi/api'
       image: ghcr.io/umiconsulting/umi-api
       health_url: https://api.umiconsulting.co/health
-    secrets: inherit
+    secrets:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+concurrency:
+  group: deploy-api-production
+  cancel-in-progress: false

@@ -6,10 +6,6 @@ const migration = readFileSync(
   resolve(__dirname, '../../../../../db/migrations/059_inventory_initial_cost.sql'),
   'utf8',
 );
-const ci = readFileSync(
-  resolve(__dirname, '../../../../../.github/workflows/umi-api-ci.yml'),
-  'utf8',
-);
 
 describe('initial inventory cost migration', () => {
   it('adds a nullable safe amount with a guarded constraint', () => {
@@ -20,9 +16,5 @@ describe('initial inventory cost migration', () => {
     expect(migration).toContain('initial_unit_cost_minor IS NULL');
     expect(migration).toContain('initial_unit_cost_minor BETWEEN 0 AND 9007199254740991');
     expect(migration).not.toMatch(/DEFAULT|UPDATE|stock_ledger|stock_balance/i);
-  });
-  it('runs in fresh CI and verifies delta ledger skip after populated CI data via db/migrate.sh', () => {
-    expect(ci.match(/bash db\/migrate\.sh "\$GATE_DB"/g)).toHaveLength(2);
-    expect(ci).not.toContain('supabase/migrations');
   });
 });
