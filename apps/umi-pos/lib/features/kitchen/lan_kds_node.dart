@@ -98,19 +98,47 @@ final class LanKdsNode {
   final Map<String, _LanTrust> _trusted = {};
   final HubAccountSequencer _accountSequencer = HubAccountSequencer();
   Duration? _lastProbeAt;
-  /// Probe rate: a burst of two, then one probe after 15 seconds, then one
-  /// every 5 seconds. The rate does not depend on the number of distinct
-  /// refused credentials or on the identity map size.
+  /// Probe rate: a burst of two, then one probe after 5 seconds, then one
+  /// every 2 seconds. The rate is fixed. Fairness uses a Bloom filter for
+  /// "has asked" and a bounded FIFO for "asked, not probed": an eviction from
+  /// the FIFO cannot make an old refused hash look new again.
   static const int _probeBurst = 2;
-  static const Duration _probeFirstRefill = Duration(seconds: 14);
-  static const Duration _probeRefill = Duration(seconds: 5);
-  static const int _probeCredentialCapacity = 16;
+  static const Duration _probeFirstRefill = Duration(seconds: 5);
+  static const Duration _probeRefill = Duration(seconds: 2);
+  static const int _probeCredentialCapacity = 128;
+  static const Duration _probePendingTtl = Duration(seconds: 10);
+  static const int _probeBloomBits = 8192;
+  final List<int> _probeBloom = List<int>.filled(_probeBloomBits ~/ 64, 0);
   double _probeTokens = _probeBurst.toDouble();
   Duration? _probeNextRefill;
   final Map<String, Duration> _probeLastAt = {};
-  /// Credentials that asked and have not probed yet. They go before repeaters,
-  /// so arrival order cannot starve a later credential.
-  final Set<String> _probeSeen = {};
+  /// Asked and not probed yet, in arrival order. These go before repeaters.
+  final Map<String, Duration> _probePending = {};
+
+  int _bloomIndex(String value, int salt) {
+    var hash = 0x811c9dc5;
+    for (final unit in value.codeUnits) {
+      hash ^= unit;
+      hash = (hash * 0x01000193) & 0xffffffff;
+    }
+    hash = (hash ^ salt) & 0xffffffff;
+    return hash % _probeBloomBits;
+  }
+
+  bool _probeSeen(String value) {
+    for (final salt in const [1, 7]) {
+      final bit = _bloomIndex(value, salt);
+      if ((_probeBloom[bit ~/ 64] & (1 << (bit % 64))) == 0) return false;
+    }
+    return true;
+  }
+
+  void _markProbeSeen(String value) {
+    for (final salt in const [1, 7]) {
+      final bit = _bloomIndex(value, salt);
+      _probeBloom[bit ~/ 64] |= 1 << (bit % 64);
+    }
+  }
 
   void _refillProbeTokens(Duration now) {
     final startNext = _probeNextRefill;
@@ -123,24 +151,37 @@ final class LanKdsNode {
     _probeNextRefill = _probeTokens >= _probeBurst ? null : next;
   }
 
+  void _markProbePending(String credentialHash, Duration now) {
+    final firstSight = !_probeSeen(credentialHash);
+    _markProbeSeen(credentialHash);
+    if (_probePending.containsKey(credentialHash)) {
+      _probePending[credentialHash] = now;
+      return;
+    }
+    // Only a first sight enters the priority queue. A hash evicted from the
+    // queue or the cooldown map is still "seen" in the Bloom filter, so it
+    // cannot look new again and take a fresh priority slot.
+    if (!firstSight || _probeLastAt.containsKey(credentialHash)) return;
+    _probePending[credentialHash] = now;
+    if (_probePending.length > _probeCredentialCapacity) {
+      _probePending.remove(_probePending.keys.first);
+    }
+  }
+
   bool _probeThrottled(String credentialHash, Duration now) {
     _refillProbeTokens(now);
-    if (!_probeSeen.contains(credentialHash) &&
-        _probeSeen.length >= _probeCredentialCapacity) {
-      _probeSeen.remove(_probeSeen.first);
-    }
-    _probeSeen.add(credentialHash);
-    // A credential that stops asking must not hold priority forever. Two
-    // windows cover its 30s cooldown.
-    _probeLastAt.removeWhere((_, at) => now - at >= _probePeriod * 2);
+    _markProbePending(credentialHash, now);
+    _probePending.removeWhere(
+      (_, at) => now - at > _probePendingTtl,
+    );
+    // A credential that stops asking must not hold priority forever.
+    _probeLastAt.removeWhere((_, at) => now - at >= _probePeriod * 4);
     final mine = _probeLastAt[credentialHash];
     if (mine != null && now - mine < _probePeriod) return true;
     if (_probeTokens < 1) return true;
     if (mine != null) {
-      // A credential that has never probed has priority over a repeater.
-      for (final seen in _probeSeen) {
-        if (!_probeLastAt.containsKey(seen)) return true;
-      }
+      // Any credential that has asked and not probed goes first.
+      if (_probePending.isNotEmpty) return true;
       // Among repeaters, the oldest probe goes first.
       for (final other in _probeLastAt.values) {
         if (other < mine) return true;
@@ -157,6 +198,8 @@ final class LanKdsNode {
     if (_probeTokens < 1 && _probeNextRefill == null) {
       _probeNextRefill = now + _probeFirstRefill;
     }
+    _probePending.remove(credentialHash);
+    _markProbeSeen(credentialHash);
     if (!_probeLastAt.containsKey(credentialHash) &&
         _probeLastAt.length >= _probeCredentialCapacity) {
       _probeLastAt.remove(_probeLastAt.keys.first);
@@ -168,7 +211,8 @@ final class LanKdsNode {
     _probeTokens = _probeBurst.toDouble();
     _probeNextRefill = null;
     _probeLastAt.clear();
-    _probeSeen.clear();
+    _probePending.clear();
+    _probeBloom.fillRange(0, _probeBloom.length, 0);
   }
 
   bool _stopped = false;

@@ -1237,7 +1237,7 @@ void main() {
     },
   );
 
-  for (final refusedCount in [2, 3, 4, 6, 8]) {
+  for (final refusedCount in [2, 3, 4, 6, 8, 16, 32]) {
     for (final order in ['refused-first', 'genuine-first', 'rotated']) {
       test(
         'genuine probes within 45s with $refusedCount refused, $order',
@@ -1262,10 +1262,12 @@ void main() {
 
           for (var second = 0; second < 90; second += 1) {
             clock.advance(const Duration(seconds: 1));
+            // True rotation: the identity that sends first changes every
+            // second. The refused set is the same N hashes.
             final refused = List.generate(
               refusedCount,
               (index) => order == 'rotated'
-                  ? 'refused-${refusedCount - index}'
+                  ? 'refused-${(index + second) % refusedCount + 1}'
                   : 'refused-${index + 1}',
             );
             final batch = switch (order) {
@@ -1283,11 +1285,18 @@ void main() {
             }
           }
 
+          final genuineProbes = credentials
+              .where((credential) => credential == 'genuine')
+              .length;
           expect(firstGenuineSecond, greaterThanOrEqualTo(0));
-          expect(firstGenuineSecond, lessThanOrEqualTo(45));
-          if (refusedCount == 8) {
-            expect(credentials, hasLength(lessThanOrEqualTo(20)));
+          if (refusedCount <= 16) {
+            expect(genuineProbes, greaterThanOrEqualTo(2));
+            expect(firstGenuineSecond, lessThanOrEqualTo(45));
+          } else {
+            expect(genuineProbes, greaterThanOrEqualTo(1));
+            expect(firstGenuineSecond, lessThanOrEqualTo(70));
           }
+          expect(credentials, hasLength(lessThanOrEqualTo(46)));
         },
       );
     }
@@ -1335,9 +1344,8 @@ void main() {
           .length;
       expect(genuineProbes, greaterThan(0));
       expect(genuineProbes, lessThanOrEqualTo(3));
-      // The fairness rate is burst 2, then one probe per 5s after 15s.
-      // A 90s run cannot exceed 20 probes.
-      expect(credentials, hasLength(lessThanOrEqualTo(20)));
+      // Rate is burst 2, then one probe per 2s after 5s.
+      expect(credentials, hasLength(lessThanOrEqualTo(46)));
       expect(firstGenuineSecond, lessThanOrEqualTo(45));
     },
   );
