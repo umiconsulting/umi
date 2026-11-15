@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "1",
+  "runId": "pos-checkout-partial-guards-1794731208272",
+  "createdAt": "2026-11-15T08:26:48.272Z",
+  "contentView": "working-tree",
+  "policySha256": "dcc6c649ce210c15a4ecb351bb04bfa68e3f326f46cc651d04e3b4aa5a704835",
+  "check": {
+    "id": "pos-checkout-partial-guards",
+    "argv": [
+      "pnpm",
+      "--filter",
+      "@umi/api",
+      "exec",
+      "vitest",
+      "run",
+      "src/modules/pos-checkout/checkout-partial-guards.spec.ts"
+    ],
+    "cwd": "."
+  },
+  "capture": {
+    "tool": "scripts/evidence/evidence.mjs",
+    "version": "1.0.0"
+  },
+  "logs": {
+    "stdout": {
+      "path": "scripts/evidence/runs/pos-checkout-partial-guards/stdout.log",
+      "sha256": "9ee90841e786de388ebf831a3067e33b6b5439f6f9d9a93cb2104435cdd48cab",
+      "bytes": 649
+    },
+    "stderr": {
+      "path": "scripts/evidence/runs/pos-checkout-partial-guards/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  },
+  "outcome": {
+    "exitCode": 0,
+    "signal": null
+  },
+  "tested": [
+    {
+      "path": "apps/umi-api/src/modules/pos-checkout/checkout-partial-guards.spec.ts",
+      "sha256": "04d5e64ec616161a79b68a4840d488cc2af4911ddf813305e11b3efc7a01d07f",
+      "bytes": 3718
+    },
+    {
+      "path": "apps/umi-api/src/modules/pos-cart/pos-cart.repository.ts",
+      "sha256": "0fdf6c18200cf5f993c54ba4fd49e3b15d99ffc6f8d7d6d4452234afe884da4c",
+      "bytes": 79639
+    },
+    {
+      "path": "apps/umi-api/src/modules/table-map/table-map.repository.ts",
+      "sha256": "e6bd13acb9e2fcd5130c3ee149daa1f66e532bf263adcca9af14f9961b25fad0",
+      "bytes": 29701
+    },
+    {
+      "path": "apps/umi-api/vitest.config.ts",
+      "sha256": "f53d01ad537b0c3ca8f1382b909780ebd4b768b6073999192aac1a4975be94e0",
+      "bytes": 853
+    },
+    {
+      "path": "packages/contract/package.json",
+      "sha256": "f313091ac2f06b6d4fc5083d8d301605854152045fc023e9ec199b99b85fb32e",
+      "bytes": 1870
+    },
+    {
+      "path": "packages/contract/tsup.config.ts",
+      "sha256": "1a70f1166a0c01432300046df437e086cf9a58ffa77742070c16d788b25e2962",
+      "bytes": 811
+    },
+    {
+      "path": "packages/contract/tsconfig.json",
+      "sha256": "06730dbdbf86aaf68f93f12519546ccb3767e604d9d56f47a0e09d61dddf4f3b",
+      "bytes": 301
+    },
+    {
+      "path": "packages/contract/src/index.ts",
+      "sha256": "0dce99b7e6bb12c6447f17b9b0f62be1b3e64bec0b1b77db55a662cf24ee0a18",
+      "bytes": 2276
+    },
+    {
+      "path": "packages/contract/src/table-state.ts",
+      "sha256": "29fc21ef6e4cbe1bce880a1f7bbad0ed728c33e71230eb1bd4bd3f7a30504c87",
+      "bytes": 10192
+    },
+    {
+      "path": "packages/contract/src/platform.ts",
+      "sha256": "ff133580c86c729eb8db8eb96645e75aafd9fce3bc188a060f2189c70d4db712",
+      "bytes": 27638
+    }
+  ],
+  "required": true
+}

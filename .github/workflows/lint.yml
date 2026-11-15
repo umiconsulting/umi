@@ -21,6 +21,16 @@ jobs:
           corepack prepare pnpm@10.29.3 --activate
       - name: Install
         run: pnpm install --frozen-lockfile
+      # The evidence guard imports @umi/contract. The package exports dist, dist
+      # is gitignored, and pnpm install does not build it. Build the runtime here
+      # so a cold checkout has the entry before evidence:check:ci runs.
+      - name: Build contract runtime
+        run: pnpm --filter @umi/contract build:runtime
+      # Re-executes the approved evidence checks in this checkout. It does not
+      # read an uploaded exit code, so a packet from a developer machine cannot
+      # stand in for a result observed here.
+      - name: Evidence gate
+        run: pnpm evidence:check:ci
       - name: Lint
         run: pnpm lint
       - name: Lint warning baseline

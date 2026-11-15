@@ -1,0 +1,12 @@
+apps/umi-dashboard                       |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.21.0","pnpm":"10.29.3"})
+apps/umi-menu                            |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.21.0","pnpm":"10.29.3"})
+
+ RUN  v3.2.7 /home/juan/Projects/umiconsulting/umi/.worktrees/pr-a-evidence-20261115/apps/umi-api
+
+ ✓ src/modules/pos-checkout/checkout-partial-guards.spec.ts (3 tests) 5ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  01:26:47
+   Duration  686ms (transform 288ms, setup 0ms, collect 485ms, tests 5ms, environment 0ms, prepare 56ms)
+
