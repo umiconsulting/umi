@@ -290,6 +290,19 @@ export function selfTest() {
     writeFixture(dir, file, text.replace('](../../AGENTS.md)', '](../../AGENTS-MISSING.md)'));
   }, 'broken link');
 
+  run('resolver retired owner is rejected', (dir) => {
+    const file = FILES.resolver;
+    const text = readFileSync(path.join(dir, file), 'utf8');
+    writeFixture(
+      dir,
+      file,
+      text.replace(
+        'Historical paths `apps/umi-conversaflow` and `apps/umi-logs` are not in the current tree. Do not use them as owners. Keep old references as history only.',
+        'Shared backend owner: `apps/umi-conversaflow`.',
+      ),
+    );
+  }, 'retired owner path');
+
   run('weakened triage rule is rejected', (dir) => {
     const file = FILES.registry;
     const text = readFileSync(path.join(dir, file), 'utf8');
