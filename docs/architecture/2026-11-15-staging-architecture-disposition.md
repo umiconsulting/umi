@@ -4,7 +4,12 @@
 **Scope:** Current staging release. One backend authority and the existing LAN KDS node remain.
 **Authority:** The assigned release brief permits conservative, reversible staging defaults.
 These decisions authorize no commercial terms, real-merchant activation, or production change.
-**Completion:** Six dispositions are final for this release. ADOPT names required work; it does not report completed implementation.
+**Completion:** Six dispositions are final for this release.
+The three ADOPT slices are implemented at `94f5772b`.
+HTTP major: `apps/umi-api/src/shared/release/release-identity.service.ts` and `apps/umi-pos/lib/core/release/release_compatibility.dart`.
+ONCA default-deny: `apps/umi-api/src/modules/pos-offline/pos-offline.service.ts`; 9/9 tests in `apps/umi-api/src/modules/pos-offline/pos-offline.integration.ts`.
+LAN 300s trust: `apps/umi-pos/lib/features/kitchen/lan_kds_node.dart` line 92; revocation tests in `apps/umi-pos/test/features/kitchen/lan_kds_node_test.dart`.
+Device drill, deployed payment isolation, and real-device validation remain unverified.
 
 All source paths below refer to the baseline commit, not the dirty root checkout.
 Documented fact describes inspected source. Source-backed tradeoff describes a documented cost or constraint.
@@ -131,7 +136,10 @@ Retain queued commands and the existing KDS node after refusal.
 Prove acceptance before 300 seconds and refusal at 300 seconds, including HTTP 5xx and timeout paths.
 Prove rejection after restart, scope change, credential change, clock rollback, and explicit revocation.
 Run that test file and repeat the outage drill on native staging devices.
-The baseline fails this expiry requirement by source inspection; implementation and device proof remain required.
+The baseline failed this expiry requirement by source inspection.
+The slice is implemented at `94f5772b` in `apps/umi-pos/lib/features/kitchen/lan_kds_node.dart` line 92.
+The revocation tests in `apps/umi-pos/test/features/kitchen/lan_kds_node_test.dart` cover it.
+Device drill proof remains required.
 
 ## Router experiment, cost, and verification boundary
 
@@ -160,5 +168,7 @@ No custom research tool was necessary. Sources used repository code and official
 The named consolidation `RUN.md` was absent from the supplied worktree and this bot's task folder; the assigned six-item list supplied its scope.
 
 **Performed:** Source inspection and document validation only. Product code, configuration, PRs, databases, and deployments were unchanged by this task.
-**Still required:** The named implementation slices, executable acceptance checks, deployed payment isolation, and real-device validation.
+**Still required:** The device drill, deployed payment isolation, and real-device validation.
+The three ADOPT slices are implemented at `94f5772b`.
+The implementing files are `release-identity.service.ts`, `pos-offline.service.ts`, and `lan_kds_node.dart` line 92.
 This record closes release dispositions; it does not declare PR #284 ready for deployment.
