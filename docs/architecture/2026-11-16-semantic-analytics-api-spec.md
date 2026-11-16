@@ -1,6 +1,6 @@
 # Semantic analytics API — specification v1.3
 
-**Status:** ACCEPTED at `dd46278d` (2026-11-16). Gate 3 merged at this base. This version adds the typed fact and denominator metadata. Do not append an addendum.
+**Status:** The gate-3 text is ACCEPTED at `dd46278d` (2026-11-16). The typed fact and denominator metadata in this version is PROPOSED until metadata PR #295 merges, then ACCEPTED. Do not append an addendum.
 **Date:** 2026-11-16, America/Mazatlan.
 **Owners:** Juan Lopez (decision). umi-lead (delivery). umi-builder (implementation). umi-verifier (verdict). umi-scribe (contract text).
 **Versions:** document `1.3`. API contract `2.58.0`. Metric definition `1.0.0`.
@@ -641,6 +641,6 @@ Each row names the old text, the conflict, the resolution, and the reason. This 
 
 ## 22. Publication
 
-This version is published at `docs/architecture/2026-11-16-semantic-analytics-api-spec.md`. Do not edit the accepted v1.1 at `f81d983a`. The gate-2 ledger and signed reports stay unchanged.
+Metadata PR #295 publishes this version at `docs/architecture/2026-11-16-semantic-analytics-api-spec.md`. Do not edit the accepted v1.1 at `f81d983a`. The gate-2 ledger and signed reports stay unchanged.
 
-The PR body and the evidence record name the final head. This document names no final head.
+Metadata PR #295's body and the evidence record name the final head. This document names no final head.

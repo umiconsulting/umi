@@ -64,8 +64,10 @@ Two 1440 crops differ:
   shows the capture time: `11:14 p.m.` before and `11:16 p.m.` after. `S00` is
   a smoke check; it compares no numbers.
 - A rounded-corner edge on the right side causes the difference in
-  `DB-T-CEN-HOR-1440.png`. Six pixels differ in two channels or more, at 9
-  pixel positions in total. The maximum channel difference is 1.
+  `DB-T-CEN-HOR-1440.png`. A direct RGB recount at this head gives 9 differing
+  positions, at x 1392-1396 and y 100-101. Five positions differ in two or
+  three channels; four differ in one channel. The maximum channel difference
+  is 1. The signed report summarises the difference as 6.
 
 Both 390 crops are byte-equal.
 

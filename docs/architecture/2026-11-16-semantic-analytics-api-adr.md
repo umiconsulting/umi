@@ -2,7 +2,7 @@
 
 _ADR · build-v3 · `merchant` schema · semantic analytics API v1 · 2026-11-16_
 
-**Status:** ACCEPTED at `dd46278d` (2026-11-16). Gate 3 merged at this base. API contract `2.58.0`. Metric definition `1.0.0`.
+**Status:** The gate-3 text is ACCEPTED at `dd46278d` (2026-11-16). The §3.8 typed metadata is PROPOSED until metadata PR #295 merges, then ACCEPTED. API contract `2.58.0`. Metric definition `1.0.0`.
 **Supersedes:** the accepted 2026-11-16 ADR at `f81d983a` (176 lines, SHA-256 `ec34ea74617c5be8a8adfa3fce0ba1ce219f74caa4e8baf589f0150073d584ee`), the 2026-11-15 draft `SPEC.md`, and its gate-1 amendments. The reconciled text is `docs/architecture/2026-11-16-semantic-analytics-api-spec.md` v1.3.
 **Relates to:** `docs/architecture/2026-11-16-semantic-analytics-api-spec.md` v1.3, `docs/reports/2026-11-08-umi-product-and-data-architecture.md` §7-§8 and `docs/reports/2026-11-07-dashboard-disruptive-architecture.md` §6. These two reports are not in this checkout. The gate-1 contract records their location.
 **Code:** `apps/umi-api/src/modules/metrics/`; `packages/contract/src/metrics.ts`; `packages/contract/src/route-table.ts` (entries `metrics.query` and `metrics.insight`); `apps/umi-dashboard/src/lib/sales-metrics.js`; `apps/umi-dashboard/src/data.jsx`; `apps/umi-api/src/modules/dashboard-operations/sales-analysis.repository.ts`.
