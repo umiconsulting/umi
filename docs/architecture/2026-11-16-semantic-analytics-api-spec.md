@@ -1,10 +1,10 @@
-# Semantic analytics API — specification v1.2
+# Semantic analytics API — specification v1.3
 
-**Status:** PROPOSED for gate 3 (2026-11-16). The accepted v1.1 remains the reference until this version merges. This version describes the final migrated interface. Do not append an addendum.
+**Status:** ACCEPTED at `dd46278d` (2026-11-16). Gate 3 merged at this base. This version adds the typed fact and denominator metadata. Do not append an addendum.
 **Date:** 2026-11-16, America/Mazatlan.
 **Owners:** Juan Lopez (decision). umi-lead (delivery). umi-builder (implementation). umi-verifier (verdict). umi-scribe (contract text).
-**Versions:** document `1.2`. API contract `2.58.0`. Metric definition `1.0.0`.
-**Supersedes:** the accepted v1.1 at `f81d983a` (562 lines, SHA-256 `f7918b4c7b3777db40064ed966c1079bdfb5792608e8467f261ce252e744a399`), the 2026-11-15 draft at the read-only task path (146 lines, SHA-256 `46d10680c189f24f83a2fd3521efc3594c670de8b76ced5240060a93d468665f`), and the gate-1 amended copy at `.scribe/2026-11-16-semantic-api-gate1/SPEC.md` (371 lines, SHA-256 `fab82df818302ef0eeb4d6bb6f4d54ebf51e61ae8cbc25bbc6e257b3d5e62a19`).
+**Versions:** document `1.3`. API contract `2.58.0`. Metric definition `1.0.0`.
+**Supersedes:** the accepted v1.2 at `dd46278d` (632 lines, SHA-256 `64872de9c481120ce1c8f3ef6e8302a7800f403bcd83db1a88e0f5bfed0e4302`), the accepted v1.1 at `f81d983a` (562 lines, SHA-256 `f7918b4c7b3777db40064ed966c1079bdfb5792608e8467f261ce252e744a399`), the 2026-11-15 draft at the read-only task path (146 lines, SHA-256 `46d10680c189f24f83a2fd3521efc3594c670de8b76ced5240060a93d468665f`), and the gate-1 amended copy at `.scribe/2026-11-16-semantic-api-gate1/SPEC.md` (371 lines, SHA-256 `fab82df818302ef0eeb4d6bb6f4d54ebf51e61ae8cbc25bbc6e257b3d5e62a19`).
 **Sources:** `CHIEF-REVIEW.md` (2026-11-16, 03:22 UTC); `.gate1-contract.md` at head `750c9bfe`; `docs/verification/2026-11-16-semantic-api-gate1.md`; `docs/architecture/2026-11-16-semantic-analytics-api-spec.md` at `f81d983a`; `packages/contract/src/metrics.ts`; `packages/contract/src/route-table.ts`; `apps/umi-api/src/modules/metrics/*`.
 
 ---
@@ -32,7 +32,7 @@ The consequence is not theoretical. `I1-MET-06` reported a zero discount because
 
 | Version | Owner | Value | Scope |
 | --- | --- | --- | --- |
-| Document | this file | `1.2` | The acceptance text |
+| Document | this file | `1.3` | The acceptance text |
 | API contract | `packages/contract/src/catalog.ts` | `2.58.0` | The `CONTRACT_VERSION` constant and the generated contract |
 | Metric definition | `metrics.catalog.ts`, `metrics.ts` | `1.0.0` | The formula text and the `definitionVersion` field |
 
@@ -212,6 +212,20 @@ A preset accepts no dimension. It appears in `totals.values` only. It never appe
 | `series` | `{ label, netSalesMinorUnits }` | `{ netSalesMinorUnits }` | 31 by day, 24 by hour |
 
 `product_mix` reports merchandise. Merchandise is not net sales. It excludes tips, ticket-level discounts, and taxes, so it does not reconcile with `net_sales`.
+
+### 8.4 Typed fact and denominator metadata
+
+Each of the 15 definitions has three required fields: `includes`, `excludes`, and `denominator`. The fields are typed data. They are not prose.
+
+The policy tokens are one closed `FactPolicy` union of 15 tokens. A definition names only tokens from this union. The tokens are:
+
+`committed_sale`, `uncommitted_sale`, `void_adjustment`, `refund_adjustment`, `uncommitted_exception`, `committed_tender`, `uncommitted_tender`, `customer_value_allocation`, `business_date_window`, `prior_business_date_window`, `captured_at_cutoff`, `location_scope`, `sale_business_date`, `refund_tip`, and `tender_dedupe`.
+
+An excluded adjustment means that the metric does not apply the fact. It does not mean that the sale row is absent. For example, `net_sales` excludes `refund_adjustment`. The sale row is present in `net_sales`. The refund amount is not subtracted.
+
+`average_ticket` and `units_per_ticket` name `orders` as the denominator. The other 13 definitions state `not_applicable`. A denominator names an existing metric. The named metric has no denominator.
+
+The metadata is internal type data. It is not in the response. It does not change SQL, formula, rounding, or the null policy. There is no DSL, interpreter, optimizer, or rule engine.
 
 ## 9. Dimensions and caps
 
@@ -627,6 +641,6 @@ Each row names the old text, the conflict, the resolution, and the reason. This 
 
 ## 22. Publication
 
-Apply this replacement at `docs/architecture/2026-11-16-semantic-analytics-api-spec.md` in the gate-3 PR. Do not edit the accepted v1.1 at `f81d983a`. The gate-2 ledger and signed reports stay unchanged.
+This version is published at `docs/architecture/2026-11-16-semantic-analytics-api-spec.md`. Do not edit the accepted v1.1 at `f81d983a`. The gate-2 ledger and signed reports stay unchanged.
 
-The gate-3 PR body and the evidence record name the final head. This document names no final head.
+The PR body and the evidence record name the final head. This document names no final head.

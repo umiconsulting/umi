@@ -54,9 +54,20 @@ same seed hash. The fixture was not reseeded between phases.
 | `compare.json` | per-cell display comparison |
 | `api-matrix.json` | 12 API cases and the permission checks |
 
-The full screenshots mask only the clock element. The content crops start below
-the report header, so they contain no clock. Each screenshot and crop carries a
-SHA-256 in its evidence JSON.
+The full screenshots mask only the clock element. Each screenshot and crop
+carries a SHA-256 in its evidence JSON.
+
+23 of the 25 content crops are byte-equal between the before and after phases.
+Two 1440 crops differ:
+
+- `DB-T-CEN-ANALYSIS-1440.png` differs at 39 pixels in a 6×8 box. The body text
+  shows the capture time: `11:14 p.m.` before and `11:16 p.m.` after. `S00` is
+  a smoke check; it compares no numbers.
+- A rounded-corner edge on the right side causes the difference in
+  `DB-T-CEN-HOR-1440.png`. Six pixels differ in two channels or more, at 9
+  pixel positions in total. The maximum channel difference is 1.
+
+Both 390 crops are byte-equal.
 
 ## Reproduce
 

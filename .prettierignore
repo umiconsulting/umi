@@ -87,6 +87,11 @@ docs/verification/2026-11-16-semantic-api-gate2-verifier.md
 # rerun must reproduce them exactly, so Prettier must not reformat the file.
 docs/verification/2026-11-16-semantic-api-gate2-parity.json
 
+# Gate-3 verifier report: a signed, imported artifact. The committed copy must
+# stay byte-identical to the verifier's file, and its SHA-256 is in the gate
+# evidence. Prettier must not rewrite it.
+docs/verification/2026-11-16-semantic-api-gate3-verifier-final.md
+
 # Accepted gate-2 SPEC v1.1: the signed acceptance text. Its SHA-256 is recorded
 # in the gate-2 evidence. Prettier must not rewrite the accepted bytes.
 docs/architecture/2026-11-16-semantic-analytics-api-spec.md
