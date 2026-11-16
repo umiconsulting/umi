@@ -1,11 +1,11 @@
-# Semantic analytics API — specification v1.1
+# Semantic analytics API — specification v1.2
 
-**Status:** ACCEPTED (2026-11-16). This version is the single acceptance reference. Do not append another addendum.
+**Status:** PROPOSED for gate 3 (2026-11-16). The accepted v1.1 remains the reference until this version merges. This version describes the final migrated interface. Do not append an addendum.
 **Date:** 2026-11-16, America/Mazatlan.
 **Owners:** Juan Lopez (decision). umi-lead (delivery). umi-builder (implementation). umi-verifier (verdict). umi-scribe (contract text).
-**Versions:** document `1.1`. API contract `2.57.0`. Metric definition `1.0.0`.
-**Supersedes:** the 2026-11-15 draft at the read-only task path (146 lines, SHA-256 `46d10680c189f24f83a2fd3521efc3594c670de8b76ced5240060a93d468665f`) and the gate-1 amended copy at `.scribe/2026-11-16-semantic-api-gate1/SPEC.md` (371 lines, SHA-256 `fab82df818302ef0eeb4d6bb6f4d54ebf51e61ae8cbc25bbc6e257b3d5e62a19`).
-**Sources:** `CHIEF-REVIEW.md` (2026-11-16, 03:22 UTC); `.gate1-contract.md` at head `750c9bfe`; `docs/verification/2026-11-16-semantic-api-gate1.md`; `packages/contract/src/metrics.ts`; `packages/contract/src/route-table.ts`; `apps/umi-api/src/modules/metrics/*`.
+**Versions:** document `1.2`. API contract `2.58.0`. Metric definition `1.0.0`.
+**Supersedes:** the accepted v1.1 at `f81d983a` (562 lines, SHA-256 `f7918b4c7b3777db40064ed966c1079bdfb5792608e8467f261ce252e744a399`), the 2026-11-15 draft at the read-only task path (146 lines, SHA-256 `46d10680c189f24f83a2fd3521efc3594c670de8b76ced5240060a93d468665f`), and the gate-1 amended copy at `.scribe/2026-11-16-semantic-api-gate1/SPEC.md` (371 lines, SHA-256 `fab82df818302ef0eeb4d6bb6f4d54ebf51e61ae8cbc25bbc6e257b3d5e62a19`).
+**Sources:** `CHIEF-REVIEW.md` (2026-11-16, 03:22 UTC); `.gate1-contract.md` at head `750c9bfe`; `docs/verification/2026-11-16-semantic-api-gate1.md`; `docs/architecture/2026-11-16-semantic-analytics-api-spec.md` at `f81d983a`; `packages/contract/src/metrics.ts`; `packages/contract/src/route-table.ts`; `apps/umi-api/src/modules/metrics/*`.
 
 ---
 
@@ -32,21 +32,25 @@ The consequence is not theoretical. `I1-MET-06` reported a zero discount because
 
 | Version | Owner | Value | Scope |
 | --- | --- | --- | --- |
-| Document | this file | `1.1` | The acceptance text |
-| API contract | `packages/contract/src/catalog.ts` | `2.57.0` | The `CONTRACT_VERSION` constant and the generated contract |
+| Document | this file | `1.2` | The acceptance text |
+| API contract | `packages/contract/src/catalog.ts` | `2.58.0` | The `CONTRACT_VERSION` constant and the generated contract |
 | Metric definition | `metrics.catalog.ts`, `metrics.ts` | `1.0.0` | The formula text and the `definitionVersion` field |
 
-A change to a formula needs a new definition version. A change to a schema needs a new contract version. A change to a rule in this document needs a new document version.
+A change to a formula needs a new definition version. A change to a schema or a contract shape needs a new contract version. A change to a rule in this document needs a new document version.
 
 ## 5. Route
 
 ```
 POST /api/merchants/:merchantId/metrics/query
+POST /api/merchants/:merchantId/metrics/insight
 ```
 
-- The controller is `@Controller('api/merchants/:merchantId/metrics')` with `@Post('query')` in `apps/umi-api/src/modules/metrics/metrics.controller.ts`.
+- The controller is `@Controller('api/merchants/:merchantId/metrics')` in `apps/umi-api/src/modules/metrics/metrics.controller.ts`.
+- `@Post('query')` serves the metric query. `@Post('insight')` serves the narrative.
 - There is no `/v1` segment. The `/api` prefix is the controller convention.
-- The route table has one entry. Do not add a second entry.
+- The route table has two entries: `metrics.query` and `metrics.insight`. Do not add a third entry.
+
+### 5.1 Query route
 
 | Field | Value |
 | --- | --- |
@@ -67,9 +71,34 @@ POST /api/merchants/:merchantId/metrics/query
 | `contract.approval` | `false` |
 | `contract.errors` | `['VALIDATION_FAILED', 'PERMISSION_DENIED', 'LOCATION_SCOPE_VIOLATION']` |
 
-`MetricsQuery` and `MetricsResponse` are registered in `modelCatalog`. The generated contract matches `2.57.0`.
+`MetricsQuery` and `MetricsResponse` are registered in `modelCatalog`.
+
+### 5.2 Insight route
+
+| Field | Value |
+| --- | --- |
+| `id` | `metrics.insight` |
+| `method` | `POST` |
+| `path` | `/api/merchants/:merchantId/metrics/insight` |
+| `params` | `['merchantId']` |
+| `dart` | `null` |
+| `contract.request` | `MetricsInsightQuery` |
+| `contract.response` | `MetricsInsightResponse` |
+| `contract.auth` | `session` |
+| `contract.permission` | `sale.lifecycle` |
+| `contract.idempotent` | `false` |
+| `contract.merchantContext` | `true` |
+| `contract.locationContext` | `true` |
+| `contract.offline` | `false` |
+| `contract.pin` | `false` |
+| `contract.approval` | `false` |
+| `contract.errors` | `['VALIDATION_FAILED', 'PERMISSION_DENIED', 'LOCATION_SCOPE_VIOLATION']` |
+
+`MetricsInsightQuery` and `MetricsInsightResponse` are registered in `modelCatalog`. The generated contract matches `2.58.0`.
 
 ## 6. Request
+
+### 6.1 Query request
 
 ```json
 {
@@ -105,14 +134,30 @@ All validation failures return `VALIDATION_FAILED` with `fieldErrors`. The route
 | `locationId` is not a uuid | `locationId` |
 | Unknown body key | `$` |
 
+### 6.2 Insight request
+
+```json
+{
+  "range": "last_7_days",
+  "locationId": "uuid-opcional"
+}
+```
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `range` | string | One of `today`, `yesterday`, `last_7_days`, `last_30_days`. Required. |
+| `locationId` | uuid | Optional. A null value is a 400, because it is not a uuid. |
+
+The object is strict. It has no `metrics`, no `dimensions`, and no `limit`. An unknown key is a 400. All validation failures return `VALIDATION_FAILED` with `fieldErrors`.
+
 ## 7. Authorization and location scope
 
-- The permission is `sale.lifecycle`. The service reads the `sales` entry of `DASHBOARD_DOMAIN_POLICY` and calls `hasDashboardPermission` in `apps/umi-api/src/modules/metrics/metrics.service.ts`.
+- Both routes use `sale.lifecycle`. Each service reads the `sales` entry of `DASHBOARD_DOMAIN_POLICY` and calls `hasDashboardPermission` in `apps/umi-api/src/modules/metrics/metrics.service.ts`.
 - Do not use `merchant.manage`. Do not add a permission.
 - The effective location is `access.locationId ?? query.locationId ?? null`.
 - If the scoped location and `query.locationId` differ, return 403 `LOCATION_SCOPE_VIOLATION`.
 - Pass the effective location to `runWithMerchant`. The row-level security policy then confines every read.
-- The endpoint accepts no SQL, no table name, and no expression.
+- Neither endpoint accepts SQL, a table name, or an expression.
 
 ## 8. Catalogue
 
@@ -296,6 +341,8 @@ Gate 2 uses a separate refunds oracle fixture. It has a void, a full refund, a p
 
 ## 12. Response
 
+### 12.1 Query response
+
 ```json
 {
   "definitionVersion": "1.0.0",
@@ -355,6 +402,24 @@ Gate 2 uses a separate refunds oracle fixture. It has a void, a full refund, a p
 - A value is a number, a null, or a Distribution.
 - `rows` holds at most 1,000 rows.
 - Do not add a synthetic row.
+
+### 12.2 Insight response
+
+```json
+{
+  "narrative": "Las ventas subieron ...",
+  "generated": true,
+  "capturedAt": "2026-11-16T01:30:00.000Z"
+}
+```
+
+| Field | Rule |
+| --- | --- |
+| `narrative` | A string of at most 600 characters, or `null`. Null when `orders = 0` or when the model call fails. |
+| `generated` | `true` when the service generated a new narrative. `false` on a cache hit. |
+| `capturedAt` | The transaction timestamp as an ISO instant. |
+
+The insight route uses the same eight metrics as the narrative input: `net_sales`, `orders`, `average_ticket`, `tips`, `discounts`, `prior_net_sales`, `payment_mix`, and `product_mix`. It adds no metric. It does not block the summary. A null narrative hides only the narrative card.
 
 ## 13. Truncation
 
@@ -488,13 +553,13 @@ A case passes only when the two normalized objects are equal and the two hashes 
 
 | Gate | Content | Exit condition |
 | ---: | --- | --- |
-| 1 | Catalogue, route, unit tests, gate-1 evidence | Code at `750c9bfe` in PR #293. The PR is open. |
-| 2 | Parity harness, 20 or more cases, refunds oracle, signed report | No consumer change. Signed hashes. |
-| 3 | Dashboard, `salesInsight`, and exports consume the new layer. Delete `reports/sales` and the duplicate SQL in the same PR. | Gate 2 signed. Dashboard unchanged. |
+| 1 | Catalogue, route, unit tests, gate-1 evidence | Code at `750c9bfe` in PR #293. Accepted. |
+| 2 | Parity harness, 20 or more cases, refunds oracle, signed report | Accepted at `ac6988ce`. Signed hashes. |
+| 3 | The dashboard summary, pivot, and narrative consume the new layer. `metrics.insight` replaces the narrative route. Delete `reports/sales`, `reports/sales/insight`, and the duplicate SQL in the same PR. | Gate 2 signed. Displayed numbers and layout unchanged. |
 | 4 | `check:pr`, lint, contract, API tests, `CI ready` on the staging push | All green. |
 | 5 | Verifier verdict, documentation merged, zero open PRs | Signed verdict. |
 
-- Do not merge or deploy during gates 1 and 2.
+- Do not merge or deploy the gate-3 PR.
 - Do not touch `main` or production.
 - The Chief merges. The verifier owns the verdict.
 - Gate 3 does not deduplicate payments. Section 15.
@@ -507,8 +572,10 @@ A case passes only when the two normalized objects are equal and the two hashes 
 4. `refunds` matches the gate-2 oracle. The gate-1 values stay 9,000 on fixture A and 24,000 on fixture B.
 5. The response declares `attribution.category`, the definition version, the coverage sources, and every cut.
 6. `check:pr`, lint, the contract check, the API tests, and `CI ready` are green on the staging push.
-7. The dashboard does not change in gate 3. The old endpoint is deleted only after the gate-2 signature.
+7. The dashboard keeps its layout, labels, interactions, formatting, and displayed numbers. The old routes are deleted only after the gate-2 signature.
 8. The documentation is merged and no PR of this run stays open.
+9. `metrics.insight` returns a null narrative when `orders = 0` or when the model call fails. The summary stays complete.
+10. The old sales types are removed. The cash-shift types stay.
 
 ## 19. Risks
 
@@ -520,11 +587,16 @@ A case passes only when the two normalized objects are equal and the two hashes 
 | A truncated mix hides its total | Distribution `total` and `totalItems` cover the full set. |
 | A different prior window | Same size as the current window. Declared in `period.comparison`. |
 | A number changes during migration | Gate 2 signs both JSON documents before gate 3 deletes the old endpoint. |
+| A request cannot hold all 14 metrics | The summary sends A (7 scalars) and B (6 presets). The narrative sends C (8 metrics). No request exceeds 10. |
+| An insight failure hides the summary | The summary and narrative are separate requests. A null narrative hides only the card. |
+| A duplicate payment method drops a row | Keep the multiset. The adapter uses a composite key for the method and the index. |
 | A duplicate payment amount | Out of scope. Section 15. A separate defect records it. |
 
 ## 20. Out of scope
 
 A separate engine (StarRocks, SQLMesh), CDC, published metric versions, peer analysis, UI changes, POS changes, `main`, production, and payment deduplication.
+
+`SalesPurchaseAnalysis` stays on the ticket-level `sales-analysis` shape. No production sales export exists at the gate-3 base. The customer CSV is out of scope.
 
 ## 21. Conflict register
 
@@ -547,16 +619,14 @@ Each row names the old text, the conflict, the resolution, and the reason. This 
 | 13 | Gate-1 evidence header; PR body | "Verification pending" stayed after the PASS. | Replace the pending header with the signed verdict. Keep the earlier FAIL result as history. | A stale status must not read as the current state, and the FAIL record is still evidence. |
 | 14 | Parity test | Legacy `prior_net_sales` can be absent; the catalogue returns 0. | Normalize an absent legacy value to 0. | A sum over an empty window is 0. |
 | 15 | SPEC §4; gate-1 §4 | `limit` had no rule at zero dimensions. | `limit` is valid only with at least one dimension. Otherwise the error path is `limit`. | A totals response has no row list to cut. |
+| 16 | Gate 3 requirement 2; PLAN §0.1 | The gate says remove the old route-table entry. No entry exists at `f81d983a`. | Remove the controller methods, service methods, repository method, and old contract models. Replace the `operations.sales` surface entry. | A claim that removes a non-existent entry is false. |
+| 17 | Gate 3 requirement 1; P3 | The gate says relevant exports use the layer. No production sales export exists. | Ship a disposition table for every remaining formula copy. The customer CSV is out of scope. | Do not invent an export. |
+| 18 | Gate 3 real-dashboard matrix; P2 | The dashboard has no all-locations control. | The all-locations cell is `N/A`. All-locations coverage is at API and adapter level. | The gate keeps the UI unchanged. |
+| 19 | SPEC §5; gate 3 plan | The accepted contract has one route at `2.57.0`. Gate 3 adds `metrics.insight` and removes the old sales types. | Add the insight route and bump the contract to `2.58.0`. | The narrative needs a separate request and a separate failure path. |
+| 20 | SPEC §6; gate 3 plan | The 10-metric limit cannot hold the 14 legacy metrics in one request. | Split the summary into A (7) and B (6). The narrative uses C (8). | No request exceeds the public limit. |
 
 ## 22. Publication
 
-The task folder `/home/juan/.openmausbot/task-workspaces/2213ed6e-07d1-46bc-a8d9-5dd6d1f96eb6/e0afed5e-f800-4480-ad72-dce4f6a54ba8/semantic-api-20261116/` is read-only. To replace the draft there, run:
+Apply this replacement at `docs/architecture/2026-11-16-semantic-analytics-api-spec.md` in the gate-3 PR. Do not edit the accepted v1.1 at `f81d983a`. The gate-2 ledger and signed reports stay unchanged.
 
-```sh
-cp /home/juan/Projects/umiconsulting/umi/.scribe/2026-11-16-gate2/spec.md /home/juan/.openmausbot/task-workspaces/2213ed6e-07d1-46bc-a8d9-5dd6d1f96eb6/e0afed5e-f800-4480-ad72-dce4f6a54ba8/semantic-api-20261116/SPEC.md
-sha256sum /home/juan/Projects/umiconsulting/umi/.scribe/2026-11-16-gate2/spec.md
-```
-
-The SHA-256 of this file and of `adr.md` are recorded in `REPORT.md` and `SHA256SUMS` in the same folder. Check the hash before and after the copy.
-
-Do not edit the task folder in place. Do not copy this file until the hash in `REPORT.md` matches.
+The gate-3 PR body and the evidence record name the final head. This document names no final head.

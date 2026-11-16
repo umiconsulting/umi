@@ -2,10 +2,10 @@
 
 _ADR · build-v3 · `merchant` schema · semantic analytics API v1 · 2026-11-16_
 
-**Status:** ACCEPTED (2026-11-16). API contract `2.57.0`. Metric definition `1.0.0`.
-**Supersedes:** the 2026-11-15 draft `SPEC.md` and its gate-1 amendments. The reconciled text is `docs/architecture/2026-11-16-semantic-analytics-api-spec.md` v1.1.
+**Status:** PROPOSED for gate 3 (2026-11-16). Replaces the accepted 2.57.0 ADR when gate 3 merges. API contract `2.58.0`. Metric definition `1.0.0`.
+**Supersedes:** the accepted 2026-11-16 ADR at `f81d983a` (176 lines, SHA-256 `ec34ea74617c5be8a8adfa3fce0ba1ce219f74caa4e8baf589f0150073d584ee`), the 2026-11-15 draft `SPEC.md`, and its gate-1 amendments. The reconciled text is `docs/architecture/2026-11-16-semantic-analytics-api-spec.md` v1.2.
 **Relates to:** `docs/reports/2026-11-08-umi-product-and-data-architecture.md` §7-§8 and `docs/reports/2026-11-07-dashboard-disruptive-architecture.md` §6. These two files are not in this checkout. The gate-1 contract records their location.
-**Code:** `apps/umi-api/src/modules/metrics/`; `packages/contract/src/metrics.ts`; `packages/contract/src/route-table.ts` (entry `metrics.query`); `apps/umi-api/src/modules/dashboard-operations/dashboard-operations.repository.ts`; `apps/umi-api/src/modules/dashboard-operations/sales-analysis.repository.ts`.
+**Code:** `apps/umi-api/src/modules/metrics/`; `packages/contract/src/metrics.ts`; `packages/contract/src/route-table.ts` (entries `metrics.query` and `metrics.insight`); `apps/umi-dashboard/src/lib/sales-metrics.js`; `apps/umi-dashboard/src/data.jsx`; `apps/umi-api/src/modules/dashboard-operations/sales-analysis.repository.ts`.
 
 ---
 
@@ -24,29 +24,32 @@ The failure is recorded. `I1-MET-06` reported a discount of zero. One query read
 
 Gate 1 added a typed catalogue and one read route at `750c9bfe`. The route returns every current number with exact parity on the golden fixtures. This ADR records the contract that the route now carries, and the reason for each choice that the old draft left open or contradicted.
 
+Gate 3 migrates the dashboard summary, pivot, and narrative. The summary and pivot use `metrics.query`. The narrative uses `metrics.insight`. The old sales routes and the duplicate aggregate SQL leave the code. The contract advances to `2.58.0`.
+
 ## 2. Decision
 
-**There is one catalogue. There is one read route. The client names metrics and dimensions. The server names the SQL.**
+**There is one catalogue. There are two read routes: a metric query and a narrative insight. The client names metrics and dimensions. The server names the SQL.**
 
-The route is `POST /api/merchants/:merchantId/metrics/query`. The contract is `2.57.0`. The metric definitions are version `1.0.0`.
+The query route is `POST /api/merchants/:merchantId/metrics/query`. The insight route is `POST /api/merchants/:merchantId/metrics/insight`. The contract is `2.58.0`. The metric definitions are version `1.0.0`.
 
-The decision has seven parts:
+The decision has eight parts:
 
-1. The route uses the existing `/api` prefix and one route-table entry. There is no `/v1` segment.
+1. The routes use the existing `/api` prefix and two route-table entries. There is no `/v1` segment.
 2. The permission is `sale.lifecycle` through the sales domain policy, with the user location scope.
 3. The request has six dimensions. A payment method is not a dimension.
 4. The catalogue has 15 metrics: 9 scalars or derived values, and 6 presets.
 5. Each formula has one zero rule and one null rule.
 6. `refunds` is a committed sale exception, net of tips, on the sale business date, positive, and separate from `net_sales`.
 7. Payment deduplication stays out of this migration. The legacy concatenated multiset remains.
+8. The narrative has its own route. It uses the same policy and location scope. A null narrative hides only the narrative card.
 
 ## 3. Why these resolutions
 
 ### 3.1 Why `sale.lifecycle`
 
-The read is a sales read. The dashboard already guards its sales views with `DASHBOARD_DOMAIN_POLICY`, domain `sales`, through `hasDashboardPermission`. That policy resolves to `sale.lifecycle`.
+The reads are sales reads. The dashboard already guards its sales views with `DASHBOARD_DOMAIN_POLICY`, domain `sales`, through `hasDashboardPermission`. That policy resolves to `sale.lifecycle`.
 
-A new permission would do two bad things. It would add a second way to authorize the same read. It would also let a role see the dashboard sales summary but not the metrics route, or the reverse. The same number must need the same permission.
+A new permission would do two bad things. It would add a second way to authorize the same read. It would also let a role see the dashboard sales summary but not the metrics routes, or the reverse. The same number must need the same permission.
 
 `merchant.manage` is wider than the read. A user who may read sales does not always manage the merchant. The old draft named `merchant.manage` as an example, not as a decision. This ADR removes the example.
 
@@ -54,7 +57,7 @@ The location scope is part of the same decision. The effective location is `acce
 
 ### 3.2 Why 15 metrics and 6 presets
 
-The 14 migrated metrics are the numbers that `GET reports/sales` publishes today. They are the parity set. `refunds` is the fifteenth metric, and it has no legacy parity.
+The 14 migrated metrics are the numbers that `GET reports/sales` published at the gate-2 base. They are the parity set. `refunds` is the fifteenth metric, and it has no legacy parity.
 
 A preset is a metric whose value is a list, not a scalar. The list has its own cut and its own total. `payment_mix`, `channel_mix`, `product_mix`, `operator_mix`, `hour_mix`, and `series` are presets for three reasons:
 
@@ -62,7 +65,7 @@ A preset is a metric whose value is a list, not a scalar. The list has its own c
 2. The cut belongs to the list. A distribution carries `totalItems` and `total` over the full set, so a cut never hides the sum.
 3. The item shape differs for each preset. A typed envelope per preset is clearer than a generic map.
 
-The price is that a preset cannot be combined with a dimension. That is a limit, and the contract states it. A caller who needs a mix by day needs a new contract shape in a later version. Gate 1 does not build that shape.
+The price is that a preset cannot be combined with a dimension. That is a limit, and the contract states it. A caller who needs a mix by day needs a new contract shape in a later version. Gate 3 does not build that shape.
 
 ### 3.3 Why six dimensions, and no `payment_method`
 
@@ -104,17 +107,27 @@ The Chief review of 2026-11-16 fixes the boundary. Deduplication is outside this
 
 The defect is real and is not hidden. Section 15 of the reconciled SPEC states it in the contract, and `metrics.catalog.ts` states "no dedupe" in the `payment_mix` formula text.
 
+### 3.7 Why a separate insight route
+
+The summary and the narrative have different inputs. The summary needs 7 scalars and 6 presets. The narrative needs 8 metrics and model text. The client cannot send all of them in one request because the limit is 10 metrics.
+
+The narrative can fail without a data failure. A model timeout or a provider error must not hide the summary. A separate route gives each failure its own response. The insight route returns `narrative: null`, and the summary stays complete.
+
+The insight route uses the same `sale.lifecycle` policy and location scope. It adds no permission and no metric.
+
 ## 4. The v1 contract
 
-1. **Route.** `POST /api/merchants/:merchantId/metrics/query`. Controller `@Controller('api/merchants/:merchantId/metrics')`, `@Post('query')`. One route-table entry, id `metrics.query`. No `/v1`.
+1. **Routes.** `POST /api/merchants/:merchantId/metrics/query` and `POST /api/merchants/:merchantId/metrics/insight`. Controller `@Controller('api/merchants/:merchantId/metrics')`, with `@Post('query')` and `@Post('insight')`. Two route-table entries, ids `metrics.query` and `metrics.insight`. No `/v1`.
 2. **Authorization.** `sale.lifecycle` through `DASHBOARD_DOMAIN_POLICY`, domain `sales`, with `hasDashboardPermission`. Effective location `access.locationId ?? query.locationId ?? null`. A different scoped location returns 403 `LOCATION_SCOPE_VIOLATION`.
-3. **Request.** 1 to 10 metrics. 0 to 2 dimensions. One of four ranges. Optional uuid location. `limit` 1 to 1000, default 100, only with a dimension. Strict object. All failures are `VALIDATION_FAILED` with `fieldErrors`.
-4. **Catalogue.** 15 metrics. The matrix in Section 8 of the SPEC gives the accepted dimensions of each. A preset accepts none. `prior_net_sales` accepts none.
-5. **Zero and null.** The sums are 0. `average_ticket` is 0 when `orders = 0`. `units_per_ticket` is null only when `orders = 0`, else 4 decimals, half-up. No other metric is null.
-6. **Refunds.** Committed exceptions of type `void`, `full_refund`, or `partial_refund`. Amount `total_minor_units - tip_minor_units`. Sale business date. Positive. Separate from `net_sales`.
-7. **Category.** Current `product_category`, declared as `scope.attribution.category: "current"`.
-8. **Truncation.** A row cut sets `truncated` and `rowsTotal`. A distribution cut sets `truncated`, `limit`, `totalItems`, and `total` over the full set. Limits: product 200, operator 100, channel 8, hour 24, day 31, category 100, payment 8, series 31 by day and 24 by hour.
-9. **Payment.** The concatenated multiset. No dedupe.
+3. **Query request.** 1 to 10 metrics. 0 to 2 dimensions. One of four ranges. Optional uuid location. `limit` 1 to 1000, default 100, only with a dimension. Strict object. All failures are `VALIDATION_FAILED` with `fieldErrors`.
+4. **Insight request.** `range` required. Optional uuid location. No metrics, dimensions, or limit. Strict object. All failures are `VALIDATION_FAILED` with `fieldErrors`.
+5. **Catalogue.** 15 metrics. The matrix in Section 8 of the SPEC gives the accepted dimensions of each. A preset accepts none. `prior_net_sales` accepts none.
+6. **Zero and null.** The sums are 0. `average_ticket` is 0 when `orders = 0`. `units_per_ticket` is null only when `orders = 0`, else 4 decimals, half-up. No other metric is null.
+7. **Refunds.** Committed exceptions of type `void`, `full_refund`, or `partial_refund`. Amount `total_minor_units - tip_minor_units`. Sale business date. Positive. Separate from `net_sales`.
+8. **Category.** Current `product_category`, declared as `scope.attribution.category: "current"`.
+9. **Truncation.** A row cut sets `truncated` and `rowsTotal`. A distribution cut sets `truncated`, `limit`, `totalItems`, and `total` over the full set. Limits: product 200, operator 100, channel 8, hour 24, day 31, category 100, payment 8, series 31 by day and 24 by hour.
+10. **Payment.** The concatenated multiset. No dedupe.
+11. **Consumers.** The summary sends A (7 scalars) and B (6 presets) to `metrics.query`. The pivot reads the same pair. The narrative sends C (8 metrics) to `metrics.insight`. No request exceeds 10 metrics. The old sales routes and old sales types are removed.
 
 A change to any of these rules needs a new document version. A change to a formula needs a new definition version. A change to a shape needs a new contract version.
 
@@ -126,6 +139,8 @@ A change to any of these rules needs a new document version. A change to a formu
 
 **A generic query language.** Rejected. It moves the definition from the catalogue into the caller, and it reopens the duplicate-SQL problem at a higher layer. The request names ids. The server names the SQL. The endpoint never accepts SQL, a table name, or an expression.
 
+**A narrative field on the query response.** Rejected. It couples a model failure to the summary. The summary must stay complete when the model fails. The insight route gives the narrative its own response.
+
 **`payment_method` as a seventh dimension.** Rejected in 3.3. A split tender has no single method. `payment_mix` is the honest shape.
 
 **A computed split-tender allocation.** Rejected. No current rule exists, and any rule would change a published number. The legacy multiset stays.
@@ -134,7 +149,7 @@ A change to any of these rules needs a new document version. A change to a formu
 
 **Refunds including tips, or netted into `net_sales`.** Rejected in 3.5. A tip is not merchandise, and a netted number hides both sides.
 
-**A dedupe in gate 2.** Rejected in 3.6. It would break the parity signature, and the Chief review forbids it.
+**A dedupe in gate 2 or gate 3.** Rejected in 3.6. It would break the parity signature, and the Chief review forbids it.
 
 **A separate analytics service.** Rejected for v1. The data is in `merchant`, the read is one transaction, and the API already owns the policy and the location scope. A new service would add a boundary with no measured need.
 
@@ -144,7 +159,7 @@ A change to any of these rules needs a new document version. A change to a formu
 
 - One definition for each metric, with a version and a test.
 - One permission for every sales read. The location scope is enforced once.
-- The dashboard, the narrative, and the exports can move to one layer in gate 3 and delete the duplicate SQL.
+- The dashboard summary, pivot, and narrative use one layer. The old sales routes and the duplicate aggregate SQL leave the code.
 - Every response declares its period, coverage, attribution, and cuts.
 - Refunds now have an explicit rule and an oracle.
 
@@ -153,12 +168,14 @@ A change to any of these rules needs a new document version. A change to a formu
 - A preset cannot be combined with a dimension. A mix by day has no shape in v1.
 - The category is current, not at-sale. A product that moves category moves its history.
 - `payment_mix` can double-count a split tender. The defect is known and deferred.
+- The narrative has a second route and a second failure path.
 - The catalogue is a second place to change when a formula changes. A test pins each formula, but the discipline is new.
 
 **Cost**
 
 - Gate 2 needs at least 20 reproducible cases and two hashes for each case.
-- Gate 3 must delete `reports/sales` and the duplicate SQL in one PR, after the gate-2 signature.
+- Gate 3 deletes `reports/sales`, `reports/sales/insight`, and the duplicate aggregate SQL in one PR, after the gate-2 signature.
+- The frozen oracle keeps the gate-2 ledger unchanged.
 - A later definition change needs a version bump and a migration note.
 
 **Follow-up**
@@ -169,8 +186,23 @@ A change to any of these rules needs a new document version. A change to a formu
 
 ## 7. What this ADR does not decide
 
-- The consumer migration. Gate 3 owns the dashboard, `salesInsight`, the exports, and the deletion of `reports/sales`.
 - The payment deduplication design. A separate defect and a separate decision own it.
 - The at-sale category. It needs a schema change and a backfill.
 - A mix by dimension. It needs a new contract shape.
-- The dashboard layout or the narrative text. This ADR changes no number that the owner sees.
+- The dashboard layout or the narrative text. Gate 3 keeps the layout and labels. The narrative text is not a parity claim.
+- The sales purchase analysis. It stays on `sales-analysis`.
+- A production sales export. None exists at the gate-3 base. The customer CSV is out of scope.
+
+## 8. Gate 3 — the migrated interface
+
+- The summary sends A (7 scalars) and B (6 presets) to `metrics.query`. The pivot reads the same pair.
+- The narrative sends C (8 metrics) to `metrics.insight`. The summary does not depend on the insight response.
+- The adapter keeps the old screen field names. Gate 3 requires the screen to keep its layout, labels, interactions, formatting, and displayed numbers.
+- Category mix is a client-side group of `product_mix.items` by category. It does not call a second endpoint.
+- `series` uses `period.bucket`: hour for `today` and `yesterday`, day for `last_7_days` and `last_30_days`.
+- Gate 3 removes the old routes `reports/sales` and `reports/sales/insight`. No route-table entry existed for them. Gate 3 replaces the `operations.sales` surface entry with `metrics.query` and adds `metrics.insight`.
+- Gate 3 removes the old sales types. The cash-shift types stay. The contract is `2.58.0`.
+- Gate 3 keeps `SalesPurchaseAnalysis` on `sales-analysis`. No production sales export exists. The customer CSV is out of scope.
+- Gate 3 freezes the gate-2 ledger. The oracle uses the 24 gate-2 cases, 4 gate-1 fixture A cases, and 1 fixture B case.
+- The dashboard has no all-locations control. The all-locations cell is `N/A`. API and adapter checks cover all locations.
+- Payment deduplication stays out. The legacy multiset remains.
