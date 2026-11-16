@@ -215,7 +215,9 @@ A sale that uses cash and wallet can appear in both sources.
 The wallet amount can therefore count twice in the method totals.
 The legacy `salesSummary` has the same behavior.
 A dedupe would break parity in this gate.
-Gate 3 owns the dedupe and the overlap correction.
+Payment dedupe stays outside this migration.
+Record this as a separate finding.
+Do not correct it during gate 3.
 The contract decision table records this limit.
 
 ## Commands and results

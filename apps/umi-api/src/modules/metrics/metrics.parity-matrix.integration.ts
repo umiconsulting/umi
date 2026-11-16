@@ -136,6 +136,11 @@ const NORMALIZATION = [
   'units_per_ticket keeps four decimals, half-up, and stays null at zero orders.',
   'A null field stays null. An absent field stays absent. The canonical row copies only keys that the source has.',
   'Exclude the envelope fields. The compared form has no truncated, limit, totalItems, total, capturedAt, scope or period.',
+  'The canonical object has the 14 fields in this fixed order: net_sales, orders, average_ticket, items_sold, units_per_ticket, discounts, tips, prior_net_sales, payment_mix, channel_mix, product_mix, operator_mix, hour_mix, series.',
+  'prior_net_sales maps an absent or null legacy value to 0.',
+  'Minor units stay integers. The normal form does not scale, round or convert them.',
+  'series labels are YYYY-MM-DD for a day bucket and HH24 for an hour bucket.',
+  'The ledger hash replaces each random fixture product UUID with its fixture role: bread, coffee and foreign.',
 ];
 
 interface CaseRow {

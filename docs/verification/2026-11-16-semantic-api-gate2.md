@@ -18,7 +18,7 @@ Gate 2 adds four items:
 
 Gate 2 changes no consumer and no old endpoint.
 It changes no sales number and no contract response.
-It does not deduplicate payments. Gate 3 owns that change.
+It does not deduplicate payments. Payment dedupe stays outside this migration. Record it as a separate finding.
 
 ## Gate-1 record corrections
 
@@ -114,7 +114,7 @@ The payment multiset has two cases:
 ### Ledger
 
 Path: `docs/verification/2026-11-16-semantic-api-gate2-parity.json`.
-File SHA-256: `293231552a1092f17ff9cd023e209691ba2c89f347c2e2ac99d26a7644718a32`.
+File SHA-256: `df631c72afeb2e3d52915777e3a4c96b71a65ee1bcb5a534fce0f88b4c5c7ee3`.
 Case set SHA-256: `fe1365f872f364448a05384ffa2e7e63d9977463b4d8bd4753fc45cacd26f4c5`.
 The test writes the ledger only with `METRICS_GATE2_LEDGER_WRITE=1`.
 A rerun without the flag reads the file and compares the parsed object.
@@ -132,9 +132,14 @@ The test applies these rules to both reads. The code is in `metrics-parity-norma
 6. `units_per_ticket` keeps four decimals, half-up. The value is null at zero orders.
 7. A null field stays null. An absent field stays absent. A row copies a key only when the source has it.
 8. The compared form excludes the envelope fields: `truncated`, `limit`, `totalItems`, `total`, `capturedAt`, `scope` and `period`.
+9. The canonical object has the 14 fields in this fixed order: `net_sales`, `orders`, `average_ticket`, `items_sold`, `units_per_ticket`, `discounts`, `tips`, `prior_net_sales`, `payment_mix`, `channel_mix`, `product_mix`, `operator_mix`, `hour_mix`, `series`.
+10. `prior_net_sales` maps an absent or null legacy value to 0.
+11. Minor units stay integers. The normal form does not scale, round or convert them.
+12. `series` labels are `YYYY-MM-DD` for a day bucket and `HH24` for an hour bucket.
+13. The ledger hash replaces each random fixture product UUID with its fixture role: `bread`, `coffee` and `foreign`.
 
-The ledger hash replaces the random product UUIDs with their fixture role: `bread`, `coffee` and `foreign`.
-The comparison uses the raw ids. The alias only keeps the ledger stable across runs.
+The comparison uses the raw ids.
+The alias only keeps the ledger stable across runs.
 
 ## Refunds oracle
 
@@ -188,7 +193,7 @@ The PR adds no production SQL statement.
 
 ## Residual risks
 
-- `payment_mix` still concatenates `pos_tender_fact` and `customer_value_tender_allocation`. It does not deduplicate. A mixed payment can count twice. Gate 3 owns the fix.
+- `payment_mix` still concatenates `pos_tender_fact` and `customer_value_tender_allocation`. It does not deduplicate. A mixed payment can count twice. Record this as a separate finding. Do not correct it during gate 3.
 - The matrix uses the repository read, not the HTTP route. The gate-1 integration and verifier runs cover the route contract.
 - The matrix uses fixture A only. The I1 METRIC fixture case stays in gate 1.
 - Four empty cells are structural. They prove the empty response, not a data path.
