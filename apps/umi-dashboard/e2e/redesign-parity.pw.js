@@ -34,11 +34,25 @@ async function assertScope(page, server, range, locationId) {
   await expect(page.getByText('Órdenes', { exact: true }).locator('..')).toHaveText(
     `Órdenes${scope.totals.orders}`,
   );
-  for (const suffix of ['/reports/sales', '/reports/sales/insight']) {
-    await expect
-      .poll(() => server.requests.filter((entry) => entry.path.endsWith(suffix)).at(-1)?.query)
-      .toEqual({ range, locationId });
+  await expect
+    .poll(() => server.requests.filter((entry) => entry.path.endsWith('/metrics/query')).length)
+    .toBeGreaterThanOrEqual(2);
+  const metricCalls = server.requests
+    .filter((entry) => entry.path.endsWith('/metrics/query'))
+    .slice(-2);
+  for (const call of metricCalls) {
+    expect(call.method).toBe('POST');
+    expect(call.body.range).toBe(range);
+    expect(call.body.dimensions).toEqual([]);
+    expect(call.body.metrics.length).toBeLessThanOrEqual(10);
+    if (locationId) expect(call.body.locationId).toBe(locationId);
+    else expect(call.body.locationId).toBeUndefined();
   }
+  await expect
+    .poll(
+      () => server.requests.filter((entry) => entry.path.endsWith('/metrics/insight')).at(-1)?.body,
+    )
+    .toMatchObject(locationId ? { range, locationId } : { range });
 }
 
 async function screenshot(page, testInfo, name) {
@@ -79,7 +93,7 @@ test('sales summary remains complete when the optional narrative is absent', asy
     page.getByText('Ventas cobradas con propina', { exact: true }).locator('..'),
   ).toContainText('$1,234.00');
   await expect
-    .poll(() => server.requests.some((entry) => entry.path.endsWith('/sales/insight')))
+    .poll(() => server.requests.some((entry) => entry.path.endsWith('/metrics/insight')))
     .toBe(true);
   await expect(page.getByText('Resumen del periodo', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('img', { name: 'Serie de ventas del periodo' })).toBeVisible();

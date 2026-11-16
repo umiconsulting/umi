@@ -9,6 +9,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CONTRACT_VERSION,
+  MetricsInsightQuery,
+  MetricsInsightResponse,
   MetricsQuery,
   MetricsResponse,
   ROUTE_TABLE,
@@ -33,8 +35,8 @@ function accepts(body) {
   return result.data;
 }
 
-test('the contract version advances to 2.57.0', () => {
-  assert.equal(CONTRACT_VERSION, '2.57.0');
+test('the contract version advances to 2.58.0', () => {
+  assert.equal(CONTRACT_VERSION, '2.58.0');
 });
 
 test('the route is registered with the sales policy', () => {
@@ -53,6 +55,56 @@ test('the route is registered with the sales policy', () => {
     'PERMISSION_DENIED',
     'LOCATION_SCOPE_VIOLATION',
   ]);
+});
+
+test('the insight route is registered with the sales policy', () => {
+  const definition = route('metrics.insight');
+  assert.equal(definition.method, 'POST');
+  assert.equal(definition.path, '/api/merchants/:merchantId/metrics/insight');
+  assert.deepEqual(definition.params, ['merchantId']);
+  assert.equal(definition.contract.request, 'MetricsInsightQuery');
+  assert.equal(definition.contract.response, 'MetricsInsightResponse');
+  assert.equal(definition.contract.auth, 'session');
+  assert.equal(definition.contract.permission, 'sale.lifecycle');
+  assert.equal(definition.contract.merchantContext, true);
+  assert.equal(definition.contract.locationContext, true);
+  assert.deepEqual(definition.contract.errors, [
+    'VALIDATION_FAILED',
+    'PERMISSION_DENIED',
+    'LOCATION_SCOPE_VIOLATION',
+  ]);
+});
+
+test('the insight request requires a range and refuses an unknown key', () => {
+  assert.equal(MetricsInsightQuery.safeParse({ range: 'last_7_days' }).success, true);
+  assert.equal(
+    MetricsInsightQuery.safeParse({
+      range: 'last_7_days',
+      locationId: '55555555-5555-4555-8555-000000000011',
+    }).success,
+    true,
+  );
+  assert.equal(MetricsInsightQuery.safeParse({}).success, false);
+  assert.equal(MetricsInsightQuery.safeParse({ range: 'last_90_days' }).success, false);
+  assert.equal(
+    MetricsInsightQuery.safeParse({ range: 'today', locationId: 'centro' }).success,
+    false,
+  );
+  assert.equal(MetricsInsightQuery.safeParse({ range: 'today', unknown: true }).success, false);
+});
+
+test('the insight response keeps the fail-safe narrative shape', () => {
+  const parsed = MetricsInsightResponse.parse({
+    narrative: null,
+    generated: false,
+    capturedAt: '2026-11-16T01:30:00.000Z',
+  });
+  assert.equal(parsed.narrative, null);
+  assert.equal(parsed.generated, false);
+  assert.equal(
+    MetricsInsightResponse.safeParse({ narrative: 'x', generated: true }).success,
+    false,
+  );
 });
 
 test('a valid body parses with the documented defaults', () => {
@@ -245,10 +297,14 @@ test('a rows response with a distribution parses, and both shapes at once do not
   assert.equal(MetricsResponse.safeParse({ ...rows, rows: undefined }).success, false);
 });
 
-test('the route table carries exactly one metrics query', () => {
+test('the route table carries the metrics query and insight routes', () => {
   const found = ROUTE_TABLE.filter((entry) => entry.id.startsWith('metrics.'));
-  assert.deepEqual(
-    found.map((entry) => entry.id),
-    ['metrics.query'],
+  assert.deepEqual(found.map((entry) => entry.id).sort(), ['metrics.insight', 'metrics.query']);
+  assert.equal(
+    ROUTE_TABLE.some(
+      (entry) =>
+        entry.path.endsWith('/reports/sales') || entry.path.endsWith('/reports/sales/insight'),
+    ),
+    false,
   );
 });

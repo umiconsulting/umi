@@ -1,0 +1,239 @@
+{
+  "record": "2026-11-16-semantic-api-gate3-legacy-oracle",
+  "legacyCommit": "dfa7a78a94e696eb67fc4606b281268746128ec8",
+  "captureCommand": "npx vitest run --config vitest.integration.config.ts src/modules/metrics/capture-legacy-oracle.integration.ts",
+  "cases": [
+    {
+      "caseId": "T01",
+      "file": "gate2/T01.json",
+      "rawSha256": "5756ef62f74e61327e0f96cd7d66e11e95bbbfebf28bcb60abbf4b68d63cafd4",
+      "normalizedLegacySha256": "98f8712bbb1fb12211334e9b97b88542e20c712e003bc532db0aeff05ec1f1b8",
+      "ledgerLegacySha256": "98f8712bbb1fb12211334e9b97b88542e20c712e003bc532db0aeff05ec1f1b8",
+      "ledgerFreshSha256": "98f8712bbb1fb12211334e9b97b88542e20c712e003bc532db0aeff05ec1f1b8"
+    },
+    {
+      "caseId": "T02",
+      "file": "gate2/T02.json",
+      "rawSha256": "4f23c87d6fd62550b71a3f4f4d383735bcd93b4ddd7a27141f948d39964a91c7",
+      "normalizedLegacySha256": "b9e4cc47eb6b0d3ab2027eed3d602d19cda1e612b085dec580a4949096421d87",
+      "ledgerLegacySha256": "b9e4cc47eb6b0d3ab2027eed3d602d19cda1e612b085dec580a4949096421d87",
+      "ledgerFreshSha256": "b9e4cc47eb6b0d3ab2027eed3d602d19cda1e612b085dec580a4949096421d87"
+    },
+    {
+      "caseId": "T03",
+      "file": "gate2/T03.json",
+      "rawSha256": "340fcc5ca358d0334d1029267271a726c1d54b22b1a6909c445e2c3462bba5c3",
+      "normalizedLegacySha256": "8d7f3d37a2f0073d8f022f074343a99d4b5e7d4b5d776b3b8809decde4cac79a",
+      "ledgerLegacySha256": "8d7f3d37a2f0073d8f022f074343a99d4b5e7d4b5d776b3b8809decde4cac79a",
+      "ledgerFreshSha256": "8d7f3d37a2f0073d8f022f074343a99d4b5e7d4b5d776b3b8809decde4cac79a"
+    },
+    {
+      "caseId": "T04",
+      "file": "gate2/T04.json",
+      "rawSha256": "91638338486ab40ae2b5a91fc870b85b9b7ad3b6e6be414e66139b0e1110bdde",
+      "normalizedLegacySha256": "4e13a758ef3df59887a5553e2228421990b9ecadb788401ec7afdaa284de05a3",
+      "ledgerLegacySha256": "4e13a758ef3df59887a5553e2228421990b9ecadb788401ec7afdaa284de05a3",
+      "ledgerFreshSha256": "4e13a758ef3df59887a5553e2228421990b9ecadb788401ec7afdaa284de05a3"
+    },
+    {
+      "caseId": "T05",
+      "file": "gate2/T05.json",
+      "rawSha256": "a9c368e4251b237c338e463bd4fc815b56904e56c6c7f73731a5493d198097e1",
+      "normalizedLegacySha256": "8d7f3d37a2f0073d8f022f074343a99d4b5e7d4b5d776b3b8809decde4cac79a",
+      "ledgerLegacySha256": "8d7f3d37a2f0073d8f022f074343a99d4b5e7d4b5d776b3b8809decde4cac79a",
+      "ledgerFreshSha256": "8d7f3d37a2f0073d8f022f074343a99d4b5e7d4b5d776b3b8809decde4cac79a"
+    },
+    {
+      "caseId": "Y01",
+      "file": "gate2/Y01.json",
+      "rawSha256": "2c75bc336bd13e93b9e34bfeaee98256765ccd8fbbc6edda78d59f9df81a41f2",
+      "normalizedLegacySha256": "98f8712bbb1fb12211334e9b97b88542e20c712e003bc532db0aeff05ec1f1b8",
+      "ledgerLegacySha256": "98f8712bbb1fb12211334e9b97b88542e20c712e003bc532db0aeff05ec1f1b8",
+      "ledgerFreshSha256": "98f8712bbb1fb12211334e9b97b88542e20c712e003bc532db0aeff05ec1f1b8"
+    },
+    {
+      "caseId": "Y02",
+      "file": "gate2/Y02.json",
+      "rawSha256": "2ac4d890c54649f8c5eb662b46700a6fb8a5e785603a2945a925852bf1c97115",
+      "normalizedLegacySha256": "b9e4cc47eb6b0d3ab2027eed3d602d19cda1e612b085dec580a4949096421d87",
+      "ledgerLegacySha256": "b9e4cc47eb6b0d3ab2027eed3d602d19cda1e612b085dec580a4949096421d87",
+      "ledgerFreshSha256": "b9e4cc47eb6b0d3ab2027eed3d602d19cda1e612b085dec580a4949096421d87"
+    },
+    {
+      "caseId": "Y03",
+      "file": "gate2/Y03.json",
+      "rawSha256": "5e7f986b146ac78ec278c10f8b2b990bc600a271d38ca2aaf4bcac7d54bd19f3",
+      "normalizedLegacySha256": "8d7f3d37a2f0073d8f022f074343a99d4b5e7d4b5d776b3b8809decde4cac79a",
+      "ledgerLegacySha256": "8d7f3d37a2f0073d8f022f074343a99d4b5e7d4b5d776b3b8809decde4cac79a",
+      "ledgerFreshSha256": "8d7f3d37a2f0073d8f022f074343a99d4b5e7d4b5d776b3b8809decde4cac79a"
+    },
+    {
+      "caseId": "Y04",
+      "file": "gate2/Y04.json",
+      "rawSha256": "685a46b76fa9e20453ada0b4189a5c4a5efff032bbc90b700d7ab5ff066249f1",
+      "normalizedLegacySha256": "9a226278cb22c9b5c6d68e02545b8d9be5fff62db18d847ba675b31999c44f3c",
+      "ledgerLegacySha256": "9a226278cb22c9b5c6d68e02545b8d9be5fff62db18d847ba675b31999c44f3c",
+      "ledgerFreshSha256": "9a226278cb22c9b5c6d68e02545b8d9be5fff62db18d847ba675b31999c44f3c"
+    },
+    {
+      "caseId": "Y05",
+      "file": "gate2/Y05.json",
+      "rawSha256": "a7a587ffab442f98b1844f739489ecbe03cc378c6c31a9ce8f11349b10c7ca05",
+      "normalizedLegacySha256": "8d7f3d37a2f0073d8f022f074343a99d4b5e7d4b5d776b3b8809decde4cac79a",
+      "ledgerLegacySha256": "8d7f3d37a2f0073d8f022f074343a99d4b5e7d4b5d776b3b8809decde4cac79a",
+      "ledgerFreshSha256": "8d7f3d37a2f0073d8f022f074343a99d4b5e7d4b5d776b3b8809decde4cac79a"
+    },
+    {
+      "caseId": "W01",
+      "file": "gate2/W01.json",
+      "rawSha256": "8388a2cb5c5830dec33d8011ce471bbc100170cfb981843754204e20f185204f",
+      "normalizedLegacySha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63",
+      "ledgerLegacySha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63",
+      "ledgerFreshSha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63"
+    },
+    {
+      "caseId": "W02",
+      "file": "gate2/W02.json",
+      "rawSha256": "7bce4a3ebddef78339962952748e0e31214fb2965de6bd1c4200f5087e4d17e5",
+      "normalizedLegacySha256": "5981227d6f2371e0c166dec8db8a35b19cd617ff988ee6d1cb7e4f5b8e056227",
+      "ledgerLegacySha256": "5981227d6f2371e0c166dec8db8a35b19cd617ff988ee6d1cb7e4f5b8e056227",
+      "ledgerFreshSha256": "5981227d6f2371e0c166dec8db8a35b19cd617ff988ee6d1cb7e4f5b8e056227"
+    },
+    {
+      "caseId": "W03",
+      "file": "gate2/W03.json",
+      "rawSha256": "b81ef3f389790fd047179964a3c8470a49623b68a83b4915066fa067157702e5",
+      "normalizedLegacySha256": "06ce23f8b25525831695308275deb1128304b6a867c24433305eeccd7356929c",
+      "ledgerLegacySha256": "06ce23f8b25525831695308275deb1128304b6a867c24433305eeccd7356929c",
+      "ledgerFreshSha256": "06ce23f8b25525831695308275deb1128304b6a867c24433305eeccd7356929c"
+    },
+    {
+      "caseId": "W04",
+      "file": "gate2/W04.json",
+      "rawSha256": "cb62306712bc0e46ad6c9f0ab9a56b82cd16ae6b5468b623b3c1cdbe3f3e7c43",
+      "normalizedLegacySha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63",
+      "ledgerLegacySha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63",
+      "ledgerFreshSha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63"
+    },
+    {
+      "caseId": "W05",
+      "file": "gate2/W05.json",
+      "rawSha256": "ff7a2d9e02f8787741b1279ecfbe971c5e1888a4e51125e60a0f93444efb8272",
+      "normalizedLegacySha256": "291890a6b71e67b0838d284154a1cfea456be2b0dbf8fbf4f353eda414a62f59",
+      "ledgerLegacySha256": "291890a6b71e67b0838d284154a1cfea456be2b0dbf8fbf4f353eda414a62f59",
+      "ledgerFreshSha256": "291890a6b71e67b0838d284154a1cfea456be2b0dbf8fbf4f353eda414a62f59"
+    },
+    {
+      "caseId": "W06",
+      "file": "gate2/W06.json",
+      "rawSha256": "bec21bdf9cdeb8ab8f7059e648b546faa1c5e6645b9472d41e3162a992737985",
+      "normalizedLegacySha256": "9a226278cb22c9b5c6d68e02545b8d9be5fff62db18d847ba675b31999c44f3c",
+      "ledgerLegacySha256": "9a226278cb22c9b5c6d68e02545b8d9be5fff62db18d847ba675b31999c44f3c",
+      "ledgerFreshSha256": "9a226278cb22c9b5c6d68e02545b8d9be5fff62db18d847ba675b31999c44f3c"
+    },
+    {
+      "caseId": "W07",
+      "file": "gate2/W07.json",
+      "rawSha256": "be7ad811ff7c480841b87c9f9945d0e05a58f2845e9f1d40041ace8071c6ec38",
+      "normalizedLegacySha256": "5981227d6f2371e0c166dec8db8a35b19cd617ff988ee6d1cb7e4f5b8e056227",
+      "ledgerLegacySha256": "5981227d6f2371e0c166dec8db8a35b19cd617ff988ee6d1cb7e4f5b8e056227",
+      "ledgerFreshSha256": "5981227d6f2371e0c166dec8db8a35b19cd617ff988ee6d1cb7e4f5b8e056227"
+    },
+    {
+      "caseId": "M01",
+      "file": "gate2/M01.json",
+      "rawSha256": "6b86379156ba10425f4d3253a370f961febed325558452f0c80a682a39c86581",
+      "normalizedLegacySha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63",
+      "ledgerLegacySha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63",
+      "ledgerFreshSha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63"
+    },
+    {
+      "caseId": "M02",
+      "file": "gate2/M02.json",
+      "rawSha256": "8666d2cfd18445149820c5d80ce94ce4a92ebdbe2736a4e5fb403a8b95c7733b",
+      "normalizedLegacySha256": "5981227d6f2371e0c166dec8db8a35b19cd617ff988ee6d1cb7e4f5b8e056227",
+      "ledgerLegacySha256": "5981227d6f2371e0c166dec8db8a35b19cd617ff988ee6d1cb7e4f5b8e056227",
+      "ledgerFreshSha256": "5981227d6f2371e0c166dec8db8a35b19cd617ff988ee6d1cb7e4f5b8e056227"
+    },
+    {
+      "caseId": "M03",
+      "file": "gate2/M03.json",
+      "rawSha256": "4d79106a944ba5d157d292e5507896282778fb9e1f0af9c7e9a21332c1e90787",
+      "normalizedLegacySha256": "06ce23f8b25525831695308275deb1128304b6a867c24433305eeccd7356929c",
+      "ledgerLegacySha256": "06ce23f8b25525831695308275deb1128304b6a867c24433305eeccd7356929c",
+      "ledgerFreshSha256": "06ce23f8b25525831695308275deb1128304b6a867c24433305eeccd7356929c"
+    },
+    {
+      "caseId": "M04",
+      "file": "gate2/M04.json",
+      "rawSha256": "5b8393ff9712852281b1c3dd019196a59d02e59bdba7f3e406d99d94832a9264",
+      "normalizedLegacySha256": "59b044a49fbad8a442aeddd2492740b6df16000e8fab430ef21f5ca294671f8e",
+      "ledgerLegacySha256": "59b044a49fbad8a442aeddd2492740b6df16000e8fab430ef21f5ca294671f8e",
+      "ledgerFreshSha256": "59b044a49fbad8a442aeddd2492740b6df16000e8fab430ef21f5ca294671f8e"
+    },
+    {
+      "caseId": "M05",
+      "file": "gate2/M05.json",
+      "rawSha256": "e1e7e6be511893b18db46208afab232c6049fad55c7d8d5b26153433bc4cdd23",
+      "normalizedLegacySha256": "59b044a49fbad8a442aeddd2492740b6df16000e8fab430ef21f5ca294671f8e",
+      "ledgerLegacySha256": "59b044a49fbad8a442aeddd2492740b6df16000e8fab430ef21f5ca294671f8e",
+      "ledgerFreshSha256": "59b044a49fbad8a442aeddd2492740b6df16000e8fab430ef21f5ca294671f8e"
+    },
+    {
+      "caseId": "M06",
+      "file": "gate2/M06.json",
+      "rawSha256": "7e42073ecae8ec591d9ebf902530e695e2b71638d24775a33004a74bb9c07117",
+      "normalizedLegacySha256": "9a226278cb22c9b5c6d68e02545b8d9be5fff62db18d847ba675b31999c44f3c",
+      "ledgerLegacySha256": "9a226278cb22c9b5c6d68e02545b8d9be5fff62db18d847ba675b31999c44f3c",
+      "ledgerFreshSha256": "9a226278cb22c9b5c6d68e02545b8d9be5fff62db18d847ba675b31999c44f3c"
+    },
+    {
+      "caseId": "M07",
+      "file": "gate2/M07.json",
+      "rawSha256": "37af1ed8b2d7c891a7f781bf61c543d68805e2ad7372c3769ee2c7ce0d48a1d3",
+      "normalizedLegacySha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63",
+      "ledgerLegacySha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63",
+      "ledgerFreshSha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63"
+    },
+    {
+      "caseId": "fixture-a-all",
+      "file": "gate1/fixture-a-all.json",
+      "rawSha256": "ba6b0c69a4cff07b7f5d12404af94bbd3adb60ab12a468f4743f0a55b7492c34",
+      "normalizedLegacySha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63",
+      "ledgerLegacySha256": null,
+      "ledgerFreshSha256": null
+    },
+    {
+      "caseId": "fixture-a-centro",
+      "file": "gate1/fixture-a-centro.json",
+      "rawSha256": "56b20ff6a9d25fe79c0fdcb4b87234fa07d3e82bd98c4cae48a852d747982835",
+      "normalizedLegacySha256": "5981227d6f2371e0c166dec8db8a35b19cd617ff988ee6d1cb7e4f5b8e056227",
+      "ledgerLegacySha256": null,
+      "ledgerFreshSha256": null
+    },
+    {
+      "caseId": "fixture-a-day-series",
+      "file": "gate1/fixture-a-day-series.json",
+      "rawSha256": "00603dad78ba8431a168ae420b23862d5eae42a0e95eab7bc15c6f733d16d7eb",
+      "normalizedLegacySha256": "70f758d5cd6a5703f344f71f0feca9a6018a96cd0f722e0e184b06532b18fd63",
+      "ledgerLegacySha256": null,
+      "ledgerFreshSha256": null
+    },
+    {
+      "caseId": "fixture-a-payment",
+      "file": "gate1/fixture-a-payment.json",
+      "rawSha256": "e8ad7ca9513ae42a707c39bf806a64b4f29306114a172b349449030ab20119a9",
+      "normalizedLegacySha256": "5981227d6f2371e0c166dec8db8a35b19cd617ff988ee6d1cb7e4f5b8e056227",
+      "ledgerLegacySha256": null,
+      "ledgerFreshSha256": null
+    },
+    {
+      "caseId": "fixture-b-i1",
+      "file": "gate1/fixture-b-i1.json",
+      "rawSha256": "40c0be2bdc3f41467cb2cc7f2cfc7d58518b9f666ba6fe1afd929df7586ab306",
+      "normalizedLegacySha256": "c5e01b12050a7c4204deedb95ab06748b8ece8575d35f61c9a283229df133f98",
+      "ledgerLegacySha256": null,
+      "ledgerFreshSha256": null
+    }
+  ]
+}

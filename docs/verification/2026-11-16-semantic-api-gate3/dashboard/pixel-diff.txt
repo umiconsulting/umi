@@ -1,0 +1,8 @@
+# Gate-3 dashboard pixel comparison
+
+Full image compare (includes the header clock; the reported metric is the compare tool output):
+1440: 12.8627 (7.54723e-06)
+390: 11.549 (2.00243e-05)
+
+Content crop below y=180 (excludes the header clock):
+1440 crop: 0 (0)

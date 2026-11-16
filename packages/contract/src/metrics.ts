@@ -366,6 +366,28 @@ export const MetricsCoverage = z
   })
   .strict();
 
+/**
+ * The narrative request and response. The request names the same period and
+ * location as the summary. The response keeps the old fail-safe shape: a null
+ * narrative hides the card, and a model failure never blocks the summary.
+ */
+export const MetricsInsightQuery = z
+  .object({
+    range: MetricsRange,
+    locationId: Uuid.optional(),
+  })
+  .strict();
+export type MetricsInsightQuery = z.infer<typeof MetricsInsightQuery>;
+
+export const MetricsInsightResponse = z
+  .object({
+    narrative: z.string().max(600).nullable(),
+    generated: z.boolean(),
+    capturedAt: IsoTimestamp,
+  })
+  .strict();
+export type MetricsInsightResponse = z.infer<typeof MetricsInsightResponse>;
+
 export const MetricsResponse = z
   .object({
     definitionVersion: z.literal('1.0.0'),
@@ -414,4 +436,6 @@ export const metricsModels = {
   MetricsPeriod,
   MetricsCoverage,
   MetricsResponse,
+  MetricsInsightQuery,
+  MetricsInsightResponse,
 } as const;

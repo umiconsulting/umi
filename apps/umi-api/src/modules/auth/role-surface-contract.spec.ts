@@ -304,9 +304,13 @@ const SERVICE_ENFORCED: Readonly<Record<string, { domain: string; selector: stri
     domain: 'catalog',
     selector: 'snapshot() selects DASHBOARD_DOMAIN_POLICY by `query.domain`',
   },
-  'operations.sales': {
+  'metrics.query': {
     domain: 'sales',
-    selector: "salesSummary() selects domain 'sales' with no query input",
+    selector: "MetricsService.query() selects domain 'sales'",
+  },
+  'metrics.insight': {
+    domain: 'sales',
+    selector: "MetricsInsightService.insight() calls MetricsService.query() with domain 'sales'",
   },
 };
 

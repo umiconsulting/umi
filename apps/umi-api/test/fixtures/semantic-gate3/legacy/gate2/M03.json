@@ -1,0 +1,69 @@
+{
+  "caseId": "M03",
+  "capturedAt": "2026-11-16T04:30:18.804Z",
+  "legacyCommit": "dfa7a78a94e696eb67fc4606b281268746128ec8",
+  "request": {
+    "range": "last_30_days",
+    "locationId": "8777f4c3-4854-4857-8eac-b611f9d3b9dc",
+    "asOf": "2026-11-04"
+  },
+  "productAliases": {
+    "2f80943e-ff4c-40fd-92e7-26d5dc32984f": "bread",
+    "243522ad-5b36-4814-8adb-0b9b2ba0fe6a": "coffee",
+    "f239d284-6600-4ca5-8101-a5e0f556d3bd": "foreign"
+  },
+  "response": {
+    "merchantId": "6bede1cc-0484-47ba-82fd-590abc948cb7",
+    "locationId": "8777f4c3-4854-4857-8eac-b611f9d3b9dc",
+    "range": "last_30_days",
+    "currency": "MXN",
+    "bucket": "day",
+    "totals": {
+      "netSalesMinorUnits": 9000,
+      "orders": 1,
+      "averageTicketMinorUnits": 9000,
+      "itemsSold": 1,
+      "discountMinorUnits": 1000,
+      "tipsMinorUnits": 0,
+      "priorNetSalesMinorUnits": 0
+    },
+    "paymentMix": [],
+    "channelMix": [
+      {
+        "channel": "walk_in",
+        "netSalesMinorUnits": 9000,
+        "orders": 1
+      }
+    ],
+    "productMix": [
+      {
+        "productId": "243522ad-5b36-4814-8adb-0b9b2ba0fe6a",
+        "productName": "Café americano",
+        "category": "Café",
+        "units": 1,
+        "netMinorUnits": 10000
+      }
+    ],
+    "byOperator": [
+      {
+        "key": "—",
+        "units": 1,
+        "netMinorUnits": 10000
+      }
+    ],
+    "byHour": [
+      {
+        "key": "04",
+        "units": 1,
+        "netMinorUnits": 10000
+      }
+    ],
+    "series": [
+      {
+        "label": "2026-11-04",
+        "amountMinorUnits": 9000
+      }
+    ],
+    "capturedAt": "2026-11-16T04:30:18.803Z"
+  }
+}

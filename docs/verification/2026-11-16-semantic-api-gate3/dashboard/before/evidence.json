@@ -1,0 +1,316 @@
+{
+  "capturedAt": "2026-11-16T04:35:39.718Z",
+  "url": "http://127.0.0.1:4000/reportes",
+  "range": "last_30_days",
+  "location": "Centro",
+  "desktop": {
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "summaryText": "Saltar al contenido\numidash\nHOY\nResumen\nOPERACIÓN\nPedidos\nReportes\nVentas\nReembolsos\nCaja y turnos\nCocina\nCLIENTES\nClientes\nAtención\nLealtad y valor\nNEGOCIO\nProductos\nInventario\nPlano de mesas\nDispositivos\nEquipo y accesos\nCONFIGURACIÓN\nHorarios\nAjustes\nDiagnóstico\nCafé Fixture\nReportes\nEspañol\nCentro\nIO\nI1 Owner\nEN LÍNEA\n·\nCAFÉ FIXTURE\n·\nCENTRO\n·\nDOM 15 DE NOV\n09:35 P.M.\nHoy\nAyer\n7 días\n30 días\nAnálisis de compras\nCobros originales\nTabla dinámica\nRecibos\nVentas cobradas con propina\n$355.00\n\nImportes originales de los recibos, antes de devoluciones. Consulta Análisis de compras para ver la venta neta sin propina.\n\nÓrdenes\n3\nTicket cobrado con propina\n$118.33\nÍtems vendidos\n5\nDescuentos\n$10.00\nPropinas\n$25.00\nVenta por día\n11-02\n11-04\nCanal de venta\nLa atribución por canal se activa cuando el punto de venta enlaza los pedidos de WhatsApp. Mientras tanto, las ventas cuentan como mostrador.\nAgrupar por\nProducto\nCategoría\nOperador\nHora\nProducto\tCategoría\tUnidades\tImporte antes de descuentos ▼\t% del total\nCafé americano\tBebidas\t3\t$240.00\t71%\nConcha\tPanadería\t2\t$100.00\t29%\nTotal\t\t5\t$340.00\t100%",
+    "pivots": {
+      "Producto": "Saltar al contenido\numidash\nHOY\nResumen\nOPERACIÓN\nPedidos\nReportes\nVentas\nReembolsos\nCaja y turnos\nCocina\nCLIENTES\nClientes\nAtención\nLealtad y valor\nNEGOCIO\nProductos\nInventario\nPlano de mesas\nDispositivos\nEquipo y accesos\nCONFIGURACIÓN\nHorarios\nAjustes\nDiagnóstico\nCafé Fixture\nReportes\nEspañol\nCentro\nIO\nI1 Owner\nEN LÍNEA\n·\nCAFÉ FIXTURE\n·\nCENTRO\n·\nDOM 15 DE NOV\n09:35 P.M.\nHoy\nAyer\n7 días\n30 días\nAnálisis de compras\nCobros originales\nTabla dinámica\nRecibos\nAgrupar por\nProducto\nCategoría\nOperador\nHora\nProducto\tCategoría\tUnidades\tImporte antes de descuentos ▼\t% del total\nCafé americano\tBebidas\t3\t$240.00\t71%\nConcha\tPanadería\t2\t$100.00\t29%\nTotal\t\t5\t$340.00\t100%",
+      "Categoría": "Saltar al contenido\numidash\nHOY\nResumen\nOPERACIÓN\nPedidos\nReportes\nVentas\nReembolsos\nCaja y turnos\nCocina\nCLIENTES\nClientes\nAtención\nLealtad y valor\nNEGOCIO\nProductos\nInventario\nPlano de mesas\nDispositivos\nEquipo y accesos\nCONFIGURACIÓN\nHorarios\nAjustes\nDiagnóstico\nCafé Fixture\nReportes\nEspañol\nCentro\nIO\nI1 Owner\nEN LÍNEA\n·\nCAFÉ FIXTURE\n·\nCENTRO\n·\nDOM 15 DE NOV\n09:35 P.M.\nHoy\nAyer\n7 días\n30 días\nAnálisis de compras\nCobros originales\nTabla dinámica\nRecibos\nAgrupar por\nProducto\nCategoría\nOperador\nHora\nCategoría\tUnidades\tImporte antes de descuentos ▼\t% del total\nBebidas\t3\t$240.00\t71%\nPanadería\t2\t$100.00\t29%\nTotal\t5\t$340.00\t100%",
+      "Operador": "Saltar al contenido\numidash\nHOY\nResumen\nOPERACIÓN\nPedidos\nReportes\nVentas\nReembolsos\nCaja y turnos\nCocina\nCLIENTES\nClientes\nAtención\nLealtad y valor\nNEGOCIO\nProductos\nInventario\nPlano de mesas\nDispositivos\nEquipo y accesos\nCONFIGURACIÓN\nHorarios\nAjustes\nDiagnóstico\nCafé Fixture\nReportes\nEspañol\nCentro\nIO\nI1 Owner\nEN LÍNEA\n·\nCAFÉ FIXTURE\n·\nCENTRO\n·\nDOM 15 DE NOV\n09:35 P.M.\nHoy\nAyer\n7 días\n30 días\nAnálisis de compras\nCobros originales\nTabla dinámica\nRecibos\nAgrupar por\nProducto\nCategoría\nOperador\nHora\nOperador\tUnidades\tImporte antes de descuentos ▼\t% del total\n—\t5\t$340.00\t100%\nTotal\t5\t$340.00\t100%",
+      "Hora": "Saltar al contenido\numidash\nHOY\nResumen\nOPERACIÓN\nPedidos\nReportes\nVentas\nReembolsos\nCaja y turnos\nCocina\nCLIENTES\nClientes\nAtención\nLealtad y valor\nNEGOCIO\nProductos\nInventario\nPlano de mesas\nDispositivos\nEquipo y accesos\nCONFIGURACIÓN\nHorarios\nAjustes\nDiagnóstico\nCafé Fixture\nReportes\nEspañol\nCentro\nIO\nI1 Owner\nEN LÍNEA\n·\nCAFÉ FIXTURE\n·\nCENTRO\n·\nDOM 15 DE NOV\n09:35 P.M.\nHoy\nAyer\n7 días\n30 días\nAnálisis de compras\nCobros originales\nTabla dinámica\nRecibos\nAgrupar por\nProducto\nCategoría\nOperador\nHora\nHora\tUnidades\tImporte antes de descuentos ▼\t% del total\n11\t3\t$180.00\t53%\n02\t1\t$80.00\t24%\n12\t1\t$80.00\t24%\nTotal\t5\t$340.00\t100%"
+    },
+    "responses": [
+      {
+        "path": "/api/merchants/55555555-5555-4555-8555-000000000001/operations/reports/sales",
+        "query": {
+          "range": "today",
+          "locationId": "55555555-5555-4555-8555-000000000011"
+        },
+        "status": 200,
+        "body": {
+          "merchantId": "55555555-5555-4555-8555-000000000001",
+          "locationId": "55555555-5555-4555-8555-000000000011",
+          "range": "today",
+          "currency": "MXN",
+          "bucket": "hour",
+          "totals": {
+            "netSalesMinorUnits": 0,
+            "orders": 0,
+            "averageTicketMinorUnits": 0,
+            "itemsSold": 0,
+            "discountMinorUnits": 0,
+            "tipsMinorUnits": 0,
+            "priorNetSalesMinorUnits": 0
+          },
+          "paymentMix": [],
+          "channelMix": [],
+          "productMix": [],
+          "byOperator": [],
+          "byHour": [],
+          "series": [],
+          "capturedAt": "2026-11-16T04:35:23.068Z"
+        }
+      },
+      {
+        "path": "/api/merchants/55555555-5555-4555-8555-000000000001/operations/reports/sales/insight",
+        "query": {
+          "range": "today",
+          "locationId": "55555555-5555-4555-8555-000000000011"
+        },
+        "status": 200,
+        "body": {
+          "narrative": null,
+          "generated": false,
+          "capturedAt": "2026-11-16T04:35:23.071Z"
+        }
+      },
+      {
+        "path": "/api/merchants/55555555-5555-4555-8555-000000000001/operations/reports/sales",
+        "query": {
+          "range": "last_30_days",
+          "locationId": "55555555-5555-4555-8555-000000000011"
+        },
+        "status": 200,
+        "body": {
+          "merchantId": "55555555-5555-4555-8555-000000000001",
+          "locationId": "55555555-5555-4555-8555-000000000011",
+          "range": "last_30_days",
+          "currency": "MXN",
+          "bucket": "day",
+          "totals": {
+            "netSalesMinorUnits": 35500,
+            "orders": 3,
+            "averageTicketMinorUnits": 11833,
+            "itemsSold": 5,
+            "discountMinorUnits": 1000,
+            "tipsMinorUnits": 2500,
+            "priorNetSalesMinorUnits": 0
+          },
+          "paymentMix": [],
+          "channelMix": [
+            {
+              "channel": "walk_in",
+              "netSalesMinorUnits": 35500,
+              "orders": 3
+            }
+          ],
+          "productMix": [
+            {
+              "productId": "55555555-5555-4555-8555-000000000032",
+              "productName": "Café americano",
+              "category": "Bebidas",
+              "units": 3,
+              "netMinorUnits": 24000
+            },
+            {
+              "productId": "55555555-5555-4555-8555-000000000031",
+              "productName": "Concha",
+              "category": "Panadería",
+              "units": 2,
+              "netMinorUnits": 10000
+            }
+          ],
+          "byOperator": [
+            {
+              "key": "—",
+              "units": 5,
+              "netMinorUnits": 34000
+            }
+          ],
+          "byHour": [
+            {
+              "key": "02",
+              "units": 1,
+              "netMinorUnits": 8000
+            },
+            {
+              "key": "11",
+              "units": 3,
+              "netMinorUnits": 18000
+            },
+            {
+              "key": "12",
+              "units": 1,
+              "netMinorUnits": 8000
+            }
+          ],
+          "series": [
+            {
+              "label": "2026-11-02",
+              "amountMinorUnits": 27000
+            },
+            {
+              "label": "2026-11-04",
+              "amountMinorUnits": 8500
+            }
+          ],
+          "capturedAt": "2026-11-16T04:35:23.579Z"
+        }
+      },
+      {
+        "path": "/api/merchants/55555555-5555-4555-8555-000000000001/operations/reports/sales/insight",
+        "query": {
+          "range": "last_30_days",
+          "locationId": "55555555-5555-4555-8555-000000000011"
+        },
+        "status": 200,
+        "body": {
+          "narrative": null,
+          "generated": false,
+          "capturedAt": "2026-11-16T04:35:23.580Z"
+        }
+      }
+    ]
+  },
+  "mobile": {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "summaryText": "Saltar al contenido\numidash\nHOY\nResumen\nOPERACIÓN\nPedidos\nReportes\nVentas\nReembolsos\nCaja y turnos\nCocina\nCLIENTES\nClientes\nAtención\nLealtad y valor\nNEGOCIO\nProductos\nInventario\nPlano de mesas\nDispositivos\nEquipo y accesos\nCONFIGURACIÓN\nHorarios\nAjustes\nDiagnóstico\nCafé Fixture\nReportes\nEspañol\nCentro\nIO\nI1 Owner\nEN LÍNEA\n·\nCAFÉ FIXTURE\n·\nCENTRO\n·\nDOM 15 DE NOV\n09:35 P.M.\nHoy\nAyer\n7 días\n30 días\nAnálisis de compras\nCobros originales\nTabla dinámica\nRecibos\nVentas cobradas con propina\n$355.00\n\nImportes originales de los recibos, antes de devoluciones. Consulta Análisis de compras para ver la venta neta sin propina.\n\nÓrdenes\n3\nTicket cobrado con propina\n$118.33\nÍtems vendidos\n5\nDescuentos\n$10.00\nPropinas\n$25.00\nVenta por día\n11-02\n11-04\nCanal de venta\nLa atribución por canal se activa cuando el punto de venta enlaza los pedidos de WhatsApp. Mientras tanto, las ventas cuentan como mostrador.\nAgrupar por\nProducto\nCategoría\nOperador\nHora\nProducto\tCategoría\tUnidades\tImporte antes de descuentos ▼\t% del total\nCafé americano\tBebidas\t3\t$240.00\t71%\nConcha\tPanadería\t2\t$100.00\t29%\nTotal\t\t5\t$340.00\t100%",
+    "pivots": {
+      "Producto": "Saltar al contenido\numidash\nHOY\nResumen\nOPERACIÓN\nPedidos\nReportes\nVentas\nReembolsos\nCaja y turnos\nCocina\nCLIENTES\nClientes\nAtención\nLealtad y valor\nNEGOCIO\nProductos\nInventario\nPlano de mesas\nDispositivos\nEquipo y accesos\nCONFIGURACIÓN\nHorarios\nAjustes\nDiagnóstico\nCafé Fixture\nReportes\nEspañol\nCentro\nIO\nI1 Owner\nEN LÍNEA\n·\nCAFÉ FIXTURE\n·\nCENTRO\n·\nDOM 15 DE NOV\n09:35 P.M.\nHoy\nAyer\n7 días\n30 días\nAnálisis de compras\nCobros originales\nTabla dinámica\nRecibos\nAgrupar por\nProducto\nCategoría\nOperador\nHora\nProducto\tCategoría\tUnidades\tImporte antes de descuentos ▼\t% del total\nCafé americano\tBebidas\t3\t$240.00\t71%\nConcha\tPanadería\t2\t$100.00\t29%\nTotal\t\t5\t$340.00\t100%",
+      "Categoría": "Saltar al contenido\numidash\nHOY\nResumen\nOPERACIÓN\nPedidos\nReportes\nVentas\nReembolsos\nCaja y turnos\nCocina\nCLIENTES\nClientes\nAtención\nLealtad y valor\nNEGOCIO\nProductos\nInventario\nPlano de mesas\nDispositivos\nEquipo y accesos\nCONFIGURACIÓN\nHorarios\nAjustes\nDiagnóstico\nCafé Fixture\nReportes\nEspañol\nCentro\nIO\nI1 Owner\nEN LÍNEA\n·\nCAFÉ FIXTURE\n·\nCENTRO\n·\nDOM 15 DE NOV\n09:35 P.M.\nHoy\nAyer\n7 días\n30 días\nAnálisis de compras\nCobros originales\nTabla dinámica\nRecibos\nAgrupar por\nProducto\nCategoría\nOperador\nHora\nCategoría\tUnidades\tImporte antes de descuentos ▼\t% del total\nBebidas\t3\t$240.00\t71%\nPanadería\t2\t$100.00\t29%\nTotal\t5\t$340.00\t100%",
+      "Operador": "Saltar al contenido\numidash\nHOY\nResumen\nOPERACIÓN\nPedidos\nReportes\nVentas\nReembolsos\nCaja y turnos\nCocina\nCLIENTES\nClientes\nAtención\nLealtad y valor\nNEGOCIO\nProductos\nInventario\nPlano de mesas\nDispositivos\nEquipo y accesos\nCONFIGURACIÓN\nHorarios\nAjustes\nDiagnóstico\nCafé Fixture\nReportes\nEspañol\nCentro\nIO\nI1 Owner\nEN LÍNEA\n·\nCAFÉ FIXTURE\n·\nCENTRO\n·\nDOM 15 DE NOV\n09:35 P.M.\nHoy\nAyer\n7 días\n30 días\nAnálisis de compras\nCobros originales\nTabla dinámica\nRecibos\nAgrupar por\nProducto\nCategoría\nOperador\nHora\nOperador\tUnidades\tImporte antes de descuentos ▼\t% del total\n—\t5\t$340.00\t100%\nTotal\t5\t$340.00\t100%",
+      "Hora": "Saltar al contenido\numidash\nHOY\nResumen\nOPERACIÓN\nPedidos\nReportes\nVentas\nReembolsos\nCaja y turnos\nCocina\nCLIENTES\nClientes\nAtención\nLealtad y valor\nNEGOCIO\nProductos\nInventario\nPlano de mesas\nDispositivos\nEquipo y accesos\nCONFIGURACIÓN\nHorarios\nAjustes\nDiagnóstico\nCafé Fixture\nReportes\nEspañol\nCentro\nIO\nI1 Owner\nEN LÍNEA\n·\nCAFÉ FIXTURE\n·\nCENTRO\n·\nDOM 15 DE NOV\n09:35 P.M.\nHoy\nAyer\n7 días\n30 días\nAnálisis de compras\nCobros originales\nTabla dinámica\nRecibos\nAgrupar por\nProducto\nCategoría\nOperador\nHora\nHora\tUnidades\tImporte antes de descuentos ▼\t% del total\n11\t3\t$180.00\t53%\n02\t1\t$80.00\t24%\n12\t1\t$80.00\t24%\nTotal\t5\t$340.00\t100%"
+    },
+    "responses": [
+      {
+        "path": "/api/merchants/55555555-5555-4555-8555-000000000001/operations/reports/sales/insight",
+        "query": {
+          "range": "today",
+          "locationId": "55555555-5555-4555-8555-000000000011"
+        },
+        "status": 200,
+        "body": {
+          "narrative": null,
+          "generated": false,
+          "capturedAt": "2026-11-16T04:35:34.013Z"
+        }
+      },
+      {
+        "path": "/api/merchants/55555555-5555-4555-8555-000000000001/operations/reports/sales",
+        "query": {
+          "range": "today",
+          "locationId": "55555555-5555-4555-8555-000000000011"
+        },
+        "status": 200,
+        "body": {
+          "merchantId": "55555555-5555-4555-8555-000000000001",
+          "locationId": "55555555-5555-4555-8555-000000000011",
+          "range": "today",
+          "currency": "MXN",
+          "bucket": "hour",
+          "totals": {
+            "netSalesMinorUnits": 0,
+            "orders": 0,
+            "averageTicketMinorUnits": 0,
+            "itemsSold": 0,
+            "discountMinorUnits": 0,
+            "tipsMinorUnits": 0,
+            "priorNetSalesMinorUnits": 0
+          },
+          "paymentMix": [],
+          "channelMix": [],
+          "productMix": [],
+          "byOperator": [],
+          "byHour": [],
+          "series": [],
+          "capturedAt": "2026-11-16T04:35:34.015Z"
+        }
+      },
+      {
+        "path": "/api/merchants/55555555-5555-4555-8555-000000000001/operations/reports/sales",
+        "query": {
+          "range": "last_30_days",
+          "locationId": "55555555-5555-4555-8555-000000000011"
+        },
+        "status": 200,
+        "body": {
+          "merchantId": "55555555-5555-4555-8555-000000000001",
+          "locationId": "55555555-5555-4555-8555-000000000011",
+          "range": "last_30_days",
+          "currency": "MXN",
+          "bucket": "day",
+          "totals": {
+            "netSalesMinorUnits": 35500,
+            "orders": 3,
+            "averageTicketMinorUnits": 11833,
+            "itemsSold": 5,
+            "discountMinorUnits": 1000,
+            "tipsMinorUnits": 2500,
+            "priorNetSalesMinorUnits": 0
+          },
+          "paymentMix": [],
+          "channelMix": [
+            {
+              "channel": "walk_in",
+              "netSalesMinorUnits": 35500,
+              "orders": 3
+            }
+          ],
+          "productMix": [
+            {
+              "productId": "55555555-5555-4555-8555-000000000032",
+              "productName": "Café americano",
+              "category": "Bebidas",
+              "units": 3,
+              "netMinorUnits": 24000
+            },
+            {
+              "productId": "55555555-5555-4555-8555-000000000031",
+              "productName": "Concha",
+              "category": "Panadería",
+              "units": 2,
+              "netMinorUnits": 10000
+            }
+          ],
+          "byOperator": [
+            {
+              "key": "—",
+              "units": 5,
+              "netMinorUnits": 34000
+            }
+          ],
+          "byHour": [
+            {
+              "key": "02",
+              "units": 1,
+              "netMinorUnits": 8000
+            },
+            {
+              "key": "11",
+              "units": 3,
+              "netMinorUnits": 18000
+            },
+            {
+              "key": "12",
+              "units": 1,
+              "netMinorUnits": 8000
+            }
+          ],
+          "series": [
+            {
+              "label": "2026-11-02",
+              "amountMinorUnits": 27000
+            },
+            {
+              "label": "2026-11-04",
+              "amountMinorUnits": 8500
+            }
+          ],
+          "capturedAt": "2026-11-16T04:35:34.529Z"
+        }
+      },
+      {
+        "path": "/api/merchants/55555555-5555-4555-8555-000000000001/operations/reports/sales/insight",
+        "query": {
+          "range": "last_30_days",
+          "locationId": "55555555-5555-4555-8555-000000000011"
+        },
+        "status": 200,
+        "body": {
+          "narrative": null,
+          "generated": false,
+          "capturedAt": "2026-11-16T04:35:34.530Z"
+        }
+      }
+    ]
+  }
+}

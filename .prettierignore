@@ -90,3 +90,10 @@ docs/verification/2026-11-16-semantic-api-gate2-parity.json
 # Accepted gate-2 SPEC v1.1: the signed acceptance text. Its SHA-256 is recorded
 # in the gate-2 evidence. Prettier must not rewrite the accepted bytes.
 docs/architecture/2026-11-16-semantic-analytics-api-spec.md
+
+# Gate-3 frozen legacy oracle: captured evidence. The test checks the stored bytes
+# against the manifest, so Prettier must not rewrite them.
+apps/umi-api/test/fixtures/semantic-gate3/
+
+# Gate-3 dashboard evidence: screenshots and the recorded network/DOM JSON.
+docs/verification/2026-11-16-semantic-api-gate3/dashboard/

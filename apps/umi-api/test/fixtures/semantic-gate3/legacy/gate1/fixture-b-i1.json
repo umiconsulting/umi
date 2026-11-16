@@ -1,0 +1,91 @@
+{
+  "caseId": "fixture-b-i1",
+  "capturedAt": "2026-11-16T04:30:18.883Z",
+  "legacyCommit": "dfa7a78a94e696eb67fc4606b281268746128ec8",
+  "request": {
+    "range": "last_7_days",
+    "locationId": null,
+    "asOf": "2026-11-04"
+  },
+  "productAliases": {},
+  "response": {
+    "merchantId": "55555555-5555-4555-8555-000000000001",
+    "locationId": null,
+    "range": "last_7_days",
+    "currency": "MXN",
+    "bucket": "day",
+    "totals": {
+      "netSalesMinorUnits": 49500,
+      "orders": 4,
+      "averageTicketMinorUnits": 12375,
+      "itemsSold": 7,
+      "discountMinorUnits": 3000,
+      "tipsMinorUnits": 2500,
+      "priorNetSalesMinorUnits": 0
+    },
+    "paymentMix": [],
+    "channelMix": [
+      {
+        "channel": "walk_in",
+        "netSalesMinorUnits": 49500,
+        "orders": 4
+      }
+    ],
+    "productMix": [
+      {
+        "productId": "55555555-5555-4555-8555-000000000032",
+        "productName": "Café americano",
+        "category": "Bebidas",
+        "units": 5,
+        "netMinorUnits": 40000
+      },
+      {
+        "productId": "55555555-5555-4555-8555-000000000031",
+        "productName": "Concha",
+        "category": "Panadería",
+        "units": 2,
+        "netMinorUnits": 10000
+      }
+    ],
+    "byOperator": [
+      {
+        "key": "—",
+        "units": 7,
+        "netMinorUnits": 50000
+      }
+    ],
+    "byHour": [
+      {
+        "key": "02",
+        "units": 1,
+        "netMinorUnits": 8000
+      },
+      {
+        "key": "09",
+        "units": 2,
+        "netMinorUnits": 16000
+      },
+      {
+        "key": "11",
+        "units": 3,
+        "netMinorUnits": 18000
+      },
+      {
+        "key": "12",
+        "units": 1,
+        "netMinorUnits": 8000
+      }
+    ],
+    "series": [
+      {
+        "label": "2026-11-02",
+        "amountMinorUnits": 27000
+      },
+      {
+        "label": "2026-11-04",
+        "amountMinorUnits": 22500
+      }
+    ],
+    "capturedAt": "2026-11-16T04:30:18.883Z"
+  }
+}

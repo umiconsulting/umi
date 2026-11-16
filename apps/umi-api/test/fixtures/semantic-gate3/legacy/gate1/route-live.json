@@ -1,0 +1,87 @@
+{
+  "caseId": "route-live",
+  "capturedAt": "2026-11-16T04:35:39.718Z",
+  "legacyCommit": "dfa7a78a94e696eb67fc4606b281268746128ec8",
+  "request": {
+    "method": "GET",
+    "range": "last_30_days",
+    "locationId": "55555555-5555-4555-8555-000000000011",
+    "asOf": null
+  },
+  "productAliases": {},
+  "response": {
+    "merchantId": "55555555-5555-4555-8555-000000000001",
+    "locationId": "55555555-5555-4555-8555-000000000011",
+    "range": "last_30_days",
+    "currency": "MXN",
+    "bucket": "day",
+    "totals": {
+      "netSalesMinorUnits": 35500,
+      "orders": 3,
+      "averageTicketMinorUnits": 11833,
+      "itemsSold": 5,
+      "discountMinorUnits": 1000,
+      "tipsMinorUnits": 2500,
+      "priorNetSalesMinorUnits": 0
+    },
+    "paymentMix": [],
+    "channelMix": [
+      {
+        "channel": "walk_in",
+        "netSalesMinorUnits": 35500,
+        "orders": 3
+      }
+    ],
+    "productMix": [
+      {
+        "productId": "55555555-5555-4555-8555-000000000032",
+        "productName": "Café americano",
+        "category": "Bebidas",
+        "units": 3,
+        "netMinorUnits": 24000
+      },
+      {
+        "productId": "55555555-5555-4555-8555-000000000031",
+        "productName": "Concha",
+        "category": "Panadería",
+        "units": 2,
+        "netMinorUnits": 10000
+      }
+    ],
+    "byOperator": [
+      {
+        "key": "—",
+        "units": 5,
+        "netMinorUnits": 34000
+      }
+    ],
+    "byHour": [
+      {
+        "key": "02",
+        "units": 1,
+        "netMinorUnits": 8000
+      },
+      {
+        "key": "11",
+        "units": 3,
+        "netMinorUnits": 18000
+      },
+      {
+        "key": "12",
+        "units": 1,
+        "netMinorUnits": 8000
+      }
+    ],
+    "series": [
+      {
+        "label": "2026-11-02",
+        "amountMinorUnits": 27000
+      },
+      {
+        "label": "2026-11-04",
+        "amountMinorUnits": 8500
+      }
+    ],
+    "capturedAt": "2026-11-16T04:35:23.579Z"
+  }
+}

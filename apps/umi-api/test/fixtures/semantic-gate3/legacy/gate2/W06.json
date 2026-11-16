@@ -1,0 +1,38 @@
+{
+  "caseId": "W06",
+  "capturedAt": "2026-11-16T04:30:18.773Z",
+  "legacyCommit": "dfa7a78a94e696eb67fc4606b281268746128ec8",
+  "request": {
+    "range": "last_7_days",
+    "locationId": null,
+    "asOf": "2026-11-01"
+  },
+  "productAliases": {
+    "2f80943e-ff4c-40fd-92e7-26d5dc32984f": "bread",
+    "243522ad-5b36-4814-8adb-0b9b2ba0fe6a": "coffee",
+    "f239d284-6600-4ca5-8101-a5e0f556d3bd": "foreign"
+  },
+  "response": {
+    "merchantId": "6bede1cc-0484-47ba-82fd-590abc948cb7",
+    "locationId": null,
+    "range": "last_7_days",
+    "currency": "MXN",
+    "bucket": "day",
+    "totals": {
+      "netSalesMinorUnits": 0,
+      "orders": 0,
+      "averageTicketMinorUnits": 0,
+      "itemsSold": 0,
+      "discountMinorUnits": 0,
+      "tipsMinorUnits": 0,
+      "priorNetSalesMinorUnits": 0
+    },
+    "paymentMix": [],
+    "channelMix": [],
+    "productMix": [],
+    "byOperator": [],
+    "byHour": [],
+    "series": [],
+    "capturedAt": "2026-11-16T04:30:18.773Z"
+  }
+}

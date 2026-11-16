@@ -195,7 +195,8 @@ import type { ZodTypeAny } from 'zod';
 /** 2.55.0 adds the typed basket state and keeps the summary when the basket budget fails. */
 /** 2.56.0 adds settlement-cart origin fields and the payment hold classification. */
 /** 2.57.0 adds the typed analytics metrics query and its metric catalogue. */
-export const CONTRACT_VERSION = '2.57.0';
+/** 2.58.0 adds the metrics insight route and removes the sales report types. */
+export const CONTRACT_VERSION = '2.58.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;

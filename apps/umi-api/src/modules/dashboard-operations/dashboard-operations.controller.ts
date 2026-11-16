@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
-import { DashboardOperationsQuery, ReportsSalesQuery } from '@umi/contract';
+import { DashboardOperationsQuery } from '@umi/contract';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser, Merchant } from '../auth/current-user.decorator';
@@ -120,26 +120,6 @@ export class DashboardOperationsController {
     @Param('saleId') saleId: string,
   ) {
     return this.operations.saleReceipt(user, merchant, saleId);
-  }
-
-  @Get('reports/sales')
-  salesSummary(
-    @CurrentUser() user: AuthUser,
-    @Merchant() merchant: MerchantAccess,
-    @Param('merchantId') _merchantId: string,
-    @Query(new ZodValidationPipe(ReportsSalesQuery)) query: ReportsSalesQuery,
-  ) {
-    return this.operations.salesSummary(user, merchant, query);
-  }
-
-  @Get('reports/sales/insight')
-  salesInsight(
-    @CurrentUser() user: AuthUser,
-    @Merchant() merchant: MerchantAccess,
-    @Param('merchantId') _merchantId: string,
-    @Query(new ZodValidationPipe(ReportsSalesQuery)) query: ReportsSalesQuery,
-  ) {
-    return this.operations.salesInsight(user, merchant, query);
   }
 
   @Get('cash-shifts/:shiftId')

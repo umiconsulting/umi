@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "f97644a71bb6b83391884e88aaffd452f95ed4664d19a9c0a18b4097a80ec14d",
-  "contractVersion": "2.57.0",
+  "contentHash": "2d3ec277b2345be978ea41ba2be501bdb4823718181881f62ddf15d2144e9fce",
+  "contractVersion": "2.58.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -60979,6 +60979,57 @@
       ],
       "type": "string"
     },
+    "MetricsInsightQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "range": {
+          "enum": [
+            "today",
+            "yesterday",
+            "last_7_days",
+            "last_30_days"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "range"
+      ],
+      "type": "object"
+    },
+    "MetricsInsightResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "capturedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "generated": {
+          "type": "boolean"
+        },
+        "narrative": {
+          "anyOf": [
+            {
+              "maxLength": 600,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "narrative",
+        "generated",
+        "capturedAt"
+      ],
+      "type": "object"
+    },
     "MetricsOperatorDistribution": {
       "additionalProperties": false,
       "properties": {
@@ -113310,6 +113361,23 @@
       "pin": false,
       "request": "FiscalStampSaleRequest",
       "response": "FiscalStampSaleResult"
+    },
+    "POST /api/merchants/:merchantId/metrics/insight": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "VALIDATION_FAILED",
+        "PERMISSION_DENIED",
+        "LOCATION_SCOPE_VIOLATION"
+      ],
+      "idempotent": false,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "sale.lifecycle",
+      "pin": false,
+      "request": "MetricsInsightQuery",
+      "response": "MetricsInsightResponse"
     },
     "POST /api/merchants/:merchantId/metrics/query": {
       "approval": false,

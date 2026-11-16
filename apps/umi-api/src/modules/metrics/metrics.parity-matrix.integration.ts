@@ -7,8 +7,8 @@ import { METRIC_RANGES } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
 import type { AppConfig } from '../../shared/config/config.schema';
 import type { AuthUser } from '../auth/auth.types';
-import { DashboardOperationsRepository } from '../dashboard-operations/dashboard-operations.repository';
 import { seedSalesAnalysis } from '../../../test/integration/sales-analysis-fixture';
+import { loadLegacyCase } from '../../../test/integration/legacy-sales-oracle';
 import {
   aliasFixtureProducts,
   canonicalJson,
@@ -22,8 +22,8 @@ import { MetricsRepository } from './metrics.repository';
 /**
  * Gate-2 parity matrix.
  *
- * Each case asks the new `metrics/query` read and the legacy `salesSummary`
- * read the same question over the same explicit window. The test normalizes
+ * Each case asks the new `metrics/query` read and a frozen legacy sales
+ * summary the same question over the same explicit window. The test normalizes
  * both answers with one canonical shape and compares all fourteen migrated
  * metrics. The committed ledger records one row per case with the two hashes.
  *
@@ -180,7 +180,6 @@ const DISTRIBUTIONS = [
 describe('gate-2 parity matrix over fixture A', () => {
   let pg: PgService;
   let metrics: MetricsRepository;
-  let legacy: DashboardOperationsRepository;
   let ids: Awaited<ReturnType<typeof seedSalesAnalysis>>;
   let user: AuthUser;
   const rows: CaseRow[] = [];
@@ -192,7 +191,6 @@ describe('gate-2 parity matrix over fixture A', () => {
     await pg.onModuleInit();
     ids = await seedSalesAnalysis(pg.worker);
     metrics = new MetricsRepository(pg);
-    legacy = new DashboardOperationsRepository(pg);
     user = { id: ids.user, email: null, sessionId: ids.session, deviceId: null };
   });
 
@@ -212,10 +210,8 @@ describe('gate-2 parity matrix over fixture A', () => {
       dimensions: [],
       range: item.range,
     };
-    const [fresh, old] = await Promise.all([
-      metrics.read(user.id, ids.merchant, locationId, query, item.asOf),
-      legacy.salesSummary(user.id, ids.merchant, { range: item.range }, locationId, item.asOf),
-    ]);
+    const fresh = await metrics.read(user.id, ids.merchant, locationId, query, item.asOf);
+    const frozen = loadLegacyCase(item.id);
 
     expect(fresh.rows).toBeUndefined();
     expect(fresh.rowsTotal).toBeUndefined();
@@ -232,16 +228,15 @@ describe('gate-2 parity matrix over fixture A', () => {
     }
 
     const freshNormalized = normalizeFresh(fresh);
-    const legacyNormalized = normalizeLegacy(old);
-    expect(freshNormalized).toEqual(legacyNormalized);
-
+    const legacyNormalized = normalizeLegacy(frozen.response);
     const aliases: Record<string, string> = {
       [ids.bread]: 'bread',
       [ids.coffee]: 'coffee',
       [ids.foreignProduct]: 'foreign',
     };
     const freshHashed = aliasFixtureProducts(freshNormalized, aliases);
-    const legacyHashed = aliasFixtureProducts(legacyNormalized, aliases);
+    const legacyHashed = aliasFixtureProducts(legacyNormalized, frozen.productAliases);
+    expect(freshHashed).toEqual(legacyHashed);
     const freshSha256 = sha256(canonicalJson(freshHashed));
     const legacySha256 = sha256(canonicalJson(legacyHashed));
     expect(freshSha256).toBe(legacySha256);
