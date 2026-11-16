@@ -1,8 +1,9 @@
 # I1-FIN-03 pair semantics record
 
 Date: 2026-11-15, America/Mazatlan.
-Status: Open. SPEC owner decision required.
-Decision owner: umi-lead (SPEC owner). Evidence owner: umi-verifier.
+Status: Resolved by decision. The case remains BLOCKED as an external baseline
+limitation. It is not a product failure.
+Decision owner: umi-lead (SPEC owner), 2026-11-15. Evidence owner: umi-verifier.
 Worktree: `.worktrees/i1-closeout-20261115`.
 
 ## Finding
@@ -17,18 +18,23 @@ fields.
 baseline. `I1-FIN-01` requires the section 4.2 anchor, including `pairs = 1`.
 The two pinned expectations conflict at `sale_result.pairs`.
 
-## Decision required
+## Decision
 
-The SPEC owner must choose one option:
+Decision (umi-lead, 2026-11-15):
 
-1. Keep the `I1-FIN-03` baseline equality. Then `I1-FIN-01` and `I1-FIN-03`
-   cannot both pass at this baseline.
-2. Change `I1-FIN-03` to compare the seven dimensions to the baseline and the
-   pair fields to the section 4.2 anchor. This option changes the SPEC and the
-   harness.
+- The SPEC 4.2 anchor and `I1-FIN-01` are correct. A sale with two products and a
+  refund of one line has one product pair. A refund removes money, not the
+  purchase event.
+- The baseline `b4ba45fc` is stale. It removes the refunded line before pair
+  counting and returns `pairs=0`.
+- The candidate at the head matches the SPEC: `pairs=1` and `pairsAvailable=1`.
+- The `I1-FIN-03` baseline pair equality is unsatisfiable at this baseline.
+- Do not change the harness or the expected value.
+- The regression test in `sales-analysis.spec.ts` pins the chosen semantics.
+- The signed SPEC is unchanged and verifies.
 
-This record does not decide the case. `I1-FIN-03` stays BLOCKED until the SPEC
-owner decides.
+The case remains BLOCKED as an external baseline limitation. It is not a product
+failure. The acceptance count treats it as a blocked case.
 
 ## What this record does not do
 
@@ -36,13 +42,14 @@ owner decides.
   `SHA256SUMS` verifies.
 - It does not change `tools/verification/i1-cases-fin.mjs`. The harness keeps
   the baseline equality. The verifier owns the harness.
+- It does not change a product file or a test file.
 - It does not mark `I1-FIN-03` PASS.
 - It does not present a new case rule as applied.
 
 ## Seven-dimension comparison
 
-Baseline `b4ba45fc` against the final candidate in the evidence package at the
-same golden range.
+Baseline `b4ba45fc` against the candidate at the evidence head, at the same
+golden range.
 
 | `sale_result` dimension | Baseline  | Candidate | Match |
 | ----------------------- | --------- | --------- | ----- |
@@ -73,25 +80,38 @@ The candidate pair is Concha and Café americano. It has `baskets=1`,
 original sale lines for pair counting. A refund removes money, not the purchase
 event. The baseline build removes the refunded line before it counts pairs. The
 golden fixture has one sale with two products and a refund of one line. The
-baseline therefore reports no pair. The candidate reports one pair. The 4.2
-anchor and the product agree that the pair exists.
+baseline therefore reports no pair. The candidate reports one pair.
+
+## Basis
+
+- SPEC `I1-FIN-01` (`[A:L274–L286]`) pins the section 4.2 anchor:
+  `pairs.length=1` and `coverage.pairsAvailable=1`.
+- SPEC `I1-FIN-03` (`[A:L297–L309]`) requires `pairs` to match the baseline.
+- The baseline result `baseline-sale-result.json` has `pairs.length=0` and
+  `coverage.pairsAvailable=0`.
+- The candidate result `candidate-sale-result.json` has `pairs.length=1` and
+  `coverage.pairsAvailable=1`.
+- The case result `result.json` is BLOCKED with the pair-conflict message.
 
 ## Evidence
 
-The cold run at the final candidate is
-`.analytics-i1-closeout-20261115/final/cases/I1-FIN-03`. It holds these files:
+The cold run at the new head is
+`.analytics-i1-closeout-20261115/fin03-cold/cases/I1-FIN-03`. The full run is
+`.analytics-i1-closeout-20261115/full-2/cases/I1-FIN-03`. Each case directory
+holds these case files:
 
 - `baseline-sale-result.json`
 - `baseline-period-movements.json`
 - `candidate-sale-result.json`
 - `candidate-period-movements.json`
-- `cmp.txt` (the seven-dimension comparison)
 - `result.json`
 - `sha256.txt`
+- `stdout.txt`
+- `stderr.txt`
 
-The run result is BLOCKED with the pair-conflict message. The four JSON files
-hold the values above.
+The four JSON files hold the values above. The case returns before it writes a
+comparison file.
 
-The governance record is the register block "Architecture decision status,
-2026-11-15" at
-`.release-evidence-9917f361-20261115/records/register.md`.
+`.analytics-i1-closeout-20261115/fin03-cmp.txt` is a derived comparison. A
+helper reads the four JSON files after the run and writes it. It is not case
+output. The manifest does not list it as a case file.
