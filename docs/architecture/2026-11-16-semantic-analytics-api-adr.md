@@ -2,9 +2,9 @@
 
 _ADR · build-v3 · `merchant` schema · semantic analytics API v1 · 2026-11-16_
 
-**Status:** PROPOSED for gate 3 (2026-11-16). Replaces the accepted 2.57.0 ADR when gate 3 merges. API contract `2.58.0`. Metric definition `1.0.0`.
-**Supersedes:** the accepted 2026-11-16 ADR at `f81d983a` (176 lines, SHA-256 `ec34ea74617c5be8a8adfa3fce0ba1ce219f74caa4e8baf589f0150073d584ee`), the 2026-11-15 draft `SPEC.md`, and its gate-1 amendments. The reconciled text is `docs/architecture/2026-11-16-semantic-analytics-api-spec.md` v1.2.
-**Relates to:** `docs/reports/2026-11-08-umi-product-and-data-architecture.md` §7-§8 and `docs/reports/2026-11-07-dashboard-disruptive-architecture.md` §6. These two files are not in this checkout. The gate-1 contract records their location.
+**Status:** The gate-3 text is ACCEPTED at `dd46278d` (2026-11-16). The §3.8 typed metadata is PROPOSED until metadata PR #295 merges, then ACCEPTED. API contract `2.58.0`. Metric definition `1.0.0`.
+**Supersedes:** the accepted 2026-11-16 ADR at `f81d983a` (176 lines, SHA-256 `ec34ea74617c5be8a8adfa3fce0ba1ce219f74caa4e8baf589f0150073d584ee`), the 2026-11-15 draft `SPEC.md`, and its gate-1 amendments. The reconciled text is `docs/architecture/2026-11-16-semantic-analytics-api-spec.md` v1.3.
+**Relates to:** `docs/architecture/2026-11-16-semantic-analytics-api-spec.md` v1.3, `docs/reports/2026-11-08-umi-product-and-data-architecture.md` §7-§8 and `docs/reports/2026-11-07-dashboard-disruptive-architecture.md` §6. These two reports are not in this checkout. The gate-1 contract records their location.
 **Code:** `apps/umi-api/src/modules/metrics/`; `packages/contract/src/metrics.ts`; `packages/contract/src/route-table.ts` (entries `metrics.query` and `metrics.insight`); `apps/umi-dashboard/src/lib/sales-metrics.js`; `apps/umi-dashboard/src/data.jsx`; `apps/umi-api/src/modules/dashboard-operations/sales-analysis.repository.ts`.
 
 ---
@@ -114,6 +114,14 @@ The summary and the narrative have different inputs. The summary needs 7 scalars
 The narrative can fail without a data failure. A model timeout or a provider error must not hide the summary. A separate route gives each failure its own response. The insight route returns `narrative: null`, and the summary stays complete.
 
 The insight route uses the same `sale.lifecycle` policy and location scope. It adds no permission and no metric.
+
+### 3.8 Why the metadata is typed data
+
+The definition stays data. A new metric must decide its inclusions, its exclusions, and its denominator before it enters the catalogue. A required field makes the decision visible. The type check rejects a definition that omits a field. An invariant test rejects a quotient that does not name its denominator.
+
+The catalogue uses literal tokens from one closed union. It does not use a query language, an interpreter, an optimizer, or a rule engine. Section 5 rejects a generic query language for the same reason. That language moves the definition from the catalogue to the caller. The duplicate-SQL problem then returns at a higher layer.
+
+The metadata stays internal. The public contract `2.58.0`, the definition `1.0.0`, and the response bytes do not change.
 
 ## 4. The v1 contract
 

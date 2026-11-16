@@ -1,6 +1,37 @@
 import { METRIC_DIMENSIONS_BY_ID, type MetricsDimension, type MetricsId } from '@umi/contract';
 
 /**
+ * The closed set of fact policies. A definition names only these tokens. The
+ * repository SQL is the authority for the token that applies to each metric.
+ */
+export const FACT_POLICIES = [
+  'committed_sale',
+  'uncommitted_sale',
+  'void_adjustment',
+  'refund_adjustment',
+  'uncommitted_exception',
+  'committed_tender',
+  'uncommitted_tender',
+  'customer_value_allocation',
+  'business_date_window',
+  'prior_business_date_window',
+  'captured_at_cutoff',
+  'location_scope',
+  'sale_business_date',
+  'refund_tip',
+  'tender_dedupe',
+] as const;
+export type FactPolicy = (typeof FACT_POLICIES)[number];
+
+/**
+ * A quotient names its denominator metric. Every other metric states that a
+ * denominator does not apply. The field is required, so a new metric cannot omit
+ * the decision.
+ */
+export type MetricDenominator =
+  { readonly kind: 'metric'; readonly metric: MetricsId } | { readonly kind: 'not_applicable' };
+
+/**
  * One metric definition. It is data, not code: the formula text is the contract
  * the verifier reads, and the repository implements the same text. A new metric
  * needs a definition here and a formula there, and nothing in between.
@@ -23,6 +54,12 @@ export interface MetricDefinition {
   /** The tables the definition reads. The response coverage is their union. */
   readonly sources: readonly string[];
   readonly additive: boolean;
+  /** The fact policies that the metric includes. */
+  readonly includes: readonly FactPolicy[];
+  /** The fact policies that the metric excludes. */
+  readonly excludes: readonly FactPolicy[];
+  /** The denominator metric for a quotient. Not applicable for every other metric. */
+  readonly denominator: MetricDenominator;
   readonly dimensions: readonly MetricsDimension[];
   readonly nullPolicy: string;
   readonly formula: string;
@@ -41,6 +78,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'sale',
     sources: SALE_SOURCES,
     additive: true,
+    includes: ['committed_sale', 'business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.net_sales,
     nullPolicy: ZERO_WHEN_EMPTY,
     formula:
@@ -54,6 +94,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'sale',
     sources: SALE_SOURCES,
     additive: true,
+    includes: ['committed_sale', 'business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.orders,
     nullPolicy: ZERO_WHEN_EMPTY,
     formula: 'count(*)::bigint over committed sales in the business-date window',
@@ -66,6 +109,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'sale',
     sources: SALE_SOURCES,
     additive: false,
+    includes: ['committed_sale', 'business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'metric', metric: 'orders' },
     dimensions: METRIC_DIMENSIONS_BY_ID.average_ticket,
     nullPolicy: '0 when orders = 0. This is the documented exception to the null rule.',
     formula: 'orders = 0 ? 0 : Math.round(net_sales / orders)',
@@ -78,6 +124,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'line',
     sources: LINE_SOURCES,
     additive: true,
+    includes: ['committed_sale', 'business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.items_sold,
     nullPolicy: ZERO_WHEN_EMPTY,
     formula:
@@ -91,6 +140,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'line',
     sources: LINE_SOURCES,
     additive: false,
+    includes: ['committed_sale', 'business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'metric', metric: 'orders' },
     dimensions: METRIC_DIMENSIONS_BY_ID.units_per_ticket,
     nullPolicy: 'null when orders = 0; 0 when orders > 0 and items = 0; else 4 decimals, half-up',
     formula: 'orders = 0 ? null : items = 0 ? 0 : roundHalfUp(items / orders, 4)',
@@ -103,6 +155,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'sale',
     sources: SALE_SOURCES,
     additive: true,
+    includes: ['committed_sale', 'business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.discounts,
     nullPolicy: ZERO_WHEN_EMPTY,
     formula: "coalesce(sum((r.snapshot->'discountTotal'->>'minorUnits')::bigint), 0)",
@@ -115,6 +170,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'sale',
     sources: SALE_SOURCES,
     additive: true,
+    includes: ['committed_sale', 'business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.tips,
     nullPolicy: ZERO_WHEN_EMPTY,
     formula: "coalesce(sum((r.snapshot->'tip'->>'minorUnits')::bigint), 0)",
@@ -127,6 +185,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'period',
     sources: SALE_SOURCES,
     additive: true,
+    includes: ['committed_sale', 'prior_business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.prior_net_sales,
     nullPolicy: ZERO_WHEN_EMPTY,
     formula: 'net_sales over the prior window of the same size',
@@ -139,6 +200,17 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'sale',
     sources: ['pos_sale_exception', ...SALE_SOURCES],
     additive: true,
+    includes: [
+      'committed_sale',
+      'void_adjustment',
+      'refund_adjustment',
+      'business_date_window',
+      'location_scope',
+      'sale_business_date',
+      'captured_at_cutoff',
+    ],
+    excludes: ['uncommitted_sale', 'uncommitted_exception', 'refund_tip'],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.refunds,
     nullPolicy: ZERO_WHEN_EMPTY,
     formula:
@@ -152,6 +224,21 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'method',
     sources: [...SALE_SOURCES, 'pos_tender_fact', 'customer_value_tender_allocation'],
     additive: true,
+    includes: [
+      'committed_sale',
+      'business_date_window',
+      'location_scope',
+      'committed_tender',
+      'customer_value_allocation',
+    ],
+    excludes: [
+      'uncommitted_sale',
+      'uncommitted_tender',
+      'void_adjustment',
+      'refund_adjustment',
+      'tender_dedupe',
+    ],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.payment_mix,
     nullPolicy: 'empty items and zero total when the set is empty',
     formula:
@@ -165,6 +252,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'channel',
     sources: SALE_SOURCES,
     additive: true,
+    includes: ['committed_sale', 'business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.channel_mix,
     nullPolicy: 'empty items and zero total when the set is empty',
     formula: "group by coalesce(s.origin_channel, 'walk_in'); sum(r.grand_total), count(*)",
@@ -177,6 +267,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'product',
     sources: [...LINE_SOURCES, 'product', 'product_category'],
     additive: true,
+    includes: ['committed_sale', 'business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.product_mix,
     nullPolicy: 'empty items and zero total when the set is empty',
     formula:
@@ -190,6 +283,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'operator',
     sources: [...LINE_SOURCES, 'cash_shift', 'staff'],
     additive: true,
+    includes: ['committed_sale', 'business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.operator_mix,
     nullPolicy: 'empty items and zero total when the set is empty',
     formula: "group by coalesce(st.name, '—') through cash_shift and staff; units and merchandise",
@@ -202,6 +298,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'hour',
     sources: LINE_SOURCES,
     additive: true,
+    includes: ['committed_sale', 'business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.hour_mix,
     nullPolicy: 'empty items and zero total when the set is empty',
     formula:
@@ -215,6 +314,9 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     granularity: 'day_or_hour',
     sources: SALE_SOURCES,
     additive: true,
+    includes: ['committed_sale', 'business_date_window', 'location_scope'],
+    excludes: ['uncommitted_sale', 'void_adjustment', 'refund_adjustment'],
+    denominator: { kind: 'not_applicable' },
     dimensions: METRIC_DIMENSIONS_BY_ID.series,
     nullPolicy: 'empty items and zero total when the set is empty',
     formula:
