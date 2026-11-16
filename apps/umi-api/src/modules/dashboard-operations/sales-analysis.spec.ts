@@ -152,6 +152,41 @@ describe('análisis de compras', () => {
     expect(tuesday.byDay[0]).toMatchObject({ key: '2026-11-03', tickets: 0, netMinorUnits: -6000 });
   });
 
+  it('cuenta un par aunque una devolución elimine una línea de la venta', () => {
+    // I1-FIN-03: a sale with two products and a refund of one line keeps one pair.
+    // A refund removes money, not the purchase event. SPEC 4.2 pins pairsAvailable=1.
+    const mixed = sale('mixed', {
+      merchandiseMinorUnits: 27000,
+      tipsMinorUnits: 0,
+      discountsMinorUnits: 0,
+      lines: [
+        { id: 'mixed-bread', productId: bread, name: 'Pan', quantity: 1 },
+        { id: 'mixed-coffee', productId: coffee, name: 'Café', quantity: 1 },
+      ],
+      refunds: [
+        {
+          id: 'mixed-refund',
+          day,
+          hour: '09',
+          weekday: '1',
+          merchandiseMinorUnits: 9000,
+          tipsMinorUnits: 0,
+          quantities: [{ lineId: 'mixed-bread', quantity: 1 }],
+        },
+      ],
+    });
+    const result = analyzePurchases([mixed], query, []);
+    expect(result.pairs).toHaveLength(1);
+    expect(result.pairs[0]).toMatchObject({
+      baskets: 1,
+      support: 1,
+      confidenceAtoB: 1,
+      confidenceBtoA: 1,
+      lift: 1,
+    });
+    expect(result.coverage.pairsAvailable).toBe(1);
+  });
+
   it('une tickets de una visita de mesa sin inventar visitas para ventas anónimas', () => {
     const result = analyzePurchases(
       [
