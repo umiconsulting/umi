@@ -27,6 +27,7 @@ import { tableStateModels } from './table-state';
 import { tableOrderModels } from './table-order';
 import { posKitchenModels } from './pos-kitchen';
 import { dashboardOperationsModels } from './dashboard-operations';
+import { metricsModels } from './metrics';
 import { tenderModels } from './tender';
 import { mercadoPagoModels } from './mercado-pago';
 import { realtimeModels } from './realtime';
@@ -193,7 +194,8 @@ import type { ZodTypeAny } from 'zod';
 /** 2.54.0 adds direct inventory purchases and private invoice artifacts. */
 /** 2.55.0 adds the typed basket state and keeps the summary when the basket budget fails. */
 /** 2.56.0 adds settlement-cart origin fields and the payment hold classification. */
-export const CONTRACT_VERSION = '2.56.0';
+/** 2.57.0 adds the typed analytics metrics query and its metric catalogue. */
+export const CONTRACT_VERSION = '2.57.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;
@@ -251,6 +253,8 @@ export const modelCatalog: Readonly<Record<string, ZodTypeAny>> = {
   ...tableStateModels,
   ...tableOrderModels,
   ...dashboardOperationsModels,
+  // The semantic analytics read and its response envelopes (gate 1).
+  ...metricsModels,
   // The tender path and the fiscal record (workstream G): the attempt model with its
   // three outcomes, and the CFDI state machine with its deadline.
   ...tenderModels,

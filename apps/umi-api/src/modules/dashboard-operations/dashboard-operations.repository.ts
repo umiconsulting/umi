@@ -365,6 +365,9 @@ export class DashboardOperationsRepository {
     merchantId: string,
     query: ReportsSalesQuery,
     locationId: string | null,
+    // Internal replay hook for the gate-1 parity test. The route never sends it,
+    // so the published behaviour keeps the merchant's current business day.
+    asOf?: string,
   ): Promise<ReportsSalesSummary> {
     return this.pg.runWithMerchant(
       merchantId,
@@ -377,7 +380,7 @@ export class DashboardOperationsRepository {
         );
         const tz = meta.rows[0]?.timezone ?? 'UTC';
         const currency = meta.rows[0]?.currency ?? null;
-        const today = meta.rows[0]?.today ?? new Date().toISOString().slice(0, 10);
+        const today = asOf ?? meta.rows[0]?.today ?? new Date().toISOString().slice(0, 10);
 
         // Business-date window [start, end] and the equally-sized window before it.
         const shift = (iso: string, days: number): string => {

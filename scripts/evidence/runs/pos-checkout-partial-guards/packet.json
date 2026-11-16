@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1",
-  "runId": "pos-checkout-partial-guards-1794777906234",
-  "createdAt": "2026-11-15T21:25:06.234Z",
+  "runId": "pos-checkout-partial-guards-1794794911547",
+  "createdAt": "2026-11-16T02:08:31.547Z",
   "contentView": "working-tree",
   "policySha256": "dcc6c649ce210c15a4ecb351bb04bfa68e3f326f46cc651d04e3b4aa5a704835",
   "check": {
@@ -24,8 +24,8 @@
   "logs": {
     "stdout": {
       "path": "scripts/evidence/runs/pos-checkout-partial-guards/stdout.log",
-      "sha256": "e02e3c78711d266237418b2283fc0d75fcd18886a7edfff0a84f52c9fe386d48",
-      "bytes": 651
+      "sha256": "92519bb9b59584131c357801bdade93603b26b61bd09d893813524b43a2dc8d1",
+      "bytes": 647
     },
     "stderr": {
       "path": "scripts/evidence/runs/pos-checkout-partial-guards/stderr.log",
@@ -75,8 +75,8 @@
     },
     {
       "path": "packages/contract/src/index.ts",
-      "sha256": "0dce99b7e6bb12c6447f17b9b0f62be1b3e64bec0b1b77db55a662cf24ee0a18",
-      "bytes": 2276
+      "sha256": "e0bbf2ffeb696eba1e328bc0c903458fc49107b5072abae29166f11582b0a5ac",
+      "bytes": 2303
     },
     {
       "path": "packages/contract/src/table-state.ts",

@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "a3c2811fef4472defa9b401eef9e287fef337682a42c39d9b5e34f8e4ce6beb7",
-  "contractVersion": "2.56.0",
+  "contentHash": "f97644a71bb6b83391884e88aaffd452f95ed4664d19a9c0a18b4097a80ec14d",
+  "contractVersion": "2.57.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -60744,6 +60744,3038 @@
       ],
       "type": "object"
     },
+    "MetricsChannelDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "channel": {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              "netSalesMinorUnits": {
+                "type": "integer"
+              },
+              "orders": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "channel",
+              "netSalesMinorUnits",
+              "orders"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "additionalProperties": false,
+          "properties": {
+            "netSalesMinorUnits": {
+              "type": "integer"
+            },
+            "orders": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "netSalesMinorUnits",
+            "orders"
+          ],
+          "type": "object"
+        },
+        "totalItems": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "truncated",
+        "limit",
+        "totalItems",
+        "total"
+      ],
+      "type": "object"
+    },
+    "MetricsChannelItem": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "maxLength": 40,
+          "minLength": 1,
+          "type": "string"
+        },
+        "netSalesMinorUnits": {
+          "type": "integer"
+        },
+        "orders": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "channel",
+        "netSalesMinorUnits",
+        "orders"
+      ],
+      "type": "object"
+    },
+    "MetricsCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "committedOnly": {
+          "const": true,
+          "type": "boolean"
+        },
+        "refundsIncluded": {
+          "type": "boolean"
+        },
+        "sources": {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 12,
+          "type": "array"
+        }
+      },
+      "required": [
+        "sources",
+        "committedOnly",
+        "refundsIncluded"
+      ],
+      "type": "object"
+    },
+    "MetricsDimension": {
+      "enum": [
+        "day",
+        "hour",
+        "channel",
+        "operator",
+        "category",
+        "product"
+      ],
+      "type": "string"
+    },
+    "MetricsHourDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "hour": {
+                "maxLength": 2,
+                "minLength": 2,
+                "type": "string"
+              },
+              "merchandiseMinorUnits": {
+                "type": "integer"
+              },
+              "units": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "hour",
+              "units",
+              "merchandiseMinorUnits"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "additionalProperties": false,
+          "properties": {
+            "merchandiseMinorUnits": {
+              "type": "integer"
+            },
+            "units": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "units",
+            "merchandiseMinorUnits"
+          ],
+          "type": "object"
+        },
+        "totalItems": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "truncated",
+        "limit",
+        "totalItems",
+        "total"
+      ],
+      "type": "object"
+    },
+    "MetricsHourItem": {
+      "additionalProperties": false,
+      "properties": {
+        "hour": {
+          "maxLength": 2,
+          "minLength": 2,
+          "type": "string"
+        },
+        "merchandiseMinorUnits": {
+          "type": "integer"
+        },
+        "units": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "hour",
+        "units",
+        "merchandiseMinorUnits"
+      ],
+      "type": "object"
+    },
+    "MetricsId": {
+      "enum": [
+        "net_sales",
+        "orders",
+        "average_ticket",
+        "items_sold",
+        "units_per_ticket",
+        "discounts",
+        "tips",
+        "prior_net_sales",
+        "refunds",
+        "payment_mix",
+        "channel_mix",
+        "product_mix",
+        "operator_mix",
+        "hour_mix",
+        "series"
+      ],
+      "type": "string"
+    },
+    "MetricsOperatorDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "merchandiseMinorUnits": {
+                "type": "integer"
+              },
+              "operator": {
+                "maxLength": 240,
+                "minLength": 1,
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "operator",
+              "units",
+              "merchandiseMinorUnits"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "additionalProperties": false,
+          "properties": {
+            "merchandiseMinorUnits": {
+              "type": "integer"
+            },
+            "units": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "units",
+            "merchandiseMinorUnits"
+          ],
+          "type": "object"
+        },
+        "totalItems": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "truncated",
+        "limit",
+        "totalItems",
+        "total"
+      ],
+      "type": "object"
+    },
+    "MetricsOperatorItem": {
+      "additionalProperties": false,
+      "properties": {
+        "merchandiseMinorUnits": {
+          "type": "integer"
+        },
+        "operator": {
+          "maxLength": 240,
+          "minLength": 1,
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "operator",
+        "units",
+        "merchandiseMinorUnits"
+      ],
+      "type": "object"
+    },
+    "MetricsPaymentDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "amountMinorUnits": {
+                "type": "integer"
+              },
+              "method": {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "method",
+              "amountMinorUnits"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "additionalProperties": false,
+          "properties": {
+            "amountMinorUnits": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "amountMinorUnits"
+          ],
+          "type": "object"
+        },
+        "totalItems": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "truncated",
+        "limit",
+        "totalItems",
+        "total"
+      ],
+      "type": "object"
+    },
+    "MetricsPaymentItem": {
+      "additionalProperties": false,
+      "properties": {
+        "amountMinorUnits": {
+          "type": "integer"
+        },
+        "method": {
+          "maxLength": 40,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "method",
+        "amountMinorUnits"
+      ],
+      "type": "object"
+    },
+    "MetricsPeriod": {
+      "additionalProperties": false,
+      "properties": {
+        "bucket": {
+          "enum": [
+            "day",
+            "hour"
+          ],
+          "type": "string"
+        },
+        "comparison": {
+          "additionalProperties": false,
+          "properties": {
+            "end": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            "start": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "type": "object"
+        },
+        "end": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "range": {
+          "enum": [
+            "today",
+            "yesterday",
+            "last_7_days",
+            "last_30_days"
+          ],
+          "type": "string"
+        },
+        "start": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "range",
+        "start",
+        "end",
+        "bucket",
+        "comparison"
+      ],
+      "type": "object"
+    },
+    "MetricsProductDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "anyOf": [
+                  {
+                    "maxLength": 240,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "merchandiseMinorUnits": {
+                "type": "integer"
+              },
+              "productId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "productName": {
+                "maxLength": 240,
+                "minLength": 1,
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "productId",
+              "productName",
+              "category",
+              "units",
+              "merchandiseMinorUnits"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "additionalProperties": false,
+          "properties": {
+            "merchandiseMinorUnits": {
+              "type": "integer"
+            },
+            "units": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "units",
+            "merchandiseMinorUnits"
+          ],
+          "type": "object"
+        },
+        "totalItems": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "truncated",
+        "limit",
+        "totalItems",
+        "total"
+      ],
+      "type": "object"
+    },
+    "MetricsProductItem": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchandiseMinorUnits": {
+          "type": "integer"
+        },
+        "productId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "productName": {
+          "maxLength": 240,
+          "minLength": 1,
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "productId",
+        "productName",
+        "category",
+        "units",
+        "merchandiseMinorUnits"
+      ],
+      "type": "object"
+    },
+    "MetricsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "dimensions": {},
+        "limit": {},
+        "locationId": {},
+        "metrics": {},
+        "range": {}
+      },
+      "type": "object"
+    },
+    "MetricsRange": {
+      "enum": [
+        "today",
+        "yesterday",
+        "last_7_days",
+        "last_30_days"
+      ],
+      "type": "string"
+    },
+    "MetricsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage": {
+          "additionalProperties": false,
+          "properties": {
+            "committedOnly": {
+              "const": true,
+              "type": "boolean"
+            },
+            "refundsIncluded": {
+              "type": "boolean"
+            },
+            "sources": {
+              "items": {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 12,
+              "type": "array"
+            }
+          },
+          "required": [
+            "sources",
+            "committedOnly",
+            "refundsIncluded"
+          ],
+          "type": "object"
+        },
+        "definitionVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "freshness": {
+          "additionalProperties": false,
+          "properties": {
+            "capturedAt": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "capturedAt"
+          ],
+          "type": "object"
+        },
+        "period": {
+          "additionalProperties": false,
+          "properties": {
+            "bucket": {
+              "enum": [
+                "day",
+                "hour"
+              ],
+              "type": "string"
+            },
+            "comparison": {
+              "additionalProperties": false,
+              "properties": {
+                "end": {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                "start": {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "type": "object"
+            },
+            "end": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            "range": {
+              "enum": [
+                "today",
+                "yesterday",
+                "last_7_days",
+                "last_30_days"
+              ],
+              "type": "string"
+            },
+            "start": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "range",
+            "start",
+            "end",
+            "bucket",
+            "comparison"
+          ],
+          "type": "object"
+        },
+        "rows": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "dimensions": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "values": {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "amountMinorUnits": {
+                                "type": "integer"
+                              },
+                              "method": {
+                                "maxLength": 40,
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "method",
+                              "amountMinorUnits"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "limit": {
+                          "exclusiveMinimum": 0,
+                          "type": "integer"
+                        },
+                        "total": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "amountMinorUnits": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "amountMinorUnits"
+                          ],
+                          "type": "object"
+                        },
+                        "totalItems": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "truncated",
+                        "limit",
+                        "totalItems",
+                        "total"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "channel": {
+                                "maxLength": 40,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "netSalesMinorUnits": {
+                                "type": "integer"
+                              },
+                              "orders": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "channel",
+                              "netSalesMinorUnits",
+                              "orders"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "limit": {
+                          "exclusiveMinimum": 0,
+                          "type": "integer"
+                        },
+                        "total": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "netSalesMinorUnits": {
+                              "type": "integer"
+                            },
+                            "orders": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "netSalesMinorUnits",
+                            "orders"
+                          ],
+                          "type": "object"
+                        },
+                        "totalItems": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "truncated",
+                        "limit",
+                        "totalItems",
+                        "total"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "category": {
+                                "anyOf": [
+                                  {
+                                    "maxLength": 240,
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "merchandiseMinorUnits": {
+                                "type": "integer"
+                              },
+                              "productId": {
+                                "anyOf": [
+                                  {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "productName": {
+                                "maxLength": 240,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "units": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "productId",
+                              "productName",
+                              "category",
+                              "units",
+                              "merchandiseMinorUnits"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "limit": {
+                          "exclusiveMinimum": 0,
+                          "type": "integer"
+                        },
+                        "total": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "merchandiseMinorUnits": {
+                              "type": "integer"
+                            },
+                            "units": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "units",
+                            "merchandiseMinorUnits"
+                          ],
+                          "type": "object"
+                        },
+                        "totalItems": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "truncated",
+                        "limit",
+                        "totalItems",
+                        "total"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "merchandiseMinorUnits": {
+                                "type": "integer"
+                              },
+                              "operator": {
+                                "maxLength": 240,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "units": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "operator",
+                              "units",
+                              "merchandiseMinorUnits"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "limit": {
+                          "exclusiveMinimum": 0,
+                          "type": "integer"
+                        },
+                        "total": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "merchandiseMinorUnits": {
+                              "type": "integer"
+                            },
+                            "units": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "units",
+                            "merchandiseMinorUnits"
+                          ],
+                          "type": "object"
+                        },
+                        "totalItems": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "truncated",
+                        "limit",
+                        "totalItems",
+                        "total"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "hour": {
+                                "maxLength": 2,
+                                "minLength": 2,
+                                "type": "string"
+                              },
+                              "merchandiseMinorUnits": {
+                                "type": "integer"
+                              },
+                              "units": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "hour",
+                              "units",
+                              "merchandiseMinorUnits"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "limit": {
+                          "exclusiveMinimum": 0,
+                          "type": "integer"
+                        },
+                        "total": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "merchandiseMinorUnits": {
+                              "type": "integer"
+                            },
+                            "units": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "units",
+                            "merchandiseMinorUnits"
+                          ],
+                          "type": "object"
+                        },
+                        "totalItems": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "truncated",
+                        "limit",
+                        "totalItems",
+                        "total"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "label": {
+                                "maxLength": 24,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "netSalesMinorUnits": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "label",
+                              "netSalesMinorUnits"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "limit": {
+                          "exclusiveMinimum": 0,
+                          "type": "integer"
+                        },
+                        "total": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "netSalesMinorUnits": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "netSalesMinorUnits"
+                          ],
+                          "type": "object"
+                        },
+                        "totalItems": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "truncated",
+                        "limit",
+                        "totalItems",
+                        "total"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "dimensions",
+              "values"
+            ],
+            "type": "object"
+          },
+          "maxItems": 1000,
+          "type": "array"
+        },
+        "rowsTotal": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "properties": {
+            "attribution": {
+              "additionalProperties": false,
+              "properties": {
+                "category": {
+                  "const": "current",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "category"
+              ],
+              "type": "object"
+            },
+            "currency": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "locationId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "timezone": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "merchantId",
+            "locationId",
+            "currency",
+            "timezone",
+            "attribution"
+          ],
+          "type": "object"
+        },
+        "totals": {
+          "additionalProperties": false,
+          "properties": {
+            "values": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "items": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "amountMinorUnits": {
+                              "type": "integer"
+                            },
+                            "method": {
+                              "maxLength": 40,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "method",
+                            "amountMinorUnits"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "limit": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      "total": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "amountMinorUnits": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "amountMinorUnits"
+                        ],
+                        "type": "object"
+                      },
+                      "totalItems": {
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "items",
+                      "truncated",
+                      "limit",
+                      "totalItems",
+                      "total"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "items": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "channel": {
+                              "maxLength": 40,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "netSalesMinorUnits": {
+                              "type": "integer"
+                            },
+                            "orders": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "channel",
+                            "netSalesMinorUnits",
+                            "orders"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "limit": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      "total": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "netSalesMinorUnits": {
+                            "type": "integer"
+                          },
+                          "orders": {
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "netSalesMinorUnits",
+                          "orders"
+                        ],
+                        "type": "object"
+                      },
+                      "totalItems": {
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "items",
+                      "truncated",
+                      "limit",
+                      "totalItems",
+                      "total"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "items": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "category": {
+                              "anyOf": [
+                                {
+                                  "maxLength": 240,
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "merchandiseMinorUnits": {
+                              "type": "integer"
+                            },
+                            "productId": {
+                              "anyOf": [
+                                {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "productName": {
+                              "maxLength": 240,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "units": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "productId",
+                            "productName",
+                            "category",
+                            "units",
+                            "merchandiseMinorUnits"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "limit": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      "total": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "merchandiseMinorUnits": {
+                            "type": "integer"
+                          },
+                          "units": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "units",
+                          "merchandiseMinorUnits"
+                        ],
+                        "type": "object"
+                      },
+                      "totalItems": {
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "items",
+                      "truncated",
+                      "limit",
+                      "totalItems",
+                      "total"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "items": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "merchandiseMinorUnits": {
+                              "type": "integer"
+                            },
+                            "operator": {
+                              "maxLength": 240,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "units": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "operator",
+                            "units",
+                            "merchandiseMinorUnits"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "limit": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      "total": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "merchandiseMinorUnits": {
+                            "type": "integer"
+                          },
+                          "units": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "units",
+                          "merchandiseMinorUnits"
+                        ],
+                        "type": "object"
+                      },
+                      "totalItems": {
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "items",
+                      "truncated",
+                      "limit",
+                      "totalItems",
+                      "total"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "items": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "hour": {
+                              "maxLength": 2,
+                              "minLength": 2,
+                              "type": "string"
+                            },
+                            "merchandiseMinorUnits": {
+                              "type": "integer"
+                            },
+                            "units": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "hour",
+                            "units",
+                            "merchandiseMinorUnits"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "limit": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      "total": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "merchandiseMinorUnits": {
+                            "type": "integer"
+                          },
+                          "units": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "units",
+                          "merchandiseMinorUnits"
+                        ],
+                        "type": "object"
+                      },
+                      "totalItems": {
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "items",
+                      "truncated",
+                      "limit",
+                      "totalItems",
+                      "total"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "items": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "label": {
+                              "maxLength": 24,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "netSalesMinorUnits": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "label",
+                            "netSalesMinorUnits"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "limit": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      "total": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "netSalesMinorUnits": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "netSalesMinorUnits"
+                        ],
+                        "type": "object"
+                      },
+                      "totalItems": {
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "items",
+                      "truncated",
+                      "limit",
+                      "totalItems",
+                      "total"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "values"
+          ],
+          "type": "object"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "definitionVersion",
+        "scope",
+        "period",
+        "coverage",
+        "freshness",
+        "truncated"
+      ],
+      "type": "object"
+    },
+    "MetricsRow": {
+      "additionalProperties": false,
+      "properties": {
+        "dimensions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "values": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "amountMinorUnits": {
+                          "type": "integer"
+                        },
+                        "method": {
+                          "maxLength": 40,
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "method",
+                        "amountMinorUnits"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "total": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "amountMinorUnits": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "amountMinorUnits"
+                    ],
+                    "type": "object"
+                  },
+                  "totalItems": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "truncated",
+                  "limit",
+                  "totalItems",
+                  "total"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "maxLength": 40,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "netSalesMinorUnits": {
+                          "type": "integer"
+                        },
+                        "orders": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "channel",
+                        "netSalesMinorUnits",
+                        "orders"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "total": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "netSalesMinorUnits": {
+                        "type": "integer"
+                      },
+                      "orders": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "netSalesMinorUnits",
+                      "orders"
+                    ],
+                    "type": "object"
+                  },
+                  "totalItems": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "truncated",
+                  "limit",
+                  "totalItems",
+                  "total"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "category": {
+                          "anyOf": [
+                            {
+                              "maxLength": 240,
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "merchandiseMinorUnits": {
+                          "type": "integer"
+                        },
+                        "productId": {
+                          "anyOf": [
+                            {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "productName": {
+                          "maxLength": 240,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "units": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "productId",
+                        "productName",
+                        "category",
+                        "units",
+                        "merchandiseMinorUnits"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "total": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "merchandiseMinorUnits": {
+                        "type": "integer"
+                      },
+                      "units": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "units",
+                      "merchandiseMinorUnits"
+                    ],
+                    "type": "object"
+                  },
+                  "totalItems": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "truncated",
+                  "limit",
+                  "totalItems",
+                  "total"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "merchandiseMinorUnits": {
+                          "type": "integer"
+                        },
+                        "operator": {
+                          "maxLength": 240,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "units": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "operator",
+                        "units",
+                        "merchandiseMinorUnits"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "total": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "merchandiseMinorUnits": {
+                        "type": "integer"
+                      },
+                      "units": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "units",
+                      "merchandiseMinorUnits"
+                    ],
+                    "type": "object"
+                  },
+                  "totalItems": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "truncated",
+                  "limit",
+                  "totalItems",
+                  "total"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "hour": {
+                          "maxLength": 2,
+                          "minLength": 2,
+                          "type": "string"
+                        },
+                        "merchandiseMinorUnits": {
+                          "type": "integer"
+                        },
+                        "units": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "hour",
+                        "units",
+                        "merchandiseMinorUnits"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "total": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "merchandiseMinorUnits": {
+                        "type": "integer"
+                      },
+                      "units": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "units",
+                      "merchandiseMinorUnits"
+                    ],
+                    "type": "object"
+                  },
+                  "totalItems": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "truncated",
+                  "limit",
+                  "totalItems",
+                  "total"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "label": {
+                          "maxLength": 24,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "netSalesMinorUnits": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "netSalesMinorUnits"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "total": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "netSalesMinorUnits": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "netSalesMinorUnits"
+                    ],
+                    "type": "object"
+                  },
+                  "totalItems": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "truncated",
+                  "limit",
+                  "totalItems",
+                  "total"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "dimensions",
+        "values"
+      ],
+      "type": "object"
+    },
+    "MetricsScope": {
+      "additionalProperties": false,
+      "properties": {
+        "attribution": {
+          "additionalProperties": false,
+          "properties": {
+            "category": {
+              "const": "current",
+              "type": "string"
+            }
+          },
+          "required": [
+            "category"
+          ],
+          "type": "object"
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "timezone": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "merchantId",
+        "locationId",
+        "currency",
+        "timezone",
+        "attribution"
+      ],
+      "type": "object"
+    },
+    "MetricsSeriesDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "maxLength": 24,
+                "minLength": 1,
+                "type": "string"
+              },
+              "netSalesMinorUnits": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "label",
+              "netSalesMinorUnits"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "additionalProperties": false,
+          "properties": {
+            "netSalesMinorUnits": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "netSalesMinorUnits"
+          ],
+          "type": "object"
+        },
+        "totalItems": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "truncated",
+        "limit",
+        "totalItems",
+        "total"
+      ],
+      "type": "object"
+    },
+    "MetricsSeriesItem": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "maxLength": 24,
+          "minLength": 1,
+          "type": "string"
+        },
+        "netSalesMinorUnits": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "label",
+        "netSalesMinorUnits"
+      ],
+      "type": "object"
+    },
+    "MetricsTotals": {
+      "additionalProperties": false,
+      "properties": {
+        "values": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "amountMinorUnits": {
+                          "type": "integer"
+                        },
+                        "method": {
+                          "maxLength": 40,
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "method",
+                        "amountMinorUnits"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "total": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "amountMinorUnits": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "amountMinorUnits"
+                    ],
+                    "type": "object"
+                  },
+                  "totalItems": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "truncated",
+                  "limit",
+                  "totalItems",
+                  "total"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "maxLength": 40,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "netSalesMinorUnits": {
+                          "type": "integer"
+                        },
+                        "orders": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "channel",
+                        "netSalesMinorUnits",
+                        "orders"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "total": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "netSalesMinorUnits": {
+                        "type": "integer"
+                      },
+                      "orders": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "netSalesMinorUnits",
+                      "orders"
+                    ],
+                    "type": "object"
+                  },
+                  "totalItems": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "truncated",
+                  "limit",
+                  "totalItems",
+                  "total"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "category": {
+                          "anyOf": [
+                            {
+                              "maxLength": 240,
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "merchandiseMinorUnits": {
+                          "type": "integer"
+                        },
+                        "productId": {
+                          "anyOf": [
+                            {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "productName": {
+                          "maxLength": 240,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "units": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "productId",
+                        "productName",
+                        "category",
+                        "units",
+                        "merchandiseMinorUnits"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "total": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "merchandiseMinorUnits": {
+                        "type": "integer"
+                      },
+                      "units": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "units",
+                      "merchandiseMinorUnits"
+                    ],
+                    "type": "object"
+                  },
+                  "totalItems": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "truncated",
+                  "limit",
+                  "totalItems",
+                  "total"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "merchandiseMinorUnits": {
+                          "type": "integer"
+                        },
+                        "operator": {
+                          "maxLength": 240,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "units": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "operator",
+                        "units",
+                        "merchandiseMinorUnits"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "total": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "merchandiseMinorUnits": {
+                        "type": "integer"
+                      },
+                      "units": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "units",
+                      "merchandiseMinorUnits"
+                    ],
+                    "type": "object"
+                  },
+                  "totalItems": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "truncated",
+                  "limit",
+                  "totalItems",
+                  "total"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "hour": {
+                          "maxLength": 2,
+                          "minLength": 2,
+                          "type": "string"
+                        },
+                        "merchandiseMinorUnits": {
+                          "type": "integer"
+                        },
+                        "units": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "hour",
+                        "units",
+                        "merchandiseMinorUnits"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "total": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "merchandiseMinorUnits": {
+                        "type": "integer"
+                      },
+                      "units": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "units",
+                      "merchandiseMinorUnits"
+                    ],
+                    "type": "object"
+                  },
+                  "totalItems": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "truncated",
+                  "limit",
+                  "totalItems",
+                  "total"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "label": {
+                          "maxLength": 24,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "netSalesMinorUnits": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "netSalesMinorUnits"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "total": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "netSalesMinorUnits": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "netSalesMinorUnits"
+                    ],
+                    "type": "object"
+                  },
+                  "totalItems": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "items",
+                  "truncated",
+                  "limit",
+                  "totalItems",
+                  "total"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "values"
+      ],
+      "type": "object"
+    },
+    "MetricsValue": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "amountMinorUnits": {
+                    "type": "integer"
+                  },
+                  "method": {
+                    "maxLength": 40,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "method",
+                  "amountMinorUnits"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "limit": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "total": {
+              "additionalProperties": false,
+              "properties": {
+                "amountMinorUnits": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "amountMinorUnits"
+              ],
+              "type": "object"
+            },
+            "totalItems": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "items",
+            "truncated",
+            "limit",
+            "totalItems",
+            "total"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "channel": {
+                    "maxLength": 40,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "netSalesMinorUnits": {
+                    "type": "integer"
+                  },
+                  "orders": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "channel",
+                  "netSalesMinorUnits",
+                  "orders"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "limit": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "total": {
+              "additionalProperties": false,
+              "properties": {
+                "netSalesMinorUnits": {
+                  "type": "integer"
+                },
+                "orders": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "netSalesMinorUnits",
+                "orders"
+              ],
+              "type": "object"
+            },
+            "totalItems": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "items",
+            "truncated",
+            "limit",
+            "totalItems",
+            "total"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "category": {
+                    "anyOf": [
+                      {
+                        "maxLength": 240,
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "merchandiseMinorUnits": {
+                    "type": "integer"
+                  },
+                  "productId": {
+                    "anyOf": [
+                      {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "productName": {
+                    "maxLength": 240,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "productId",
+                  "productName",
+                  "category",
+                  "units",
+                  "merchandiseMinorUnits"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "limit": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "total": {
+              "additionalProperties": false,
+              "properties": {
+                "merchandiseMinorUnits": {
+                  "type": "integer"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "units",
+                "merchandiseMinorUnits"
+              ],
+              "type": "object"
+            },
+            "totalItems": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "items",
+            "truncated",
+            "limit",
+            "totalItems",
+            "total"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "merchandiseMinorUnits": {
+                    "type": "integer"
+                  },
+                  "operator": {
+                    "maxLength": 240,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "operator",
+                  "units",
+                  "merchandiseMinorUnits"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "limit": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "total": {
+              "additionalProperties": false,
+              "properties": {
+                "merchandiseMinorUnits": {
+                  "type": "integer"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "units",
+                "merchandiseMinorUnits"
+              ],
+              "type": "object"
+            },
+            "totalItems": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "items",
+            "truncated",
+            "limit",
+            "totalItems",
+            "total"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "hour": {
+                    "maxLength": 2,
+                    "minLength": 2,
+                    "type": "string"
+                  },
+                  "merchandiseMinorUnits": {
+                    "type": "integer"
+                  },
+                  "units": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "hour",
+                  "units",
+                  "merchandiseMinorUnits"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "limit": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "total": {
+              "additionalProperties": false,
+              "properties": {
+                "merchandiseMinorUnits": {
+                  "type": "integer"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "units",
+                "merchandiseMinorUnits"
+              ],
+              "type": "object"
+            },
+            "totalItems": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "items",
+            "truncated",
+            "limit",
+            "totalItems",
+            "total"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "maxLength": 24,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "netSalesMinorUnits": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "label",
+                  "netSalesMinorUnits"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "limit": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "total": {
+              "additionalProperties": false,
+              "properties": {
+                "netSalesMinorUnits": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "netSalesMinorUnits"
+              ],
+              "type": "object"
+            },
+            "totalItems": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "items",
+            "truncated",
+            "limit",
+            "totalItems",
+            "total"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "MfaChallengeResponse": {
       "additionalProperties": false,
       "properties": {
@@ -110278,6 +113310,23 @@
       "pin": false,
       "request": "FiscalStampSaleRequest",
       "response": "FiscalStampSaleResult"
+    },
+    "POST /api/merchants/:merchantId/metrics/query": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "VALIDATION_FAILED",
+        "PERMISSION_DENIED",
+        "LOCATION_SCOPE_VIOLATION"
+      ],
+      "idempotent": false,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "sale.lifecycle",
+      "pin": false,
+      "request": "MetricsQuery",
+      "response": "MetricsResponse"
     },
     "POST /api/merchants/:merchantId/mp-point/store": {
       "approval": false,

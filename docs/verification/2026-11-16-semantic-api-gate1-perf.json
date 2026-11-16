@@ -1,0 +1,346 @@
+{
+  "capturedAt": "2026-11-16T02:08:15.180Z",
+  "environment": {
+    "database": "umi_i1_exec_2f52a6d5",
+    "port": "5543",
+    "appRole": "api_login",
+    "workerRole": "worker_login",
+    "source": "apps/umi-api/dist (nest build)"
+  },
+  "fixture": {
+    "merchantId": "44444444-4444-4444-8444-000000000001",
+    "locationId": "44444444-4444-4444-8444-000000000011",
+    "tickets": 19000,
+    "cartLines": 76000,
+    "businessDates": {
+      "start": "2026-10-10",
+      "end": "2026-11-08"
+    },
+    "ticketsAtLocation": 19000,
+    "nullOriginChannels": 19000,
+    "walkInChannels": 0,
+    "boundAsOf": "2026-11-08",
+    "range": "last_30_days",
+    "metrics": [
+      "net_sales",
+      "orders",
+      "average_ticket",
+      "items_sold",
+      "units_per_ticket",
+      "discounts",
+      "tips",
+      "prior_net_sales",
+      "refunds",
+      "payment_mix",
+      "channel_mix",
+      "product_mix",
+      "operator_mix",
+      "hour_mix",
+      "series"
+    ],
+    "dimensions": [],
+    "window": {
+      "range": "last_30_days",
+      "start": "2026-10-10",
+      "end": "2026-11-08",
+      "bucket": "day",
+      "comparison": {
+        "start": "2026-09-10",
+        "end": "2026-10-09"
+      }
+    }
+  },
+  "method": {
+    "warmups": 5,
+    "measuredRuns": 20,
+    "sqlStatementsPerRequest": 11,
+    "timing": "milliseconds, wall clock around one repository request"
+  },
+  "latencyMs": {
+    "p50": 1281.593,
+    "p95": 1293.794,
+    "max": 1329.74,
+    "min": 1274.632,
+    "samples": [
+      1279.385, 1275.157, 1278.639, 1274.632, 1282.733, 1288.108, 1283.507, 1329.74, 1283.827,
+      1274.749, 1282.123, 1277.963, 1293.794, 1287.356, 1278.665, 1281.122, 1281.593, 1287.332,
+      1284.939, 1278.118
+    ]
+  },
+  "totals": {
+    "net_sales": 76000000,
+    "orders": 19000,
+    "average_ticket": 4000,
+    "items_sold": 76000,
+    "units_per_ticket": 4,
+    "discounts": 0,
+    "tips": 0,
+    "prior_net_sales": 0,
+    "refunds": 0,
+    "payment_mix": {
+      "items": [],
+      "truncated": false,
+      "limit": 8,
+      "totalItems": 0,
+      "total": {
+        "amountMinorUnits": 0
+      }
+    },
+    "channel_mix": {
+      "items": [
+        {
+          "channel": "walk_in",
+          "netSalesMinorUnits": 76000000,
+          "orders": 19000
+        }
+      ],
+      "truncated": false,
+      "limit": 8,
+      "totalItems": 1,
+      "total": {
+        "netSalesMinorUnits": 76000000,
+        "orders": 19000
+      }
+    },
+    "product_mix": {
+      "items": [
+        {
+          "productId": "4427e994-15a5-440d-80d9-77adc03739bd",
+          "productName": "Perf 4",
+          "category": "Panadería",
+          "units": 19000,
+          "merchandiseMinorUnits": 19000000
+        },
+        {
+          "productId": "7c352716-f82b-490f-8c4a-243b72470d60",
+          "productName": "Perf 1",
+          "category": "Panadería",
+          "units": 19000,
+          "merchandiseMinorUnits": 19000000
+        },
+        {
+          "productId": "85132e21-0f3e-456c-8eb2-da79ae24ef9c",
+          "productName": "Perf 3",
+          "category": "Panadería",
+          "units": 19000,
+          "merchandiseMinorUnits": 19000000
+        },
+        {
+          "productId": "bd217701-909f-4651-81c7-1727c773d8d8",
+          "productName": "Perf 2",
+          "category": "Panadería",
+          "units": 19000,
+          "merchandiseMinorUnits": 19000000
+        }
+      ],
+      "truncated": false,
+      "limit": 200,
+      "totalItems": 4,
+      "total": {
+        "units": 76000,
+        "merchandiseMinorUnits": 76000000
+      }
+    },
+    "operator_mix": {
+      "items": [
+        {
+          "operator": "—",
+          "units": 76000,
+          "merchandiseMinorUnits": 76000000
+        }
+      ],
+      "truncated": false,
+      "limit": 100,
+      "totalItems": 1,
+      "total": {
+        "units": 76000,
+        "merchandiseMinorUnits": 76000000
+      }
+    },
+    "hour_mix": {
+      "items": [
+        {
+          "hour": "12",
+          "units": 76000,
+          "merchandiseMinorUnits": 76000000
+        }
+      ],
+      "truncated": false,
+      "limit": 24,
+      "totalItems": 1,
+      "total": {
+        "units": 76000,
+        "merchandiseMinorUnits": 76000000
+      }
+    },
+    "series": {
+      "items": [
+        {
+          "label": "2026-10-10",
+          "netSalesMinorUnits": 2536000
+        },
+        {
+          "label": "2026-10-11",
+          "netSalesMinorUnits": 2536000
+        },
+        {
+          "label": "2026-10-12",
+          "netSalesMinorUnits": 2536000
+        },
+        {
+          "label": "2026-10-13",
+          "netSalesMinorUnits": 2536000
+        },
+        {
+          "label": "2026-10-14",
+          "netSalesMinorUnits": 2536000
+        },
+        {
+          "label": "2026-10-15",
+          "netSalesMinorUnits": 2536000
+        },
+        {
+          "label": "2026-10-16",
+          "netSalesMinorUnits": 2536000
+        },
+        {
+          "label": "2026-10-17",
+          "netSalesMinorUnits": 2536000
+        },
+        {
+          "label": "2026-10-18",
+          "netSalesMinorUnits": 2536000
+        },
+        {
+          "label": "2026-10-19",
+          "netSalesMinorUnits": 2536000
+        },
+        {
+          "label": "2026-10-20",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-10-21",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-10-22",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-10-23",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-10-24",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-10-25",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-10-26",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-10-27",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-10-28",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-10-29",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-10-30",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-10-31",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-11-01",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-11-02",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-11-03",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-11-04",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-11-05",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-11-06",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-11-07",
+          "netSalesMinorUnits": 2532000
+        },
+        {
+          "label": "2026-11-08",
+          "netSalesMinorUnits": 2532000
+        }
+      ],
+      "truncated": false,
+      "limit": 31,
+      "totalItems": 30,
+      "total": {
+        "netSalesMinorUnits": 76000000
+      }
+    }
+  },
+  "comparisonWithSalesSummary": {
+    "asOf": "2026-11-08",
+    "windowStart": "2026-10-10",
+    "windowEnd": "2026-11-08",
+    "legs": {
+      "metrics": {
+        "ms": 1282.405,
+        "statements": 11,
+        "totals": {
+          "net_sales": 76000000,
+          "orders": 19000,
+          "average_ticket": 4000,
+          "discounts": 0,
+          "tips": 0,
+          "refunds": 0
+        }
+      },
+      "salesSummary": {
+        "ms": 1266.411,
+        "totals": {
+          "netSalesMinorUnits": 76000000,
+          "orders": 19000,
+          "averageTicketMinorUnits": 4000,
+          "itemsSold": 76000,
+          "discountMinorUnits": 0,
+          "tipsMinorUnits": 0,
+          "priorNetSalesMinorUnits": 0
+        },
+        "windowNote": "salesSummary has no asOf; with this range its window ends today"
+      }
+    },
+    "equal": {
+      "net_sales": true,
+      "orders": true,
+      "average_ticket": true,
+      "discounts": true,
+      "tips": true
+    }
+  }
+}

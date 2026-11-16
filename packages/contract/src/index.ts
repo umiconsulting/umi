@@ -32,6 +32,7 @@ export * from './pos-customer-value';
 export * from './pos-hardware';
 export * from './pos-kitchen';
 export * from './dashboard-operations';
+export * from './metrics';
 export * from './reports';
 export * from './sales-analysis';
 export * from './fiscal';

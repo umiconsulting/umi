@@ -4721,6 +4721,28 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
       ],
     },
   },
+  {
+    // The semantic analytics read (gate 1). The body names metrics and dimensions;
+    // the server names the SQL. A preset is a distribution with its own cut.
+    id: 'metrics.query',
+    method: 'POST',
+    path: '/api/merchants/:merchantId/metrics/query',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'MetricsQuery',
+      response: 'MetricsResponse',
+      auth: 'session',
+      permission: 'sale.lifecycle',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED', 'LOCATION_SCOPE_VIOLATION'],
+    },
+  },
 ];
 
 /** Route ids, for lookups that must fail at compile time when an id is wrong. */

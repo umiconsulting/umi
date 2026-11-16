@@ -240,6 +240,16 @@ const UNCOVERED_EXPECTED: ReadonlyArray<{ file: string; count: number; why: stri
     // `modules/fiscal/fiscal.integration.ts`.
     why: 'true run-time clause; accepted 2026-09-17',
   },
+  {
+    file: 'modules/metrics/metrics.repository.ts',
+    count: 3,
+    // ACCEPTED. The three grouped reads choose their SELECT list and GROUP BY
+    // list from the request dimensions at run time. A request has one or two
+    // dimensions from six values. No static rebuild can produce the statement
+    // the database will see. `modules/metrics/metrics.integration.ts` exercises
+    // day, hour, product and the merged row path against the real schema.
+    why: 'dimension-driven SELECT and GROUP BY lists; accepted 2026-11-16',
+  },
 ];
 
 describe('build-v3 SQL preflight · every backend statement parses against the real schema', () => {

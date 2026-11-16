@@ -146,7 +146,7 @@ export async function seedSalesAnalysis(pool: Pool) {
         values($1,$2,$3,$4,$5,$6,$7,repeat('a',64),$8::timestamptz+interval '1 hour')`,
         [saleId, ids.merchant, location, cart, order, attempt, receipt, placed],
       );
-      return { saleId, receipt, lineId: lines[0].lineRef };
+      return { saleId, receipt, lineId: lines[0].lineRef, cart, order };
     }
     const first = await sale(ids.location, '2026-11-02T16:00:00Z', 18000, 1500, [
       ids.bread,
@@ -154,6 +154,45 @@ export async function seedSalesAnalysis(pool: Pool) {
     ]);
     await sale(ids.location, '2026-11-02T17:00:00Z', 9000, 0, [ids.bread]);
     await sale(ids.branch, '2026-11-04T10:30:00Z', 9000, 0, [ids.coffee]);
+
+    // D1 and D4 need one committed cash tender and one wallet allocation. The
+    // sale paid 19,500 in cash and 5,000 from a wallet. Payment mix reads both
+    // sources, so this fixture makes the multiset non-empty.
+    const checkout = randomUUID();
+    const tender = randomUUID();
+    const authorization = randomUUID();
+    const account = randomUUID();
+    await client.query(
+      `insert into merchant.pos_checkout_draft(id,merchant_id,location_id,cart_id,operator_session_id,device_id,state,receipt_delivery)
+      values($1,$2,$3,$4,$5,$6,'receipt_available','{"destination":"display"}'::jsonb)`,
+      [checkout, ids.merchant, ids.location, first.cart, ids.operator, ids.device],
+    );
+    await client.query(
+      `insert into merchant.pos_tender_fact(id,merchant_id,location_id,checkout_id,cart_id,position,tender_type,status,
+      amount_minor_units,change_minor_units,currency,committed_at)
+      values($1,$2,$3,$4,$5,0,'cash','committed',19500,0,'MXN','2026-11-02T16:00:00Z')`,
+      [tender, ids.merchant, ids.location, checkout, first.cart],
+    );
+    await client.query(
+      `insert into merchant.customer_value_authorization(id,merchant_id,location_id,account_type,account_id,
+      sale_id,checkout_version,amount_minor_units,currency,checkout_fingerprint,policy_version,
+      command_id,idempotency_key,command_fingerprint,status,expires_at,committed_at,correlation_id)
+      values($1,$2,$3,'wallet',$4,$5,1,5000,'MXN',repeat('c',64),'wallet-pilot',
+      $1,$1,repeat('d',64),'committed',now()+interval '1 day',now(),$6::text)`,
+      [authorization, ids.merchant, ids.location, account, first.cart, authorization],
+    );
+    await client.query(
+      `insert into merchant.customer_value_tender_allocation(merchant_id,location_id,sale_id,checkout_id,
+      checkout_version,allocation_id,tender_type,account_id,account_public_reference,authorization_id,currency,
+      requested_minor_units,authorized_minor_units,committed_minor_units,remaining_balance_minor_units,
+      allocation_order,cash_allocation_minor_units,manual_terminal_allocation_minor_units,
+      wallet_allocation_ids,gift_card_allocation_ids,policy_id,policy_version,authorization_expires_at,
+      command_id,idempotency_key,optimistic_version,fingerprint)
+      values($1,$2,$3,$4,1,$5,'wallet',$6,'WALLET-I1',$5,'MXN',
+      5000,5000,5000,0,0,19500,0,array[$5]::uuid[],'{}'::uuid[],'wallet-pilot','wallet-pilot-v1',
+      now()+interval '1 day',$5,$5,1,repeat('e',64))`,
+      [ids.merchant, ids.location, first.saleId, checkout, authorization, account],
+    );
     const preview = randomUUID();
     await client.query(
       `insert into merchant.pos_exception_preview(id,merchant_id,location_id,sale_id,original_receipt_id,operator_session_id,device_id,exception_type,reason_code,
