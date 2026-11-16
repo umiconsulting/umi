@@ -114,7 +114,7 @@ The payment multiset has two cases:
 ### Ledger
 
 Path: `docs/verification/2026-11-16-semantic-api-gate2-parity.json`.
-File SHA-256: `df631c72afeb2e3d52915777e3a4c96b71a65ee1bcb5a534fce0f88b4c5c7ee3`.
+File SHA-256: `8986d5ebdb6deea83da5c0215d91d85c892cc5a5c1a41495119d6ee9d6e5377e`.
 Case set SHA-256: `fe1365f872f364448a05384ffa2e7e63d9977463b4d8bd4753fc45cacd26f4c5`.
 The test writes the ledger only with `METRICS_GATE2_LEDGER_WRITE=1`.
 A rerun without the flag reads the file and compares the parsed object.
@@ -133,7 +133,7 @@ The test applies these rules to both reads. The code is in `metrics-parity-norma
 7. A null field stays null. An absent field stays absent. A row copies a key only when the source has it.
 8. The compared form excludes the envelope fields: `truncated`, `limit`, `totalItems`, `total`, `capturedAt`, `scope` and `period`.
 9. The canonical object has the 14 fields in this fixed order: `net_sales`, `orders`, `average_ticket`, `items_sold`, `units_per_ticket`, `discounts`, `tips`, `prior_net_sales`, `payment_mix`, `channel_mix`, `product_mix`, `operator_mix`, `hour_mix`, `series`.
-10. `prior_net_sales` maps an absent or null legacy value to 0.
+10. `prior_net_sales` maps an absent or null source value to 0.
 11. Minor units stay integers. The normal form does not scale, round or convert them.
 12. `series` labels are `YYYY-MM-DD` for a day bucket and `HH24` for an hour bucket.
 13. The ledger hash replaces each random fixture product UUID with its fixture role: `bread`, `coffee` and `foreign`.
