@@ -60,6 +60,7 @@ Each case asks the new read and the legacy `salesSummary` read the same question
 The test compares all 14 migrated metrics: eight scalars and six presets.
 The test asserts one row of `rows` or `totals`, no row cut, and no truncated mix.
 The test asserts a case count of 20 or more and an id that is unique.
+It asserts one non-empty case for every range and scope, at least four empty cells, and the three boundary kinds.
 
 | Case | asOf       | Range          | Scope  | Boundary        | Fresh SHA-256 (12) | Result |
 | ---- | ---------- | -------------- | ------ | --------------- | ------------------ | ------ |
@@ -103,6 +104,7 @@ The two hashes are equal in every case.
 
 The table cells hold the count of non-empty cases.
 The matrix has one empty cell in each range: T04, Y04, W06 and M06.
+These cells also prove that `units_per_ticket` is null at zero orders.
 The boundary cells are W04 start-inclusive, W05 start-exclusive, M04 end-exclusive and M05 end-inclusive.
 The payment multiset has two cases:
 
@@ -164,18 +166,20 @@ For `last_7_days` at `2026-11-07`, `refunds` is 31,000 and `net_sales` is 48,500
 Environment: `umi_sales_analysis` on `127.0.0.1:5543`, roles `api_login` and `worker_login`.
 The SQL preflight uses `umi_verify_293`, the current-schema clone.
 
-| Command                                                                                                                     | Result                                                     |
-| --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `npx vitest run --config vitest.integration.config.ts src/modules/metrics/metrics.parity-matrix.integration.ts`             | 26 tests pass: 24 cases, 1 count guard, 1 ledger check     |
-| `npx vitest run --config vitest.integration.config.ts src/modules/metrics/metrics.refunds-oracle.integration.ts`            | 5 tests pass                                               |
-| `npx vitest run --config vitest.integration.config.ts src/modules/metrics/metrics.parity.integration.ts`                    | 5 tests pass                                               |
-| `npx vitest run --config vitest.integration.config.ts src/modules/metrics/metrics.integration.ts`                           | 11 tests pass                                              |
-| `npx vitest run --config vitest.integration.config.ts src/app-graph.integration.ts`                                         | 2 tests pass                                               |
-| `npx vitest run --config vitest.integration.config.ts src/shared/database/sql-preflight.integration.ts` on `umi_verify_293` | 3 tests pass; 1,257 statements; 18 uncovered; 0 unresolved |
-| `pnpm test`                                                                                                                 | 226 files pass, 1 skipped; 2,289 tests pass, 29 skipped    |
-| `pnpm typecheck`                                                                                                            | pass                                                       |
-| `pnpm lint`                                                                                                                 | pass                                                       |
-| `npx prettier --check` on the changed files                                                                                 | pass                                                       |
+| Command                                                                                                                     | Result                                                                   |
+| --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `npx vitest run --config vitest.integration.config.ts src/modules/metrics/metrics.parity-matrix.integration.ts`             | 27 tests pass: 24 cases, 1 count guard, 1 coverage guard, 1 ledger check |
+| `npx vitest run --config vitest.integration.config.ts src/modules/metrics/metrics.refunds-oracle.integration.ts`            | 5 tests pass                                                             |
+| `npx vitest run --config vitest.integration.config.ts src/modules/metrics/metrics.parity.integration.ts`                    | 5 tests pass                                                             |
+| `npx vitest run --config vitest.integration.config.ts src/modules/metrics/metrics.integration.ts`                           | 11 tests pass                                                            |
+| `npx vitest run --config vitest.integration.config.ts src/app-graph.integration.ts`                                         | 2 tests pass                                                             |
+| `npx vitest run --config vitest.integration.config.ts src/shared/database/sql-preflight.integration.ts` on `umi_verify_293` | 3 tests pass; 1,257 statements; 18 uncovered; 0 unresolved               |
+| `pnpm test`                                                                                                                 | 226 files pass, 1 skipped; 2,289 tests pass, 29 skipped                  |
+| `pnpm typecheck`                                                                                                            | pass                                                                     |
+| `pnpm lint`                                                                                                                 | pass                                                                     |
+| `npx prettier --check` on the changed files                                                                                 | pass                                                                     |
+| `pnpm evidence:check`                                                                                                       | 2 packets pass                                                           |
+| `pnpm --filter @umi/contract generate:check`                                                                                | `Generated UMI contract 2.57.0 (f97644a7...)`                            |
 
 The SQL preflight does not pass on `umi_sales_analysis`.
 That database lacks six current columns, such as `merchant.purchase_days` and `purchase_order.origin`.

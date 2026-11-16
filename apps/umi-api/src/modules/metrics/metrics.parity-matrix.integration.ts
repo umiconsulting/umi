@@ -257,6 +257,20 @@ describe('gate-2 parity matrix over fixture A', () => {
     });
   });
 
+  it('covers every range and scope with a non-empty case', () => {
+    for (const range of METRIC_RANGES) {
+      expect(rows.some((row) => row.range === range && row.nonEmpty)).toBe(true);
+      for (const scope of ['all', 'centro', 'norte'] as const)
+        expect(rows.some((row) => row.range === range && row.scope === scope && row.nonEmpty)).toBe(
+          true,
+        );
+    }
+    expect(new Set(rows.map((row) => row.range))).toEqual(new Set(METRIC_RANGES));
+    expect(rows.filter((row) => !row.nonEmpty).length).toBeGreaterThanOrEqual(4);
+    for (const boundary of ['start-inclusive', 'start-exclusive', 'end-exclusive'] as const)
+      expect(rows.some((row) => row.boundary === boundary)).toBe(true);
+  });
+
   it('commits a ledger that a rerun reproduces', () => {
     const ledger = buildLedger(rows);
     if (process.env.METRICS_GATE2_LEDGER_WRITE === '1')
