@@ -1,0 +1,141 @@
+{
+  "record": "2026-11-16-semantic-api-gate3-dashboard-compare",
+  "createdAt": "2026-11-16T06:17:42.130Z",
+  "d0": "2026-11-15",
+  "seedSha256": "1c1b21373b7909ab3e268aece7867ca8d20399eca58aba5d3236aac5fa7e8d08",
+  "beforeHead": "dfa7a78a94e696eb67fc4606b281268746128ec8",
+  "afterHead": "2b08f55ce98c79debb6e0bf5d4c40df6eaedda16",
+  "seedMatch": true,
+  "counts": {
+    "cells": 25,
+    "matches": 25,
+    "mismatches": 0
+  },
+  "rows": [
+    {
+      "id": "DB-T-CEN-RES",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-T-CEN-PRO",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-T-CEN-CAT",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-T-CEN-OPE",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-T-CEN-HOR",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-Y-CEN-RES",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-Y-CEN-PRO",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-Y-CEN-CAT",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-Y-CEN-OPE",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-Y-CEN-HOR",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-W-CEN-RES",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-W-CEN-PRO",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-W-CEN-CAT",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-W-CEN-OPE",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-W-CEN-HOR",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-M-CEN-RES",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-M-CEN-PRO",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-M-CEN-CAT",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-M-CEN-OPE",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-M-CEN-HOR",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-T-NOR-RES",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-T-NOR-HOR",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-T-CEN-MOB-RES",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-T-CEN-MOB-HOR",
+      "match": true,
+      "differences": []
+    },
+    {
+      "id": "DB-T-CEN-ANALYSIS",
+      "match": true,
+      "differences": []
+    }
+  ]
+}
