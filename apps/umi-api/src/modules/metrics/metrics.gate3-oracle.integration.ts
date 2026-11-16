@@ -16,7 +16,7 @@ import {
   sha256,
   type LegacySalesSummary,
   type NormalizedMetrics,
-} from './gate3-normalize';
+} from '../../../test/integration/gate3-normalize';
 
 /**
  * The gate-3 frozen legacy oracle.

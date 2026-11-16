@@ -68,7 +68,7 @@ checks:
 3. It asserts 20 non-empty gate-2 cases and 14 fields in each normalized value.
 4. It asserts the gate-2 ledger file hash and case-set hash.
 
-The test uses `apps/umi-api/src/modules/metrics/gate3-normalize.ts`. That file
+The test uses `apps/umi-api/test/integration/gate3-normalize.ts`. That file
 declares the legacy shape locally. It imports no legacy module and no
 `ReportsSales` type.
 
