@@ -164,7 +164,7 @@ function Mix({ title, parts, labelOf, currency }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {parts.map((p, i) => (
           <div
-            key={p.key}
+            key={`${p.key}:${i}`}
             style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5 }}
           >
             <span

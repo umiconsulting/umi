@@ -1,127 +1,11 @@
 import { z } from 'zod';
 import { IsoTimestamp, Uuid } from './platform';
 
-// Reports — the commercial read model. A sales summary aggregates committed sales
-// (pos_committed_sale + receipt_snapshot) plus their cart lines and tenders into the
-// figures the owner reads: net sales, product mix, payment mix, and a time series.
-// This is the aggregate the "Reportes → Ventas" view needs and the old generic
-// transaction list could not give. Read-only, RLS-scoped, gated by the sales permission.
+// Reports — the cash shift reconciliation read model. The sales summary types moved
+// to the semantic metrics contract in 2.58.0. This file keeps the cash-shift detail
+// that the "Caja y turnos" view reads.
 
 const Money = z.number().int().nonnegative();
-
-export const ReportsRange = z.enum(['today', 'yesterday', 'last_7_days', 'last_30_days']);
-export type ReportsRange = z.infer<typeof ReportsRange>;
-
-export const ReportsSalesQuery = z
-  .object({
-    range: ReportsRange.default('today'),
-    locationId: Uuid.optional(),
-  })
-  .strict();
-export type ReportsSalesQuery = z.infer<typeof ReportsSalesQuery>;
-
-export const ReportsSalesTotals = z
-  .object({
-    netSalesMinorUnits: Money,
-    orders: z.number().int().nonnegative(),
-    averageTicketMinorUnits: Money,
-    itemsSold: z.number().int().nonnegative(),
-    discountMinorUnits: Money,
-    // Tips captured on the receipt (snapshot->'tip'). Zero when the POS took none.
-    tipsMinorUnits: Money,
-    // Net sales in the equally-sized window immediately before this one, for a delta.
-    priorNetSalesMinorUnits: Money.nullable(),
-  })
-  .strict();
-
-// The real tender universe: cash + external (manual) terminal (pos_tender_fact) plus
-// wallet + gift_card (customer_value_tender_allocation). No integrated card exists yet
-// (that needs a payments gateway), so the mix is honest about the four it does capture.
-export const ReportsPaymentSlice = z
-  .object({
-    method: z.enum(['cash', 'manual_terminal', 'bank_transfer', 'wallet', 'gift_card']),
-    amountMinorUnits: Money,
-  })
-  .strict();
-
-// A generic grouped row for the pivot's Barista and Hora dimensions (Producto/Categoría
-// come from productMix). `key` is the operator name or the hour label.
-export const ReportsGroupRow = z
-  .object({
-    key: z.string().min(1).max(240),
-    units: z.number().int().nonnegative(),
-    netMinorUnits: Money,
-  })
-  .strict();
-
-export const ReportsProductRow = z
-  .object({
-    productId: Uuid.nullable(),
-    productName: z.string().min(1).max(240),
-    category: z.string().max(240).nullable(),
-    units: z.number().int().nonnegative(),
-    // Gross merchandise for the product (line price × quantity), pre-tax. No COGS: the
-    // cart line carries no cost, so margin is not derivable here without a recipe join.
-    netMinorUnits: Money,
-  })
-  .strict();
-
-export const ReportsSeriesPoint = z
-  .object({
-    // An hour ("08") for a single day, or a business date ("2026-09-06") for a range.
-    label: z.string().min(1).max(24),
-    amountMinorUnits: Money,
-  })
-  .strict();
-
-// Committed revenue split by the channel a sale originated in — the "channel wedge".
-// `channel` is the origin_channel stamped onto pos_committed_sale AT CHECKOUT (frozen), so
-// the split is reproducible and reconciles to `netSalesMinorUnits` (same committed-sale set).
-// It is NEVER derived from order_total, a mutable working/owed quote (ORDER_MODEL §4). A plain
-// counter sale with no upstream order is `walk_in`; the rest mirror customer_order.source.
-// See docs/architecture/2026-09-13-pos-channel-attribution-adr.md.
-export const ReportsChannelSlice = z
-  .object({
-    channel: z.enum(['walk_in', 'whatsapp', 'web', 'aggregator']),
-    netSalesMinorUnits: Money,
-    orders: z.number().int().nonnegative(),
-  })
-  .strict();
-
-export const ReportsSalesSummary = z
-  .object({
-    merchantId: Uuid,
-    locationId: Uuid.nullable(),
-    range: ReportsRange,
-    currency: z
-      .string()
-      .regex(/^[A-Z]{3}$/)
-      .nullable(),
-    bucket: z.enum(['hour', 'day']),
-    totals: ReportsSalesTotals,
-    paymentMix: z.array(ReportsPaymentSlice).max(8),
-    channelMix: z.array(ReportsChannelSlice).max(8),
-    productMix: z.array(ReportsProductRow).max(200),
-    byOperator: z.array(ReportsGroupRow).max(100),
-    byHour: z.array(ReportsGroupRow).max(31),
-    series: z.array(ReportsSeriesPoint).max(31),
-    capturedAt: IsoTimestamp,
-  })
-  .strict();
-export type ReportsSalesSummary = z.infer<typeof ReportsSalesSummary>;
-
-// A short, plain-Spanish narrative over the sales summary — "here's what changed and
-// what to do", written by the configured LLM (LLM_COMPLETION). Grounded only in the
-// summary figures; never invents. `generated` is false when it came from cache or the
-// model was skipped/failed, so the UI can render silently and hide on null (fail-safe).
-export const ReportsSalesInsight = z
-  .object({
-    narrative: z.string().max(600).nullable(),
-    generated: z.boolean(),
-    capturedAt: IsoTimestamp,
-  })
-  .strict();
-export type ReportsSalesInsight = z.infer<typeof ReportsSalesInsight>;
 
 // ── Cash shift detail — the reconciliation drill-down the "Caja y turnos" view needs.
 // All of it already exists in the schema (cash_shift, cash_ledger_entry, cash_count_attempt,
@@ -210,15 +94,6 @@ export const CashShiftDetail = z
 export type CashShiftDetail = z.infer<typeof CashShiftDetail>;
 
 export const reportsModels = {
-  ReportsSalesQuery,
-  ReportsSalesTotals,
-  ReportsPaymentSlice,
-  ReportsProductRow,
-  ReportsGroupRow,
-  ReportsSeriesPoint,
-  ReportsChannelSlice,
-  ReportsSalesSummary,
-  ReportsSalesInsight,
   CashRole,
   CashDenomination,
   CashLedgerLine,

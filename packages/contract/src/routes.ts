@@ -15,6 +15,10 @@ import { buildPath, routePath, merchantBase } from './route-table';
 export { merchantBase };
 
 export const routes = {
+  metrics: {
+    query: (merchantId: string) => buildPath('metrics.query', { merchantId }),
+    insight: (merchantId: string) => buildPath('metrics.insight', { merchantId }),
+  },
   salesAnalysis: {
     read: (merchantId: string) => buildPath('salesAnalysis.read', { merchantId }),
     options: (merchantId: string) => buildPath('salesAnalysis.options', { merchantId }),

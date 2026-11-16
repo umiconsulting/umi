@@ -32,6 +32,11 @@ import {
   invalidateSalesReports,
 } from '@/lib/sales-analysis-query.js';
 import { subscribeConversationMessages } from '@/lib/conversation-realtime.js';
+import {
+  adaptSalesSummary,
+  buildSalesInsightRequest,
+  buildSalesMetricsRequests,
+} from '@/lib/sales-metrics.js';
 
 const EMPTY_OVERVIEW = {};
 const EMPTY_STATIONS = [];
@@ -503,15 +508,25 @@ async function _loadOperations(ctx, domain, cursor, merchantWide, limit) {
   return _apiFetch(`${routes.merchants.operations(merchantId)}?${query}`);
 }
 
-// The Reportes → Ventas aggregate: net sales, product mix, payment mix, and a time
-// series for a business-date range. Location-scoped like the operations snapshot.
+// The Reportes → Ventas aggregate. Two requests replace the old summary: one
+// for the seven scalars and one for the six presets. The adapter keeps the old
+// view model, so the screen keeps its field names and its layout.
 async function _loadSalesSummary(ctx, range) {
   const merchantId = _merchantId(ctx);
   if (!merchantId) return null;
-  const query = new URLSearchParams({ range: range || 'today' });
   const locationId = _locationId(ctx);
-  if (locationId) query.set('locationId', locationId);
-  return _apiFetch(`${routes.merchants.operations(merchantId)}/reports/sales?${query}`);
+  const [scalars, presets] = buildSalesMetricsRequests(range, locationId);
+  const [scalarResponse, presetResponse] = await Promise.all([
+    _apiFetch(routes.metrics.query(merchantId), {
+      method: 'POST',
+      body: JSON.stringify(scalars),
+    }),
+    _apiFetch(routes.metrics.query(merchantId), {
+      method: 'POST',
+      body: JSON.stringify(presets),
+    }),
+  ]);
+  return adaptSalesSummary(scalarResponse, presetResponse);
 }
 
 // The AI sales narrative over the Ventas summary (same range/scope). Optional and
@@ -519,10 +534,11 @@ async function _loadSalesSummary(ctx, range) {
 async function _loadSalesInsight(ctx, range) {
   const merchantId = _merchantId(ctx);
   if (!merchantId) return EMPTY_SALES_INSIGHT;
-  const query = new URLSearchParams({ range: range || 'today' });
   const locationId = _locationId(ctx);
-  if (locationId) query.set('locationId', locationId);
-  return _apiFetch(`${routes.merchants.operations(merchantId)}/reports/sales/insight?${query}`);
+  return _apiFetch(routes.metrics.insight(merchantId), {
+    method: 'POST',
+    body: JSON.stringify(buildSalesInsightRequest(range, locationId)),
+  });
 }
 
 // One cash shift's reconciliation detail (roles, cash-math, denominations, ledger,

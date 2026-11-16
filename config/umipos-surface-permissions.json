@@ -271,18 +271,38 @@
       }
     },
     {
-      "id": "operations.sales",
+      "id": "metrics.query",
       "module": "reportes",
       "client": {
         "gate": ["sale.lifecycle", "sale.exception.read"],
         "gateMode": "any",
-        "source": "apps/umi-dashboard/src/data.jsx:551 (_loadSalesSummary → GET /api/merchants/{merchantId}/operations/reports/sales)"
+        "source": "apps/umi-dashboard/src/data.jsx (_loadSalesSummary → POST /api/merchants/{merchantId}/metrics/query)"
       },
       "request": {
-        "method": "GET",
-        "path": "/api/merchants/{merchantId}/operations/reports/sales?range=last_30_days"
+        "method": "POST",
+        "path": "/api/merchants/{merchantId}/metrics/query"
       },
       "note": "Cashier-keeps row: reportes is a module the client SHOWS to a cashier, so the server must keep serving it. Guards against over-tightening.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "metrics.insight",
+      "module": "reportes",
+      "client": {
+        "gate": ["sale.lifecycle", "sale.exception.read"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx (_loadSalesInsight → POST /api/merchants/{merchantId}/metrics/insight)"
+      },
+      "request": {
+        "method": "POST",
+        "path": "/api/merchants/{merchantId}/metrics/insight"
+      },
+      "note": "The optional narrative over the same sales read. A null narrative hides the card; the summary stays complete.",
       "expect": {
         "cashier": "allowed",
         "manager": "allowed",

@@ -4,12 +4,15 @@ import type { MetricsId, MetricsQueryInput } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
 import type { AppConfig } from '../../shared/config/config.schema';
 import type { AuthUser } from '../auth/auth.types';
-import { DashboardOperationsRepository } from '../dashboard-operations/dashboard-operations.repository';
 import { seedSalesAnalysis } from '../../../test/integration/sales-analysis-fixture';
+import {
+  loadLegacyCase,
+  type LegacySalesSummary,
+} from '../../../test/integration/legacy-sales-oracle';
 import { MetricsRepository } from './metrics.repository';
 
 /**
- * Parity between the new catalogue and the current `salesSummary`.
+ * Parity between the new catalogue and the frozen legacy sales summary.
  *
  * The old method has no `asOf`, so its repository method takes an internal
  * optional `asOf` that defaults to today. The public route never passes it and
@@ -41,28 +44,37 @@ const text = (value: string | null) => value ?? '';
 
 interface ParityResult {
   fresh: Awaited<ReturnType<MetricsRepository['read']>>;
-  legacy: Awaited<ReturnType<DashboardOperationsRepository['salesSummary']>>;
+  legacy: LegacySalesSummary;
+  legacyAliases: Record<string, string>;
 }
 
 async function readBoth(
   metrics: MetricsRepository,
-  legacy: DashboardOperationsRepository,
   userId: string,
   merchantId: string,
   locationId: string | null,
   asOf: string,
+  caseId: string,
   query: MetricsQueryInput = { metrics: MIGRATED, dimensions: [], range: 'last_7_days' },
 ): Promise<ParityResult> {
-  const [fresh, old] = await Promise.all([
+  const [fresh, frozen] = await Promise.all([
     metrics.read(userId, merchantId, locationId, query, asOf),
-    legacy.salesSummary(userId, merchantId, { range: 'last_7_days' }, locationId, asOf),
+    Promise.resolve(loadLegacyCase(caseId)),
   ]);
-  return { fresh, legacy: old };
+  return { fresh, legacy: frozen.response, legacyAliases: frozen.productAliases };
 }
 
 function legacyUnitsPerTicket(itemsSold: number, orders: number): number | null {
   if (orders === 0) return null;
   return Math.floor((itemsSold * 20000 + orders) / (2 * orders)) / 10000;
+}
+
+function fixtureAliases(ids: { bread: string; coffee: string; foreignProduct: string }) {
+  return {
+    [ids.bread]: 'bread',
+    [ids.coffee]: 'coffee',
+    [ids.foreignProduct]: 'foreign',
+  };
 }
 
 function expectTotalsParity({ fresh, legacy }: ParityResult) {
@@ -142,7 +154,10 @@ function paymentKey(row: { method: string; amountMinorUnits: number }) {
   return `${row.method}:${row.amountMinorUnits}`;
 }
 
-function expectMixParity({ fresh, legacy }: ParityResult) {
+function expectMixParity(
+  { fresh, legacy, legacyAliases }: ParityResult,
+  freshAliases: Record<string, string> = {},
+) {
   const payment = fresh.totals?.values.payment_mix as {
     items: { method: string; amountMinorUnits: number }[];
   };
@@ -157,34 +172,50 @@ function expectMixParity({ fresh, legacy }: ParityResult) {
       merchandiseMinorUnits: number;
     }[];
   };
-  const key = (row: { productId: string | null }) => text(row.productId);
+  const key = (row: { productId: string | null }, aliases: Record<string, string>) => {
+    const id = text(row.productId);
+    return id ? (aliases[id] ?? id) : '';
+  };
+  const mapFresh = (item: {
+    productId: string | null;
+    productName: string;
+    category: string | null;
+    units: number;
+    merchandiseMinorUnits: number;
+  }) => ({
+    productId: key(item, freshAliases),
+    productName: item.productName,
+    category: item.category,
+    units: item.units,
+    netMinorUnits: item.merchandiseMinorUnits,
+  });
+  const mapLegacy = (item: {
+    productId: string | null;
+    productName: string;
+    category: string | null;
+    units: number;
+    netMinorUnits: number;
+  }) => ({
+    productId: key(item, legacyAliases),
+    productName: item.productName,
+    category: item.category,
+    units: item.units,
+    netMinorUnits: item.netMinorUnits,
+  });
   expect(
     [...products.items]
-      .map((item) => ({
-        productId: item.productId,
-        productName: item.productName,
-        category: item.category,
-        units: item.units,
-        netMinorUnits: item.merchandiseMinorUnits,
-      }))
-      .sort((left, right) => key(left).localeCompare(key(right))),
+      .map(mapFresh)
+      .sort((left, right) => left.productId.localeCompare(right.productId)),
   ).toEqual(
     [...legacy.productMix]
-      .map((item) => ({
-        productId: item.productId,
-        productName: item.productName,
-        category: item.category,
-        units: item.units,
-        netMinorUnits: item.netMinorUnits,
-      }))
-      .sort((left, right) => key(left).localeCompare(key(right))),
+      .map(mapLegacy)
+      .sort((left, right) => left.productId.localeCompare(right.productId)),
   );
 }
 
-describe('parity with GET reports/sales on the golden fixture', () => {
+describe('parity with the frozen legacy summary on the golden fixture', () => {
   let pg: PgService;
   let metrics: MetricsRepository;
-  let legacy: DashboardOperationsRepository;
   let ids: Awaited<ReturnType<typeof seedSalesAnalysis>>;
   let user: AuthUser;
 
@@ -195,7 +226,6 @@ describe('parity with GET reports/sales on the golden fixture', () => {
     await pg.onModuleInit();
     ids = await seedSalesAnalysis(pg.worker);
     metrics = new MetricsRepository(pg);
-    legacy = new DashboardOperationsRepository(pg);
     user = { id: ids.user, email: null, sessionId: ids.session, deviceId: null };
   });
 
@@ -204,25 +234,39 @@ describe('parity with GET reports/sales on the golden fixture', () => {
   });
 
   it('agrees on all fourteen migrated values for all locations', async () => {
-    const result = await readBoth(metrics, legacy, user.id, ids.merchant, null, '2026-11-04');
+    const result = await readBoth(
+      metrics,
+      user.id,
+      ids.merchant,
+      null,
+      '2026-11-04',
+      'fixture-a-all',
+    );
     expectTotalsParity(result);
-    expectMixParity(result);
+    expectMixParity(result, fixtureAliases(ids));
   });
 
   it('agrees on all fourteen migrated values for one location', async () => {
-    const result = await readBoth(metrics, legacy, user.id, ids.merchant, ids.branch, '2026-11-04');
+    const result = await readBoth(
+      metrics,
+      user.id,
+      ids.merchant,
+      ids.location,
+      '2026-11-04',
+      'fixture-a-centro',
+    );
     expectTotalsParity(result);
-    expectMixParity(result);
+    expectMixParity(result, fixtureAliases(ids));
   });
 
   it('agrees on the day series as rows', async () => {
     const { fresh, legacy: old } = await readBoth(
       metrics,
-      legacy,
       user.id,
       ids.merchant,
       null,
       '2026-11-04',
+      'fixture-a-day-series',
       { metrics: ['net_sales'], dimensions: ['day'], range: 'last_7_days' },
     );
     expect(
@@ -238,11 +282,11 @@ describe('parity with GET reports/sales on the golden fixture', () => {
   it('compares a non-empty payment mix as a multiset', async () => {
     const result = await readBoth(
       metrics,
-      legacy,
       user.id,
       ids.merchant,
       ids.location,
       '2026-11-04',
+      'fixture-a-payment',
     );
     const payment = result.fresh.totals?.values.payment_mix as {
       items: { method: string; amountMinorUnits: number }[];
@@ -256,10 +300,9 @@ describe('parity with GET reports/sales on the golden fixture', () => {
   });
 });
 
-describe('parity with GET reports/sales on the I1 METRIC fixture', () => {
+describe('parity with the frozen legacy summary on the I1 METRIC fixture', () => {
   let pg: PgService | null = null;
   let metrics: MetricsRepository | null = null;
-  let legacy: DashboardOperationsRepository | null = null;
   let available = false;
 
   const merchant = '55555555-5555-4555-8555-000000000001';
@@ -279,7 +322,6 @@ describe('parity with GET reports/sales on the I1 METRIC fixture', () => {
       );
       await pg.onModuleInit();
       metrics = new MetricsRepository(pg);
-      legacy = new DashboardOperationsRepository(pg);
       available = true;
     } catch {
       available = false;
@@ -295,7 +337,14 @@ describe('parity with GET reports/sales on the I1 METRIC fixture', () => {
       context.skip();
       return;
     }
-    const result = await readBoth(metrics!, legacy!, metricUser, merchant, null, '2026-11-04');
+    const result = await readBoth(
+      metrics!,
+      metricUser,
+      merchant,
+      null,
+      '2026-11-04',
+      'fixture-b-i1',
+    );
     expectTotalsParity(result);
     expectMixParity(result);
     expect(result.legacy.totals.netSalesMinorUnits).toBe(49500);

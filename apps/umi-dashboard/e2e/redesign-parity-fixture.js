@@ -49,7 +49,7 @@ export function salesScope(range, locationId) {
     },
     series: [{ label: '10:00', amountMinorUnits: net }],
     paymentMix: [{ method: 'cash', amountMinorUnits: net, count: orders }],
-    channelMix: [{ channel: 'walk_in', amountMinorUnits: net, count: orders }],
+    channelMix: [{ channel: 'walk_in', netSalesMinorUnits: net, orders }],
     productMix: [
       {
         productName: `Café ${branch}`,
@@ -60,6 +60,145 @@ export function salesScope(range, locationId) {
     ],
     byOperator: [{ key: `Operador ${branch}`, units: orders, netMinorUnits: net }],
     byHour: [{ key: '10:00', units: orders, netMinorUnits: net }],
+  };
+}
+
+function metricsPeriod(range) {
+  const bucket = range === 'today' || range === 'yesterday' ? 'hour' : 'day';
+  return {
+    range,
+    start: '2026-10-18',
+    end: '2026-11-16',
+    bucket,
+    comparison: { start: '2026-09-18', end: '2026-10-17' },
+  };
+}
+
+export function metricsResponse(body, scope) {
+  const values = body.metrics.includes('net_sales')
+    ? {
+        net_sales: scope.totals.netSalesMinorUnits,
+        orders: scope.totals.orders,
+        average_ticket: scope.totals.averageTicketMinorUnits,
+        items_sold: scope.totals.itemsSold,
+        discounts: scope.totals.discountMinorUnits,
+        tips: scope.totals.tipsMinorUnits,
+        prior_net_sales: scope.totals.priorNetSalesMinorUnits,
+      }
+    : {
+        payment_mix: {
+          items: scope.paymentMix.map((row) => ({
+            method: row.method,
+            amountMinorUnits: row.amountMinorUnits,
+          })),
+          truncated: false,
+          limit: 8,
+          totalItems: scope.paymentMix.length,
+          total: { amountMinorUnits: scope.totals.netSalesMinorUnits },
+        },
+        channel_mix: {
+          items: scope.channelMix.map((row) => ({
+            channel: row.channel,
+            netSalesMinorUnits: row.netSalesMinorUnits,
+            orders: row.orders,
+          })),
+          truncated: false,
+          limit: 8,
+          totalItems: scope.channelMix.length,
+          total: {
+            netSalesMinorUnits: scope.totals.netSalesMinorUnits,
+            orders: scope.totals.orders,
+          },
+        },
+        product_mix: {
+          items: scope.productMix.map((row) => ({
+            productId: null,
+            productName: row.productName,
+            category: row.category,
+            units: row.units,
+            merchandiseMinorUnits: row.netMinorUnits,
+          })),
+          truncated: false,
+          limit: 200,
+          totalItems: scope.productMix.length,
+          total: {
+            units: scope.productMix.reduce((sum, row) => sum + row.units, 0),
+            merchandiseMinorUnits: scope.productMix.reduce(
+              (sum, row) => sum + row.netMinorUnits,
+              0,
+            ),
+          },
+        },
+        operator_mix: {
+          items: scope.byOperator.map((row) => ({
+            operator: row.key,
+            units: row.units,
+            merchandiseMinorUnits: row.netMinorUnits,
+          })),
+          truncated: false,
+          limit: 100,
+          totalItems: scope.byOperator.length,
+          total: {
+            units: scope.byOperator.reduce((sum, row) => sum + row.units, 0),
+            merchandiseMinorUnits: scope.byOperator.reduce(
+              (sum, row) => sum + row.netMinorUnits,
+              0,
+            ),
+          },
+        },
+        hour_mix: {
+          items: scope.byHour.map((row) => ({
+            hour: row.key,
+            units: row.units,
+            merchandiseMinorUnits: row.netMinorUnits,
+          })),
+          truncated: false,
+          limit: 24,
+          totalItems: scope.byHour.length,
+          total: {
+            units: scope.byHour.reduce((sum, row) => sum + row.units, 0),
+            merchandiseMinorUnits: scope.byHour.reduce((sum, row) => sum + row.netMinorUnits, 0),
+          },
+        },
+        series: {
+          items: scope.series.map((row) => ({
+            label: row.label,
+            netSalesMinorUnits: row.amountMinorUnits,
+          })),
+          truncated: false,
+          limit: 31,
+          totalItems: scope.series.length,
+          total: {
+            netSalesMinorUnits: scope.series.reduce((sum, row) => sum + row.amountMinorUnits, 0),
+          },
+        },
+      };
+  return {
+    definitionVersion: '1.0.0',
+    scope: {
+      merchantId,
+      locationId: body.locationId ?? null,
+      currency: 'MXN',
+      timezone: 'America/Mexico_City',
+      attribution: { category: 'current' },
+    },
+    period: metricsPeriod(body.range),
+    coverage: {
+      sources: [
+        'pos_committed_sale',
+        'receipt_snapshot',
+        'pos_cart_line',
+        'pos_tender_fact',
+        'customer_value_tender_allocation',
+        'product',
+        'product_category',
+      ],
+      committedOnly: true,
+      refundsIncluded: false,
+    },
+    freshness: { capturedAt: '2026-11-02T18:00:00.000Z' },
+    truncated: false,
+    totals: { values },
   };
 }
 
@@ -173,10 +312,20 @@ export async function prepareDashboard(
         },
       });
     }
-    if (path.endsWith('/reports/sales') || path.endsWith('/reports/sales/insight')) {
-      const data = salesScope(url.searchParams.get('range'), url.searchParams.get('locationId'));
+    if (path.endsWith('/metrics/query')) {
+      const body = request.postDataJSON();
+      const data = salesScope(body.range, body.locationId);
+      return route.fulfill({ json: metricsResponse(body, data) });
+    }
+    if (path.endsWith('/metrics/insight')) {
+      const body = request.postDataJSON();
+      const data = salesScope(body.range, body.locationId);
       return route.fulfill({
-        json: path.endsWith('/insight') ? { narrative: narrative ? data.narrative : null } : data,
+        json: {
+          narrative: narrative ? data.narrative : null,
+          generated: Boolean(narrative),
+          capturedAt: '2026-11-02T18:00:00.000Z',
+        },
       });
     }
     if (path.endsWith('/operations') && url.searchParams.get('domain') === 'receipts') {

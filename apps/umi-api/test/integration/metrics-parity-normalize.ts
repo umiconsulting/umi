@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import type { MetricsResponse, ReportsSalesSummary } from '@umi/contract';
+import type { MetricsResponse } from '@umi/contract';
+import type { LegacySalesSummary } from './legacy-sales-oracle';
 
 /**
  * One canonical shape for the fourteen metrics that exist on both sides.
@@ -178,13 +179,13 @@ export function normalizeFresh(response: MetricsResponse): NormalizedMetrics {
 }
 
 /**
- * The canonical form of the legacy `salesSummary` read.
+ * The canonical form of the frozen legacy sales summary.
  *
  * `units_per_ticket` is derived here, because the legacy response has no such
  * field. The formula is the same integer half-up rule as the catalogue. The
  * legacy mix names differ: `byOperator` and `byHour`.
  */
-export function normalizeLegacy(summary: ReportsSalesSummary): NormalizedMetrics {
+export function normalizeLegacy(summary: LegacySalesSummary): NormalizedMetrics {
   const totals = summary.totals;
   return {
     net_sales: totals.netSalesMinorUnits,

@@ -1,0 +1,1254 @@
+{
+  "record": "2026-11-16-semantic-api-gate3-api-matrix",
+  "createdAt": "2026-11-16T06:17:30.364Z",
+  "d0": "2026-11-15",
+  "merchantId": "55555555-5555-4555-8555-000000000001",
+  "counts": {
+    "cases": 12,
+    "matches": 12,
+    "mismatches": 0
+  },
+  "cases": [
+    {
+      "id": "API-today-all",
+      "range": "today",
+      "scope": "all",
+      "locationId": null,
+      "status": 200,
+      "request": {
+        "scalars": {
+          "dimensions": [],
+          "range": "today",
+          "metrics": [
+            "net_sales",
+            "orders",
+            "average_ticket",
+            "items_sold",
+            "units_per_ticket",
+            "discounts",
+            "tips",
+            "prior_net_sales",
+            "refunds"
+          ]
+        },
+        "presets": {
+          "dimensions": [],
+          "range": "today",
+          "metrics": [
+            "payment_mix",
+            "channel_mix",
+            "product_mix",
+            "operator_mix",
+            "hour_mix",
+            "series"
+          ]
+        }
+      },
+      "expected": {
+        "net": 28500,
+        "orders": 2,
+        "avg": 14250,
+        "items": 3,
+        "disc": 3000,
+        "tips": 1500,
+        "prior": 18000,
+        "refunds": 9000,
+        "payment": [
+          [
+            "cash",
+            28500
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            28500,
+            2
+          ]
+        ],
+        "series": [
+          [
+            "09",
+            19500
+          ],
+          [
+            "17",
+            9000
+          ]
+        ]
+      },
+      "actual": {
+        "net": 28500,
+        "orders": 2,
+        "avg": 14250,
+        "items": 3,
+        "disc": 3000,
+        "tips": 1500,
+        "prior": 18000,
+        "refunds": 9000,
+        "payment": [
+          [
+            "cash",
+            28500
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            28500,
+            2
+          ]
+        ],
+        "series": [
+          [
+            "09",
+            19500
+          ],
+          [
+            "17",
+            9000
+          ]
+        ]
+      },
+      "match": true,
+      "mismatchedFields": []
+    },
+    {
+      "id": "API-today-centro",
+      "range": "today",
+      "scope": "centro",
+      "locationId": "55555555-5555-4555-8555-000000000011",
+      "status": 200,
+      "request": {
+        "scalars": {
+          "dimensions": [],
+          "range": "today",
+          "locationId": "55555555-5555-4555-8555-000000000011",
+          "metrics": [
+            "net_sales",
+            "orders",
+            "average_ticket",
+            "items_sold",
+            "units_per_ticket",
+            "discounts",
+            "tips",
+            "prior_net_sales",
+            "refunds"
+          ]
+        },
+        "presets": {
+          "dimensions": [],
+          "range": "today",
+          "locationId": "55555555-5555-4555-8555-000000000011",
+          "metrics": [
+            "payment_mix",
+            "channel_mix",
+            "product_mix",
+            "operator_mix",
+            "hour_mix",
+            "series"
+          ]
+        }
+      },
+      "expected": {
+        "net": 28500,
+        "orders": 2,
+        "avg": 14250,
+        "items": 3,
+        "disc": 3000,
+        "tips": 1500,
+        "prior": 18000,
+        "refunds": 9000,
+        "payment": [
+          [
+            "cash",
+            28500
+          ],
+          [
+            "wallet",
+            5000
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            28500,
+            2
+          ]
+        ],
+        "series": [
+          [
+            "09",
+            19500
+          ],
+          [
+            "17",
+            9000
+          ]
+        ]
+      },
+      "actual": {
+        "net": 28500,
+        "orders": 2,
+        "avg": 14250,
+        "items": 3,
+        "disc": 3000,
+        "tips": 1500,
+        "prior": 18000,
+        "refunds": 9000,
+        "payment": [
+          [
+            "cash",
+            28500
+          ],
+          [
+            "wallet",
+            5000
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            28500,
+            2
+          ]
+        ],
+        "series": [
+          [
+            "09",
+            19500
+          ],
+          [
+            "17",
+            9000
+          ]
+        ]
+      },
+      "match": true,
+      "mismatchedFields": []
+    },
+    {
+      "id": "API-today-norte",
+      "range": "today",
+      "scope": "norte",
+      "locationId": "55555555-5555-4555-8555-000000000012",
+      "status": 200,
+      "request": {
+        "scalars": {
+          "dimensions": [],
+          "range": "today",
+          "locationId": "55555555-5555-4555-8555-000000000012",
+          "metrics": [
+            "net_sales",
+            "orders",
+            "average_ticket",
+            "items_sold",
+            "units_per_ticket",
+            "discounts",
+            "tips",
+            "prior_net_sales",
+            "refunds"
+          ]
+        },
+        "presets": {
+          "dimensions": [],
+          "range": "today",
+          "locationId": "55555555-5555-4555-8555-000000000012",
+          "metrics": [
+            "payment_mix",
+            "channel_mix",
+            "product_mix",
+            "operator_mix",
+            "hour_mix",
+            "series"
+          ]
+        }
+      },
+      "expected": {
+        "net": 0,
+        "orders": 0,
+        "avg": 0,
+        "items": 0,
+        "disc": 0,
+        "tips": 0,
+        "prior": 0,
+        "refunds": 0,
+        "payment": [],
+        "channel": [],
+        "series": []
+      },
+      "actual": {
+        "net": 0,
+        "orders": 0,
+        "avg": 0,
+        "items": 0,
+        "disc": 0,
+        "tips": 0,
+        "prior": 0,
+        "refunds": 0,
+        "payment": [],
+        "channel": [],
+        "series": []
+      },
+      "match": true,
+      "mismatchedFields": []
+    },
+    {
+      "id": "API-yesterday-all",
+      "range": "yesterday",
+      "scope": "all",
+      "locationId": null,
+      "status": 200,
+      "request": {
+        "scalars": {
+          "dimensions": [],
+          "range": "yesterday",
+          "metrics": [
+            "net_sales",
+            "orders",
+            "average_ticket",
+            "items_sold",
+            "units_per_ticket",
+            "discounts",
+            "tips",
+            "prior_net_sales",
+            "refunds"
+          ]
+        },
+        "presets": {
+          "dimensions": [],
+          "range": "yesterday",
+          "metrics": [
+            "payment_mix",
+            "channel_mix",
+            "product_mix",
+            "operator_mix",
+            "hour_mix",
+            "series"
+          ]
+        }
+      },
+      "expected": {
+        "net": 18000,
+        "orders": 1,
+        "avg": 18000,
+        "items": 2,
+        "disc": 2000,
+        "tips": 0,
+        "prior": 0,
+        "refunds": 0,
+        "payment": [
+          [
+            "cash",
+            18000
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            18000,
+            1
+          ]
+        ],
+        "series": [
+          [
+            "12",
+            18000
+          ]
+        ]
+      },
+      "actual": {
+        "net": 18000,
+        "orders": 1,
+        "avg": 18000,
+        "items": 2,
+        "disc": 2000,
+        "tips": 0,
+        "prior": 0,
+        "refunds": 0,
+        "payment": [
+          [
+            "cash",
+            18000
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            18000,
+            1
+          ]
+        ],
+        "series": [
+          [
+            "12",
+            18000
+          ]
+        ]
+      },
+      "match": true,
+      "mismatchedFields": []
+    },
+    {
+      "id": "API-yesterday-centro",
+      "range": "yesterday",
+      "scope": "centro",
+      "locationId": "55555555-5555-4555-8555-000000000011",
+      "status": 200,
+      "request": {
+        "scalars": {
+          "dimensions": [],
+          "range": "yesterday",
+          "locationId": "55555555-5555-4555-8555-000000000011",
+          "metrics": [
+            "net_sales",
+            "orders",
+            "average_ticket",
+            "items_sold",
+            "units_per_ticket",
+            "discounts",
+            "tips",
+            "prior_net_sales",
+            "refunds"
+          ]
+        },
+        "presets": {
+          "dimensions": [],
+          "range": "yesterday",
+          "locationId": "55555555-5555-4555-8555-000000000011",
+          "metrics": [
+            "payment_mix",
+            "channel_mix",
+            "product_mix",
+            "operator_mix",
+            "hour_mix",
+            "series"
+          ]
+        }
+      },
+      "expected": {
+        "net": 18000,
+        "orders": 1,
+        "avg": 18000,
+        "items": 2,
+        "disc": 2000,
+        "tips": 0,
+        "prior": 0,
+        "refunds": 0,
+        "payment": [
+          [
+            "cash",
+            18000
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            18000,
+            1
+          ]
+        ],
+        "series": [
+          [
+            "12",
+            18000
+          ]
+        ]
+      },
+      "actual": {
+        "net": 18000,
+        "orders": 1,
+        "avg": 18000,
+        "items": 2,
+        "disc": 2000,
+        "tips": 0,
+        "prior": 0,
+        "refunds": 0,
+        "payment": [
+          [
+            "cash",
+            18000
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            18000,
+            1
+          ]
+        ],
+        "series": [
+          [
+            "12",
+            18000
+          ]
+        ]
+      },
+      "match": true,
+      "mismatchedFields": []
+    },
+    {
+      "id": "API-yesterday-norte",
+      "range": "yesterday",
+      "scope": "norte",
+      "locationId": "55555555-5555-4555-8555-000000000012",
+      "status": 200,
+      "request": {
+        "scalars": {
+          "dimensions": [],
+          "range": "yesterday",
+          "locationId": "55555555-5555-4555-8555-000000000012",
+          "metrics": [
+            "net_sales",
+            "orders",
+            "average_ticket",
+            "items_sold",
+            "units_per_ticket",
+            "discounts",
+            "tips",
+            "prior_net_sales",
+            "refunds"
+          ]
+        },
+        "presets": {
+          "dimensions": [],
+          "range": "yesterday",
+          "locationId": "55555555-5555-4555-8555-000000000012",
+          "metrics": [
+            "payment_mix",
+            "channel_mix",
+            "product_mix",
+            "operator_mix",
+            "hour_mix",
+            "series"
+          ]
+        }
+      },
+      "expected": {
+        "net": 0,
+        "orders": 0,
+        "avg": 0,
+        "items": 0,
+        "disc": 0,
+        "tips": 0,
+        "prior": 0,
+        "refunds": 0,
+        "payment": [],
+        "channel": [],
+        "series": []
+      },
+      "actual": {
+        "net": 0,
+        "orders": 0,
+        "avg": 0,
+        "items": 0,
+        "disc": 0,
+        "tips": 0,
+        "prior": 0,
+        "refunds": 0,
+        "payment": [],
+        "channel": [],
+        "series": []
+      },
+      "match": true,
+      "mismatchedFields": []
+    },
+    {
+      "id": "API-last_7_days-all",
+      "range": "last_7_days",
+      "scope": "all",
+      "locationId": null,
+      "status": 200,
+      "request": {
+        "scalars": {
+          "dimensions": [],
+          "range": "last_7_days",
+          "metrics": [
+            "net_sales",
+            "orders",
+            "average_ticket",
+            "items_sold",
+            "units_per_ticket",
+            "discounts",
+            "tips",
+            "prior_net_sales",
+            "refunds"
+          ]
+        },
+        "presets": {
+          "dimensions": [],
+          "range": "last_7_days",
+          "metrics": [
+            "payment_mix",
+            "channel_mix",
+            "product_mix",
+            "operator_mix",
+            "hour_mix",
+            "series"
+          ]
+        }
+      },
+      "expected": {
+        "net": 55500,
+        "orders": 4,
+        "avg": 13875,
+        "items": 6,
+        "disc": 6000,
+        "tips": 1500,
+        "prior": 10000,
+        "refunds": 9000,
+        "payment": [
+          [
+            "cash",
+            55500
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            46500,
+            3
+          ],
+          [
+            "whatsapp",
+            9000,
+            1
+          ]
+        ],
+        "series": [
+          [
+            "2026-11-12",
+            9000
+          ],
+          [
+            "2026-11-14",
+            18000
+          ],
+          [
+            "2026-11-15",
+            28500
+          ]
+        ]
+      },
+      "actual": {
+        "net": 55500,
+        "orders": 4,
+        "avg": 13875,
+        "items": 6,
+        "disc": 6000,
+        "tips": 1500,
+        "prior": 10000,
+        "refunds": 9000,
+        "payment": [
+          [
+            "cash",
+            55500
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            46500,
+            3
+          ],
+          [
+            "whatsapp",
+            9000,
+            1
+          ]
+        ],
+        "series": [
+          [
+            "2026-11-12",
+            9000
+          ],
+          [
+            "2026-11-14",
+            18000
+          ],
+          [
+            "2026-11-15",
+            28500
+          ]
+        ]
+      },
+      "match": true,
+      "mismatchedFields": []
+    },
+    {
+      "id": "API-last_7_days-centro",
+      "range": "last_7_days",
+      "scope": "centro",
+      "locationId": "55555555-5555-4555-8555-000000000011",
+      "status": 200,
+      "request": {
+        "scalars": {
+          "dimensions": [],
+          "range": "last_7_days",
+          "locationId": "55555555-5555-4555-8555-000000000011",
+          "metrics": [
+            "net_sales",
+            "orders",
+            "average_ticket",
+            "items_sold",
+            "units_per_ticket",
+            "discounts",
+            "tips",
+            "prior_net_sales",
+            "refunds"
+          ]
+        },
+        "presets": {
+          "dimensions": [],
+          "range": "last_7_days",
+          "locationId": "55555555-5555-4555-8555-000000000011",
+          "metrics": [
+            "payment_mix",
+            "channel_mix",
+            "product_mix",
+            "operator_mix",
+            "hour_mix",
+            "series"
+          ]
+        }
+      },
+      "expected": {
+        "net": 46500,
+        "orders": 3,
+        "avg": 15500,
+        "items": 5,
+        "disc": 5000,
+        "tips": 1500,
+        "prior": 10000,
+        "refunds": 9000,
+        "payment": [
+          [
+            "cash",
+            46500
+          ],
+          [
+            "wallet",
+            5000
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            46500,
+            3
+          ]
+        ],
+        "series": [
+          [
+            "2026-11-14",
+            18000
+          ],
+          [
+            "2026-11-15",
+            28500
+          ]
+        ]
+      },
+      "actual": {
+        "net": 46500,
+        "orders": 3,
+        "avg": 15500,
+        "items": 5,
+        "disc": 5000,
+        "tips": 1500,
+        "prior": 10000,
+        "refunds": 9000,
+        "payment": [
+          [
+            "cash",
+            46500
+          ],
+          [
+            "wallet",
+            5000
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            46500,
+            3
+          ]
+        ],
+        "series": [
+          [
+            "2026-11-14",
+            18000
+          ],
+          [
+            "2026-11-15",
+            28500
+          ]
+        ]
+      },
+      "match": true,
+      "mismatchedFields": []
+    },
+    {
+      "id": "API-last_7_days-norte",
+      "range": "last_7_days",
+      "scope": "norte",
+      "locationId": "55555555-5555-4555-8555-000000000012",
+      "status": 200,
+      "request": {
+        "scalars": {
+          "dimensions": [],
+          "range": "last_7_days",
+          "locationId": "55555555-5555-4555-8555-000000000012",
+          "metrics": [
+            "net_sales",
+            "orders",
+            "average_ticket",
+            "items_sold",
+            "units_per_ticket",
+            "discounts",
+            "tips",
+            "prior_net_sales",
+            "refunds"
+          ]
+        },
+        "presets": {
+          "dimensions": [],
+          "range": "last_7_days",
+          "locationId": "55555555-5555-4555-8555-000000000012",
+          "metrics": [
+            "payment_mix",
+            "channel_mix",
+            "product_mix",
+            "operator_mix",
+            "hour_mix",
+            "series"
+          ]
+        }
+      },
+      "expected": {
+        "net": 9000,
+        "orders": 1,
+        "avg": 9000,
+        "items": 1,
+        "disc": 1000,
+        "tips": 0,
+        "prior": 0,
+        "refunds": 0,
+        "payment": [
+          [
+            "cash",
+            9000
+          ]
+        ],
+        "channel": [
+          [
+            "whatsapp",
+            9000,
+            1
+          ]
+        ],
+        "series": [
+          [
+            "2026-11-12",
+            9000
+          ]
+        ]
+      },
+      "actual": {
+        "net": 9000,
+        "orders": 1,
+        "avg": 9000,
+        "items": 1,
+        "disc": 1000,
+        "tips": 0,
+        "prior": 0,
+        "refunds": 0,
+        "payment": [
+          [
+            "cash",
+            9000
+          ]
+        ],
+        "channel": [
+          [
+            "whatsapp",
+            9000,
+            1
+          ]
+        ],
+        "series": [
+          [
+            "2026-11-12",
+            9000
+          ]
+        ]
+      },
+      "match": true,
+      "mismatchedFields": []
+    },
+    {
+      "id": "API-last_30_days-all",
+      "range": "last_30_days",
+      "scope": "all",
+      "locationId": null,
+      "status": 200,
+      "request": {
+        "scalars": {
+          "dimensions": [],
+          "range": "last_30_days",
+          "metrics": [
+            "net_sales",
+            "orders",
+            "average_ticket",
+            "items_sold",
+            "units_per_ticket",
+            "discounts",
+            "tips",
+            "prior_net_sales",
+            "refunds"
+          ]
+        },
+        "presets": {
+          "dimensions": [],
+          "range": "last_30_days",
+          "metrics": [
+            "payment_mix",
+            "channel_mix",
+            "product_mix",
+            "operator_mix",
+            "hour_mix",
+            "series"
+          ]
+        }
+      },
+      "expected": {
+        "net": 65500,
+        "orders": 5,
+        "avg": 13100,
+        "items": 7,
+        "disc": 6000,
+        "tips": 1500,
+        "prior": 0,
+        "refunds": 9000,
+        "payment": [
+          [
+            "cash",
+            65500
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            56500,
+            4
+          ],
+          [
+            "whatsapp",
+            9000,
+            1
+          ]
+        ],
+        "series": [
+          [
+            "2026-11-07",
+            10000
+          ],
+          [
+            "2026-11-12",
+            9000
+          ],
+          [
+            "2026-11-14",
+            18000
+          ],
+          [
+            "2026-11-15",
+            28500
+          ]
+        ]
+      },
+      "actual": {
+        "net": 65500,
+        "orders": 5,
+        "avg": 13100,
+        "items": 7,
+        "disc": 6000,
+        "tips": 1500,
+        "prior": 0,
+        "refunds": 9000,
+        "payment": [
+          [
+            "cash",
+            65500
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            56500,
+            4
+          ],
+          [
+            "whatsapp",
+            9000,
+            1
+          ]
+        ],
+        "series": [
+          [
+            "2026-11-07",
+            10000
+          ],
+          [
+            "2026-11-12",
+            9000
+          ],
+          [
+            "2026-11-14",
+            18000
+          ],
+          [
+            "2026-11-15",
+            28500
+          ]
+        ]
+      },
+      "match": true,
+      "mismatchedFields": []
+    },
+    {
+      "id": "API-last_30_days-centro",
+      "range": "last_30_days",
+      "scope": "centro",
+      "locationId": "55555555-5555-4555-8555-000000000011",
+      "status": 200,
+      "request": {
+        "scalars": {
+          "dimensions": [],
+          "range": "last_30_days",
+          "locationId": "55555555-5555-4555-8555-000000000011",
+          "metrics": [
+            "net_sales",
+            "orders",
+            "average_ticket",
+            "items_sold",
+            "units_per_ticket",
+            "discounts",
+            "tips",
+            "prior_net_sales",
+            "refunds"
+          ]
+        },
+        "presets": {
+          "dimensions": [],
+          "range": "last_30_days",
+          "locationId": "55555555-5555-4555-8555-000000000011",
+          "metrics": [
+            "payment_mix",
+            "channel_mix",
+            "product_mix",
+            "operator_mix",
+            "hour_mix",
+            "series"
+          ]
+        }
+      },
+      "expected": {
+        "net": 56500,
+        "orders": 4,
+        "avg": 14125,
+        "items": 6,
+        "disc": 5000,
+        "tips": 1500,
+        "prior": 0,
+        "refunds": 9000,
+        "payment": [
+          [
+            "cash",
+            56500
+          ],
+          [
+            "wallet",
+            5000
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            56500,
+            4
+          ]
+        ],
+        "series": [
+          [
+            "2026-11-07",
+            10000
+          ],
+          [
+            "2026-11-14",
+            18000
+          ],
+          [
+            "2026-11-15",
+            28500
+          ]
+        ]
+      },
+      "actual": {
+        "net": 56500,
+        "orders": 4,
+        "avg": 14125,
+        "items": 6,
+        "disc": 5000,
+        "tips": 1500,
+        "prior": 0,
+        "refunds": 9000,
+        "payment": [
+          [
+            "cash",
+            56500
+          ],
+          [
+            "wallet",
+            5000
+          ]
+        ],
+        "channel": [
+          [
+            "walk_in",
+            56500,
+            4
+          ]
+        ],
+        "series": [
+          [
+            "2026-11-07",
+            10000
+          ],
+          [
+            "2026-11-14",
+            18000
+          ],
+          [
+            "2026-11-15",
+            28500
+          ]
+        ]
+      },
+      "match": true,
+      "mismatchedFields": []
+    },
+    {
+      "id": "API-last_30_days-norte",
+      "range": "last_30_days",
+      "scope": "norte",
+      "locationId": "55555555-5555-4555-8555-000000000012",
+      "status": 200,
+      "request": {
+        "scalars": {
+          "dimensions": [],
+          "range": "last_30_days",
+          "locationId": "55555555-5555-4555-8555-000000000012",
+          "metrics": [
+            "net_sales",
+            "orders",
+            "average_ticket",
+            "items_sold",
+            "units_per_ticket",
+            "discounts",
+            "tips",
+            "prior_net_sales",
+            "refunds"
+          ]
+        },
+        "presets": {
+          "dimensions": [],
+          "range": "last_30_days",
+          "locationId": "55555555-5555-4555-8555-000000000012",
+          "metrics": [
+            "payment_mix",
+            "channel_mix",
+            "product_mix",
+            "operator_mix",
+            "hour_mix",
+            "series"
+          ]
+        }
+      },
+      "expected": {
+        "net": 9000,
+        "orders": 1,
+        "avg": 9000,
+        "items": 1,
+        "disc": 1000,
+        "tips": 0,
+        "prior": 0,
+        "refunds": 0,
+        "payment": [
+          [
+            "cash",
+            9000
+          ]
+        ],
+        "channel": [
+          [
+            "whatsapp",
+            9000,
+            1
+          ]
+        ],
+        "series": [
+          [
+            "2026-11-12",
+            9000
+          ]
+        ]
+      },
+      "actual": {
+        "net": 9000,
+        "orders": 1,
+        "avg": 9000,
+        "items": 1,
+        "disc": 1000,
+        "tips": 0,
+        "prior": 0,
+        "refunds": 0,
+        "payment": [
+          [
+            "cash",
+            9000
+          ]
+        ],
+        "channel": [
+          [
+            "whatsapp",
+            9000,
+            1
+          ]
+        ],
+        "series": [
+          [
+            "2026-11-12",
+            9000
+          ]
+        ]
+      },
+      "match": true,
+      "mismatchedFields": []
+    }
+  ],
+  "permissions": {
+    "allAccount": {
+      "status": 200,
+      "net": 55500
+    },
+    "boundCentro": {
+      "status": 200
+    },
+    "boundNorte": {
+      "status": 403,
+      "code": "LOCATION_SCOPE_VIOLATION"
+    }
+  }
+}
