@@ -115,7 +115,7 @@ The payment multiset has two cases:
 
 Path: `docs/verification/2026-11-16-semantic-api-gate2-parity.json`.
 File SHA-256: `293231552a1092f17ff9cd023e209691ba2c89f347c2e2ac99d26a7644718a32`.
-Case set SHA-256: `0ede4e799bbcfc2978de8036194b155477c87bd69f60668e977515d6b11b680d`.
+Case set SHA-256: `fe1365f872f364448a05384ffa2e7e63d9977463b4d8bd4753fc45cacd26f4c5`.
 The test writes the ledger only with `METRICS_GATE2_LEDGER_WRITE=1`.
 A rerun without the flag reads the file and compares the parsed object.
 Two reruns produced the same bytes.
