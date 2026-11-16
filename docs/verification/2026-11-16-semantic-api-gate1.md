@@ -55,11 +55,13 @@ Test: `metrics.integration.ts`.
 | `operator_mix`     | `—` {4; 40,000}                                      | match               |
 | `hour_mix`         | `04` {1; 10,000}, `10` {2; 20,000}, `11` {1; 10,000} | match               |
 | `series`           | 2026-11-02 28,500; 2026-11-04 9,000                  | match               |
-| `payment_mix`      | empty                                                | empty               |
+| `payment_mix`      | `cash` {19,500}, `wallet` {5,000}                    | match               |
 
 The hourly bucket uses `pos_committed_sale.committed_at` in `America/Mazatlan`.
 The day uses `receipt_snapshot.business_date`.
-The fixture has no `pos_tender_fact` rows, so `payment_mix` is empty.
+The fixture has one committed cash tender of 19,500 and one wallet allocation of 5,000.
+The all-locations read returns the cash tender only, because the allocation has a location scope.
+The one-location read returns both rows.
 
 ## Golden fixture B
 
@@ -99,18 +101,22 @@ The old repository method takes an internal optional `asOf`.
 The route never sends it, so the published output does not change.
 Both methods use the same explicit window.
 
-| Fixture       | Location scope | Metrics            | Result      |
-| ------------- | -------------- | ------------------ | ----------- |
-| A             | all locations  | 14 migrated        | exact match |
-| A             | one location   | 14 migrated        | exact match |
-| A             | all locations  | day series as rows | exact match |
-| B (I1 METRIC) | all locations  | 14 migrated        | exact match |
+| Fixture       | Location scope | Metrics               | Result         |
+| ------------- | -------------- | --------------------- | -------------- |
+| A             | all locations  | 14 migrated           | exact match    |
+| A             | one location   | 14 migrated           | exact match    |
+| A             | all locations  | day series as rows    | exact match    |
+| A             | one location   | non-empty payment mix | multiset match |
+| B (I1 METRIC) | all locations  | 14 migrated           | exact match    |
 
 The test compares:
 
-- `net_sales`, `orders`, `average_ticket`, `items_sold`, `discounts`, `tips`, `prior_net_sales`;
-- `payment_mix` as a multiset;
+- `net_sales`, `orders`, `average_ticket`, `items_sold`, `units_per_ticket`, `discounts`, `tips`, `prior_net_sales`;
+- `payment_mix` as a multiset, including one tender and one allocation;
 - `channel_mix`, `product_mix`, `operator_mix`, `hour_mix`, `series` after key and order normalization.
+
+The `units_per_ticket` legacy value comes from `itemsSold` and `orders` at 4 decimals, half-up.
+The test returns null when `orders` is 0.
 
 ## Performance on the 19k fixture
 
@@ -170,18 +176,58 @@ The new method is 16 ms slower on this run.
 The new method runs 11 SQL statements.
 The old method runs 11 statements by code inspection.
 
+## Rework after the verifier FAIL at `0ec5de71`
+
+The verifier returned FAIL at `0ec5de71`.
+This section records the five defects and the correction.
+
+| Defect | Cause                                                                   | Correction                                                                                      |
+| ------ | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| D1     | The payment mapper read `row.key`. The SQL aliases the column `method`. | Read `row.method`. Add `PaymentRow` to the row type.                                            |
+| D2     | The SQL applied `LIMIT` to each metric family. `rowsTotal` used `max`.  | Remove the per-family `LIMIT`. Merge the tuples, sort, cut once. `rowsTotal` is the union size. |
+| D3     | SQL preflight counted three new uncovered statements.                   | Name the three dimension-driven statements in `UNCOVERED_EXPECTED` with the reason.             |
+| D4     | Parity did not compare `units_per_ticket`. Payment mix was empty.       | Compare the derived value. Add one tender and one allocation to the fixture.                    |
+| D5     | The mock returned `key`. The mock hid D1.                               | Return `method`. Add the D1, D2 and D4 regression tests.                                        |
+
+Red-to-green evidence:
+
+| Test                                                       | At `0ec5de71`                                                   | At the new head |
+| ---------------------------------------------------------- | --------------------------------------------------------------- | --------------- |
+| `metrics.repository.spec.ts` payment envelope              | `safeParse` false; method `undefined`                           | pass            |
+| `metrics.repository.spec.ts` disjoint-day cut              | 2 rows; `truncated` false; no `rowsTotal`                       | pass            |
+| `metrics.integration.ts` cash tender envelope              | `safeParse` false; method `undefined`                           | pass            |
+| `metrics.parity.integration.ts` non-empty payment multiset | `undefined:19500`, `undefined:5000`                             | pass            |
+| `sql-preflight.integration.ts` uncovered remainder         | `NEW uncovered file: modules/metrics/metrics.repository.ts (3)` | pass            |
+
+The `units_per_ticket` parity check passes at both heads, because the value was correct.
+The new check closes the coverage gap. The new non-empty payment case is the red case for D4.
+
+### Payment overlap risk
+
+`payment_mix` concatenates `merchant.pos_tender_fact` with
+`merchant.customer_value_tender_allocation`.
+It does not dedupe the two sources.
+A sale that uses cash and wallet can appear in both sources.
+The wallet amount can therefore count twice in the method totals.
+The legacy `salesSummary` has the same behavior.
+A dedupe would break parity in this gate.
+Gate 3 owns the dedupe and the overlap correction.
+The contract decision table records this limit.
+
 ## Commands and results
 
 | Command                                                                                                  | Result                                                                                             |
 | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `pnpm --filter @umi/contract test`                                                                       | 143 tests pass, 0 fail                                                                             |
 | `pnpm --filter @umi/contract generate:check`                                                             | `Generated UMI contract 2.57.0 (f97644a71bb6b83391884e88aaffd452f95ed4664d19a9c0a18b4097a80ec14d)` |
-| `pnpm --filter @umi/api test`                                                                            | 226 files pass, 1 skipped; 2,287 tests pass, 29 skipped                                            |
+| `pnpm --filter @umi/api test`                                                                            | 226 files pass, 1 skipped; 2,289 tests pass, 29 skipped                                            |
 | `pnpm --filter @umi/api typecheck`                                                                       | pass                                                                                               |
 | `pnpm --filter @umi/api lint`                                                                            | pass                                                                                               |
-| `npx vitest run --config vitest.integration.config.ts src/modules/metrics/metrics.integration.ts`        | 10 tests pass                                                                                      |
-| `npx vitest run --config vitest.integration.config.ts src/modules/metrics/metrics.parity.integration.ts` | 4 tests pass                                                                                       |
+| `npx vitest run --config vitest.integration.config.ts src/modules/metrics/metrics.integration.ts`        | 11 tests pass                                                                                      |
+| `npx vitest run --config vitest.integration.config.ts src/modules/metrics/metrics.parity.integration.ts` | 5 tests pass                                                                                       |
 | `npx vitest run --config vitest.integration.config.ts src/app-graph.integration.ts`                      | 2 tests pass                                                                                       |
+| `npx vitest run --config vitest.integration.config.ts src/shared/database/sql-preflight.integration.ts`  | 3 tests pass; 18 uncovered statements are named                                                    |
+| `bash db/check.sh`                                                                                       | pass; schema, realtime, checkout and acceptance suites                                             |
 | `node tools/verification/metrics-perf.mjs`                                                               | p50 1,281.593 ms, p95 1,293.794 ms                                                                 |
 | `pnpm evidence:check`                                                                                    | 2 packets pass                                                                                     |
 | `pnpm check:pr`                                                                                          | see the pull request checks                                                                        |
@@ -191,6 +237,8 @@ The integration and app-graph commands use:
 ```sh
 DATABASE_URL_APP=postgresql://api_login:i1_local_api@127.0.0.1:5543/umi_sales_analysis
 DATABASE_URL_WORKER=postgresql://worker_login:i1_local_worker@127.0.0.1:5543/umi_sales_analysis
+JWT_SECRET=<local test value>
+REDIS_URL=redis://localhost:6379
 ```
 
 The `I1 METRIC` cross-check uses the fixture database through the default local connection.

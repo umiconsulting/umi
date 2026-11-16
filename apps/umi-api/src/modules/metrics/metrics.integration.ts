@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ConfigService } from '@nestjs/config';
-import type { MetricsQueryInput } from '@umi/contract';
+import { MetricsPaymentDistribution, type MetricsQueryInput } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
 import type { AppConfig } from '../../shared/config/config.schema';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
@@ -189,11 +189,31 @@ describe('semantic analytics against PostgreSQL with RLS', () => {
       total: { netSalesMinorUnits: 37500 },
     });
     expect(values?.payment_mix).toEqual({
-      items: [],
+      items: [{ method: 'cash', amountMinorUnits: 19500 }],
       truncated: false,
       limit: 8,
-      totalItems: 0,
-      total: { amountMinorUnits: 0 },
+      totalItems: 1,
+      total: { amountMinorUnits: 19500 },
+    });
+  });
+
+  it('returns the committed cash tender with its method and a valid envelope', async () => {
+    const result = await repository.read(
+      user.id,
+      access.merchantId,
+      ids.location,
+      query({ metrics: ['payment_mix'] }),
+      '2026-11-04',
+    );
+    const payment = result.totals?.values.payment_mix;
+    expect(MetricsPaymentDistribution.safeParse(payment).success).toBe(true);
+    expect(payment).toMatchObject({
+      items: [
+        { method: 'cash', amountMinorUnits: 19500 },
+        { method: 'wallet', amountMinorUnits: 5000 },
+      ],
+      totalItems: 2,
+      total: { amountMinorUnits: 24500 },
     });
   });
 

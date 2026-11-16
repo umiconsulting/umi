@@ -60,6 +60,11 @@ async function readBoth(
   return { fresh, legacy: old };
 }
 
+function legacyUnitsPerTicket(itemsSold: number, orders: number): number | null {
+  if (orders === 0) return null;
+  return Math.floor((itemsSold * 20000 + orders) / (2 * orders)) / 10000;
+}
+
 function expectTotalsParity({ fresh, legacy }: ParityResult) {
   const values = fresh.totals?.values;
   const totals = legacy.totals;
@@ -67,6 +72,7 @@ function expectTotalsParity({ fresh, legacy }: ParityResult) {
   expect(values?.orders).toBe(totals.orders);
   expect(values?.average_ticket).toBe(totals.averageTicketMinorUnits);
   expect(values?.items_sold).toBe(totals.itemsSold);
+  expect(values?.units_per_ticket).toBe(legacyUnitsPerTicket(totals.itemsSold, totals.orders));
   expect(values?.discounts).toBe(totals.discountMinorUnits);
   expect(values?.tips).toBe(totals.tipsMinorUnits);
   expect(values?.prior_net_sales).toBe(totals.priorNetSalesMinorUnits ?? 0);
@@ -227,6 +233,26 @@ describe('parity with GET reports/sales on the golden fixture', () => {
     ).toEqual(
       old.series.map((point) => ({ label: point.label, amountMinorUnits: point.amountMinorUnits })),
     );
+  });
+
+  it('compares a non-empty payment mix as a multiset', async () => {
+    const result = await readBoth(
+      metrics,
+      legacy,
+      user.id,
+      ids.merchant,
+      ids.location,
+      '2026-11-04',
+    );
+    const payment = result.fresh.totals?.values.payment_mix as {
+      items: { method: string; amountMinorUnits: number }[];
+    };
+    expect(payment.items).toHaveLength(2);
+    expect(result.legacy.paymentMix).toHaveLength(2);
+    expect(payment.items.map(paymentKey).sort()).toEqual(
+      result.legacy.paymentMix.map(paymentKey).sort(),
+    );
+    expect(new Set(payment.items.map(paymentKey))).toEqual(new Set(['cash:19500', 'wallet:5000']));
   });
 });
 

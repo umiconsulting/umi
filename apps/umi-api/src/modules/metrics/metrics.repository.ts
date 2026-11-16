@@ -31,21 +31,25 @@ interface SaleGroup {
   orders: string;
   discount: string;
   tips: string;
-  totalRows?: string;
 }
 
 interface ItemGroup {
   k0?: string | null;
   k1?: string | null;
   units: string;
-  totalRows?: string;
 }
 
 interface RefundGroup {
   k0?: string | null;
   k1?: string | null;
   refund: string;
-  totalRows?: string;
+}
+
+interface PaymentRow {
+  method: string;
+  amount?: string;
+  totalItems?: string;
+  totalAmount?: string;
 }
 
 interface GroupRow {
@@ -337,12 +341,12 @@ export class MetricsRepository {
   > {
     const dimensions = query.dimensions;
     const usesHour = dimensions.includes('hour');
-    // An unused placeholder has no inferable type in PostgreSQL. The parameter
-    // list therefore follows the dimensions: the time zone exists only for the
-    // hour bucket, and the limit renumbers when it is absent.
+    // The union is cut once, after the families merge. Each family therefore
+    // returns every group in the window, and the row limit applies to the
+    // distinct dimension tuples, not to each family separately.
     const groupedParams = usesHour
-      ? [merchantId, window.start, window.end, locationId, timezone, limit]
-      : [merchantId, window.start, window.end, locationId, limit];
+      ? [merchantId, window.start, window.end, locationId, timezone]
+      : [merchantId, window.start, window.end, locationId];
 
     const saleRows = needsSale
       ? await run<SaleGroup>(this.groupedSaleSql(dimensions), groupedParams)
@@ -354,8 +358,8 @@ export class MetricsRepository {
       ? await run<RefundGroup>(
           this.groupedRefundsSql(dimensions),
           usesHour
-            ? [merchantId, window.start, window.end, locationId, timezone, capturedAt, limit]
-            : [merchantId, window.start, window.end, locationId, capturedAt, limit],
+            ? [merchantId, window.start, window.end, locationId, timezone, capturedAt]
+            : [merchantId, window.start, window.end, locationId, capturedAt],
         )
       : [];
 
@@ -414,12 +418,13 @@ export class MetricsRepository {
         return { dimensions: dimensionsValue, values };
       });
 
-    const totalRows = Math.max(
-      0,
-      ...[...saleRows, ...itemRows, ...refundRows].map((row) => number(row.totalRows)),
-    );
-    const truncated = totalRows > rows.length;
-    return { truncated, ...(truncated ? { rowsTotal: totalRows } : {}), rows };
+    const rowsTotal = rows.length;
+    const truncated = rowsTotal > limit;
+    return {
+      truncated,
+      ...(truncated ? { rowsTotal } : {}),
+      rows: truncated ? rows.slice(0, limit) : rows,
+    };
   }
 
   private groupedSaleSql(dimensions: readonly MetricsDimension[]): string {
@@ -427,13 +432,11 @@ export class MetricsRepository {
     const select = `${dimensions
       .map((dimension, index) => `${DIMENSION_SQL[dimension]} AS k${index}`)
       .join(', ')}, `;
-    const total = ', count(*) OVER ()::bigint AS "totalRows"';
-    const limitParam = dimensions.includes('hour') ? '$6' : '$5';
     const group = `GROUP BY ${dimensions.map((_, index) => `k${index}`).join(', ')}
-       ORDER BY ${dimensions.map((_, index) => `k${index}`).join(', ')} LIMIT ${limitParam}`;
+       ORDER BY ${dimensions.map((_, index) => `k${index}`).join(', ')}`;
     return `SELECT ${select}coalesce(sum(r.grand_total),0)::bigint AS net, count(*)::bigint AS orders,
               coalesce(sum((r.snapshot->'discountTotal'->>'minorUnits')::bigint),0)::bigint AS discount,
-              coalesce(sum((r.snapshot->'tip'->>'minorUnits')::bigint),0)::bigint AS tips${total}
+              coalesce(sum((r.snapshot->'tip'->>'minorUnits')::bigint),0)::bigint AS tips
        ${baseFrom}
        ${needsOperator ? operatorJoin : ''}
        WHERE ${rangeWhere}
@@ -446,11 +449,9 @@ export class MetricsRepository {
     const select = dimensions
       .map((dimension, index) => `${DIMENSION_SQL[dimension]} AS k${index}`)
       .join(', ');
-    const limitParam = dimensions.includes('hour') ? '$6' : '$5';
     const group = `GROUP BY ${dimensions.map((_, index) => `k${index}`).join(', ')}
-       ORDER BY ${dimensions.map((_, index) => `k${index}`).join(', ')} LIMIT ${limitParam}`;
-    return `SELECT ${select}, coalesce(sum(cl.quantity),0)::bigint AS units,
-              count(*) OVER ()::bigint AS "totalRows"
+       ORDER BY ${dimensions.map((_, index) => `k${index}`).join(', ')}`;
+    return `SELECT ${select}, coalesce(sum(cl.quantity),0)::bigint AS units
        ${baseFrom}
        JOIN merchant.pos_cart_line cl ON cl.cart_id=s.cart_id
        ${needsCategory ? 'LEFT JOIN merchant.product p ON p.id=cl.product_id LEFT JOIN merchant.product_category pc ON pc.id=p.category_id' : ''}
@@ -466,11 +467,9 @@ export class MetricsRepository {
       .join(', ');
     const usesHour = dimensions.includes('hour');
     const capturedAtParam = usesHour ? '$6' : '$5';
-    const limitParam = usesHour ? '$7' : '$6';
     const group = `GROUP BY ${dimensions.map((_, index) => `k${index}`).join(', ')}
-       ORDER BY ${dimensions.map((_, index) => `k${index}`).join(', ')} LIMIT ${limitParam}`;
-    return `SELECT ${select}, coalesce(sum(x.total_minor_units - x.tip_minor_units),0)::bigint AS refund,
-              count(*) OVER ()::bigint AS "totalRows"
+       ORDER BY ${dimensions.map((_, index) => `k${index}`).join(', ')}`;
+    return `SELECT ${select}, coalesce(sum(x.total_minor_units - x.tip_minor_units),0)::bigint AS refund
        FROM merchant.pos_sale_exception x
        JOIN merchant.pos_committed_sale s ON s.id=x.sale_id
        JOIN merchant.receipt_snapshot r ON r.id=s.receipt_snapshot_id
@@ -488,7 +487,7 @@ export class MetricsRepository {
     window: PeriodWindow,
   ): Promise<{ value: MetricsValue; truncated: boolean }> {
     if (id === 'payment_mix') {
-      const rows = await run<GroupRow>(
+      const rows = await run<PaymentRow>(
         `WITH payment AS (
            SELECT tf.tender_type AS method, coalesce(sum(tf.amount_minor_units),0)::bigint AS amount
            ${baseFrom}
@@ -508,7 +507,7 @@ export class MetricsRepository {
         [merchantId, window.start, window.end, locationId, PRESET_LIMIT.payment_mix],
       );
       const items = rows.map((row) => ({
-        method: row.key,
+        method: row.method,
         amountMinorUnits: number(row.amount),
       }));
       return distributionResult(

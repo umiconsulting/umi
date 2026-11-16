@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { MetricsQueryInput } from '@umi/contract';
+import { MetricsPaymentDistribution, type MetricsQueryInput } from '@umi/contract';
 import { MetricsRepository } from './metrics.repository';
 
 type Responder = (sql: string, params: unknown[]) => Record<string, unknown>[];
@@ -36,7 +36,7 @@ const goldenResponder: Responder = (sql, params) => {
   if (sql.includes('WITH payment'))
     return [
       {
-        key: 'cash',
+        method: 'cash',
         amount: '20000',
         totalItems: '1',
         totalAmount: '37500',
@@ -181,7 +181,9 @@ describe('MetricsRepository totals', () => {
         total: { netSalesMinorUnits: 28500 },
       },
     });
-    expect(result.response.totals?.values.payment_mix).toMatchObject({
+    const payment = result.response.totals?.values.payment_mix;
+    expect(MetricsPaymentDistribution.safeParse(payment).success).toBe(true);
+    expect(payment).toMatchObject({
       items: [{ method: 'cash', amountMinorUnits: 20000 }],
       totalItems: 1,
       total: { amountMinorUnits: 37500 },
@@ -324,21 +326,20 @@ describe('MetricsRepository rows', () => {
           },
         ];
       if (sql.includes('x.total_minor_units - x.tip_minor_units'))
-        return [{ k0: '2026-11-02', refund: '9000', totalRows: '2' }];
+        return [{ k0: '2026-11-02', refund: '9000' }];
       if (sql.includes('sum(cl.quantity)'))
         return [
-          { k0: '2026-11-04', units: '1', totalRows: '2' },
-          { k0: '2026-11-02', units: '3', totalRows: '2' },
+          { k0: '2026-11-04', units: '1' },
+          { k0: '2026-11-02', units: '3' },
         ];
       return [
-        { k0: '2026-11-04', net: '9000', orders: '1', discount: '0', tips: '0', totalRows: '2' },
+        { k0: '2026-11-04', net: '9000', orders: '1', discount: '0', tips: '0' },
         {
           k0: '2026-11-02',
           net: '28500',
           orders: '2',
           discount: '3000',
           tips: '1500',
-          totalRows: '2',
         },
       ];
     });
@@ -372,7 +373,8 @@ describe('MetricsRepository rows', () => {
     expect(result.rowsTotal).toBeUndefined();
   });
 
-  it('reports the total before the cut and no synthetic row', async () => {
+  it('reports the distinct total before the cut and no synthetic row', async () => {
+    const days = ['2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'];
     const { repository } = make((sql) => {
       if (sql.includes('FROM merchant.merchant m'))
         return [
@@ -383,9 +385,13 @@ describe('MetricsRepository rows', () => {
             capturedAt: '2026-11-16T01:30:00.000Z',
           },
         ];
-      return [
-        { k0: '2026-11-02', net: '28500', orders: '2', discount: '0', tips: '0', totalRows: '5' },
-      ];
+      return days.map((day) => ({
+        k0: day,
+        net: '28500',
+        orders: '2',
+        discount: '0',
+        tips: '0',
+      }));
     });
     const result = await repository.read(
       userId,
@@ -395,8 +401,81 @@ describe('MetricsRepository rows', () => {
       '2026-11-04',
     );
     expect(result.rows).toHaveLength(1);
+    expect(result.rows?.[0].dimensions.day).toBe('2026-10-31');
     expect(result.rowsTotal).toBe(5);
     expect(result.truncated).toBe(true);
+  });
+
+  it('cuts the merged tuple union once across metric families', async () => {
+    const { repository } = make((sql) => {
+      if (sql.includes('FROM merchant.merchant m'))
+        return [
+          {
+            timezone: 'UTC',
+            currency: 'MXN',
+            today: '2026-11-15',
+            capturedAt: '2026-11-16T01:30:00.000Z',
+          },
+        ];
+      if (sql.includes('x.total_minor_units - x.tip_minor_units'))
+        return [{ k0: '2026-11-04', refund: '9000' }];
+      if (sql.includes('sum(cl.quantity)')) return [{ k0: '2026-11-02', units: '3' }];
+      return [];
+    });
+    const result = await repository.read(
+      userId,
+      merchantId,
+      null,
+      {
+        metrics: ['items_sold', 'refunds'],
+        dimensions: ['day'],
+        range: 'last_7_days',
+        limit: 1,
+      },
+      '2026-11-04',
+    );
+    expect(result.rows).toEqual([
+      { dimensions: { day: '2026-11-02' }, values: { items_sold: 3, refunds: 0 } },
+    ]);
+    expect(result.truncated).toBe(true);
+    expect(result.rowsTotal).toBe(2);
+  });
+
+  it('reports no cut when the merged tuple union fits the limit', async () => {
+    const { repository } = make((sql) => {
+      if (sql.includes('FROM merchant.merchant m'))
+        return [
+          {
+            timezone: 'UTC',
+            currency: 'MXN',
+            today: '2026-11-15',
+            capturedAt: '2026-11-16T01:30:00.000Z',
+          },
+        ];
+      if (sql.includes('x.total_minor_units - x.tip_minor_units'))
+        return [{ k0: '2026-11-02', refund: '9000' }];
+      if (sql.includes('sum(cl.quantity)'))
+        return [
+          { k0: '2026-11-02', units: '3' },
+          { k0: '2026-11-04', units: '1' },
+        ];
+      return [];
+    });
+    const result = await repository.read(
+      userId,
+      merchantId,
+      null,
+      {
+        metrics: ['items_sold', 'refunds'],
+        dimensions: ['day'],
+        range: 'last_7_days',
+        limit: 5,
+      },
+      '2026-11-04',
+    );
+    expect(result.rows).toHaveLength(2);
+    expect(result.truncated).toBe(false);
+    expect(result.rowsTotal).toBeUndefined();
   });
 
   it('uses the product dimension only through a line metric', async () => {
@@ -410,7 +489,7 @@ describe('MetricsRepository rows', () => {
             capturedAt: '2026-11-16T01:30:00.000Z',
           },
         ];
-      return [{ k0: 'product-1', units: '2', totalRows: '1' }];
+      return [{ k0: 'product-1', units: '2' }];
     });
     await repository.read(
       userId,
