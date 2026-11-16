@@ -53,6 +53,7 @@ import { FiscalModule } from './modules/fiscal/fiscal.module';
 import { PosCustomerValueModule } from './modules/pos-customer-value/pos-customer-value.module';
 import { PosHardwareModule } from './modules/pos-hardware/pos-hardware.module';
 import { DashboardOperationsModule } from './modules/dashboard-operations/dashboard-operations.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
 import { DashboardCatalogModule } from './modules/dashboard-catalog/dashboard-catalog.module';
 import { CsrfGuard } from './modules/auth/csrf.guard';
 import { AdministrativeCommandModule } from './modules/administrative-commands/administrative-command.module';
@@ -131,6 +132,9 @@ import { MerchantBrandingLogoModule } from './modules/merchant-branding/merchant
     PosCustomerValueModule,
     PosHardwareModule,
     DashboardOperationsModule,
+    // The semantic analytics read (gate 1): a typed metric catalogue and one
+    // query route. It reuses the sales policy and reads the same committed set.
+    MetricsModule,
     DashboardCatalogModule,
     AdministrativeCommandModule,
     OrdersModule,
