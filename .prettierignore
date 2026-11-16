@@ -72,3 +72,12 @@ apps/umi-dashboard/src/locales/**/*.mjs
 # Preserve the original bytes of this historical delivery.
 # Active sources and current documentation under apps/umi-menu remain checked.
 apps/umi-menu/docs/entrega-2026-11-04/
+
+# Gate-1 verifier report: a signed, imported artifact. The committed copy must
+# stay byte-identical to the verifier's file, and its SHA-256 is in the gate
+# evidence. Prettier must not rewrite it.
+docs/verification/2026-11-16-semantic-api-gate1-verifier.md
+
+# Gate-2 parity ledger: generated evidence. The test writes these bytes and a
+# rerun must reproduce them exactly, so Prettier must not reformat the file.
+docs/verification/2026-11-16-semantic-api-gate2-parity.json

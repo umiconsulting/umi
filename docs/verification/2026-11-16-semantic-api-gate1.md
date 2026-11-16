@@ -1,7 +1,8 @@
 # Gate 1 evidence — semantic analytics API v1
 
 Date: 2026-11-16, America/Mazatlan.
-Builder: umi-builder. Verifier: umi-verifier. Verifier verdict: pending.
+Builder: umi-builder. Verifier: umi-verifier.
+Verifier verdict: **PASS at `750c9bfe`**. See the [verifier report](./2026-11-16-semantic-api-gate1-verifier.md).
 Branch: `feat/semantic-analytics-api-v1-20261116`.
 Base: `origin/staging` `4da41dfd`.
 Authorization: staging only. No merge. No deploy. No `main`.
@@ -97,6 +98,9 @@ The refund total is 24,000.
 ## Parity with `GET reports/sales`
 
 Test: `metrics.parity.integration.ts`.
+Gate 1 parity count: 5 cases.
+The five cases are the four rows for fixture A and the one row for fixture B in the table below.
+Gate 2 adds the 24-case matrix in `docs/verification/2026-11-16-semantic-api-gate2-parity.json`.
 The old repository method takes an internal optional `asOf`.
 The route never sends it, so the published output does not change.
 Both methods use the same explicit window.
@@ -293,16 +297,13 @@ Tests and evidence:
 - `docs/verification/2026-11-16-semantic-api-gate1-perf.json`
 - `scripts/evidence/runs/pos-checkout-partial-guards/*` (recaptured: the packet records `packages/contract/src/index.ts`)
 
-## What the verifier must check independently
+## Verifier verdict
 
-1. Run the four test commands and the two integration files. Do not trust this file.
-2. Re-run the perf script on the same database, and confirm the fixture binding.
-3. Confirm no consumer file changed.
-4. Confirm the generated contract matches `CONTRACT_VERSION` `2.57.0`.
-5. Confirm the route table entry, the permission, the location scope, and the 400 matrix.
-6. Confirm the two golden fixtures, including the refund attribution by sale date.
-7. Confirm `salesSummary` output did not change. The only change is the optional internal `asOf`.
-8. Confirm the response envelope rules: one of `rows` or `totals`, no synthetic row, total before the cut, top-level `truncated`.
+The verifier returned **PASS at `750c9bfe`**.
+The [gate-1 verification report](./2026-11-16-semantic-api-gate1-verifier.md) holds the verdict.
+The report keeps the historical **FAIL at `0ec5de71`**.
+The verifier ran the checks in a fresh worktree at the reviewed commit: the HTTP route, PostgreSQL with RLS, the contract parse, the SQL preflight and CI.
+The report records no code edit by the verifier, and no merge or deploy.
 
 ## Status
 
