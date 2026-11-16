@@ -26,6 +26,7 @@ same seed hash. The fixture was not reseeded between phases.
   rows for the empty period.
 - Narrative: present for the non-empty Centro periods. The exact text for
   today/Centro is `Vendiste $285.00 en 2 órdenes; el ticket promedio fue $142.50.`
+  The six today/Centro stub inputs have one SHA-256. See `narrative-inputs.json`.
 - Permissions: the unscoped account reads all locations. The Centro-bound
   account gets 403 for Norte and 200 for Centro.
 
