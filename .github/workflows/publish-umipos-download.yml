@@ -1,0 +1,84 @@
+name: Publish accepted UmiPOS APK
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing stable umipos-android-BUILD release (publish or retry)'
+        required: true
+        type: string
+  pull_request:
+    paths:
+      - '.github/workflows/publish-umipos-download.yml'
+      - 'apps/umi-landing-page/downloads/**'
+      - 'apps/umi-landing-page/src/data/umipos-release.json'
+
+permissions:
+  contents: read
+
+# One promotion at a time; the publisher also rejects downgrades and conflicting build identities.
+concurrency:
+  group: umipos-public-download
+  cancel-in-progress: false
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - run: node --test apps/umi-landing-page/downloads/release-policy.test.mjs
+  publish:
+    needs: policy
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (startsWith(github.event.release.tag_name, 'umipos-android-') &&
+      !github.event.release.draft && !github.event.release.prerelease))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # Publisher code comes from the default branch, not arbitrary release assets.
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Download stable release assets and resolve the source tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^umipos-android-[0-9]+$ ]]
+          gh release view "$RELEASE_TAG" --json isDraft,isPrerelease --jq 'if .isDraft or .isPrerelease then error("Only stable releases can be published") else true end'
+          mkdir -p "$RUNNER_TEMP/umipos-release"
+          gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/umipos-release" --pattern '*.apk' --pattern release.json --pattern acceptance.json
+          git fetch --no-tags origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          printf 'RELEASE_COMMIT=%s\n' "$(git rev-parse "$RELEASE_TAG^{commit}")" >> "$GITHUB_ENV"
+      - name: Verify and publish the exact APK
+        working-directory: apps/umi-landing-page
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 8aef562d6d0c51b70f1b83fa1d2912a4
+          RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
+          sdkmanager 'build-tools;36.0.0' >/dev/null
+          export APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          export AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt2"
+          artifacts=("$RUNNER_TEMP"/umipos-release/*.apk)
+          [[ ${#artifacts[@]} == 1 && -f "${artifacts[0]}" ]]
+          node downloads/publish-release.mjs "${artifacts[0]}" "$RUNNER_TEMP/umipos-release/release.json" "$RUNNER_TEMP/umipos-release/acceptance.json"

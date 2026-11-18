@@ -1,39 +1,29 @@
-import { createHash } from 'node:crypto';
 import { readFile, mkdir, writeFile, cp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import release from '../src/data/umipos-release.json' with { type: 'json' };
+import { validateRelease, sha256, readApk } from './release-policy.mjs';
+import initialRelease from '../src/data/umipos-release.json' with { type: 'json' };
+const release = validateRelease(
+  process.argv[3] ? JSON.parse(await readFile(process.argv[3], 'utf8')) : initialRelease,
+);
 
 const apk = process.argv[2];
 if (!apk)
   throw new Error('Usage: node downloads/prepare-release.mjs /absolute/path/to/release.apk');
 const bytes = await readFile(apk);
-if (bytes.length > 25 * 1024 * 1024) {
-  throw new Error(
-    'The APK exceeds the Pages limit of 25 MiB. Stop. Do not switch to a billed service.',
-  );
-}
-const digest = createHash('sha256').update(bytes).digest('hex');
-if (bytes.length !== release.bytes || digest !== release.sha256) {
+if (bytes.length !== release.bytes || sha256(bytes) !== release.sha256) {
   throw new Error('APK size or SHA-256 differs from the reviewed manifest. Nothing was prepared.');
 }
-const verification = spawnSync(
-  process.env.APKSIGNER || 'apksigner',
-  ['verify', '--print-certs', apk],
-  { encoding: 'utf8' },
-);
-if (
-  verification.status !== 0 ||
-  !verification.stdout.includes(`certificate SHA-256 digest: ${release.signerSha256}`)
-) {
-  throw new Error('APK signature verification failed or signer differs. Nothing was prepared.');
+const info = readApk(apk);
+for (const field of ['packageName', 'versionCode', 'versionName', 'minimumSdk', 'targetSdk']) {
+  if (info[field] !== release[field]) throw new Error(`APK metadata differs: ${field}.`);
 }
 const root = join(dirname(fileURLToPath(import.meta.url)), 'dist');
 await rm(root, { recursive: true, force: true });
 const destination = join(root, release.objectPrefix);
 await mkdir(destination, { recursive: true });
 await cp(apk, join(destination, release.artifactFile));
+await writeFile(join(root, 'latest.json'), `${JSON.stringify(release, null, 2)}\n`);
 await writeFile(join(destination, release.metadataFile), `${JSON.stringify(release, null, 2)}\n`);
 await writeFile(
   join(destination, release.checksumFile),
@@ -62,6 +52,9 @@ await writeFile(
     `/${release.objectPrefix}/${release.artifactFile}`,
     '  Content-Type: application/vnd.android.package-archive',
     `  Content-Disposition: attachment; filename="${release.artifactFile}"`,
+    '/latest.json',
+    '  Cache-Control: no-store',
+    '  Access-Control-Allow-Origin: *',
     '/*',
     '  X-Robots-Tag: noindex',
     '',
