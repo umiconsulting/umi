@@ -224,13 +224,7 @@ $('#search').oninput = (event) => {
   $('#clear-search').hidden = !search;
   if (menu && (context.kind === 'table' || menu.locationId)) renderProducts();
 };
-$('#clear-search').onclick = () => {
-  search = '';
-  $('#search').value = '';
-  $('#clear-search').hidden = true;
-  if (menu) renderProducts();
-  $('#search').focus();
-};
+$('#clear-search').onclick = clearMenuSearch;
 $('#info-button').onclick = renderInfo;
 $('#mobile-cart-button').onclick = () => {
   if (context?.kind !== 'table') renderInfo();

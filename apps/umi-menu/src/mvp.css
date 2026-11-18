@@ -557,3 +557,29 @@
 .line-price {
   font-variant-numeric: tabular-nums;
 }
+
+/* Keep controls usable with touch and keyboard without changing the theme. */
+.stepper button,
+.search button,
+.category,
+.icon-btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+.option-row {
+  min-height: 44px;
+}
+.option-row:has(input:disabled) {
+  color: var(--muted);
+}
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.menu-product-name,
+.line-title,
+.option-row span {
+  overflow-wrap: anywhere;
+}

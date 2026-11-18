@@ -57,6 +57,9 @@ Consulta las decisiones y límites en [la nota de API](../../docs/research/2026-
 ## Funcionalidad y límites
 
 - Productos, categorías, fotografías HTTPS, precios y opciones provienen de la API.
+- La búsqueda ofrece un botón para borrar consultas sin resultados y anuncia el conteo de productos.
+- Las fotos reservan espacio y tienen respaldo si fallan; las primeras tarjetas cargan sin demora diferida.
+- Los controles principales tienen objetivos táctiles de 44 píxeles y foco visible.
 - La búsqueda admite acentos. El detalle muestra opciones obligatorias y límites de selección.
 - Los productos con variantes requieren al personal: el contrato de pedidos aún no expresa una variante.
 - Sin QR válido, el menú permite consultar productos y sucursales.

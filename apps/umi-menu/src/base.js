@@ -33,10 +33,28 @@ const photo = (item) => {
     return null;
   }
 };
-const productPhoto = (item, large = false) =>
+const photoPlaceholder = () =>
+  `<span class="menu-photo-placeholder" aria-hidden="true">${icon('coffee')}</span>`;
+const productPhoto = (item, large = false, eager = false) =>
   photo(item)
-    ? `<img src="${escapeHTML(photo(item))}" alt="${large ? escapeHTML(item.name) : ''}" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
-    : `<span class="menu-photo-placeholder" aria-hidden="true">${icon('coffee')}</span>`;
+    ? `<img src="${escapeHTML(photo(item))}" alt="${large ? escapeHTML(item.name) : ''}" width="800" height="600" loading="${large || eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer">`
+    : photoPlaceholder();
+document.addEventListener(
+  'error',
+  (event) => {
+    const image = event.target;
+    if (
+      !(image instanceof HTMLImageElement) ||
+      !image.closest('.menu-product,.cart-line,.modal-photo,.photo-viewer')
+    )
+      return;
+    const placeholder = document.createElement('span');
+    placeholder.innerHTML = photoPlaceholder();
+    const button = image.closest('.photo-enlarge');
+    (button ?? image).replaceWith(placeholder.firstElementChild);
+  },
+  true,
+);
 function notify(message) {
   $('#toast').textContent = message;
   $('#toast').classList.add('show');
@@ -161,6 +179,13 @@ function availabilityLabel(item) {
     }[item.availability] ?? 'No disponible'
   );
 }
+function clearMenuSearch() {
+  search = '';
+  $('#search').value = '';
+  $('#clear-search').hidden = true;
+  renderProducts();
+  $('#search').focus();
+}
 function renderProducts() {
   if (context?.kind === 'browse' && !menu?.locationId) return;
   const list = items().filter(
@@ -173,8 +198,11 @@ function renderProducts() {
     : (categories().find((group) => group.id === category)?.name ?? 'Menú');
   $('#result-count').textContent = `${list.length} ${list.length === 1 ? 'producto' : 'productos'}`;
   $('#products').innerHTML = list.length
-    ? `<div class="product-grid">${list.map((item) => `<button type="button" class="menu-product" data-product="${escapeHTML(item.productId)}" aria-label="Ver ${escapeHTML(item.name)}, ${escapeHTML(money(item.price.minorUnits))}">${productPhoto(item)}<span class="menu-product-name">${escapeHTML(item.name)}</span><span class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</span>${availabilityLabel(item) ? `<span class="small muted">${escapeHTML(availabilityLabel(item))}</span>` : ''}</button>`).join('')}</div>`
-    : '<div class="empty-results"><h3>Sin productos disponibles</h3><p>Revisa otra categoría o consulta al personal.</p></div>';
+    ? `<div class="product-grid">${list.map((item, index) => `<button type="button" class="menu-product" data-product="${escapeHTML(item.productId)}" aria-label="Ver ${escapeHTML(item.name)}, ${escapeHTML(money(item.price.minorUnits))}">${productPhoto(item, false, index < 2)}<span class="menu-product-name">${escapeHTML(item.name)}</span><span class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</span>${availabilityLabel(item) ? `<span class="small muted">${escapeHTML(availabilityLabel(item))}</span>` : ''}</button>`).join('')}</div>`
+    : search.trim()
+      ? `<div class="empty-results"><h3>No encontramos «${escapeHTML(search.trim())}»</h3><p>Prueba otro nombre o borra la búsqueda para ver los productos de esta categoría.</p><button class="secondary" id="reset-search">Borrar búsqueda</button></div>`
+      : '<div class="empty-results"><h3>Sin productos disponibles</h3><p>Revisa otra categoría o consulta al personal.</p></div>';
+  $('#reset-search')?.addEventListener('click', clearMenuSearch);
   $('#products')
     .querySelectorAll('[data-product]')
     .forEach((button) => {
@@ -233,6 +261,16 @@ function openProduct(id) {
   if (typeof enableProductPhoto === 'function') enableProductPhoto(item);
 }
 function updateProductTotal() {
+  $('#product-dialog')
+    .querySelectorAll('fieldset.option-group')
+    .forEach((fieldset, index) => {
+      const group = selectedProduct.optionGroups[index];
+      if (group.maxSelect === 1 || group.maxSelect === null) return;
+      const count = fieldset.querySelectorAll('input:checked').length;
+      fieldset.querySelectorAll('input:not(:checked)').forEach((input) => {
+        input.disabled = count >= group.maxSelect;
+      });
+    });
   $('#product-quantity').textContent = selectedQty;
   $('#product-minus').disabled = selectedQty === 1;
   $('#product-plus').disabled = selectedQty === 50;

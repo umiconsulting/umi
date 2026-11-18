@@ -1,5 +1,19 @@
 # Bitácora de Umi Menu
 
+## 2026-11-18 — Claridad y controles del menú
+
+- Búsqueda sin resultados con texto específico y botón para borrarla.
+- Fotografías con dimensiones declaradas; primeras tarjetas sin carga diferida y restantes con carga diferida nativa.
+- Respaldo visual si una fotografía falla, sin bloquear la selección del producto.
+- Controles de cantidad, búsqueda, categorías y cierre con objetivo táctil de 44 × 44 píxeles.
+- Foco visible y ajuste de nombres largos. Conteo de resultados anunciado a tecnologías de asistencia.
+- Las opciones múltiples respetan su máximo desde la selección y permiten deshacerla.
+
+Validación: Chromium real en escritorio y móvil, con catálogo sintético y fallos de imagen controlados.
+Se conserva una sola prueba automatizada. No se agregan dependencias ni archivos de evidencia al PR.
+Fuentes: guía de carga diferida de web.dev y criterios de tamaño de objetivo de WCAG, citados en la investigación.
+No se presenta esta comprobación como una medición de Core Web Vitals ni una auditoría completa de accesibilidad.
+
 ## 2026-11-17 — Conexión con la API
 
 Rama: `hc_digital_menu_connect`. Base: `b509fcc487bf17fe01cb80787533c98955a664ce` de staging.
