@@ -1,5 +1,22 @@
 # Bitácora de Umi Menu
 
+## 2026-11-17 — Conexión con la API
+
+Rama: `hc_digital_menu_connect`. Base: `b509fcc487bf17fe01cb80787533c98955a664ce` de staging.
+
+- Sustitución del catálogo fijo y los pedidos simulados por contratos y llamadas públicas.
+- Consulta por restaurante y sucursal con el catálogo existente de la API.
+- QR como autoridad de mesa; precios finales calculados por la API.
+- Recuperación de envíos inciertos con cuerpo y clave de idempotencia persistentes.
+- Separación del carrito por contexto y coordinación entre pestañas.
+- Conservación del tema aprobado y fotos del catálogo. Retirada de acciones operativas simuladas.
+- Una sola prueba nueva para el reintento, por instrucción del usuario. Retirada de pruebas de la simulación eliminada.
+- Investigación de UI, rendimiento y alcance en `docs/research/2026-11-17-digital-menu-recommendations.md`.
+
+Validación: recorrido Chromium en escritorio y móvil con respuestas controladas; sin errores JavaScript.
+Se comprobó pérdida de respuesta, recarga, reintento idéntico, total confirmado y consulta sin QR.
+No se creó ningún pedido remoto. El despliegue y un pedido persistido de piloto quedan pendientes.
+
 ## 2026-11-06 — Limpieza del módulo
 
 Rama: `hc_umi_menu_cleanup`. Base local: `e68ed51e`, merge del PR #260 a staging.

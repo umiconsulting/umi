@@ -26,10 +26,7 @@ import type { ResolvedTableOrderCredential } from './table-order.repository';
  * `TableOrderRateLimitGuard`, which bounds the CREDENTIAL as well as the address and
  * therefore has to run after the credential exists.
  *
- * NOT IN `ROUTE_TABLE`, deliberately, and the reason is the table's own stated scope:
- * it carries the POS and device surfaces plus what `routes.ts` already imported, and
- * leaves the browser-facing and dashboard handlers out with that boundary written down.
- * The guest page this serves is a separate job and imports no path today.
+ * Paths and payload schemas are shared through `@umi/contract` with umi-menu.
  */
 @Public()
 @UseGuards(TableOrderCredentialGuard, TableOrderRateLimitGuard)

@@ -1,72 +1,72 @@
-/* Reglas de la demo. No representan contratos ni configuración de producción. */
+'use strict';
 (function (root) {
-  const terminal = ['cancelled', 'expired', 'rejected', 'delivered'];
-  const settings = {
-    paused: false,
-    acceptanceMinutes: 5,
-    preparationMinutes: 20,
-    cancellationMinutes: 30,
-  };
-  function advance(order, action, now, payload = {}) {
-    const o = JSON.parse(JSON.stringify(order));
-    if (terminal.includes(o.status)) throw new Error('Este pedido ya terminó.');
-    if (o.status === 'pending' && now >= o.expiresAt && action !== 'expire') {
-      throw new Error('El plazo de aceptación terminó. Actualiza el pedido.');
-    }
-    const requireState = (...states) => {
-      if (!states.includes(o.status)) throw new Error('La acción no corresponde al estado actual.');
-    };
-    if (action === 'accept') {
-      requireState('pending');
-      o.status = o.scheduled && now < o.releaseAt ? 'accepted' : 'preparing';
-    } else if (action === 'reject') {
-      requireState('pending');
-      if (!payload.reason?.trim()) throw new Error('Escribe el motivo del rechazo.');
-      o.status = 'rejected';
-      o.reason = payload.reason.trim().slice(0, 180);
-    } else if (action === 'expire') {
-      requireState('pending');
-      if (now < o.expiresAt) throw new Error('El plazo aún no termina.');
-      o.status = 'expired';
-    } else if (action === 'release') {
-      requireState('accepted');
-      if (now < o.releaseAt) throw new Error('Aún no es hora de preparar.');
-      o.status = 'preparing';
-    } else if (action === 'station') {
-      requireState('preparing');
-      if (!(payload.station in o.stations)) throw new Error('Estación desconocida.');
-      o.stations[payload.station] = true;
-      if (Object.values(o.stations).every(Boolean)) o.status = 'ready';
-    } else if (action === 'cancel') {
-      if (o.request) throw new Error('La solicitud ya está pendiente.');
+  function validateLine(items, line) {
+    const item = items.find((item) => item.productId === line.productId);
+    if (!item || item.availability !== 'enabled' || item.hasVariants)
+      throw new Error('Un producto cambió o requiere atención del personal. Revisa tu pedido.');
+    if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 50)
+      throw new Error('Elige entre 1 y 50 unidades por producto.');
+    const modifiers = line.modifiers ?? [];
+    const ids = new Set();
+    for (const selection of modifiers) {
       if (
-        o.status === 'pending' ||
-        (o.status === 'accepted' && now < o.cutoff && now < o.releaseAt)
+        ids.has(selection.modifierId) ||
+        selection.quantity !== 1 ||
+        !item.optionGroups.some((group) =>
+          group.modifiers.some((modifier) => modifier.id === selection.modifierId),
+        )
       )
-        o.status = 'cancelled';
-      else o.request = true;
-    } else if (action === 'approveCancel' || action === 'denyCancel') {
-      if (!o.request) throw new Error('No hay una solicitud de cancelación.');
-      o.request = false;
-      if (action === 'approveCancel') o.status = 'cancelled';
-    } else if (action === 'deliver') {
-      requireState('ready');
-      o.status = 'delivered';
-      o.paid = true;
-    } else throw new Error('Acción desconocida.');
-    o.updatedAt = now;
-    return o;
+        throw new Error('Una opción del producto cambió. Revisa tu pedido.');
+      ids.add(selection.modifierId);
+    }
+    for (const group of item.optionGroups) {
+      const count = group.modifiers.filter((modifier) => ids.has(modifier.id)).length;
+      if (count < group.minSelect || (group.maxSelect !== null && count > group.maxSelect))
+        throw new Error(`Revisa las opciones de ${group.name}.`);
+    }
+    if (
+      line.note != null &&
+      (typeof line.note !== 'string' || line.note.length > 500 || /[<>]/.test(line.note))
+    )
+      throw new Error('Las indicaciones deben ser texto de hasta 500 caracteres.');
+    return item;
   }
-  function hasOpenAccount(orders, table) {
-    return orders.some(
-      (o) =>
-        o.mode === 'table' &&
-        String(o.table) === String(table) &&
-        !o.paid &&
-        !terminal.includes(o.status),
-    );
+  function priceLine(items, line) {
+    const item = validateLine(items, line);
+    const ids = new Set((line.modifiers ?? []).map((modifier) => modifier.modifierId));
+    const extra = item.optionGroups
+      .flatMap((group) => group.modifiers)
+      .filter((modifier) => ids.has(modifier.id))
+      .reduce((sum, modifier) => sum + modifier.priceDelta.minorUnits, 0);
+    return (item.price.minorUnits + extra) * line.quantity;
   }
-  const api = { advance, settings, terminal, hasOpenAccount };
-  root.MenuDemo = api;
+  function addLine(lines, next) {
+    const key = (line) =>
+      JSON.stringify([
+        line.productId,
+        line.modifiers.map((m) => m.modifierId).sort(),
+        line.note ?? null,
+      ]);
+    const index = lines.findIndex((line) => key(line) === key(next));
+    if (index < 0) {
+      if (lines.length >= 50)
+        throw new Error('Puedes agregar hasta 50 productos distintos por pedido.');
+      return [...lines, next];
+    }
+    const quantity = lines[index].quantity + next.quantity;
+    if (quantity > 50) throw new Error('Puedes agregar hasta 50 unidades por producto.');
+    return lines.map((line, i) => (i === index ? { ...line, quantity } : line));
+  }
+  function pendingRequest(lines, idempotencyKey) {
+    return {
+      idempotencyKey,
+      lines: JSON.parse(JSON.stringify(lines)),
+      guestName: null,
+      guestPhone: null,
+      note: null,
+    };
+  }
+  const api = { validateLine, priceLine, addLine, pendingRequest };
   if (typeof module !== 'undefined') module.exports = api;
+  else root.MenuState = api;
 })(globalThis);

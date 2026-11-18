@@ -509,3 +509,51 @@
     margin-bottom: 16px;
   }
 }
+
+/* Live catalog states keep the approved menu layout and Umi palette. */
+.menu-photo-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 140px;
+  aspect-ratio: 4 / 3;
+  background: var(--canvas);
+  color: var(--muted);
+  border-radius: var(--radius);
+}
+.menu-photo-placeholder .icon {
+  width: 40px;
+  height: 40px;
+}
+.modal-photo > .menu-photo-placeholder {
+  min-height: 220px;
+}
+.menu-status:not(:empty),
+.pending-notice {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-block: 16px;
+}
+.menu-status p,
+.pending-notice {
+  color: var(--ink);
+}
+.location-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+.cart-line > .menu-photo-placeholder {
+  width: 54px;
+  min-height: 54px;
+}
+.cart-line > .menu-photo-placeholder .icon {
+  width: 24px;
+  height: 24px;
+}
+.menu-product-price,
+.line-price {
+  font-variant-numeric: tabular-nums;
+}

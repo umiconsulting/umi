@@ -15,6 +15,13 @@ import { buildPath, routePath, merchantBase } from './route-table';
 export { merchantBase };
 
 export const routes = {
+  publicMenu: {
+    menu: (handle: string): string => buildPath('publicMenu.menu', { handle }),
+  },
+  tableOrder: {
+    menu: (token: string): string => buildPath('tableOrder.menu', { token }),
+    place: (token: string): string => buildPath('tableOrder.place', { token }),
+  },
   metrics: {
     query: (merchantId: string) => buildPath('metrics.query', { merchantId }),
     insight: (merchantId: string) => buildPath('metrics.insight', { merchantId }),

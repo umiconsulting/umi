@@ -10,6 +10,7 @@ import type { AppConfig } from './shared/config/config.schema';
 import { RESOURCE_LIMITS } from './shared/operations/resource-limits';
 import { validateConfig } from './shared/config/config.schema';
 import { JsonLogger } from './shared/logging/json.logger';
+import { menuCorsOptions } from './shared/http/menu-cors';
 
 /**
  * Web process. Handles all HTTP ingress (health now; Twilio webhook, KDS,
@@ -53,15 +54,15 @@ async function bootstrap(): Promise<void> {
     ?.split(',')
     .map((s) => s.trim())
     .filter(Boolean);
-  if (corsOrigins?.length) {
+  {
     // Methods MUST be explicit: on the Fastify adapter the default
     // Access-Control-Allow-Methods is only `GET,HEAD,POST`, which fails the CORS
     // preflight for every cross-origin dashboard PATCH (settings, hours, voice,
     // reward-config, locations). List the full verb set the dashboard uses.
     app.enableCors({
-      origin: corsOrigins,
-      credentials: true,
-      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      delegator: (request, callback) => {
+        callback(null, menuCorsOptions(request.url, corsOrigins ?? []));
+      },
     });
   }
 

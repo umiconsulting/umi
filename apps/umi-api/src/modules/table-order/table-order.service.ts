@@ -9,8 +9,10 @@ import {
   type RevokeTableOrderCredentialRequest,
   type TableOrderMenuItem,
   type TableOrderMenu,
+  type PublicMenuResponse,
 } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
+import { getRequestContext } from '../../shared/database/request-context';
 import { writeOrder } from '../../shared/orders/order-writer';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { resolveLocationAuthority } from '../auth/location-authority';
@@ -85,6 +87,34 @@ export class TableOrderService {
    * till paginates and the guest page does not (see {@link menu}). */
   private static readonly MENU_LIMIT = 500;
 
+  async publicMenu(handle: string, locationId?: string): Promise<PublicMenuResponse> {
+    if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(handle)) throw menuNotFound();
+    const merchant = await this.repo.publicMerchant(handle);
+    if (!merchant) throw menuNotFound();
+    const ctx = getRequestContext();
+    if (!ctx) throw new Error('Public menu requires a request context');
+    ctx.merchantId = merchant.id;
+    ctx.locationId = null;
+    const locations = await this.repo.publicLocations(merchant.id);
+    const selected = locationId
+      ? locations.find((location) => location.id === locationId)
+      : locations.length === 1
+        ? locations[0]
+        : null;
+    if ((locationId && !selected) || !locations.length) throw menuNotFound();
+    ctx.locationId = selected?.id ?? null;
+    return {
+      merchantHandle: merchant.handle,
+      merchantName: merchant.name,
+      currency: merchant.currency,
+      paymentAtCounter: true,
+      locations,
+      locationId: selected?.id ?? null,
+      locationName: selected?.name ?? null,
+      items: selected ? await this.menuItems(merchant.id, selected.id, merchant.currency) : [],
+    };
+  }
+
   // ── The guest's two routes ──────────────────────────────────────────────────
 
   /**
@@ -108,38 +138,60 @@ export class TableOrderService {
     // removed from the layout. Fail closed, and say what the guest can do.
     if (!context || tableLabel === null) throw credentialInvalid();
 
-    const items = await this.catalog.products({
-      merchantId: credential.merchantId,
-      locationId: credential.locationId,
-      limit: TableOrderService.MENU_LIMIT,
-    });
-    const productIds = items.map((item) => item.id);
-    // One set-based read for the whole menu, alongside the other two (§8.5): the list is
-    // DERIVED from each product's recipe (D8), so it must be read when the menu is read
-    // and never stored on a row.
-    const [groups, variantProducts, allergens] = await Promise.all([
-      this.optionGroups(credential.merchantId, productIds),
-      this.variantProducts(credential.merchantId, productIds),
-      this.repo.allergensByProduct(credential.merchantId, productIds),
-    ]);
-
     return {
       merchantName: context.merchantName,
       locationName: context.locationName,
       tableLabel,
       currency: context.currency,
       paymentAtCounter: true,
-      items: items.map((item) => ({
-        productId: item.id,
-        name: item.name,
-        description: item.description,
-        price: item.price,
-        allergens: allergens.get(item.id) ?? [],
-        availability: item.availability,
-        hasVariants: variantProducts.has(item.id),
-        optionGroups: groups.get(item.id) ?? [],
-      })),
+      items: await this.menuItems(credential.merchantId, credential.locationId, context.currency),
     };
+  }
+
+  private async menuItems(
+    merchantId: string,
+    locationId: string,
+    currency: string,
+  ): Promise<TableOrderMenuItem[]> {
+    const catalog = await this.catalog.products({
+      merchantId,
+      locationId,
+      limit: TableOrderService.MENU_LIMIT,
+    });
+    const items = catalog.filter(
+      (item) =>
+        item.saleAction === 'merchandise' &&
+        item.availability !== 'disabled' &&
+        item.availability !== 'out_of_assortment',
+    );
+    const productIds = items.map((item) => item.id);
+    // One set-based read for the whole menu, alongside the other two (§8.5): the list is
+    // DERIVED from each product's recipe (D8), so it must be read when the menu is read
+    // and never stored on a row.
+    const [groups, variantProducts, allergens] = await Promise.all([
+      this.optionGroups(merchantId, productIds),
+      this.variantProducts(merchantId, productIds),
+      this.repo.allergensByProduct(merchantId, productIds),
+    ]);
+
+    return items.map((item) => ({
+      productId: item.id,
+      name: item.name,
+      description: item.description,
+      category: item.category ? { id: item.category.id, name: item.category.name } : null,
+      imageUrl: item.primaryMedia?.url?.startsWith('https://') ? item.primaryMedia.url : null,
+      price: item.price,
+      allergens: allergens.get(item.id) ?? [],
+      availability: item.availability,
+      hasVariants: variantProducts.has(item.id),
+      optionGroups: (groups.get(item.id) ?? []).map((group) => ({
+        ...group,
+        modifiers: group.modifiers.map((modifier) => ({
+          ...modifier,
+          priceDelta: { ...modifier.priceDelta, currency },
+        })),
+      })),
+    }));
   }
 
   /**
@@ -399,8 +451,8 @@ export class TableOrderService {
               m.id::text AS "modifierId", m.name AS "modifierName",
               m.price_delta::text AS "priceDelta"
          FROM merchant.product_option_group g
-         LEFT JOIN merchant.product_modifier m ON m.option_group_id = g.id
-        WHERE g.product_id = ANY($1::uuid[])
+         LEFT JOIN merchant.product_modifier m ON m.option_group_id = g.id AND m.active
+        WHERE g.product_id = ANY($1::uuid[]) AND g.active
         ORDER BY g.product_id, g.name, g.id, m.name, m.id`,
       [productIds],
     );
@@ -614,6 +666,13 @@ export function tableOrderReference(tableLabel: string, idempotencyKey: string):
 /** The one refusal a bad token earns, wherever it is raised. Uniform on purpose: the
  * guest cannot act on the difference between unknown and revoked, and saying "revoked"
  * where a token was mistyped tells an attacker the token was once real. */
+function menuNotFound(): NotFoundException {
+  return new NotFoundException({
+    code: 'RESOURCE_NOT_FOUND',
+    message: 'Este menú no está disponible. Revisa el enlace o elige otra sucursal.',
+  });
+}
+
 function credentialInvalid(): NotFoundException {
   return new NotFoundException({
     code: 'TABLE_ORDER_CREDENTIAL_INVALID',

@@ -1,379 +1,250 @@
-/* MVP local: persistencia y operación simuladas en este navegador. */
-const demoId = () =>
-  Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
-    b.toString(16).padStart(2, '0'),
-  ).join('');
-const STORE = 'umi-menu-mvp-v1';
-let state;
-try {
-  state = JSON.parse(localStorage.getItem(STORE));
-} catch {}
-if (!state || state.version !== 1)
-  state = {
-    version: 1,
-    orders: [],
-    bills: [],
-    settings: { ...MenuDemo.settings },
-    offset: 0,
-    cart: [],
-    mode: 'pickup',
-  };
-const now = () => Date.now() + state.offset;
-const tableParam = new URLSearchParams(location.search).get('mesa');
-const tableNumber = ['1', '2', '12'].includes(tableParam) ? tableParam : '12';
-const tableLocked = !!tableParam;
-let activeId = location.hash.slice(1) || state.activeId;
-let storageOK = true;
-function save() {
-  try {
-    localStorage.setItem(STORE, JSON.stringify(state));
-    storageOK = true;
-  } catch {
-    storageOK = false;
-    notify('No se pudo guardar en este navegador. Conserva esta pestaña abierta.');
-  }
-}
-function currentOrder() {
-  return state.orders.find((o) => o.id === activeId);
-}
-function syncOrder() {
-  order = currentOrder() || null;
-}
-function transact(id, action, payload = {}) {
-  try {
-    const i = state.orders.findIndex((o) => o.id === id);
-    if (i < 0) throw new Error('No se encontró el pedido.');
-    state.orders[i] = MenuDemo.advance(state.orders[i], action, now(), payload);
-    const updated = state.orders[i];
-    if (updated.mode === 'table' && !MenuDemo.hasOpenAccount(state.orders, updated.table)) {
-      state.bills
-        .filter((b) => b.table === updated.table && b.status === 'pending')
-        .forEach((b) => {
-          b.status = 'closed';
-        });
-    }
-    save();
-    refresh();
-  } catch (e) {
-    notify(e.message);
-  }
-}
-const baseRenderCart = renderCart;
-renderCart = function () {
-  state.cart = cart;
-  state.cartContext = mode === 'table' ? 'table-' + tableNumber : 'pickup';
-  state.mode = mode;
-  syncOrder();
-  baseRenderCart();
-  save();
-};
-const baseSetMode = setMode;
-setMode = function (next) {
-  if (tableLocked && next !== 'table') return;
-  baseSetMode(next);
-  renderContext();
-};
-renderContext = function () {
-  const table = mode === 'table';
-  const hasAccount = MenuDemo.hasOpenAccount(state.orders, tableNumber);
-  const bill = state.bills.find((b) => b.table === tableNumber && b.status === 'pending');
-  const content = `<div class="row"><span class="context-icon">${icon(table ? 'table' : 'bag')}</span><div><div class="context-title">${table ? 'Mesa ' + tableNumber : 'Para recoger'}</div><div class="context-sub">Bruma · Sucursal Centro · Ejemplo</div></div></div><div class="fulfillment-caption">${state.settings.paused ? 'Pedidos pausados. Puedes consultar el menú.' : table ? 'El personal recibe el número de tu mesa.' : 'Pago en el negocio · Sujeto a aceptación'}</div>${table ? `<button class="secondary" data-bill ${!hasAccount || bill ? 'disabled' : ''}>${bill ? 'Cuenta solicitada' : 'Pedir la cuenta'}</button>` : ''}`;
-  $('#fulfillment').innerHTML = content;
-  $('#mobile-context').innerHTML =
-    `<div><strong>${table ? 'Mesa ' + tableNumber : 'Para recoger'}</strong><div>${state.settings.paused ? 'Pedidos pausados' : 'Bruma · Centro'}</div></div>${table ? `<button class="text-btn" data-bill ${!hasAccount || bill ? 'disabled' : ''}>${bill ? 'Cuenta solicitada' : 'Pedir la cuenta'}</button>` : ''}`;
-  document.querySelectorAll('[data-bill]').forEach(
-    (b) =>
-      (b.onclick = () => {
-        if (mode !== 'table' || !MenuDemo.hasOpenAccount(state.orders, tableNumber)) return;
-        if (!state.bills.some((b) => b.table === tableNumber && b.status === 'pending')) {
-          state.bills.unshift({ id: demoId(), table: tableNumber, status: 'pending', at: now() });
-          save();
-          refresh();
-          notify('El personal de la demo recibió tu solicitud de cuenta.');
-        }
-      }),
-  );
-  $('.hours-pill').innerHTML =
-    `<span class="open-dot"></span>${state.settings.paused ? 'Pedidos pausados' : 'Negocio de ejemplo · Horarios simulados'}`;
-};
-const baseCheckout = openCheckout;
-openCheckout = function () {
-  if (state.settings.paused) return notify('Los pedidos están pausados. Tu carrito se conserva.');
-  baseCheckout();
-  if (mode === 'table')
-    $('#checkout-dialog').innerHTML = $('#checkout-dialog').innerHTML.replaceAll(
-      'mesa 12',
-      'mesa ' + tableNumber,
+'use strict';
+function cartMarkup() {
+  if (loading || !menu)
+    return '<div class="cart-empty"><h3>Consulta el menú</h3><p>Los productos se cargan desde el restaurante.</p></div>';
+  if (context.kind !== 'table')
+    return (
+      '<div class="cart-empty"><div class="bag-drawing">' +
+      icon('table') +
+      '</div><h3>Consulta el menú</h3><p>Para pedir, escanea el QR de tu mesa. El personal puede ayudarte.</p></div>'
     );
-  $('#checkout-form').onsubmit = (e) => {
-    e.preventDefault();
-    submitOrder();
-  };
-};
-submitOrder = function () {
-  if (!cart.length || state.settings.paused)
-    return notify('No se puede enviar este pedido. Revisa el carrito y la pausa.');
-  if (!$('#checkout-form').reportValidity()) return;
-  const scheduled = mode === 'pickup' && $('[name=timing]:checked').value === 'scheduled';
-  const contact =
-    mode === 'pickup'
-      ? {
-          name: $('#customer-name').value.trim(),
-          phone: $('#customer-phone').value.trim(),
-          email: $('#customer-email').value.trim(),
-        }
-      : { name: 'Mesa ' + tableNumber };
-  if (mode === 'pickup' && (!contact.name || !/^\d{10,13}$/.test(contact.phone.replace(/\D/g, ''))))
-    return notify('Revisa el nombre y el número de celular.');
-  const date = scheduled
-    ? new Date($('#pickup-day').value + 'T' + $('#pickup-time').value).getTime()
-    : null;
-  if (scheduled && (!date || date < Date.now() + 30 * 60000))
-    return notify('Elige un horario con al menos 30 minutos de anticipación.');
-  const stations = Object.fromEntries(
-    cart.flatMap((l) =>
-      (l.product.stations || [l.product.category === 'coffee' ? 'Barra' : 'Cocina']).map((s) => [
-        s,
-        false,
-      ]),
-    ),
-  );
-  const o = {
-    id: demoId(),
-    number: 'D-' + String(state.orders.length + 1).padStart(4, '0'),
-    mode,
-    table: mode === 'table' ? tableNumber : null,
-    lines: structuredClone(cart),
-    total: total(),
-    ...contact,
-    scheduled,
-    date,
-    cutoff: date ? date - state.settings.cancellationMinutes * 60000 : null,
-    releaseAt: date ? date - state.settings.preparationMinutes * 60000 : null,
-    createdAt: now(),
-    expiresAt: now() + state.settings.acceptanceMinutes * 60000,
-    status: mode === 'table' ? 'preparing' : 'pending',
-    request: false,
-    stations,
-    paid: false,
-  };
-  state.orders.unshift(o);
-  activeId = o.id;
-  state.activeId = activeId;
-  location.hash = activeId;
-  cart = [];
-  save();
-  closeDialogs();
-  refresh();
-  renderOrder();
-  showDialog('#status-dialog');
-};
-const labels = {
-  pending: 'Pendiente de aceptación',
-  accepted: 'Horario reservado',
-  preparing: 'En preparación',
-  ready: 'Todo listo',
-  delivered: 'Entregado y cobrado · Simulado',
-  cancelled: 'Cancelado',
-  rejected: 'Rechazado',
-  expired: 'Vencido sin respuesta',
-};
-const fmt = (t) => displayDate(new Date(t));
-function orderLines(o) {
-  return o.lines
-    .map(
-      (l) =>
-        `<div class="staff-order"><strong>${l.qty} × ${escapeHTML(l.product.name)}</strong><small>${escapeHTML(l.options.join(' · '))}</small>${l.note ? `<p>${escapeHTML(l.note)}</p>` : ''}<span>${money(l.price * l.qty)}</span></div>`,
-    )
+  let valid = true,
+    sum = 0;
+  const lines = cart
+    .map((line, index) => {
+      const item = items().find((item) => item.productId === line.productId);
+      let linePrice = '';
+      try {
+        const amount = MenuState.priceLine(items(), line);
+        sum += amount;
+        linePrice = money(amount);
+      } catch {
+        valid = false;
+        linePrice = 'Revisar producto';
+      }
+      const names =
+        item?.optionGroups
+          .flatMap((group) => group.modifiers)
+          .filter((modifier) =>
+            line.modifiers?.some((selection) => selection.modifierId === modifier.id),
+          )
+          .map((modifier) => modifier.name) ?? [];
+      return `<div class="cart-line">${item ? productPhoto(item) : ''}<div><div class="line-title">${escapeHTML(item?.name ?? 'Producto no disponible')}</div><div class="line-options">${escapeHTML(names.join(' · '))}</div>${line.note ? `<div class="line-options">${escapeHTML(line.note)}</div>` : ''}<div class="line-bottom"><div class="stepper"><button data-qty="${index}" data-delta="-1" aria-label="Quitar una unidad de ${escapeHTML(item?.name ?? 'producto')}" ${pending || sending ? 'disabled' : ''}>${icon('minus')}</button><span>${escapeHTML(line.quantity)}</span><button data-qty="${index}" data-delta="1" aria-label="Añadir una unidad de ${escapeHTML(item?.name ?? 'producto')}" ${pending || sending || line.quantity >= 50 ? 'disabled' : ''}>${icon('plus')}</button></div><span class="line-price">${escapeHTML(linePrice)}</span></div></div></div>`;
+    })
     .join('');
-}
-renderOrder = function () {
-  syncOrder();
-  if (!order) return;
-  const o = order,
-    done = MenuDemo.terminal.includes(o.status);
-  const descriptions = {
-    pending: 'El negocio debe aceptar antes de preparar.',
-    accepted: 'Tu horario está reservado. La preparación comenzará a la hora indicada.',
-    preparing: 'Cada estación prepara sus productos.',
-    ready:
-      o.mode === 'table'
-        ? 'El personal llevará el pedido a tu mesa.'
-        : 'Pasa al negocio. Pagas al recoger.',
-    delivered: 'La demo registró la entrega y el cobro sobre el mismo pedido.',
-    cancelled: 'Este pedido ya no se prepara.',
-    rejected: o.reason,
-    expired: 'El negocio no aceptó dentro del plazo de ejemplo.',
-  };
-  $('#status-dialog').innerHTML =
-    `<div class="dialog-top"><span class="eyebrow">Seguimiento · ${escapeHTML(o.number)}</span><button class="icon-btn" data-close aria-label="Cerrar seguimiento">${icon('x')}</button></div><div class="status-hero"><div class="status-icon">${icon(o.status === 'ready' ? 'check' : 'bag')}</div><h2 id="status-dialog-title">${labels[o.status]}</h2><p>${escapeHTML(descriptions[o.status])}</p></div><div class="modal-body"><div class="status-meta"><div><small>${o.mode === 'table' ? 'Mesa' : 'A nombre de'}</small><strong>${escapeHTML(o.name)}</strong></div><div><small>Modalidad</small><strong>${o.mode === 'table' ? 'Comer aquí' : o.scheduled ? 'Para recoger · Programado' : 'Para recoger · Lo antes posible'}</strong></div></div>${o.scheduled ? `<p>Hora para recoger: ${fmt(o.date)}<br>Preparación: ${fmt(o.releaseAt)}<br>Cancelación directa antes de: ${fmt(Math.min(o.cutoff, o.releaseAt))}</p>` : ''}${
-      ['preparing', 'ready'].includes(o.status)
-        ? `<div class="demo-notice">${Object.entries(o.stations)
-            .map(([s, ready]) => `${s}: ${ready ? 'lista' : 'en preparación'}`)
-            .join(' · ')}</div>`
-        : ''
-    }${orderLines(o)}<div class="confirm-total"><span>Total · Pago en el negocio</span><strong>${money(o.total)}</strong></div>${o.request ? '<p class="demo-notice">Cancelación solicitada. El pedido sigue activo hasta que el personal responda.</p>' : ''}<div class="status-actions">${!done && !o.request ? `<button class="secondary" id="cancel-order">${o.mode === 'table' ? 'Pedir ayuda para cancelar' : o.status === 'pending' || (o.status === 'accepted' && now() < o.cutoff) ? 'Cancelar pedido' : 'Solicitar cancelación'}</button>` : ''}<button class="secondary" id="copy-order">Copiar enlace de seguimiento local</button><button class="text-btn" id="open-staff-order">Simular atención del personal</button></div><p class="demo-hint">Solo en este navegador. No se envían correos ni pagos reales.</p></div>`;
-  if ($('#cancel-order')) $('#cancel-order').onclick = () => transact(o.id, 'cancel');
-  $('#open-staff-order').onclick = openStaff;
-  $('#copy-order').onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(location.href.split('#')[0] + '#' + o.id);
-      notify('Enlace copiado. Usa otra pestaña de este navegador.');
-    } catch {
-      notify('Copia la dirección de esta página para conservar el enlace.');
-    }
-  };
-};
-function staffActions(o) {
-  const button = (action, label, extra = '') =>
-    `<button data-action="${action}" data-id="${o.id}" ${extra}>${label}</button>`;
-  let html = '';
-  if (o.status === 'pending')
-    html +=
-      button('accept', 'Aceptar') +
-      button('reject', 'Rechazar') +
-      button('fastExpire', 'Simular vencimiento');
-  if (o.status === 'accepted') html += button('fastRelease', 'Avanzar reloj hasta preparación');
-  if (o.status === 'preparing')
-    html += Object.entries(o.stations)
-      .filter(([, v]) => !v)
-      .map(([s]) => button('station', s + ': terminar', `data-station="${s}"`))
-      .join('');
-  if (o.status === 'ready') html += button('deliver', 'Simular cobro y entrega');
-  if (o.request)
-    html +=
-      button('approveCancel', 'Autorizar cancelación') + button('denyCancel', 'Mantener pedido');
-  return html;
-}
-function openStaff() {
-  closeDialogs();
-  renderStaff();
-  showDialog('#staff-dialog');
-}
-function renderStaff() {
-  $('#staff-dialog').innerHTML =
-    `<div class="dialog-top"><h2 id="staff-title">Personal · Demo local</h2><button class="icon-btn" data-close aria-label="Cerrar personal">${icon('x')}</button></div><div class="modal-body"><p class="demo-notice">Simulación de atención. No es UmiPOS ni KDS. El reloj y los plazos son de ejemplo.</p><section class="staff-section"><h3>Recepción de pedidos</h3><label class="option-row"><input id="pause-orders" type="checkbox" ${state.settings.paused ? 'checked' : ''}><span>Pausar pedidos nuevos</span></label><p class="small muted">Aceptación: 5 min · Preparación: 20 min · Cancelación programada: 30 min antes. Hora simulada: ${fmt(now())}.</p></section><section class="staff-section"><h3>Solicitudes de cuenta</h3>${
-      state.bills
-        .filter((b) => b.status === 'pending')
-        .map(
-          (b) =>
-            `<div class="staff-order"><strong>Mesa ${b.table} · Cuenta solicitada</strong><button data-bill-done="${b.id}">Marcar atendida</button></div>`,
-        )
-        .join('') || '<p class="muted">No hay solicitudes pendientes.</p>'
-    }</section><section class="staff-section"><h3>Pedidos (${state.orders.length})</h3>${state.orders.map((o) => `<article class="staff-order"><div class="between"><strong>${o.number} · ${o.mode === 'table' ? 'Mesa ' + o.table : escapeHTML(o.name)}</strong><span>${money(o.total)}</span></div><p>${labels[o.status]}${o.request ? ' · Solicita cancelación' : ''}</p>${o.scheduled ? `<small>Recogida ${fmt(o.date)} · Preparación ${fmt(o.releaseAt)}</small>` : ''}<ul>${o.lines.map((l) => `<li>${l.qty} × ${escapeHTML(l.product.name)}${l.options.length ? ' · ' + escapeHTML(l.options.join(', ')) : ''}${l.note ? ' — ' + escapeHTML(l.note) : ''}</li>`).join('')}</ul><div class="row">${staffActions(o)}<button data-track="${o.id}">Ver seguimiento</button></div></article>`).join('') || '<p class="muted">Crea un pedido desde el menú para probar la atención.</p>'}</section><section class="staff-section"><h3>Enlaces y QR de mesa</h3><p class="small muted">Cada QR identifica su mesa. Los QR incluidos abren este equipo; para un teléfono, genera los QR con la dirección de red según el README.</p><div class="qr-grid">${['1', '2', '12'].map((t) => `<a href="./index.html?mesa=${t}"><img src="./qr/mesa-${t}.svg" alt="QR de la mesa ${t}">Abrir mesa ${t}</a>`).join('')}</div></section><section class="staff-section"><button id="reset-demo">Borrar datos y reiniciar demo</button></section></div>`;
-  $('#pause-orders').onchange = (e) => {
-    state.settings.paused = e.target.checked;
-    save();
-    renderContext();
-  };
-  document.querySelectorAll('[data-bill-done]').forEach(
-    (b) =>
-      (b.onclick = () => {
-        state.bills.find((x) => x.id === b.dataset.billDone).status = 'served';
-        save();
-        refresh();
-      }),
+  return (
+    (cart.length
+      ? lines +
+        `<div class="subtotal"><span>Total estimado</span><strong>${valid ? money(sum) : 'Por revisar'}</strong></div>`
+      : '<div class="cart-empty"><div class="bag-drawing">' +
+        icon('bag') +
+        '</div><h3>Tu pedido está vacío</h3><p>Elige productos del menú. Podrás revisarlos antes de enviar.</p></div>') +
+    (pending
+      ? '<p class="pending-notice" role="status">Hay un envío pendiente de comprobar. Reintenta el mismo pedido antes de cambiar productos.</p>'
+      : '') +
+    `<button class="primary" data-checkout ${sending || (!pending && (!cart.length || !valid)) ? 'disabled' : ''}>${sending ? 'Comprobando envío…' : pending ? 'Comprobar envío pendiente' : 'Revisar mi pedido'} ${icon('arrow')}</button><p class="cart-footnote">${icon('card')}Pagas en caja. El restaurante calcula el importe final.</p>`
   );
-  document.querySelectorAll('[data-track]').forEach(
-    (b) =>
-      (b.onclick = () => {
-        activeId = b.dataset.track;
-        state.activeId = activeId;
-        location.hash = activeId;
-        save();
-        closeDialogs();
-        renderOrder();
-        showDialog('#status-dialog');
-      }),
-  );
-  document.querySelectorAll('[data-action]').forEach(
-    (b) =>
-      (b.onclick = () => {
-        const o = state.orders.find((x) => x.id === b.dataset.id),
-          action = b.dataset.action;
-        if (action === 'fastExpire' || action === 'fastRelease') {
-          state.offset +=
-            Math.max(0, (action === 'fastExpire' ? o.expiresAt : o.releaseAt) - now()) + 1;
-          save();
-          tick();
-          return;
-        }
-        if (action === 'reject') {
-          const reason = prompt('Motivo del rechazo (datos de ejemplo):');
-          if (reason === null) return;
-          transact(o.id, action, { reason });
-        } else transact(o.id, action, { station: b.dataset.station });
-      }),
-  );
-  $('#reset-demo').onclick = () => {
-    if (confirm('¿Borrar el carrito, pedidos y solicitudes de esta demo?')) {
-      localStorage.removeItem(STORE);
-      location.href = './index.html';
-    }
-  };
 }
-function refresh() {
-  renderContext();
-  syncOrder();
-  baseRenderCart();
-  if ($('#status-dialog').open) renderOrder();
-  if ($('#staff-dialog').open) renderStaff();
-}
-function tick() {
-  let changed = false;
-  state.orders = state.orders.map((o) => {
-    const action =
-      o.status === 'pending' && now() >= o.expiresAt
-        ? 'expire'
-        : o.status === 'accepted' && now() >= o.releaseAt
-          ? 'release'
-          : null;
-    if (!action) return o;
-    changed = true;
-    return MenuDemo.advance(o, action, now());
+function bindCart(root) {
+  root.querySelectorAll('[data-qty]').forEach((button) => {
+    button.onclick = () => {
+      if (pending || sending) return;
+      const index = Number(button.dataset.qty),
+        line = cart[index];
+      line.quantity += Number(button.dataset.delta);
+      cart = cart.filter((line) => line.quantity > 0);
+      saveState();
+      renderCart();
+    };
   });
-  if (changed) {
-    save();
-    refresh();
-  }
+  root.querySelectorAll('[data-checkout]').forEach((button) => {
+    button.onclick = openCheckout;
+  });
+  root.querySelectorAll('[data-view-order]').forEach((button) => {
+    button.onclick = () => {
+      renderReceipt();
+      showDialog('#status-dialog');
+    };
+  });
 }
-$('#staff-button').onclick = openStaff;
-window.addEventListener('storage', (e) => {
-  if (e.key === STORE && e.newValue) {
-    try {
-      state = JSON.parse(e.newValue);
-      refresh();
-    } catch {}
+function renderCart() {
+  const last =
+    receipt && menu
+      ? '<button class="secondary order-link" data-view-order>Ver último pedido recibido</button>'
+      : '';
+  $('#cart-content').innerHTML = cartMarkup() + last;
+  $('#cart-count').textContent = quantity();
+  bindCart($('#cart-content'));
+  $('#mobile-count').textContent = quantity();
+  $('#mobile-label').textContent =
+    context?.kind === 'table' ? 'Ver mi pedido' : 'Información del menú';
+  let sum = 0;
+  try {
+    sum = cart.reduce((total, line) => total + MenuState.priceLine(items(), line), 0);
+  } catch {
+    sum = null;
   }
-});
-window.addEventListener('hashchange', () => {
-  activeId = location.hash.slice(1);
-  syncOrder();
-  if (order) {
+  $('#mobile-total').textContent = canOrder() && sum !== null ? money(sum) : '';
+  if ($('#cart-dialog').open) renderCartDialog();
+}
+function renderCartDialog() {
+  $('#cart-dialog').innerHTML =
+    `<div class="dialog-top"><h2 id="cart-dialog-title">Tu pedido</h2><button class="icon-btn" data-close aria-label="Cerrar pedido">${icon('x')}</button></div><div class="modal-body">${cartMarkup()}${receipt ? '<button class="secondary order-link" data-view-order>Ver último pedido recibido</button>' : ''}</div>`;
+  bindCart($('#cart-dialog'));
+}
+function openCheckout() {
+  if (!canOrder() || sending || !cart.length) return;
+  try {
+    if (!pending) cart.forEach((line) => MenuState.validateLine(items(), line));
+  } catch (error) {
+    notify(error.message);
+    return;
+  }
+  $('#checkout-dialog').innerHTML =
+    `<div class="dialog-top"><h2 id="checkout-dialog-title">${pending ? 'Comprobar envío pendiente' : 'Confirmar pedido'}</h2><button class="icon-btn" data-close aria-label="Cerrar confirmación">${icon('x')}</button></div><div class="modal-body"><p>${escapeHTML(menu.merchantName)} · ${escapeHTML(menu.locationName)} · ${escapeHTML(menu.tableLabel)}</p><p>${pending ? 'Se enviará exactamente la misma solicitud, con la misma clave de envío. El restaurante devuelve la confirmación si ya recibió el pedido.' : 'El importe del carrito es una estimación. El restaurante verifica disponibilidad, opciones y precios al recibir el pedido. Pagas en caja.'}</p><p id="checkout-error" role="alert"></p><button class="primary" id="place-order">${pending ? 'Comprobar el mismo envío' : 'Enviar pedido a mi mesa'}</button></div>`;
+  $('#place-order').onclick = submitOrder;
+  showDialog('#checkout-dialog');
+}
+async function submitOrder() {
+  if (!navigator.locks) {
+    notify('Abre el menú en un navegador actualizado con conexión segura para enviar el pedido.');
+    return;
+  }
+  await navigator.locks.request(storageKey, { ifAvailable: true }, async (lock) => {
+    if (!lock) {
+      notify('El pedido se comprueba en otra pestaña. Espera la confirmación.');
+      return;
+    }
+    readState();
+    if (!cart.length) {
+      closeDialogs();
+      renderCart();
+      return;
+    }
+    await sendPendingOrder();
+  });
+}
+async function sendPendingOrder() {
+  if (!canOrder() || sending) return;
+  sending = true;
+  $('#place-order').disabled = true;
+  $('#place-order').textContent = 'Comprobando envío…';
+  $('#checkout-error').textContent = '';
+  try {
+    if (!pending) {
+      cart.forEach((line) => MenuState.validateLine(items(), line));
+      pending = { body: MenuState.pendingRequest(cart, crypto.randomUUID()) };
+    }
+    saveState(true);
+    renderCart();
+    const result = await UmiMenuAPI.placeOrder(context, pending.body);
+    receipt = result;
+    pending = null;
+    cart = [];
+    saveState();
     closeDialogs();
-    renderOrder();
+    renderReceipt();
     showDialog('#status-dialog');
+  } catch (error) {
+    if (error instanceof UmiMenuAPI.MenuApiError && !error.uncertain && !pending?.uncertain)
+      pending = null;
+    else if (pending) pending.uncertain = true;
+    saveState();
+    $('#checkout-error').textContent = error.message;
+    $('#place-order').textContent = pending ? 'Comprobar el mismo envío' : 'Volver a enviar';
+  } finally {
+    sending = false;
+    $('#place-order') && ($('#place-order').disabled = false);
+    renderCart();
   }
+}
+function renderReceipt() {
+  if (!receipt || !menu) return;
+  $('#status-dialog').innerHTML =
+    `<div class="dialog-top"><h2 id="status-dialog-title">Pedido recibido</h2><button class="icon-btn" data-close aria-label="Cerrar pedido recibido">${icon('x')}</button></div><div class="modal-body"><p class="order-number">${escapeHTML(receipt.reference)}</p><p>${escapeHTML(menu.merchantName)} · ${escapeHTML(menu.locationName)} · ${escapeHTML(menu.tableLabel)}</p><p>${receipt.unitCount} ${receipt.unitCount === 1 ? 'unidad' : 'unidades'} · ${escapeHTML(new Intl.NumberFormat('es-MX', { style: 'currency', currency: receipt.total.currency }).format(receipt.total.minorUnits / 100))}</p><p>El restaurante confirmó la recepción de este pedido. Pagas en caja.</p><p class="small muted">Para conocer el avance, pedir la cuenta o hacer un cambio, consulta al personal.</p></div>`;
+}
+function renderInfo() {
+  $('#info-dialog .modal-body').innerHTML =
+    `<div class="info-item">${icon('pin')}<div><strong>${escapeHTML(menu?.merchantName ?? 'Menú digital')}</strong><p>${escapeHTML(menu?.locationName ?? 'Consulta el enlace del restaurante.')}</p></div></div><div class="info-item">${icon('card')}<div><strong>${context?.kind === 'table' ? 'Paga en caja' : 'Consulta del menú'}</strong><p>${context?.kind === 'table' ? 'El restaurante calcula el importe final de tu pedido.' : 'Escanea el QR de tu mesa para hacer un pedido.'}</p></div></div>`;
+  $('#info-title').textContent = menu
+    ? `Información de ${menu.merchantName}`
+    : 'Información del menú';
+  showDialog('#info-dialog');
+}
+function showLoadError(message) {
+  $('#menu-status').innerHTML =
+    `<p role="alert">${escapeHTML(message)}</p><button class="secondary" id="retry-menu">Volver a cargar el menú</button>`;
+  $('#retry-menu').onclick = loadCurrentMenu;
+}
+async function loadCurrentMenu() {
+  if (sending || (loading && context)) return;
+  loading = true;
+  closeDialogs();
+  menu = null;
+  $('#products').innerHTML = '';
+  $('.categories').innerHTML = '';
+  $('#menu-status').innerHTML = '<p role="status">Cargando el menú del restaurante…</p>';
+  renderCart();
+  try {
+    if (!context) context = UmiMenuAPI.resolveContext(new URL(location.href));
+    if (!storageKey) {
+      storageKey = await UmiMenuAPI.contextKey(context);
+      readState();
+    }
+    menu = await UmiMenuAPI.loadMenu(context);
+    loading = false;
+    $('#menu-status').innerHTML = '';
+    renderContext();
+    renderCategories();
+    if (context.kind === 'browse' && !menu.locationId) {
+      $('#products').innerHTML = menu.locations.length
+        ? `<div class="empty-results"><h3>Elige una sucursal</h3><p>Consulta sus productos y precios.</p><div class="location-choices">${menu.locations.map((branch) => `<button class="secondary" data-location="${branch.id}">${escapeHTML(branch.name)}</button>`).join('')}</div></div>`
+        : '<div class="empty-results"><h3>Sin sucursales disponibles</h3><p>Consulta al restaurante.</p></div>';
+      $('#products')
+        .querySelectorAll('[data-location]')
+        .forEach((button) => {
+          button.onclick = () => {
+            const url = new URL(location.href);
+            url.searchParams.set('locationId', button.dataset.location);
+            location.assign(url.pathname + url.search);
+          };
+        });
+    } else renderProducts();
+    renderCart();
+  } catch (error) {
+    loading = false;
+    menu = null;
+    renderContext();
+    renderCart();
+    showLoadError(error.message);
+  }
+}
+$('#search').oninput = (event) => {
+  search = event.target.value;
+  $('#clear-search').hidden = !search;
+  if (menu && (context.kind === 'table' || menu.locationId)) renderProducts();
+};
+$('#clear-search').onclick = () => {
+  search = '';
+  $('#search').value = '';
+  $('#clear-search').hidden = true;
+  if (menu) renderProducts();
+  $('#search').focus();
+};
+$('#info-button').onclick = renderInfo;
+$('#mobile-cart-button').onclick = () => {
+  if (context?.kind !== 'table') renderInfo();
+  else {
+    renderCartDialog();
+    showDialog('#cart-dialog');
+  }
+};
+$('#refresh-menu').onclick = loadCurrentMenu;
+loadCurrentMenu();
+
+window.addEventListener('storage', (event) => {
+  if (event.key !== storageKey || sending) return;
+  readState();
+  closeDialogs();
+  renderCart();
 });
-mode = tableLocked ? 'table' : state.mode || 'pickup';
-const cartContext = mode === 'table' ? 'table-' + tableNumber : 'pickup';
-cart = state.cartContext === cartContext ? state.cart || [] : [];
-if (tableLocked && currentOrder() && currentOrder().table !== tableNumber && !location.hash)
-  activeId = null;
-if (tableLocked) {
-  document.querySelectorAll('[data-mode]').forEach((b) => (b.hidden = true));
-} else
-  document
-    .querySelectorAll('[data-mode]')
-    .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
-if (tableParam && !['1', '2', '12'].includes(tableParam)) {
-  state.settings.paused = true;
-  notify('Enlace de mesa no válido. Usa los enlaces de la demo.');
-}
-refresh();
-tick();
-setInterval(tick, 1000);
-if (currentOrder() && location.hash) {
-  renderOrder();
-  showDialog('#status-dialog');
-}
