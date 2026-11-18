@@ -84,7 +84,7 @@ The bootstrap manifest in `src/data/umipos-release.json` records build 337; it i
 
 ### Hosting and workflow boundaries
 
-Use only the existing Pages project, Cloudflare account and `CLOUDFLARE_API_TOKEN` repository secret. No new secret, subscription, Function, Worker or R2 bucket is created. The publisher runs from `downloads`, because the landing root has an unrelated contact Function. Standard `ubuntu-latest` GitHub runners are free for this currently public repository. Do not switch to larger runners or make the repository private while assuming the same pricing.
+Use only the existing Pages project, Cloudflare account and `CLOUDFLARE_API_TOKEN` repository secret. No new secret, subscription, Function, Worker or R2 bucket is created. The publisher runs from `downloads`, because the landing root has an unrelated contact Function. Standard `ubuntu-24.04` GitHub runners are free for this currently public repository. Do not switch to larger runners or make the repository private while assuming the same pricing.
 
 No workflow artifact storage is used by this pipeline. The publisher uses GitHub Release assets and two static Pages deployments for a new release. An identical published identity does not deploy again. Existing account charges are outside this pipeline. The workflow becomes operational only after merge; local/bootstrap verification is not an executed GitHub production run.
 
@@ -121,3 +121,5 @@ Checked on November 17, 2026:
 ## Audit correction and current state
 
 PR #296 merged the original static download page at commit `cd0ef78f`; the later automation commit `8a5f1d4b` was not part of that merge. The automation requires a separate follow-up PR. The audit found and reproduced a certificate-subject spoof of the original substring signer check. Admission now parses only anchored signer digest lines and rejects multiple signers; regression tests include a real throwaway re-signed APK. Identical retries authenticate both the supplied and remotely downloaded APKs. Additional tests cover the real promotion order, failure boundaries, helper draft/upload/publication/dispatch order, and rejected approvals. No new POS has been published.
+
+The first follow-up PR run exposed that `ubuntu-latest` had moved to Ubuntu 26.04 without the expected SDK command. Both publisher jobs now use the standard Ubuntu 24.04 image, whose official image manifest includes Android build-tools 36.0.0, and explicitly check for the required executables.

@@ -59,6 +59,7 @@ test('rejects stale approvals and unexecuted emulator, KDS or payment recovery c
     { checks: { ...accepted.checks, androidEmulator: 'NOT_RUN' } },
     { checks: { ...accepted.checks, paymentRecovery: 'FAIL' } },
     { checks: { ...accepted.checks, kdsDelivery: 'FAIL' } },
+    { checks: { ...accepted.checks, productionCompatibility: 'NOT_RUN' } },
   ])
     assert.throws(() => validateAcceptance({ ...accepted, ...patch }, next));
 });

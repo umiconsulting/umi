@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   policy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -38,7 +38,8 @@ jobs:
       - name: Download pinned production test fixture
         run: |
           set -euo pipefail
-          sdkmanager 'build-tools;36.0.0' >/dev/null
+          test -x "$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          test -x "$ANDROID_HOME/build-tools/36.0.0/aapt2"
           curl --fail --silent --show-error --max-time 60 'https://dea44d87.umi-pos-downloads.pages.dev/umipos/android/337/UmiPOS-1.0.0-production-release-build337.apk' -o "$RUNNER_TEMP/base337.apk"
           printf '6afd4082280fec36c5ef37356a5989d70106f0fccd60dc52f9f0fc905c25b757  %s\n' "$RUNNER_TEMP/base337.apk" | sha256sum -c -
       - name: Policy, promotion and real APK admission tests
@@ -54,7 +55,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' ||
       (startsWith(github.event.release.tag_name, 'umipos-android-') &&
       !github.event.release.draft && !github.event.release.prerelease))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -87,7 +88,8 @@ jobs:
           set -euo pipefail
           corepack enable
           corepack prepare pnpm@10.29.3 --activate
-          sdkmanager 'build-tools;36.0.0' >/dev/null
+          test -x "$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          test -x "$ANDROID_HOME/build-tools/36.0.0/aapt2"
           export APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
           export AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt2"
           artifacts=("$RUNNER_TEMP"/umipos-release/*.apk)
