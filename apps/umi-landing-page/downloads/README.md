@@ -32,7 +32,7 @@ No download Worker was deployed. No paid plan was enabled.
 
 ## Automatic publication
 
-After this PR is merged, the release coordinator calls one command on the exact signed APK after independent acceptance:
+After the follow-up automation PR is merged, the release coordinator calls one command on the exact signed APK after independent acceptance:
 
 ```sh
 # From apps/umi-landing-page, with the existing authenticated gh CLI:
@@ -41,7 +41,7 @@ AAPT=/path/to/build-tools/36.0.0/aapt2 \
 node downloads/create-release.mjs /absolute/path/release.apk /absolute/path/acceptance.json 2.49.0
 ```
 
-The contract version comes from the accepted build record. This command reads Android metadata, verifies the pinned signer, generates the public manifest, uploads the exact APK and acceptance summary to a stable GitHub Release, and starts the publisher workflow on `main`. It does not rebuild the APK or sign a different binary. The existing Android builder and emulator acceptance remain responsible for build quality.
+The coordinator supplies the contract version from the accepted build record; it must equal `acceptance.contractVersion`. This command reads Android metadata, verifies the pinned signer, generates the public manifest, uploads the exact APK and acceptance summary to a stable GitHub Release, and starts the publisher workflow on `main`. It does not rebuild the APK or sign a different binary. The existing Android builder and emulator acceptance remain responsible for build quality.
 
 The acceptance record is written by the independent verifier and has this shape:
 
@@ -52,30 +52,33 @@ The acceptance record is written by the independent verifier and has this shape:
   "apkSha256": "<64-character SHA-256 of the accepted APK>",
   "sourceCommit": "<40-character accepted source commit>",
   "reviewedBy": "umi-verifier",
-  "evidenceUrl": "https://<retained evidence or release-review record>",
+  "contractVersion": "2.49.0",
+  "apiOrigin": "https://api.umiconsulting.co",
+  "evidenceUrl": "https://github.com/umiconsulting/umi/pull/<review-number>",
   "checks": {
     "androidEmulator": "PASS",
     "kdsDelivery": "PASS",
-    "paymentRecovery": "PASS"
+    "paymentRecovery": "PASS",
+    "productionCompatibility": "PASS"
   }
 }
 ```
 
-A machine-readable PASS is an admission record, not proof that tests executed. The reviewer and retained evidence remain the trust boundary. Do not manufacture this record from a successful compile. Do not publish raw lab logs, access tokens, customer data or signing material. The helper uploads only this acceptance summary, a sanitized manifest and the signed APK.
+A machine-readable PASS is an admission record, not proof that tests executed. Only `umi-verifier` and retained repository review/release URLs are admitted. The record binds contract/API identity to the APK and source. This is still an operator trust boundary: a maintainer with release rights can forge JSON or modify the workflow. It is not a cryptographic reviewer attestation or a protected-environment approval. MausBot must inspect the actual independent report before calling the helper; a string PASS alone never authorizes publication. Do not manufacture this record from a successful compile. Do not publish raw lab logs, access tokens, customer data or signing material. The helper uploads only this acceptance summary, a sanitized manifest and the signed APK.
 
 `.github/workflows/publish-umipos-download.yml` also reacts to stable `umipos-android-BUILD` releases. It ignores drafts, prereleases and unrelated tags. The helper explicitly dispatches the default-branch workflow as well, so a source tag predating the workflow, or a release created with `GITHUB_TOKEN`, can still be published. Identical duplicate events are no-ops. A failed dispatch leaves the release intact; retry the existing tag with the workflow's `release_tag` input.
 
 The publisher:
 
 1. Downloads the stable release assets and resolves its tag to a source commit.
-2. Checks acceptance identity, actual APK version/application ID, release signature, exact size/hash and the 25 MiB cap.
+2. Checks acceptance identity, actual APK version/application ID, exact single-signer certificate digest, ARM64 library, compiled production API string heuristic, exact size/hash and the 25 MiB cap.
 3. Rejects downgrade attempts and replacement of an existing build number with different bytes/source.
 4. Uploads static assets to a preview deployment and downloads the full APK to verify its hash.
 5. Publishes `latest.json` on the production alias with the verified immutable deployment URL. It then verifies the public pointer and APK again.
 
 Only the production alias promotion changes the current release. Failure before promotion leaves it unchanged. A post-promotion verification failure reports an unconfirmed publication for investigation; it does not pretend the old pointer is still current. Workflow jobs are serialized, and the current version is rechecked before promotion. Manual publishers must not run concurrently with this workflow.
 
-The landing page fetches `https://umi-pos-downloads.pages.dev/latest.json` when opened, with no-store caching and an allowlisted download origin. It no longer needs a code change, landing build or PR for each version. Until metadata loads it disables downloading; a failure shows one short instruction and a Retry button rather than an old APK. Android still asks the operator to install an update. This is distribution automation, not silent device installation.
+The landing page fetches `https://umi-pos-downloads.pages.dev/latest.json` when opened, with no-store caching and an allowlisted download origin. It no longer needs a code change, landing build or PR for each version. With JavaScript disabled, a clearly labelled backup link retains build 337; this fallback is not claimed to track the live release. Until metadata loads it disables downloading; a failure shows one short instruction and a Retry button rather than an old APK. Android still asks the operator to install an update. This is distribution automation, not silent device installation.
 
 The bootstrap manifest in `src/data/umipos-release.json` records build 337; it is no longer the live page's version selector. The initial `latest.json` is bootstrapped from that already-distributed APK, without inventing a new acceptance result for the architecture candidate. Future promotions require the independent acceptance contract above.
 
@@ -114,3 +117,7 @@ Checked on November 17, 2026:
 - GitHub public-runner pricing: https://docs.github.com/en/billing/concepts/product-billing/github-actions
 - Release events: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#release
 - Events created with GITHUB_TOKEN: https://docs.github.com/en/actions/how-tos/writing-workflows/choosing-when-your-workflow-runs/triggering-a-workflow
+
+## Audit correction and current state
+
+PR #296 merged the original static download page at commit `cd0ef78f`; the later automation commit `8a5f1d4b` was not part of that merge. The automation requires a separate follow-up PR. The audit found and reproduced a certificate-subject spoof of the original substring signer check. Admission now parses only anchored signer digest lines and rejects multiple signers; regression tests include a real throwaway re-signed APK. Identical retries authenticate both the supplied and remotely downloaded APKs. Additional tests cover the real promotion order, failure boundaries, helper draft/upload/publication/dispatch order, and rejected approvals. No new POS has been published.

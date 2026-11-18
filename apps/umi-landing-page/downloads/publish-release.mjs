@@ -1,5 +1,7 @@
 // Run only for a stable, independently accepted release. No signing keys are used here.
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { publishAccepted } from './publisher-core.mjs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -10,6 +12,7 @@ import {
   assertPromotion,
   sha256,
   tagFor,
+  readApk,
 } from './release-policy.mjs';
 
 const [apkArg, manifestArg, acceptanceArg] = process.argv.slice(2);
@@ -46,19 +49,6 @@ async function getJson(url) {
 async function current() {
   return validateRelease(await getJson(`${ORIGIN}/latest.json`));
 }
-const previous = await current();
-assertPromotion(release, previous);
-if (
-  previous.versionCode === release.versionCode &&
-  /^https:\/\/[a-f0-9]{8}\.umi-pos-downloads\.pages\.dev$/.test(previous.downloadOrigin)
-) {
-  await verify(previous.downloadOrigin);
-  console.log(
-    `Build ${release.versionCode} is already published with the same identity. Nothing changed.`,
-  );
-  process.exit(0);
-}
-run(process.execPath, ['prepare-release.mjs', apk, manifest]);
 function deploy(branch) {
   const output = run(
     'pnpm',
@@ -85,20 +75,33 @@ function deploy(branch) {
 async function verify(origin) {
   const url = `${origin}/${release.objectPrefix}/${release.artifactFile}`;
   const response = await fetch(url, { signal: AbortSignal.timeout(60000) });
-  if (!response.ok || sha256(Buffer.from(await response.arrayBuffer())) !== release.sha256)
+  if (!response.ok) throw new Error('Published APK download failed.');
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length !== release.bytes || sha256(bytes) !== release.sha256)
     throw new Error('Published APK verification failed.');
+  const dir = await mkdtemp(join(tmpdir(), 'umipos-published-'));
+  try {
+    const path = join(dir, release.artifactFile);
+    await writeFile(path, bytes);
+    // Run the same strict signature/Android/environment checks on the downloaded binary.
+    const info = readApk(path);
+    for (const key of ['packageName', 'versionCode', 'versionName', 'minimumSdk', 'targetSdk']) {
+      if (info[key] !== release[key]) throw new Error(`Published APK metadata differs: ${key}.`);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
-// Publish and download the immutable candidate before changing the current pointer.
-const versionOrigin = deploy(`release-${release.versionCode}`);
-await verify(versionOrigin);
-const published = { ...release, downloadOrigin: versionOrigin };
-await writeFile(join(cwd, 'dist', 'latest.json'), `${JSON.stringify(published, null, 2)}\n`);
-assertPromotion(release, await current());
-const productionOrigin = deploy('main');
-const actual = validateRelease(await getJson(`${ORIGIN}/latest.json`));
-if (actual.sha256 !== release.sha256 || actual.downloadOrigin !== versionOrigin)
-  throw new Error('Current pointer was not confirmed. Check the deployment before retrying.');
-await verify(actual.downloadOrigin);
-console.log(
-  `Published build ${release.versionCode}: ${versionOrigin}; production deployment ${productionOrigin}.`,
-);
+const result = await publishAccepted({
+  release,
+  acceptance: JSON.parse(await readFile(acceptanceArg, 'utf8')),
+  tag: process.env.RELEASE_TAG,
+  commit: process.env.RELEASE_COMMIT,
+  current,
+  prepare: () => run(process.execPath, ['prepare-release.mjs', apk, manifest]),
+  deploy,
+  verify,
+  setPointer: (published) =>
+    writeFile(join(cwd, 'dist', 'latest.json'), `${JSON.stringify(published, null, 2)}\n`),
+});
+console.log(JSON.stringify({ build: release.versionCode, ...result }));

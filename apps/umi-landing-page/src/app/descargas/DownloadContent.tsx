@@ -56,7 +56,18 @@ export default function DownloadContent() {
             <Smartphone className={styles.icon} size={38} aria-hidden="true" />
             <h1 id="download-title">UmiPOS para Android</h1>
             <h2 className={styles.requirements}>Android 7.0+ · ARM64</h2>
-            <div aria-live="polite" aria-busy={!release && !failed}>
+            <noscript>
+              <style>{'#download-state { display: none; }'}</style>
+              <h3 className={styles.version}>Versión de respaldo · Build 337</h3>
+              <a
+                className={styles.download}
+                href="https://dea44d87.umi-pos-downloads.pages.dev/umipos/android/337/UmiPOS-1.0.0-production-release-build337.apk"
+                download="UmiPOS-1.0.0-production-release-build337.apk"
+              >
+                Descargar APK
+              </a>
+            </noscript>
+            <div id="download-state" aria-live="polite" aria-busy={!release && !failed}>
               {release ? (
                 <>
                   <h3 className={styles.version}>

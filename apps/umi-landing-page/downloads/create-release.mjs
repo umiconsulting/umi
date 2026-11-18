@@ -40,7 +40,7 @@ await writeFile(join(dir, 'release.json'), `${JSON.stringify(release, null, 2)}\
 // Publish the acceptance summary, never raw lab logs, credentials or private files.
 await writeFile(
   join(dir, 'acceptance.json'),
-  `${JSON.stringify({ schemaVersion: 1, verdict: acceptance.verdict, apkSha256: acceptance.apkSha256, sourceCommit: acceptance.sourceCommit, reviewedBy: acceptance.reviewedBy, evidenceUrl: acceptance.evidenceUrl, checks: { androidEmulator: acceptance.checks.androidEmulator, kdsDelivery: acceptance.checks.kdsDelivery, paymentRecovery: acceptance.checks.paymentRecovery } }, null, 2)}\n`,
+  `${JSON.stringify({ schemaVersion: 1, verdict: acceptance.verdict, apkSha256: acceptance.apkSha256, sourceCommit: acceptance.sourceCommit, reviewedBy: acceptance.reviewedBy, contractVersion: acceptance.contractVersion, apiOrigin: acceptance.apiOrigin, evidenceUrl: acceptance.evidenceUrl, checks: { androidEmulator: acceptance.checks.androidEmulator, kdsDelivery: acceptance.checks.kdsDelivery, paymentRecovery: acceptance.checks.paymentRecovery, productionCompatibility: acceptance.checks.productionCompatibility } }, null, 2)}\n`,
 );
 const notes = `Production Android APK, build ${release.versionCode}.\n\nSource: ${release.sourceCommit}\nSHA-256: ${release.sha256}\nAcceptance: ${acceptance.evidenceUrl}\n`;
 await writeFile(join(dir, 'NOTES.md'), notes);

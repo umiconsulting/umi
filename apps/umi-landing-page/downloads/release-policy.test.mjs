@@ -6,6 +6,9 @@ import {
   validateAcceptance,
   assertPromotion,
   MAX_BYTES,
+  SIGNER,
+  verifySignerOutput,
+  verifyApiBytes,
 } from './release-policy.mjs';
 const next = {
   ...base,
@@ -18,9 +21,16 @@ const accepted = {
   verdict: 'PASS',
   apkSha256: next.sha256,
   sourceCommit: next.sourceCommit,
-  reviewedBy: 'Independent reviewer',
-  evidenceUrl: 'https://example.com/retained-evidence',
-  checks: { androidEmulator: 'PASS', kdsDelivery: 'PASS', paymentRecovery: 'PASS' },
+  reviewedBy: 'umi-verifier',
+  evidenceUrl: 'https://github.com/umiconsulting/umi/pull/296',
+  contractVersion: next.contractVersion,
+  apiOrigin: next.apiOrigin,
+  checks: {
+    androidEmulator: 'PASS',
+    kdsDelivery: 'PASS',
+    paymentRecovery: 'PASS',
+    productionCompatibility: 'PASS',
+  },
 };
 test('accepts an approved exact artifact and an idempotent promotion', () => {
   validateAcceptance(accepted, validateRelease(next));
@@ -56,4 +66,36 @@ test('rejects downgrade and replacement of a published build', () => {
   assert.throws(() => assertPromotion(base, next));
   assert.throws(() => assertPromotion({ ...base, sha256: '0'.repeat(64) }, base));
   assert.throws(() => assertPromotion({ ...base, sourceCommit: '0'.repeat(40) }, base));
+});
+
+test('signer pin ignores crafted certificate subjects and rejects missing, wrong or multiple signers', () => {
+  verifySignerOutput(
+    `Signer #1 certificate DN: CN=Umi\nSigner #1 certificate SHA-256 digest: ${SIGNER}\r\n`,
+  );
+  for (const output of [
+    `Signer #1 certificate DN: CN=certificate SHA-256 digest: ${SIGNER}\nSigner #1 certificate SHA-256 digest: ${'0'.repeat(64)}\n`,
+    `Signer #1 certificate DN: CN=certificate SHA-256 digest: ${SIGNER}\n`,
+    `Signer #1 certificate SHA-256 digest: ${SIGNER}\nSigner #2 certificate SHA-256 digest: ${'0'.repeat(64)}\n`,
+    `Signer #1 certificate SHA-256 digest: ${SIGNER} extra text`,
+  ])
+    assert.throws(() => verifySignerOutput(output));
+});
+test('compiled API heuristic rejects staging and absent production origins', () => {
+  verifyApiBytes(Buffer.from('https://api.umiconsulting.co'));
+  assert.throws(() => verifyApiBytes(Buffer.from('https://api-staging.umiconsulting.co')));
+  assert.throws(() =>
+    verifyApiBytes(
+      Buffer.from('https://api.umiconsulting.co https://api-staging.umiconsulting.co'),
+    ),
+  );
+  assert.throws(() => verifyApiBytes(Buffer.from('unknown')));
+});
+test('acceptance pins reviewer, retained evidence, contract and API', () => {
+  for (const patch of [
+    { reviewedBy: 'builder' },
+    { evidenceUrl: 'https://example.com' },
+    { contractVersion: '0.0.0' },
+    { apiOrigin: 'https://api-staging.umiconsulting.co' },
+  ])
+    assert.throws(() => validateAcceptance({ ...accepted, ...patch }, next));
 });

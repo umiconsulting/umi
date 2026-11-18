@@ -70,15 +70,24 @@ export function validateAcceptance(a, r) {
     a.apkSha256 === r.sha256 && a.sourceCommit === r.sourceCommit,
     'Acceptance is for a different APK or commit.',
   );
+  fail(a.reviewedBy === 'umi-verifier', 'Only the designated independent reviewer is accepted.');
   fail(
-    typeof a.reviewedBy === 'string' && a.reviewedBy.trim().length > 0,
-    'Missing acceptance reviewer.',
+    typeof a.evidenceUrl === 'string' &&
+      /^https:\/\/github\.com\/umiconsulting\/umi\/(?:pull\/[0-9]+(?:[#/].*)?|releases\/tag\/[a-zA-Z0-9._-]+)$/.test(
+        a.evidenceUrl,
+      ),
+    'Acceptance must link to the retained repository review or release record.',
   );
   fail(
-    typeof a.evidenceUrl === 'string' && /^https:\/\//.test(a.evidenceUrl),
-    'Missing retained HTTPS evidence URL.',
+    a.contractVersion === r.contractVersion && a.apiOrigin === r.apiOrigin,
+    'Acceptance contract or production environment differs.',
   );
-  for (const check of ['androidEmulator', 'kdsDelivery', 'paymentRecovery']) {
+  for (const check of [
+    'androidEmulator',
+    'kdsDelivery',
+    'paymentRecovery',
+    'productionCompatibility',
+  ]) {
     fail(a.checks?.[check] === 'PASS', `Acceptance check did not pass: ${check}.`);
   }
 }
@@ -105,10 +114,7 @@ export function readApk(apk) {
     return result.stdout;
   };
   const cert = command(process.env.APKSIGNER || 'apksigner', ['verify', '--print-certs', apk]);
-  fail(
-    cert.includes(`certificate SHA-256 digest: ${SIGNER}`),
-    'APK does not have the pinned production signer.',
-  );
+  verifySignerOutput(cert);
   const badging = command(process.env.AAPT || 'aapt2', ['dump', 'badging', apk]);
   fail(!badging.includes('application-debuggable'), 'Debug APKs cannot be published.');
   const field = (regex) => {
@@ -130,6 +136,30 @@ export function readApk(apk) {
     dartLibraries.length === 1 && dartLibraries[0] === 'lib/arm64-v8a/libapp.so',
     'Expected the ARM64-only production Dart library.',
   );
-  // The accepted build record is responsible for the compiled production Dart defines.
+  const library = spawnSync('unzip', ['-p', apk, 'lib/arm64-v8a/libapp.so'], {
+    maxBuffer: 128 * 1024 * 1024,
+  });
+  fail(library.status === 0, 'Could not inspect compiled API configuration.');
+  verifyApiBytes(library.stdout);
+  // String inspection is an additional heuristic, not proof of semantic API compatibility.
   return info;
+}
+
+export function verifySignerOutput(output) {
+  const digests = [
+    ...output
+      .replace(/\r\n/g, '\n')
+      .matchAll(/^Signer #([0-9]+) certificate SHA-256 digest: ([0-9a-f]{64})$/gm),
+  ];
+  fail(
+    digests.length === 1 && digests[0][1] === '1' && digests[0][2] === SIGNER,
+    'APK does not have exactly one pinned production signer.',
+  );
+}
+export function verifyApiBytes(bytes) {
+  fail(
+    bytes.includes(Buffer.from('https://api.umiconsulting.co')) &&
+      !bytes.includes(Buffer.from('api-staging.umiconsulting.co')),
+    'Compiled APK API-origin check failed.',
+  );
 }
