@@ -13,6 +13,7 @@ export default function Footer() {
         <nav aria-label="Enlaces del pie de página">
           <Link href="/#clientes">Clientes</Link>
           <Link href="/#sistema">Sistema</Link>
+          <Link href="/descargas">Descargas</Link>
           <Link href="/#demo">Solicitar demo</Link>
         </nav>
         <div className="footer-contact">
