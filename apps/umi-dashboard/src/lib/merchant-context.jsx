@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { getAuthHeaders, getStoredSession } from './auth.jsx';
+import { getAuthHeaders, getStoredSession, handleSessionExpired } from './auth.jsx';
 import { apiUrl, withCreds, errMessage } from './config.js';
 import {
   buildModuleAvailability,
@@ -17,6 +17,15 @@ async function apiGet(path) {
   const headers = await getAuthHeaders();
   const res = await fetch(apiUrl(path), withCreds({ headers }));
   const payload = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    // The business shell has no session. A consumer token reaches this branch:
+    // it is not a merchant session, and a stale cached profile must not keep the
+    // console on a "could not load" card.
+    handleSessionExpired();
+    const err = new Error('Sesión expirada');
+    err.status = 401;
+    throw err;
+  }
   if (!res.ok) throw new Error(errMessage(payload, `${res.status} ${path}`));
   return payload;
 }
@@ -31,6 +40,15 @@ export function MerchantProvider({ children }) {
   );
   const [capabilities, setCapabilities] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Two requests resolve independently. The list can finish first; without a
+  // separate flag its `setLoading(false)` turned the shell's loading state off
+  // while the capability request was still in flight, and the shell answered
+  // "Sin negocio seleccionado" over a café that was about to load.
+  const [capabilitiesLoading, setCapabilitiesLoading] = useState(true);
+  // A selected id from localStorage is not proof of membership. Before the list
+  // resolves it may name a café the signed-in person cannot open; asking for its
+  // capabilities is one 403 for a nonmember, and a stale role for a switch.
+  const [merchantsLoaded, setMerchantsLoaded] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -55,19 +73,39 @@ export function MerchantProvider({ children }) {
         setMerchants([]);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setMerchantsLoaded(true);
+          setLoading(false);
+        }
       });
     return () => {
       active = false;
     };
   }, []);
 
+  const merchantIds = merchants.map((merchant) => merchant.id).join('|');
+
   useEffect(() => {
-    if (!selectedMerchantId) {
+    // Wait for the membership list. Until it resolves, `selectedMerchantId` is
+    // only a localStorage hint, not a café this person may read.
+    if (!merchantsLoaded) return undefined;
+    const knownMerchant = merchantIds.split('|').includes(selectedMerchantId);
+    if (!selectedMerchantId || !knownMerchant) {
+      // NO CAFÉ, NO AUTHORITY. Keep the old capabilities here and a merchant
+      // switch would leave the previous café's permissions on screen for one
+      // frame — enough to draw the previous merchant's member list, or to offer
+      // a command the new membership does not hold.
       setCapabilities(null);
+      setCapabilitiesLoading(false);
+      setLoading(false);
       return undefined;
     }
     let active = true;
+    // Clear before the request. `DashboardLayout` renders its loading state when
+    // `loading && !capabilities`; keeping the old object made that condition false
+    // and the old screen stayed mounted under the new merchant's name.
+    setCapabilities(null);
+    setCapabilitiesLoading(true);
     setLoading(true);
     setError(null);
     const qs = selectedLocationId ? `?locationId=${encodeURIComponent(selectedLocationId)}` : '';
@@ -90,14 +128,24 @@ export function MerchantProvider({ children }) {
         setError(err.message);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setCapabilitiesLoading(false);
+          setLoading(false);
+        }
       });
     return () => {
       active = false;
     };
-  }, [selectedMerchantId, selectedLocationId]);
+  }, [selectedMerchantId, selectedLocationId, merchantsLoaded, merchantIds]);
 
   const setSelectedMerchantId = (merchantId) => {
+    // Clear authority IN THE SAME UPDATE as the merchant id. The capability
+    // effect runs after render; until it does, every data hook would see the
+    // new merchant id with the old café's permissions and fetch the new
+    // merchant's member list under the old role.
+    setCapabilities(null);
+    setCapabilitiesLoading(true);
+    setError(null);
     setSelectedMerchantIdState(merchantId);
     setSelectedLocationIdState('');
     if (merchantId) window.localStorage.setItem(SELECTED_MERCHANT_KEY, merchantId);
@@ -153,7 +201,7 @@ export function MerchantProvider({ children }) {
         null,
       selectedLocation: capabilities?.selectedLocation || null,
       capabilities,
-      loading,
+      loading: loading || capabilitiesLoading,
       error,
       setSelectedMerchantId,
       setSelectedLocationId,
@@ -169,6 +217,7 @@ export function MerchantProvider({ children }) {
       selectedLocationId,
       capabilities,
       loading,
+      capabilitiesLoading,
       error,
       updateSelectedMerchant,
       platformRole,

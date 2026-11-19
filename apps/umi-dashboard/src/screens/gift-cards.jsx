@@ -4,6 +4,9 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format.js';
 import { RegionHead } from '@/shell.jsx';
+import { useMerchant } from '@/lib/merchant-context.jsx';
+import { canCashAction } from '@/lib/cash-tabs.js';
+import PermissionUnavailable from '@/components/permission-unavailable.jsx';
 import { issueGiftCard, redeemGiftCardByCode, useGiftCardsData } from '@/data.jsx';
 
 function RedeemGiftCardDialog({ onClose, onRedeemed }) {
@@ -307,42 +310,57 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
 
 const GiftCardsScreen = () => {
   const { t } = useLingui();
+  const merchant = useMerchant();
+  const capabilities = merchant?.capabilities;
+  const canIssue = canCashAction('issue', capabilities);
+  const canRedeem = canCashAction('redeem', capabilities);
   const [page, setPage] = useState(1);
   const [refresh, setRefresh] = useState(0);
   const [showIssue, setShowIssue] = useState(false);
   const [showRedeem, setShowRedeem] = useState(false);
-  const { data, loading } = useGiftCardsData({ page, refresh });
+  const { data, loading, error, errorStatus } = useGiftCardsData({ page, refresh });
   const cards = data?.giftCards || [];
   const total = data?.total || 0;
   const totalPages = data?.totalPages || 1;
-  const openTotal = cards
-    .filter((card) => !card.isRedeemed)
-    .reduce((sum, card) => sum + (card.amountCentavos || 0), 0);
+  const openCards = cards.filter((card) => !card.isRedeemed);
+  const redeemedCards = cards.filter((card) => card.isRedeemed);
+  const openTotal = openCards.reduce((sum, card) => sum + (card.amountCentavos || 0), 0);
+
+  if (errorStatus === 403) {
+    return <PermissionUnavailable title={t`Tarjetas de regalo`} permissions={['gift_card.read']} />;
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          gap: 16,
-        }}
-      >
-        <RegionHead
-          title={t`Tarjetas de regalo`}
-          note={loading ? t`Cargando…` : t`Emitidas desde Umi Cash.`}
-          count={{ value: formatNumber(total), label: t`emitidas` }}
-        />
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" type="button" onClick={() => setShowRedeem(true)}>
-            <I.Check size={14} /> <Trans>Canjear</Trans>
-          </button>
-          <button className="btn" type="button" onClick={() => setShowIssue(true)}>
-            <I.Plus size={14} /> <Trans>Emitir tarjeta</Trans>
-          </button>
-        </div>
-      </div>
+    <div className="cash-screen">
+      <RegionHead
+        title={t`Tarjetas de regalo`}
+        note={loading ? t`Cargando…` : t`Emitidas desde Umi Cash.`}
+        count={{ value: formatNumber(total), label: t`emitidas` }}
+        actions={
+          <>
+            {canRedeem ? (
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => setShowRedeem(true)}
+              >
+                <I.Check size={14} /> <Trans>Canjear</Trans>
+              </button>
+            ) : null}
+            {canIssue ? (
+              <button className="btn" type="button" onClick={() => setShowIssue(true)}>
+                <I.Plus size={14} /> <Trans>Emitir tarjeta</Trans>
+              </button>
+            ) : null}
+            {!canIssue && !canRedeem ? (
+              <span className="cash-readonly" data-read-only="gift-cards">
+                <I.Eye size={13} aria-hidden="true" />
+                <Trans>Solo consulta</Trans>
+              </span>
+            ) : null}
+          </>
+        }
+      />
 
       {showIssue && (
         <IssueGiftCardDialog
@@ -358,37 +376,58 @@ const GiftCardsScreen = () => {
         />
       )}
 
-      <div className="grid grid-2" style={{ gap: 14 }}>
-        <div className="strip-metric">
-          <div>
-            <div className="lbl">
-              <Trans>Abiertas</Trans>
+      {error ? (
+        <div className="alert danger" role="alert">
+          <span className="strip" />
+          <div className="body">
+            <div className="ttl">
+              <Trans>No se pudieron cargar las tarjetas</Trans>
             </div>
-            <div className="en">
-              <Trans>Saldo abierto en esta página</Trans>
-            </div>
+            <div className="sub">{error}</div>
+            <button
+              className="btn btn-ghost btn-sm"
+              type="button"
+              style={{ marginTop: 8 }}
+              onClick={() => setRefresh((n) => n + 1)}
+            >
+              <Trans>Reintentar</Trans>
+            </button>
           </div>
-          <div className="val">{formatMoney(openTotal)}</div>
-          <span className="delta-mini up">{cards.filter((c) => !c.isRedeemed).length}</span>
         </div>
-        <div className="strip-metric">
-          <div>
-            <div className="lbl">
-              <Trans>Canjeadas</Trans>
-            </div>
-            <div className="en">
-              <Trans>Canjeado en esta página</Trans>
-            </div>
-          </div>
-          <div className="val">{cards.filter((c) => c.isRedeemed).length}</div>
-          <span className="delta-mini">
+      ) : null}
+
+      <div className="cash-metrics">
+        <div className="cash-metric">
+          <span className="cash-kicker">
+            <Trans>Abiertas</Trans>
+          </span>
+          <span className="cash-metric-value">{formatNumber(openCards.length)}</span>
+          <span className="cash-muted">
+            <Trans>con saldo en esta página</Trans>
+          </span>
+        </div>
+        <div className="cash-metric">
+          <span className="cash-kicker">
+            <Trans>Saldo abierto</Trans>
+          </span>
+          <span className="cash-metric-value">{formatMoney(openTotal)}</span>
+          <span className="cash-muted">
+            <Trans>en esta página</Trans>
+          </span>
+        </div>
+        <div className="cash-metric">
+          <span className="cash-kicker">
+            <Trans>Canjeadas</Trans>
+          </span>
+          <span className="cash-metric-value">{formatNumber(redeemedCards.length)}</span>
+          <span className="cash-muted">
             <Trans>{cards.length} en pantalla</Trans>
           </span>
         </div>
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table className="matrix">
+      <section className="cash-panel" aria-label={t`Tarjetas de regalo emitidas`}>
+        <table className="cash-table">
           <thead>
             <tr>
               <th>
@@ -411,37 +450,47 @@ const GiftCardsScreen = () => {
           <tbody>
             {cards.length === 0 && !loading && (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', padding: 40, color: 'var(--ink-3)' }}>
+                <td colSpan={5} className="cash-empty-cell">
                   <Trans>No hay tarjetas de regalo emitidas.</Trans>
                 </td>
               </tr>
             )}
             {cards.map((card) => (
-              <tr key={card.id}>
-                <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{card.code}</td>
+              <tr key={card.id} className="cash-row">
                 <td>
-                  <div style={{ fontWeight: 600 }}>{card.recipientName || '—'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+                  <span className="cash-mono cash-card-number">{card.code}</span>
+                </td>
+                <td>
+                  <div className="cash-member-name">{card.recipientName || '—'}</div>
+                  <div className="cash-muted">
                     {card.recipientEmail || card.recipientPhone || t`Sin contacto`}
                   </div>
                 </td>
-                <td style={{ textAlign: 'right', fontWeight: 700 }}>{card.amountMXN}</td>
-                <td>
-                  <span className={'badge ' + (card.isRedeemed ? 'badge-staff' : 'badge-admin')}>
-                    {card.isRedeemed ? <Trans>CANJEADA</Trans> : <Trans>ABIERTA</Trans>}
+                <td className="cash-num">
+                  <span className="cash-money">
+                    {card.amountMXN || formatMoney(card.amountCentavos)}
                   </span>
                 </td>
-                <td style={{ color: 'var(--ink-2)' }}>
+                <td>
+                  <span
+                    className={
+                      'cash-badge' + (card.isRedeemed ? ' cash-badge--muted' : ' cash-badge--open')
+                    }
+                  >
+                    {card.isRedeemed ? <Trans>Canjeada</Trans> : <Trans>Abierta</Trans>}
+                  </span>
+                </td>
+                <td className="cash-muted">
                   {card.createdAt ? formatDate(card.createdAt) : '—'}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+      </section>
 
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
+        <div className="cash-pagination">
           <button
             className="btn btn-ghost btn-sm"
             disabled={page <= 1}
@@ -449,9 +498,7 @@ const GiftCardsScreen = () => {
           >
             <I.ChevronLeft size={14} /> <Trans>Anterior</Trans>
           </button>
-          <span
-            style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)', alignSelf: 'center' }}
-          >
+          <span className="cash-pagination-count">
             {page} / {totalPages}
           </span>
           <button

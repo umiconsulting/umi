@@ -50,11 +50,6 @@
       "count": 1
     }
   },
-  "src/screens/members.jsx": {
-    "no-unused-vars": {
-      "count": 2
-    }
-  },
   "src/screens/orders.jsx": {
     "no-unused-vars": {
       "count": 1
