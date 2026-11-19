@@ -16,12 +16,9 @@ function make() {
     updatePerson: vi.fn().mockResolvedValue(undefined),
     createCard: vi.fn().mockResolvedValue({ cardId: 'card-1', cardNumber: 'LYL-1234567890' }),
   };
-  const session = {
-    createSession: vi.fn().mockResolvedValue({ accessToken: 'acc', refreshToken: 'ref' }),
-  };
   const qr = { generateRandomToken: vi.fn().mockReturnValue('qrtok') };
-  const svc = new CashRegisterService(repo as never, session as never, qr as never);
-  return { svc, repo, session, qr };
+  const svc = new CashRegisterService(repo as never, qr as never);
+  return { svc, repo, qr };
 }
 
 const INPUT = { name: 'Ana López', phone: '9991234567', birthDate: '1990-05-15' };
@@ -30,13 +27,15 @@ describe('CashRegisterService.register', () => {
   let h: ReturnType<typeof make>;
   beforeEach(() => (h = make()));
 
-  it('creates person + account + card and returns a 201 session payload', async () => {
+  it('creates the customer + card and returns a proof-required answer with no session', async () => {
     const r = await h.svc.register('t1', 'Kala', INPUT, 'ua/1.0');
     expect(h.repo.resolveContact).toHaveBeenCalledWith('t1', '9991234567', 'Ana López');
-    expect(r.userId).toBe('person-1');
-    expect(r.cardId).toBe('card-1');
-    expect(r.accessToken).toBe('acc');
-    expect(r.message).toBe('¡Bienvenido a Kala!');
+    expect(h.repo.updatePerson).toHaveBeenCalledWith('person-1', INPUT.name, INPUT.birthDate);
+    expect(r).toEqual({
+      verificationRequired: true,
+      message: 'Solicitud recibida. Verifica tu teléfono para usar tu tarjeta en Kala.',
+    });
+    expect(r).not.toHaveProperty('accessToken');
     // default prefix LYL + 10 digits
     const cardNumber = h.repo.createCard.mock.calls[0][0].cardNumber;
     expect(cardNumber).toMatch(/^LYL-\d{10}$/);
@@ -80,27 +79,25 @@ describe('CashRegisterService.register', () => {
     );
   });
 
-  it('returns the existing customer session without creating a second card', async () => {
+  it('returns the existing customer a proof-required answer without a second card', async () => {
     h.repo.findExisting.mockResolvedValue({
       personId: 'p9',
       displayName: 'Existing',
       hasCard: true,
     });
-    await expect(h.svc.register('t1', 'Kala', INPUT, null)).resolves.toMatchObject({
-      alreadyRegistered: true,
-      accessToken: expect.any(String),
-      user: { id: 'p9', role: 'CUSTOMER' },
+    await expect(h.svc.register('t1', 'Kala', INPUT, null)).resolves.toEqual({
+      verificationRequired: true,
+      message: 'Solicitud recibida. Verifica tu teléfono para usar tu tarjeta en Kala.',
     });
-    expect(h.session.createSession).toHaveBeenCalledWith('p9', 'CUSTOMER', 't1');
     expect(h.repo.createCard).not.toHaveBeenCalled();
+    expect(h.repo.updatePerson).not.toHaveBeenCalled();
   });
 
   it('retries card creation on a card_number collision (23505)', async () => {
     h.repo.createCard
       .mockRejectedValueOnce({ code: '23505' })
       .mockResolvedValueOnce({ cardId: 'card-2', cardNumber: 'LYL-9999999999' });
-    const r = await h.svc.register('t1', 'Kala', INPUT, null);
+    await h.svc.register('t1', 'Kala', INPUT, null);
     expect(h.repo.createCard).toHaveBeenCalledTimes(2);
-    expect(r.cardId).toBe('card-2');
   });
 });
