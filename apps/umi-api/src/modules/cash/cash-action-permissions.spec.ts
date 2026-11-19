@@ -64,10 +64,14 @@ describe('Cash action permissions', () => {
   it('removes the role list that refused a cashier on scan, topup and purchase', () => {
     expect(Reflect.getMetadata(ROLES_KEY, CashWriteController)).toBeUndefined();
     expect(Reflect.getMetadata(ROLES_KEY, CashScanController)).toBeUndefined();
-    // The register's own error sink keeps its role gate: it is not an action.
-    expect(Reflect.getMetadata(ROLES_KEY, CashController.prototype.reportClientError)).toContain(
-      'staff',
-    );
+    // The register's own error sink keeps its role gate: it is not an action, and
+    // a cashier operates the register that reports the failure.
+    const sinkRoles = Reflect.getMetadata(
+      ROLES_KEY,
+      CashController.prototype.reportClientError,
+    ) as string[];
+    expect(sinkRoles).toContain('staff');
+    expect(sinkRoles).toContain('cashier');
   });
 
   it('matches the seeded grants for the actions this slice touches', () => {

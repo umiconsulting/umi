@@ -39,7 +39,7 @@ const HOUR = 60 * 60 * 1000;
 const EXPORT_MAX_PER_HOUR = 10;
 const DEFAULT_TZ = 'America/Mexico_City';
 /** Roles that operate the register, and so can report its failures. */
-const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
+const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'cashier', 'staff'];
 
 /**
  * Cash READ side (D11 — always live) + admin-config writes (settings branding,
