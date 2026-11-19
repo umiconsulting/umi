@@ -362,6 +362,7 @@ export class CashReadService {
       sort,
       limit,
       skip,
+      includeContact,
     });
     const customers = rows.map((r) => ({
       id: r.id,

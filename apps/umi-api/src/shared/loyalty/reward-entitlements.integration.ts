@@ -583,6 +583,7 @@ describe('single-cycle reward entitlements · real PostgreSQL', () => {
           sort: 'visits',
           limit: 1000,
           skip: 0,
+          includeContact: false,
         });
         const listed = list.rows.find((r) => r.cardId === cardId);
         expect(listed?.pendingRewards).toBe(4);

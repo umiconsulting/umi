@@ -429,7 +429,7 @@ export class CashRepository {
 
   async adminCustomers(
     merchantId: string,
-    opts: { search: string; sort: string; limit: number; skip: number },
+    opts: { search: string; sort: string; limit: number; skip: number; includeContact: boolean },
   ): Promise<{ rows: Row[]; total: number }> {
     const like = `%${opts.search}%`;
     const order =
@@ -442,7 +442,13 @@ export class CashRepository {
             : opts.sort === 'ltv'
               ? 'ltv_centavos DESC NULLS LAST'
               : 'created_at DESC';
-    const filter = `($2 = '' OR name ILIKE $3 OR phone ILIKE $3 OR email ILIKE $3 OR card_number ILIKE $3)`;
+    // A caller without `customer.contact.read` may search by name or card only.
+    // Matching phone or email would still answer "is this person a member?" even
+    // when the response masks the field: a search oracle. The same filter feeds
+    // the page query and the count query, so `total` cannot diverge from the rows.
+    const filter = opts.includeContact
+      ? `($2 = '' OR name ILIKE $3 OR phone ILIKE $3 OR email ILIKE $3 OR card_number ILIKE $3)`
+      : `($2 = '' OR name ILIKE $3 OR card_number ILIKE $3)`;
     return this.pg.withMerchant(async (c) => {
       const rows = (
         await c.query<Row>(

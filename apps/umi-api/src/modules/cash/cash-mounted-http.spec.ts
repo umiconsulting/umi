@@ -149,7 +149,26 @@ const cards = {
 };
 
 const repo = {
-  adminCustomers: vi.fn().mockResolvedValue({ rows: [CUSTOMER_ROW], total: 1 }),
+  adminCustomers: vi.fn(
+    async (
+      _merchantId: string,
+      opts: { search: string; includeContact: boolean },
+    ): Promise<{ rows: unknown[]; total: number }> => {
+      const term = String(opts.search ?? '')
+        .trim()
+        .toLowerCase();
+      if (!term) return { rows: [CUSTOMER_ROW], total: 1 };
+      const contactMatch =
+        opts.includeContact === true &&
+        (CUSTOMER_ROW.phone.toLowerCase().includes(term) ||
+          CUSTOMER_ROW.email.toLowerCase().includes(term));
+      const matches =
+        CUSTOMER_ROW.name.toLowerCase().includes(term) ||
+        CUSTOMER_ROW.cardNumber.toLowerCase().includes(term) ||
+        contactMatch;
+      return matches ? { rows: [CUSTOMER_ROW], total: 1 } : { rows: [], total: 0 };
+    },
+  ),
   adminCustomerDetail: vi.fn().mockResolvedValue(DETAIL),
   cardMoneyTotals: vi.fn().mockResolvedValue({ ltvCentavos: 0, topupCentavos: 0 }),
   rewardProfileRows: vi.fn().mockResolvedValue({
@@ -321,7 +340,6 @@ afterAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   repo.branding.mockResolvedValue(SETTINGS);
-  repo.adminCustomers.mockResolvedValue({ rows: [CUSTOMER_ROW], total: 1 });
   repo.adminCustomerDetail.mockResolvedValue(DETAIL);
   writeRepo.topupEnabled.mockResolvedValue(false);
   registerRepo.findExisting.mockResolvedValue(null);
@@ -429,7 +447,7 @@ describe('contact projection over the mounted HTTP pipeline', () => {
   it('masks phone, email and birthday for a cashier on list, search, members and detail', async () => {
     const cases = [
       `/api/merchants/${MERCHANT_ID}/cash/customers`,
-      `/api/merchants/${MERCHANT_ID}/cash/customers?search=5550001111`,
+      `/api/merchants/${MERCHANT_ID}/cash/customers?search=Ana`,
       `/api/merchants/${MERCHANT_ID}/cash/members`,
       `/api/${MERCHANT_ID}/admin/customers`,
     ];
@@ -479,6 +497,56 @@ describe('contact projection over the mounted HTTP pipeline', () => {
       'manager',
     );
     expect(json<Record<string, unknown>>(detail.body).birthDate).toBe('1990-04-12');
+  });
+
+  it('does not let a cashier search by phone or email on either route', async () => {
+    for (const base of [
+      `/api/merchants/${MERCHANT_ID}/cash/customers`,
+      `/api/${MERCHANT_ID}/admin/customers`,
+    ]) {
+      const phone = await request('GET', `${base}?search=5550001111`, 'cashier');
+      expect(phone.status, base).toBe(200);
+      expect(json<{ total: number; customers: unknown[] }>(phone.body).total, base).toBe(0);
+      expect(json<{ customers: unknown[] }>(phone.body).customers, base).toEqual([]);
+
+      const email = await request(
+        'GET',
+        `${base}?search=${encodeURIComponent('ana@example.test')}`,
+        'cashier',
+      );
+      expect(email.status, base).toBe(200);
+      expect(json<{ total: number }>(email.body).total, base).toBe(0);
+    }
+  });
+
+  it('lets a cashier search by name or card and keeps the contact fields masked', async () => {
+    for (const term of ['Ana', 'KAL-1']) {
+      const res = await request(
+        'GET',
+        `/api/merchants/${MERCHANT_ID}/cash/customers?search=${encodeURIComponent(term)}`,
+        'cashier',
+      );
+      expect(res.status, term).toBe(200);
+      const body = json<{ total: number; customers: Array<Record<string, unknown>> }>(res.body);
+      expect(body.total, term).toBe(1);
+      expect(body.customers[0].phone, term).toBeNull();
+      expect(body.customers[0].email, term).toBeNull();
+      expect(body.customers[0].contactRestricted, term).toBe(true);
+    }
+  });
+
+  it('lets a manager search by phone and returns the contact fields', async () => {
+    const res = await request(
+      'GET',
+      `/api/merchants/${MERCHANT_ID}/cash/customers?search=Ana`,
+      'manager',
+    );
+    expect(res.status).toBe(200);
+    const body = json<{ total: number; customers: Array<Record<string, unknown>> }>(res.body);
+    expect(body.total).toBe(1);
+    expect(body.customers[0].phone).toBe('+5215550001111');
+    expect(body.customers[0].email).toBe('ana@example.test');
+    expect(body.customers[0].contactRestricted).toBe(false);
   });
 
   it('keeps the viewer row aggregate-only and still lets the viewer read analytics', async () => {
@@ -538,6 +606,12 @@ describe('the Cash permission matrix over the mounted HTTP pipeline', () => {
         method: 'POST',
         url: `/api/${MERCHANT_ID}/admin/scan`,
         payload: scanBody,
+        expected: 403,
+      },
+      {
+        role: 'viewer',
+        method: 'GET',
+        url: `/api/merchants/${MERCHANT_ID}/cash/gift-cards`,
         expected: 403,
       },
       {

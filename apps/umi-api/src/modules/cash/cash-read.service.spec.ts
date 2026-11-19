@@ -356,6 +356,10 @@ describe('CashReadService.getCustomers contact projection', () => {
       balanceCentavos: 12550,
       totalVisits: 13,
     });
+    expect(h.repo.adminCustomers).toHaveBeenCalledWith(
+      't1',
+      expect.objectContaining({ includeContact: false }),
+    );
   });
 
   it('returns phone and email with customer.contact.read', async () => {
@@ -369,9 +373,13 @@ describe('CashReadService.getCustomers contact projection', () => {
       email: 'ana@example.com',
       contactRestricted: false,
     });
+    expect(h.repo.adminCustomers).toHaveBeenCalledWith(
+      't1',
+      expect.objectContaining({ includeContact: true }),
+    );
   });
 
-  it('keeps the same masking for a phone search', async () => {
+  it('masks a phone search and passes the contact restriction to the query', async () => {
     const h = make();
     h.repo.adminCustomers.mockResolvedValue({ rows: [ROW], total: 1 });
 
@@ -379,7 +387,7 @@ describe('CashReadService.getCustomers contact projection', () => {
 
     expect(h.repo.adminCustomers).toHaveBeenCalledWith(
       't1',
-      expect.objectContaining({ search: '551234' }),
+      expect.objectContaining({ search: '551234', includeContact: false }),
     );
     expect(r.customers[0].phone).toBeNull();
   });
