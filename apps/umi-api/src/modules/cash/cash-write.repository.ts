@@ -142,6 +142,28 @@ export class CashWriteRepository {
     return rows[0] ?? null;
   }
 
+  /**
+   * Whether this café sells stored value. The public config already reports this
+   * flag, so the write path must enforce it too: a client that ignores the hidden
+   * button must not be able to load value at a café that turned top-up off.
+   *
+   * A missing loyalty program is a strict `false`. The column defaults to false in
+   * `db/20_merchant.sql`, and the safe default for money is "do not accept it".
+   */
+  async topupEnabled(merchantId: string): Promise<boolean> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<{ enabled: boolean }>(
+        `SELECT COALESCE(lp.topup_enabled, false) AS enabled
+           FROM merchant.merchant AS m
+           LEFT JOIN merchant.loyalty_program AS lp ON lp.merchant_id = m.id
+          WHERE m.id = $1::uuid
+          LIMIT 1`,
+        [merchantId],
+      ),
+    );
+    return rows[0]?.enabled === true;
+  }
+
   /** Today's top-up aggregates for the anti-fraud limits (from the ledger). */
   async topupGuards(
     merchantId: string,
