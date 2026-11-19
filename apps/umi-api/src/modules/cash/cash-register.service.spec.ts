@@ -84,6 +84,8 @@ describe('CashRegisterService.register', () => {
       personId: 'p9',
       displayName: 'Existing',
       hasCard: true,
+      cardId: 'card-9',
+      cardNumber: 'LYL-9999999999',
     });
     await expect(h.svc.register('t1', 'Kala', INPUT, null)).resolves.toEqual({
       verificationRequired: true,
@@ -99,5 +101,71 @@ describe('CashRegisterService.register', () => {
       .mockResolvedValueOnce({ cardId: 'card-2', cardNumber: 'LYL-9999999999' });
     await h.svc.register('t1', 'Kala', INPUT, null);
     expect(h.repo.createCard).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('CashRegisterService.registerStaff', () => {
+  let h: ReturnType<typeof make>;
+  beforeEach(() => (h = make()));
+
+  it('creates a member and returns the card, with no customer token', async () => {
+    const r = await h.svc.registerStaff('t1', 'Kala', INPUT);
+    expect(r).toEqual({
+      alreadyRegistered: false,
+      customerId: 'person-1',
+      cardId: 'card-1',
+      cardNumber: expect.stringMatching(/^LYL-\d{10}$/),
+      name: 'Ana López',
+      message: '¡Bienvenido a Kala!',
+    });
+    expect(r).not.toHaveProperty('accessToken');
+    expect(r).not.toHaveProperty('refreshToken');
+  });
+
+  it('returns the existing card without creating a second one', async () => {
+    h.repo.findExisting.mockResolvedValue({
+      personId: 'p9',
+      displayName: 'Existing',
+      hasCard: true,
+      cardId: 'card-9',
+      cardNumber: 'LYL-9999999999',
+    });
+    const r = await h.svc.registerStaff('t1', 'Kala', INPUT);
+    expect(r).toEqual({
+      alreadyRegistered: true,
+      customerId: 'p9',
+      cardId: 'card-9',
+      cardNumber: 'LYL-9999999999',
+      name: 'Existing',
+      message: 'Este teléfono ya está registrado',
+    });
+    expect(h.repo.createCard).not.toHaveBeenCalled();
+    expect(h.repo.updatePerson).not.toHaveBeenCalled();
+  });
+
+  it('creates a card for an existing customer who has none, without rewriting the profile', async () => {
+    h.repo.findExisting.mockResolvedValue({
+      personId: 'p9',
+      displayName: 'Existing',
+      hasCard: false,
+      cardId: null,
+      cardNumber: null,
+    });
+    const r = await h.svc.registerStaff('t1', 'Kala', INPUT);
+    expect(r.alreadyRegistered).toBe(true);
+    expect(h.repo.createCard).toHaveBeenCalledTimes(1);
+    expect(h.repo.updatePerson).not.toHaveBeenCalled();
+  });
+
+  it('allows the counter when public self-registration is off', async () => {
+    h.repo.merchantConfig.mockResolvedValue({
+      name: 'Kala',
+      loyaltyConfigured: true,
+      cardPrefix: null,
+      selfRegistration: false,
+    });
+    await expect(h.svc.registerStaff('t1', 'Kala', INPUT)).resolves.toMatchObject({
+      alreadyRegistered: false,
+    });
   });
 });

@@ -19,7 +19,15 @@ const INPUT = { name: 'Ana López', phone: '9991234567', birthDate: '1990-05-15'
 const VERIFICATION_MESSAGE =
   'Solicitud recibida. Verifica tu teléfono para usar tu tarjeta en Kala.';
 
-function harness(existing: { personId: string; displayName: string | null; hasCard: boolean } | null) {
+function harness(
+  existing: {
+    personId: string;
+    displayName: string | null;
+    hasCard: boolean;
+    cardId: string | null;
+    cardNumber: string | null;
+  } | null,
+) {
   const repo = {
     merchantConfig: vi.fn().mockResolvedValue({
       name: 'Kala',
@@ -40,7 +48,13 @@ function harness(existing: { personId: string; displayName: string | null; hasCa
 
 describe('public Cash registration identity boundary', () => {
   it('mints no session for an existing phone that already has a card', async () => {
-    const h = harness({ personId: 'p9', displayName: 'Existing', hasCard: true });
+    const h = harness({
+      personId: 'p9',
+      displayName: 'Existing',
+      hasCard: true,
+      cardId: 'card-9',
+      cardNumber: 'LYL-9999999999',
+    });
     const result = await h.svc.register('t1', 'Kala', INPUT, null);
 
     expect(result).toEqual({ verificationRequired: true, message: VERIFICATION_MESSAGE });
@@ -53,7 +67,13 @@ describe('public Cash registration identity boundary', () => {
   });
 
   it('does not overwrite an existing customer profile when the phone has no card', async () => {
-    const h = harness({ personId: 'p9', displayName: 'Existing', hasCard: false });
+    const h = harness({
+      personId: 'p9',
+      displayName: 'Existing',
+      hasCard: false,
+      cardId: null,
+      cardNumber: null,
+    });
     const result = await h.svc.register('t1', 'Kala', INPUT, null);
 
     expect(result).toEqual({ verificationRequired: true, message: VERIFICATION_MESSAGE });
@@ -73,7 +93,13 @@ describe('public Cash registration identity boundary', () => {
 
   it('returns one indistinguishable body for a new and an existing phone', async () => {
     const fresh = await harness(null).svc.register('t1', 'Kala', INPUT, null);
-    const known = await harness({ personId: 'p9', displayName: 'Existing', hasCard: true }).svc.register(
+    const known = await harness({
+      personId: 'p9',
+      displayName: 'Existing',
+      hasCard: true,
+      cardId: 'card-9',
+      cardNumber: 'LYL-9999999999',
+    }).svc.register(
       't1',
       'Kala',
       INPUT,

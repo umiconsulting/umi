@@ -11,6 +11,7 @@ function make() {
     analytics: vi.fn(),
     adminCustomers: vi.fn(),
     rewardConfig: vi.fn(),
+    withRewardConfigLock: vi.fn(async (_merchantId: string, work: (client: never) => Promise<unknown>) => work({} as never)),
     upsertRewardConfig: vi.fn(),
     giftCards: vi.fn(),
     adminCustomerDetail: vi.fn(),
@@ -140,6 +141,7 @@ describe('CashReadService.updateRewardConfig', () => {
       upgrade: null,
     });
     expect(r.ok).toBe(true);
+    expect(h.repo.withRewardConfigLock).not.toHaveBeenCalled();
   });
 
   it('PATCH keeps the stored description and second tier when the body omits them', async () => {
@@ -182,7 +184,10 @@ describe('CashReadService.updateRewardConfig', () => {
         rewardDescription: 'Con leche',
         rewardCostCentavos: 6000,
       },
-    });
+    }, expect.anything());
+    // The read and the write share one advisory-lock transaction.
+    expect(h.repo.withRewardConfigLock).toHaveBeenCalledWith('t1', expect.any(Function));
+    expect(h.repo.rewardConfig).toHaveBeenCalledWith('t1', expect.anything());
   });
 
   it('PATCH with an explicit null still turns the ladder off', async () => {
@@ -204,6 +209,7 @@ describe('CashReadService.updateRewardConfig', () => {
       't1',
       'prog1',
       expect.objectContaining({ upgrade: null }),
+      expect.anything(),
     );
   });
 
@@ -244,6 +250,7 @@ describe('CashReadService.updateRewardConfig', () => {
           rewardCostCentavos: 6000,
         },
       }),
+      expect.anything(),
     );
   });
 
@@ -292,10 +299,89 @@ describe('CashReadService.updateSettings', () => {
     expect(arg.primary_color).toBe('#000');
   });
 
+  it('persists the Cash-only switches on merchant.loyalty_program', async () => {
+    const h = make();
+    await h.svc.updateSettings('t1', {
+      passStyle: 'stamps',
+      selfRegistration: true,
+      topupEnabled: false,
+      multiSealEnabled: true,
+    });
+    const arg = h.repo.updateProgram.mock.calls[0][1];
+    expect(arg.pass_style).toBe('stamps');
+    expect(arg.self_registration).toBe(true);
+    expect(arg.topup_enabled).toBe(false);
+    expect(arg.multi_seal_enabled).toBe(true);
+  });
+
   it('skips the program update when only the name changes', async () => {
     const h = make();
     await h.svc.updateSettings('t1', { name: 'Only Name' });
     expect(h.repo.updateProgram).not.toHaveBeenCalled();
+  });
+});
+
+describe('CashReadService.getCustomers contact projection', () => {
+  const ROW = {
+    id: 'cust-1',
+    name: 'Ana',
+    phone: '+5215512345678',
+    email: 'ana@example.com',
+    device: null,
+    os: null,
+    cardId: 'card-1',
+    cardNumber: 'KAL-1',
+    balanceCentavos: 12550,
+    totalVisits: 13,
+    visitsThisCycle: 3,
+    pendingRewards: 1,
+    lastVisit: new Date('2026-10-04T18:00:00.000Z'),
+    createdAt: new Date('2026-01-05T18:00:00.000Z'),
+    ltvCentavos: 48000,
+  };
+
+  it('keeps the row but masks phone and email without customer.contact.read', async () => {
+    const h = make();
+    h.repo.adminCustomers.mockResolvedValue({ rows: [ROW], total: 1 });
+
+    const r = await h.svc.getCustomers('t1', {});
+
+    expect(r.customers[0]).toMatchObject({
+      id: 'cust-1',
+      name: 'Ana',
+      phone: null,
+      email: null,
+      contactRestricted: true,
+      cardNumber: 'KAL-1',
+      balanceCentavos: 12550,
+      totalVisits: 13,
+    });
+  });
+
+  it('returns phone and email with customer.contact.read', async () => {
+    const h = make();
+    h.repo.adminCustomers.mockResolvedValue({ rows: [ROW], total: 1 });
+
+    const r = await h.svc.getCustomers('t1', {}, { includeContact: true });
+
+    expect(r.customers[0]).toMatchObject({
+      phone: '+5215512345678',
+      email: 'ana@example.com',
+      contactRestricted: false,
+    });
+  });
+
+  it('keeps the same masking for a phone search', async () => {
+    const h = make();
+    h.repo.adminCustomers.mockResolvedValue({ rows: [ROW], total: 1 });
+
+    const r = await h.svc.getCustomers('t1', { search: '551234' });
+
+    expect(h.repo.adminCustomers).toHaveBeenCalledWith(
+      't1',
+      expect.objectContaining({ search: '551234' }),
+    );
+    expect(r.customers[0].phone).toBeNull();
   });
 });
 
@@ -332,8 +418,19 @@ describe('CashReadService.getCustomer', () => {
     });
   });
 
-  it('reports her identity, her card and her derived state', async () => {
+  it('masks contact fields when the caller lacks customer.contact.read', async () => {
     const r = await h.svc.getCustomer('t1', 'cust-1');
+
+    expect(r.phone).toBeNull();
+    expect(r.email).toBeNull();
+    expect(r.birthDate).toBeNull();
+    expect(r.contactRestricted).toBe(true);
+    expect(r.name).toBe('Ana');
+    expect(r.cardNumber).toBe('KAL-1');
+  });
+
+  it('reports her identity, her card and her derived state', async () => {
+    const r = await h.svc.getCustomer('t1', 'cust-1', null, { includeContact: true });
 
     expect(r.id).toBe('cust-1');
     expect(r.name).toBe('Ana');
@@ -350,7 +447,7 @@ describe('CashReadService.getCustomer', () => {
   });
 
   it('renders the birthday as a plain date, not a timestamp', async () => {
-    const r = await h.svc.getCustomer('t1', 'cust-1');
+    const r = await h.svc.getCustomer('t1', 'cust-1', null, { includeContact: true });
 
     expect(r.birthDate).toBe('1990-04-12');
   });
@@ -358,7 +455,7 @@ describe('CashReadService.getCustomer', () => {
   it('reports no birthday when she gave none', async () => {
     h.repo.adminCustomerDetail.mockResolvedValue({ ...DETAIL, birthday: null });
 
-    const r = await h.svc.getCustomer('t1', 'cust-1');
+    const r = await h.svc.getCustomer('t1', 'cust-1', null, { includeContact: true });
 
     expect(r.birthDate).toBeNull();
   });

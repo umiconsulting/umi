@@ -211,6 +211,9 @@ export class CashRepository {
         `UPDATE merchant.loyalty_program p SET
            card_prefix             = CASE WHEN pt.j ? 'card_prefix'             THEN pt.j->>'card_prefix'                     ELSE p.card_prefix END,
            pass_style              = CASE WHEN pt.j ? 'pass_style'              THEN pt.j->>'pass_style'                      ELSE p.pass_style END,
+           self_registration       = CASE WHEN pt.j ? 'self_registration'       THEN (pt.j->>'self_registration')::boolean   ELSE p.self_registration END,
+           topup_enabled           = CASE WHEN pt.j ? 'topup_enabled'           THEN (pt.j->>'topup_enabled')::boolean        ELSE p.topup_enabled END,
+           multi_seal_enabled      = CASE WHEN pt.j ? 'multi_seal_enabled'      THEN (pt.j->>'multi_seal_enabled')::boolean   ELSE p.multi_seal_enabled END,
            birthday_reward_enabled = CASE WHEN pt.j ? 'birthday_reward_enabled' THEN (pt.j->>'birthday_reward_enabled')::boolean ELSE p.birthday_reward_enabled END,
            birthday_reward_name    = CASE WHEN pt.j ? 'birthday_reward_name'    THEN pt.j->>'birthday_reward_name'            ELSE p.birthday_reward_name END,
            primary_color           = CASE WHEN pt.j ? 'primary_color'           THEN pt.j->>'primary_color'                   ELSE p.primary_color END,
@@ -672,6 +675,27 @@ export class CashRepository {
    * and must be handed over as the LOWER tier first (see
    * shared/loyalty/reward-tiers.ts, `bankedReward`).
    */
+  /**
+   * Run a reward read-modify-write under the same advisory lock as the writer.
+   *
+   * `upsertRewardConfig` already serializes the deactivate-then-insert. A PATCH
+   * also READS the current tier before it builds the new one. Without this lock
+   * the read can see the state before a concurrent PUT and then overwrite that
+   * PUT with the old description or tier. The lock is transaction-scoped, so the
+   * caller must do the read and the write inside `work`.
+   */
+  async withRewardConfigLock<T>(
+    merchantId: string,
+    work: (client: PoolClient) => Promise<T>,
+  ): Promise<T> {
+    return this.pg.withMerchant(async (c) => {
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `reward_config:${merchantId}`,
+      ]);
+      return work(c);
+    });
+  }
+
   async upsertRewardConfig(
     merchantId: string,
     _programId: string,

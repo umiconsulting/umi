@@ -19,6 +19,7 @@ import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { RequirePermission, Roles } from '../auth/roles.decorator';
+import { hasPermission } from '../auth/roles';
 import { RequireProduct } from '../auth/require-product.decorator';
 import { AcceptRegisterToken } from '../auth/register-token.decorator';
 import { Merchant } from '../auth/current-user.decorator';
@@ -169,17 +170,21 @@ export class CashController {
   @Get('customers')
   @RequirePermission('loyalty.read')
   getCustomers(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
-    return this.cash.getCustomers(t.merchantId, query);
+    return this.cash.getCustomers(t.merchantId, query, {
+      includeContact: hasPermission(t.permissions, 'customer.contact.read'),
+    });
   }
 
   /**
    * One customer. Same permission as the list beside it: the detail adds history,
-   * not a new class of data.
+   * not a new class of data. Contact fields follow `customer.contact.read`.
    */
   @Get('customers/:id')
   @RequirePermission('loyalty.read')
   getCustomer(@Merchant() t: MerchantAccess, @Param('id', ParseUUIDPipe) id: string) {
-    return this.cash.getCustomer(t.merchantId, id, registerRole(t));
+    return this.cash.getCustomer(t.merchantId, id, registerRole(t), {
+      includeContact: hasPermission(t.permissions, 'customer.contact.read'),
+    });
   }
 
   /**

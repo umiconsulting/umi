@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Patch, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
@@ -6,8 +18,12 @@ import { RequireProduct } from '../auth/require-product.decorator';
 import { RequirePermission } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { Merchant } from '../auth/current-user.decorator';
+import { hasPermission } from '../auth/roles';
 import type { MerchantAccess } from '../auth/auth.types';
+import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 import { CashReadService } from './cash-read.service';
+import { CashRegisterService } from './cash-register.service';
+import { RegisterDto } from './dto/register.dto';
 import { registerRole } from './cash-roles';
 
 /**
@@ -31,12 +47,27 @@ import { registerRole } from './cash-roles';
  * holds: `stats`, `customers` and `members` use `loyalty.read`; `analytics` uses
  * `insights.read`; `gift-cards` uses `gift_card.read`. A cashier keeps the till
  * reads and is refused analytics, which is the policy for that action.
+ *
+ * Contact fields follow `customer.contact.read`. The loyalty row stays available
+ * to `loyalty.read`; the phone, the email and the birthday become `null` without
+ * the contact permission. The merchant-id surface mirrors the legacy one.
+ *
+ * `settings` is the Cash-only settings writer. It persists `merchant.loyalty_program`
+ * fields under `merchant.manage` and never goes through the unrelated merchant DTO.
+ *
+ * `POST customers` is the authenticated shop-floor registration path. It needs
+ * `customer.create` and returns the card, not a customer session. The public
+ * `POST /api/:merchantRef/customers` stays proof-required and token-free.
  */
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard)
 @RequireProduct('cash')
 @Controller('api/merchants/:merchantId/cash')
 export class CashMerchantController {
-  constructor(private readonly cash: CashReadService) {}
+  constructor(
+    private readonly cash: CashReadService,
+    private readonly register: CashRegisterService,
+    private readonly walletPass: WalletPassAdapter,
+  ) {}
 
   @Get('stats')
   @RequirePermission('loyalty.read')
@@ -53,20 +84,75 @@ export class CashMerchantController {
   @Get('customers')
   @RequirePermission('loyalty.read')
   getCustomers(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
-    return this.cash.getCustomers(t.merchantId, query);
+    return this.cash.getCustomers(t.merchantId, query, {
+      includeContact: hasPermission(t.permissions, 'customer.contact.read'),
+    });
+  }
+
+  @Get('customers/:id')
+  @RequirePermission('loyalty.read')
+  getCustomer(@Merchant() t: MerchantAccess, @Param('id', ParseUUIDPipe) id: string) {
+    return this.cash.getCustomer(t.merchantId, id, registerRole(t), {
+      includeContact: hasPermission(t.permissions, 'customer.contact.read'),
+    });
   }
 
   // server.js maps `members` -> `customers`.
   @Get('members')
   @RequirePermission('loyalty.read')
   getMembers(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
-    return this.cash.getCustomers(t.merchantId, query);
+    return this.cash.getCustomers(t.merchantId, query, {
+      includeContact: hasPermission(t.permissions, 'customer.contact.read'),
+    });
+  }
+
+  @Get('members/:id')
+  @RequirePermission('loyalty.read')
+  getMember(@Merchant() t: MerchantAccess, @Param('id', ParseUUIDPipe) id: string) {
+    return this.cash.getCustomer(t.merchantId, id, registerRole(t), {
+      includeContact: hasPermission(t.permissions, 'customer.contact.read'),
+    });
+  }
+
+  /**
+   * Authenticated member registration for the dashboard dialog.
+   *
+   * The permission is `customer.create`; a cashier holds it. The response
+   * carries the card so the dialog can show the number. It carries no access or
+   * refresh token: a staff action never opens a customer session.
+   */
+  @Post('customers')
+  @HttpCode(200)
+  @RequirePermission('customer.create')
+  registerMember(@Merchant() t: MerchantAccess, @Body() dto: RegisterDto) {
+    return this.register.registerStaff(t.merchantId, t.name, dto);
   }
 
   @Get('gift-cards')
   @RequirePermission('gift_card.read')
   getGiftCards(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
     return this.cash.getGiftCards(t.merchantId, query);
+  }
+
+  /**
+   * Cash-only settings. The response carries the fields the Cash settings screen
+   * edits, including `topupEnabled`, `selfRegistration` and `multiSealEnabled`.
+   * The write changes `merchant.loyalty_program`, not `merchant.merchant`.
+   */
+  @Get('settings')
+  @RequirePermission('merchant.manage')
+  getSettings(@Merchant() t: MerchantAccess) {
+    return this.cash.getSettings(t.merchantId);
+  }
+
+  @Patch('settings')
+  @RequirePermission('merchant.manage')
+  async updateSettings(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
+    await this.cash.updateSettings(t.merchantId, body);
+    // Not awaited. A café-wide refresh reaches every issued pass, and the save
+    // must not wait for Apple. The adapter never throws.
+    void this.walletPass.refreshMerchant(t.merchantId);
+    return { ok: true };
   }
 
   @Get('reward-config')

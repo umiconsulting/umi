@@ -31,6 +31,23 @@ export interface RegisterResult {
 }
 
 /**
+ * The authenticated staff registration answer.
+ *
+ * A staff member with `customer.create` may enrol a member at the counter. The
+ * answer carries the card so the dashboard dialog can show the number. It never
+ * carries a CUSTOMER token: registration is not proof, even when a staff member
+ * performs it.
+ */
+export interface StaffRegisterResult {
+  alreadyRegistered: boolean;
+  customerId: string;
+  cardId: string;
+  cardNumber: string;
+  name: string;
+  message: string;
+}
+
+/**
  * Customer self-registration.
  *
  * It resolves the customer, mints a loyalty card when the customer has none, and
@@ -90,6 +107,58 @@ export class CashRegisterService {
     return {
       verificationRequired: true,
       message: `Solicitud recibida. Verifica tu teléfono para usar tu tarjeta en ${merchantName}.`,
+    };
+  }
+
+  /**
+   * Authenticated staff enrolment. The caller holds `customer.create`.
+   *
+   * Self-registration being off does not block the counter: the setting governs
+   * the public form, not the staff dialog. The profile of an existing customer is
+   * not rewritten, and no customer session is minted.
+   */
+  async registerStaff(
+    merchantId: string,
+    merchantName: string,
+    input: RegisterInput,
+  ): Promise<StaffRegisterResult> {
+    const cfg = await this.repo.merchantConfig(merchantId);
+    if (!cfg) throw new NotFoundException({ error: 'Merchant no encontrado' });
+    if (!cfg.loyaltyConfigured) {
+      throw new HttpException({ error: 'Programa de lealtad no configurado' }, 500);
+    }
+
+    const normalized = await this.repo.normalizePhone(input.phone);
+    if (!normalized) {
+      throw new BadRequestException({ error: 'Número de teléfono no válido' });
+    }
+
+    const existing = await this.repo.findExisting(merchantId, normalized);
+    if (existing) {
+      const card =
+        existing.cardId && existing.cardNumber
+          ? { cardId: existing.cardId, cardNumber: existing.cardNumber }
+          : await this.createCard(merchantId, existing.personId, cfg.cardPrefix);
+      return {
+        alreadyRegistered: true,
+        customerId: existing.personId,
+        cardId: card.cardId,
+        cardNumber: card.cardNumber,
+        name: existing.displayName ?? input.name,
+        message: 'Este teléfono ya está registrado',
+      };
+    }
+
+    const personId = await this.repo.resolveContact(merchantId, input.phone, input.name);
+    await this.repo.updatePerson(personId, input.name, input.birthDate);
+    const card = await this.createCard(merchantId, personId, cfg.cardPrefix);
+    return {
+      alreadyRegistered: false,
+      customerId: personId,
+      cardId: card.cardId,
+      cardNumber: card.cardNumber,
+      name: input.name,
+      message: `¡Bienvenido a ${merchantName}!`,
     };
   }
 

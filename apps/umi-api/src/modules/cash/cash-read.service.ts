@@ -44,6 +44,19 @@ function csvField(value: string | null | undefined): string {
 const DETAIL_LIMIT = 10;
 
 /**
+ * Whether the caller may receive stored contact data.
+ *
+ * A Cash membership reads the loyalty record (`loyalty.read`), but a phone, an
+ * email and a birthday are contact data. The caller needs
+ * `customer.contact.read` for those fields. When the caller lacks it, the keys
+ * stay in the response as `null` and `contactRestricted` is true, so the frozen
+ * client keeps its shape without receiving the value.
+ */
+export interface CashContactOptions {
+  includeContact?: boolean;
+}
+
+/**
  * The ranges the analytics screen offers, and the parser that agrees with it.
  * Kept identical to umi-cash `lib/analytics-range.ts`: 7/30/90/365, and anything
  * unrecognised (including absent) falls back to 30 rather than erroring — a bad
@@ -99,6 +112,8 @@ export class CashReadService {
       promoEndsAt: t.promoEndsAt ?? null,
       promoDays: t.promoDays,
       selfRegistration: t.selfRegistration,
+      topupEnabled: t.topupEnabled,
+      multiSealEnabled: t.multiSealEnabled,
       birthdayRewardEnabled: t.birthdayRewardEnabled,
       birthdayRewardName: t.birthdayRewardName,
       cardPrefix: t.cardPrefix,
@@ -140,6 +155,12 @@ export class CashReadService {
       patch.birthday_reward_enabled = d.birthdayRewardEnabled;
     if (d.birthdayRewardName !== undefined)
       patch.birthday_reward_name = d.birthdayRewardName || null;
+    // These three are the Cash-only switches. The merchant settings route drops
+    // them because `UpdateSettingsDto` has no such fields; the Cash settings route
+    // writes them to `merchant.loyalty_program` where they live.
+    if (typeof d.selfRegistration === 'boolean') patch.self_registration = d.selfRegistration;
+    if (typeof d.topupEnabled === 'boolean') patch.topup_enabled = d.topupEnabled;
+    if (typeof d.multiSealEnabled === 'boolean') patch.multi_seal_enabled = d.multiSealEnabled;
     if (d.lifecycleCopy !== undefined) patch.lifecycle_copy = d.lifecycleCopy ?? null;
 
     if (Object.keys(patch).length > 0) {
@@ -322,7 +343,12 @@ export class CashReadService {
     };
   }
 
-  async getCustomers(merchantId: string, query: Row): Promise<Row> {
+  async getCustomers(
+    merchantId: string,
+    query: Row,
+    options: CashContactOptions = {},
+  ): Promise<Row> {
+    const includeContact = options.includeContact === true;
     const page = Math.max(1, parseInt(query.page || '1') || 1);
     const limit = Math.max(1, Math.min(parseInt(query.limit || '20') || 20, 100));
     const search = String(query.search || '')
@@ -340,8 +366,12 @@ export class CashReadService {
     const customers = rows.map((r) => ({
       id: r.id,
       name: r.name,
-      phone: r.phone,
-      email: r.email,
+      // Contact data is separate from the loyalty record. A cashier or a viewer
+      // keeps the row and loses the phone and the email; `null` keeps the frozen
+      // client's key shape without a masked value that still leaks digits.
+      phone: includeContact ? r.phone : null,
+      email: includeContact ? r.email : null,
+      contactRestricted: !includeContact,
       // Display only. Null for a customer a barista enrolled by hand — which is
       // what the screen already renders as a dash.
       device: r.device ?? null,
@@ -378,12 +408,52 @@ export class CashReadService {
    * dashboard Settings screen sends only the name, the visit target and the cost;
    * treating that PATCH as a replacement used to erase the reward description and
    * the whole second tier.
+   *
+   * PATCH reads and writes under one advisory-lock transaction. A concurrent PUT
+   * can no longer slip between the read and the write and lose its change.
    */
   async updateRewardConfig(
     merchantId: string,
     body: Row,
     mode: 'replace' | 'patch' = 'replace',
   ): Promise<Row> {
+    const programId = await this.programId(merchantId);
+    if (!programId) throw new BadRequestException('merchant has no loyalty program');
+
+    if (mode === 'replace') {
+      const data = this.rewardWriteData(body, null, 'replace');
+      const newConfig = await this.repo.upsertRewardConfig(merchantId, programId, data);
+      return { ok: true, newConfig };
+    }
+
+    return this.repo.withRewardConfigLock(merchantId, async (client) => {
+      const { active, upgrade } = await this.repo.rewardConfig(merchantId, client);
+      const data = this.rewardWriteData(
+        body,
+        { active: active[0] ?? null, upgrade: upgrade[0] ?? null },
+        'patch',
+      );
+      const newConfig = await this.repo.upsertRewardConfig(merchantId, programId, data, client);
+      return { ok: true, newConfig };
+    });
+  }
+
+  private rewardWriteData(
+    body: Row,
+    current: { active: Row | null; upgrade: Row | null } | null,
+    mode: 'replace' | 'patch',
+  ): {
+    visitsRequired: number;
+    rewardName: string;
+    rewardDescription: string | null;
+    rewardCostCentavos: number;
+    upgrade: {
+      visitsRequired: number;
+      rewardName: string;
+      rewardDescription: string | null;
+      rewardCostCentavos: number;
+    } | null;
+  } {
     const { visitsRequired, rewardName, rewardDescription, rewardCostCentavos, upgrade } = body;
     if (!visitsRequired || !rewardName) {
       throw new BadRequestException('visitsRequired and rewardName are required');
@@ -395,9 +465,8 @@ export class CashReadService {
       throw new BadRequestException('visitsRequired must be a positive integer');
     }
 
-    const current = mode === 'patch' ? await this.getRewardConfig(merchantId) : null;
-    const currentActive = (current?.active ?? null) as Row | null;
-    const currentUpgrade = (current?.upgrade ?? null) as Row | null;
+    const currentActive = current?.active ?? null;
+    const currentUpgrade = current?.upgrade ?? null;
 
     const effectiveDescription =
       mode === 'patch' && rewardDescription === undefined
@@ -451,16 +520,13 @@ export class CashReadService {
       };
     }
 
-    const programId = await this.programId(merchantId);
-    if (!programId) throw new BadRequestException('merchant has no loyalty program');
-    const newConfig = await this.repo.upsertRewardConfig(merchantId, programId, {
+    return {
       visitsRequired: visits,
       rewardName,
       rewardDescription: effectiveDescription,
       rewardCostCentavos: effectiveCost,
       upgrade: upgradeTier,
-    });
-    return { ok: true, newConfig };
+    };
   }
 
   async getGiftCards(merchantId: string, query: Row): Promise<Row> {
@@ -547,7 +613,9 @@ export class CashReadService {
     merchantId: string,
     customerId: string,
     role: string | null = null,
+    options: CashContactOptions = {},
   ): Promise<Row> {
+    const includeContact = options.includeContact === true;
     const detail = await this.repo.adminCustomerDetail(merchantId, customerId);
     if (!detail) throw new NotFoundException({ error: 'Cliente no encontrado' });
 
@@ -575,13 +643,15 @@ export class CashReadService {
     return {
       id: detail.id,
       name: detail.name,
-      phone: detail.phone,
-      email: detail.email,
+      phone: includeContact ? detail.phone : null,
+      email: includeContact ? detail.email : null,
+      contactRestricted: !includeContact,
       device: detail.device ?? null,
       os: detail.os ?? null,
       // A date, not an instant. `merchant.customer.birthday` is a DATE, and
       // rendering it through an ISO timestamp would move it a day in some zones.
-      birthDate: detail.birthday ? isoDate(detail.birthday) : null,
+      // A birthday is contact data too, so it follows the same policy.
+      birthDate: includeContact && detail.birthday ? isoDate(detail.birthday) : null,
       cardNumber: detail.cardNumber,
       cardId: detail.cardId,
       balanceMXN: formatMxn2(state.balance_cents),
