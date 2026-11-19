@@ -427,7 +427,7 @@ const GiftCardsScreen = () => {
       </div>
 
       <section className="cash-panel" aria-label={t`Tarjetas de regalo emitidas`}>
-        <table className="cash-table">
+        <table className="cash-table cash-table--gift">
           <thead>
             <tr>
               <th>
@@ -457,21 +457,21 @@ const GiftCardsScreen = () => {
             )}
             {cards.map((card) => (
               <tr key={card.id} className="cash-row">
-                <td>
+                <td data-label={t`Código`}>
                   <span className="cash-mono cash-card-number">{card.code}</span>
                 </td>
-                <td>
+                <td data-label={t`Destinatario`}>
                   <div className="cash-member-name">{card.recipientName || '—'}</div>
                   <div className="cash-muted">
                     {card.recipientEmail || card.recipientPhone || t`Sin contacto`}
                   </div>
                 </td>
-                <td className="cash-num">
+                <td data-label={t`Monto`} className="cash-num">
                   <span className="cash-money">
                     {card.amountMXN || formatMoney(card.amountCentavos)}
                   </span>
                 </td>
-                <td>
+                <td data-label={t`Estado`}>
                   <span
                     className={
                       'cash-badge' + (card.isRedeemed ? ' cash-badge--muted' : ' cash-badge--open')
@@ -480,7 +480,7 @@ const GiftCardsScreen = () => {
                     {card.isRedeemed ? <Trans>Canjeada</Trans> : <Trans>Abierta</Trans>}
                   </span>
                 </td>
-                <td className="cash-muted">
+                <td data-label={t`Creada`} className="cash-muted">
                   {card.createdAt ? formatDate(card.createdAt) : '—'}
                 </td>
               </tr>

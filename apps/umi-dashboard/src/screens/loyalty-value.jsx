@@ -77,10 +77,12 @@ export default function LoyaltyValueScreen() {
   // authorized: say so instead of drawing an empty hub.
   if (!fallbackTab) {
     return (
-      <PermissionUnavailable
-        title={t`Lealtad y valor`}
-        permissions={['loyalty.read', 'gift_card.read', 'wallet.read']}
-      />
+      <div className="cash-screen">
+        <PermissionUnavailable
+          title={t`Lealtad y valor`}
+          permissions={['loyalty.read', 'gift_card.read', 'wallet.read']}
+        />
+      </div>
     );
   }
 
@@ -99,12 +101,14 @@ export default function LoyaltyValueScreen() {
   if (resolution.kind === 'denied') {
     const requested = cashTabConfig(resolution.tab);
     return (
-      <PermissionUnavailable
-        title={requested ? i18n._(requested.label) : resolution.tab}
-        permissions={requested?.permissions || []}
-        backLabel={i18n._(fallbackTab.label)}
-        onBack={() => navigate(`/loyalty-value/${fallbackTab.id}`, { replace: true })}
-      />
+      <div className="cash-screen">
+        <PermissionUnavailable
+          title={requested ? i18n._(requested.label) : resolution.tab}
+          permissions={requested?.permissions || []}
+          backLabel={i18n._(fallbackTab.label)}
+          onBack={() => navigate(`/loyalty-value/${fallbackTab.id}`, { replace: true })}
+        />
+      </div>
     );
   }
 

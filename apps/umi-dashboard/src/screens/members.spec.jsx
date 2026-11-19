@@ -68,6 +68,7 @@ describe('MembersScreen permission surface', () => {
     expect(markup).toContain('Registrar miembro');
     expect(markup).toContain('+52 55 1234 5678');
     expect(markup).toContain('3/10');
+    expect(markup).toContain('data-label="Gasto total"');
     expect(markup).not.toContain('Contacto restringido');
   });
 

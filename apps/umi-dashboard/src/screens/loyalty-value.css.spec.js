@@ -18,4 +18,15 @@ describe('Cash table alignment and narrow layout', () => {
   it('keeps the panel scrollable instead of clipping a wide table', () => {
     expect(css).toMatch(/\.cash-panel\s*\{[^}]*overflow-x: auto;/s);
   });
+
+  it('turns the table rows into labelled cards at 390px', () => {
+    expect(css).toContain('@media (max-width: 560px)');
+    expect(css).toContain('.cash-table td[data-label]::before');
+    expect(css).toContain('.cash-table td.cash-cell-action');
+  });
+
+  it('compacts the summary and account control on a phone', () => {
+    expect(css).toMatch(/\.cash-summary\s*\{\s*grid-template-columns: 1fr 1fr;/s);
+    expect(css).toContain('.app:has(.cash-screen) .profile-toggle-name');
+  });
 });

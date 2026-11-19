@@ -326,7 +326,7 @@ const MembersScreen = () => {
       ) : null}
 
       <section className="cash-panel" aria-label={t`Miembros`}>
-        <table className="cash-table">
+        <table className="cash-table cash-table--members">
           <thead>
             <tr>
               <th style={{ width: '24%' }}>
@@ -488,23 +488,23 @@ const MemberRow = ({
           </div>
         </div>
       </td>
-      <td>
+      <td data-label={t`Tarjeta`}>
         <span className="cash-card-number">{c.cardNumber || '—'}</span>
       </td>
-      <td className="cash-num">
+      <td data-label={t`Saldo`} className="cash-num">
         <span className="cash-money">{fmtBalance(c.balanceCentavos)}</span>
         <span className="cash-unit">MXN</span>
       </td>
-      <td className="cash-center">
+      <td data-label={t`Visitas`} className="cash-center">
         <span className="cash-visits">{c.totalVisits || 0}</span>
         <span className="cash-unit">
           <Trans>visitas</Trans>
         </span>
       </td>
-      <td>
+      <td data-label={t`Progreso`}>
         <StampMeter current={c.visitsThisCycle} target={visitsRequired} />
       </td>
-      <td className="cash-center">
+      <td data-label={t`Pendientes`} className="cash-center">
         {c.pendingRewards > 0 ? (
           <span className="cash-badge cash-badge--attention">
             {c.pendingRewards} <Trans>por canjear</Trans>
@@ -516,8 +516,8 @@ const MemberRow = ({
           </span>
         )}
       </td>
-      <td className="cash-muted">{c.lastVisit ? fmtAgo(c.lastVisit) : t`Nunca`}</td>
-      <td className="cash-num cash-strong">{c.ltvMXN || '—'}</td>
+      <td data-label={t`Última visita`} className="cash-muted">{c.lastVisit ? fmtAgo(c.lastVisit) : t`Nunca`}</td>
+      <td data-label={t`Gasto total`} className="cash-num cash-strong">{c.ltvMXN || '—'}</td>
       <td className="cash-cell-action">
         <button
           className={'btn-icon focusable' + (isSelected ? ' active' : '')}

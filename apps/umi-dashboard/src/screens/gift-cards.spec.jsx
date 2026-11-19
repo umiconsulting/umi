@@ -80,7 +80,7 @@ describe('GiftCardsScreen permission surface', () => {
     state.merchant = { capabilities: capabilitiesFor('owner') };
     const markup = renderToStaticMarkup(withI18n(<GiftCardsScreen />));
     expect(markup).toMatch(/<th class="cash-num">Monto<\/th>/);
-    expect(markup).toMatch(/<td class="cash-num">/);
+    expect(markup).toMatch(/<td data-label="Monto" class="cash-num">/);
   });
 
   it('lets the cashier redeem but not issue', () => {
