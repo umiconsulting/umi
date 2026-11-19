@@ -42,7 +42,7 @@ const ids = (capabilities) => allowedCashTabs(capabilities).map((tab) => tab.id)
 
 describe('Cash hub tab gates', () => {
   it('shows every existing tab to the owner', () => {
-    expect(ids(owner)).toEqual(['members', 'rewards', 'gift-cards', 'wallet']);
+    expect(ids(owner)).toEqual(['members', 'rewards', 'gift-cards', 'wallet', 'settings']);
   });
 
   it('shows every existing tab to the cashier but not the issue command', () => {
@@ -62,6 +62,15 @@ describe('Cash hub tab gates', () => {
     expect(firstAllowedCashTab(nonmember)).toBeNull();
   });
 
+  it('lets a merchant.manage-only membership enter the settings tab', () => {
+    const settingsOnly = {
+      products: { cash: { status: 'active' } },
+      membership: { role: 'owner', permissions: ['merchant.manage'] },
+    };
+    expect(ids(settingsOnly)).toEqual(['settings']);
+    expect(firstAllowedCashTab(settingsOnly)).toBe('settings');
+  });
+
   it('opens the first allowed tab, in hub order', () => {
     expect(firstAllowedCashTab(owner)).toBe('members');
     expect(firstAllowedCashTab(viewer)).toBe('members');
@@ -73,6 +82,7 @@ describe('Cash hub tab gates', () => {
       'rewards',
       'gift-cards',
       'wallet',
+      'settings',
     ]);
   });
 });
@@ -109,6 +119,19 @@ describe('routed Cash tabs', () => {
     expect(resolveCashTabRoute('gift-cards', cashier)).toEqual({
       kind: 'render',
       tab: 'gift-cards',
+      fallback: 'members',
+    });
+  });
+
+  it('renders the settings tab for merchant.manage and denies it to a cashier', () => {
+    expect(resolveCashTabRoute('settings', owner)).toEqual({
+      kind: 'render',
+      tab: 'settings',
+      fallback: 'members',
+    });
+    expect(resolveCashTabRoute('settings', cashier)).toEqual({
+      kind: 'denied',
+      tab: 'settings',
       fallback: 'members',
     });
   });

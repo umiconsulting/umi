@@ -62,6 +62,13 @@ export const CASH_TABS = [
       purchase: ['wallet.redeem'],
     },
   },
+  {
+    id: 'settings',
+    label: msg`Ajustes`,
+    // Cash settings live under the loyalty-value module, not the dashboard
+    // settings module. The API contract gates both halves on `merchant.manage`.
+    permissions: ['merchant.manage'],
+  },
 ];
 
 /**
@@ -76,6 +83,8 @@ const ROUTE_ALIASES = {
   giftcards: 'gift-cards',
   gift_cards: 'gift-cards',
   wallet: 'wallet',
+  settings: 'settings',
+  ajustes: 'settings',
 };
 
 export function cashTabForRoute(route) {

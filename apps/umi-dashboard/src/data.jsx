@@ -361,21 +361,34 @@ async function _loadDevicePairings(ctx) {
   return result.pairings || [];
 }
 
-async function _loadMerchant(ctx) {
+export async function loadMerchantData(ctx) {
   // Wait for the membership and its capabilities. A merchant id in localStorage
   // is a hint, not proof: a nonmember can still hold the previous merchant's id,
   // and asking for that merchant's settings before the list resolves is one
   // request the signed-in person has no authority for.
   if (!ctx?.capabilities) return null;
-  const s = await _apiFetch(_merchantPath(ctx, '/settings'));
+  const merchantId = _merchantId(ctx);
+  if (!merchantId) return null;
+
+  // `/api/merchants/:id/settings` is a DASHBOARD-product route. A Cash-only owner
+  // gets 403 there even though every Cash route works. Do not ask when the product
+  // is inactive; if it is active but the request still refuses, keep the 403
+  // contained and build the model from the membership metadata and the Cash
+  // settings contract instead.
+  const dashboardActive = _active(ctx, 'dashboard');
+  const s = dashboardActive
+    ? await _apiFetch(_merchantPath(ctx, '/settings')).catch(() => null)
+    : null;
+
   // The Cash settings contract is merchant-id scoped: GET /api/merchants/:id/cash/settings.
   // It returns the Cash-only switches (`topupEnabled`, `selfRegistration`,
   // `multiSealEnabled`) that the merchant settings DTO never declared.
   // Permission-gated on the server (`merchant.manage`); a role that cannot read it
-  // does not ask, and falls through to the merchant record below.
+  // does not ask.
   const cashSettings = _canReadCashSettings(ctx)
-    ? await _apiFetch(cashSettingsPath(_merchantId(ctx))).catch(() => null)
+    ? await _apiFetch(cashSettingsPath(merchantId)).catch(() => null)
     : null;
+
   // The reward read is `loyalty.read`, not the product alone. A membership with
   // only `wallet.read` reaches the hub but would receive a 403 here, and the
   // `.catch` hid it as a missing value.
@@ -383,39 +396,41 @@ async function _loadMerchant(ctx) {
     _active(ctx, 'cash') && hasCashPermission(ctx?.capabilities, 'loyalty.read')
       ? await _apiFetch(_merchantPath(ctx, '/cash/reward-config')).catch(() => null)
       : null;
-  if (!s) return null;
+
+  const base = s || {};
+  const meta = ctx?.capabilities?.merchant || {};
   return {
-    name: cashSettings?.name || s.name,
-    city: cashSettings?.city || s.city,
-    handle: cashSettings?.handle || s.handle || null,
-    cardPrefix: cashSettings?.cardPrefix || s.cardPrefix || '',
-    primaryColor: cashSettings?.primaryColor || s.primaryColor || '#B5605A',
-    secondaryColor: cashSettings?.secondaryColor || s.secondaryColor || '#E8C9A3',
-    logoUrl: cashSettings?.logoUrl || s.logoUrl || '',
-    stripImageUrl: cashSettings?.stripImageUrl || s.stripImageUrl || '',
-    passStyle: cashSettings?.passStyle || s.passStyle || 'stamps',
-    subscriptionStatus: s.subscriptionStatus || 'ACTIVE',
-    purchaseDays: s.purchaseDays ?? [],
-    businessDayStart: s.businessDayStart || '00:00',
+    name: cashSettings?.name || base.name || meta.name || '',
+    city: cashSettings?.city || base.city || meta.city || '',
+    handle: cashSettings?.handle || base.handle || meta.handle || null,
+    cardPrefix: cashSettings?.cardPrefix || base.cardPrefix || '',
+    primaryColor: cashSettings?.primaryColor || base.primaryColor || '#B5605A',
+    secondaryColor: cashSettings?.secondaryColor || base.secondaryColor || '#E8C9A3',
+    logoUrl: cashSettings?.logoUrl || base.logoUrl || '',
+    stripImageUrl: cashSettings?.stripImageUrl || base.stripImageUrl || '',
+    passStyle: cashSettings?.passStyle || base.passStyle || 'stamps',
+    subscriptionStatus: base.subscriptionStatus || 'ACTIVE',
+    purchaseDays: base.purchaseDays ?? [],
+    businessDayStart: base.businessDayStart || '00:00',
     // Effective segment cutoffs (code defaults merged with the owner's overrides).
-    segmentThresholds: s.segmentThresholds || {},
-    topupEnabled: cashSettings?.topupEnabled ?? s.topupEnabled,
-    multiSealEnabled: cashSettings?.multiSealEnabled ?? s.multiSealEnabled,
-    selfRegistration: cashSettings?.selfRegistration ?? s.selfRegistration,
-    birthdayRewardEnabled: cashSettings?.birthdayRewardEnabled ?? s.birthdayRewardEnabled,
-    birthdayRewardName: cashSettings?.birthdayRewardName ?? s.birthdayRewardName,
-    promoMessage: cashSettings?.promoMessage || s.promoMessage || '',
+    segmentThresholds: base.segmentThresholds || {},
+    topupEnabled: cashSettings?.topupEnabled ?? base.topupEnabled,
+    multiSealEnabled: cashSettings?.multiSealEnabled ?? base.multiSealEnabled,
+    selfRegistration: cashSettings?.selfRegistration ?? base.selfRegistration,
+    birthdayRewardEnabled: cashSettings?.birthdayRewardEnabled ?? base.birthdayRewardEnabled,
+    birthdayRewardName: cashSettings?.birthdayRewardName ?? base.birthdayRewardName,
+    promoMessage: cashSettings?.promoMessage || base.promoMessage || '',
     promoStartsAt:
-      cashSettings?.promoStartsAt || s.promoStartsAt
-        ? (cashSettings?.promoStartsAt || s.promoStartsAt).slice(0, 10)
+      cashSettings?.promoStartsAt || base.promoStartsAt
+        ? (cashSettings?.promoStartsAt || base.promoStartsAt).slice(0, 10)
         : '',
     promoEndsAt:
-      cashSettings?.promoEndsAt || s.promoEndsAt
-        ? (cashSettings?.promoEndsAt || s.promoEndsAt).slice(0, 10)
+      cashSettings?.promoEndsAt || base.promoEndsAt
+        ? (cashSettings?.promoEndsAt || base.promoEndsAt).slice(0, 10)
         : '',
-    promoDays: cashSettings?.promoDays || s.promoDays || '',
-    products: s.products || ctx?.capabilities?.products || {},
-    locations: s.locations || ctx?.capabilities?.locations || [],
+    promoDays: cashSettings?.promoDays || base.promoDays || '',
+    products: base.products || ctx?.capabilities?.products || {},
+    locations: base.locations || ctx?.capabilities?.locations || [],
     rewardConfig: rc?.active
       ? {
           visitsRequired: rc.active.visitsRequired,
@@ -1294,7 +1309,7 @@ function useMerchantData() {
   const ctx = useMerchant();
   return _useAsync(
     function () {
-      return _loadMerchant(ctx);
+      return loadMerchantData(ctx);
     },
     _deps(ctx),
     EMPTY_MERCHANT,

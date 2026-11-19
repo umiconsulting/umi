@@ -25,6 +25,7 @@ vi.mock('@/data.jsx', () => ({
 
 vi.mock('./members.jsx', () => ({ default: () => 'Members body' }));
 vi.mock('./gift-cards.jsx', () => ({ default: () => 'Gift body' }));
+vi.mock('./cash-settings.jsx', () => ({ default: () => 'Cash settings body' }));
 vi.mock('./operations-workspace.jsx', () => ({ DomainWorkspace: () => null }));
 
 import LoyaltyValueScreen from './loyalty-value.jsx';
@@ -88,6 +89,21 @@ describe('LoyaltyValueScreen routed tabs', () => {
     const markup = renderAt('/loyalty-value/members');
     expect(markup).toContain('Members body');
     expect(markup).not.toContain('>Tarjetas de regalo<');
+  });
+
+  it('renders the Cash settings tab for a merchant.manage owner', () => {
+    const markup = renderAt('/loyalty-value/settings');
+    expect(markup).toContain('Cash settings body');
+    expect(markup).toContain('Ajustes');
+    expect(markup).not.toContain('data-permission-unavailable');
+  });
+
+  it('refuses the Cash settings tab before mount for a cashier', () => {
+    state.capabilities = capabilitiesFor('cashier');
+    const markup = renderAt('/loyalty-value/settings');
+    expect(markup).toContain('data-permission-unavailable');
+    expect(markup).toContain('No tienes acceso a');
+    expect(markup).not.toContain('Cash settings body');
   });
 
   it('shows only the summary its permissions support', () => {

@@ -274,6 +274,12 @@ msgstr "Tarjetas de regalo"
 msgid "Monedero"
 msgstr "Monedero"
 
+#: src/lib/cash-tabs.js
+#: src/lib/module-registry.js
+#: src/shell.jsx
+msgid "Ajustes"
+msgstr "Ajustes"
+
 #: src/lib/inventory-import/copy.js
 msgid "Código único del artículo. Conserva los ceros iniciales."
 msgstr "Código único del artículo. Conserva los ceros iniciales."
@@ -754,11 +760,6 @@ msgstr "Atención"
 #: src/lib/module-registry.js
 msgid "Horarios"
 msgstr "Horarios"
-
-#: src/lib/module-registry.js
-#: src/shell.jsx
-msgid "Ajustes"
-msgstr "Ajustes"
 
 #: src/lib/module-registry.js
 #: src/shell.jsx
@@ -1259,6 +1260,7 @@ msgid "Escribe la CLABE o el número de cuenta. Puedes guardar ambos."
 msgstr "Escribe la CLABE o el número de cuenta. Puedes guardar ambos."
 
 #: src/screens/caja-turnos.jsx
+#: src/screens/cash-settings.jsx
 #: src/screens/devices.jsx
 #: src/screens/hours.jsx
 #: src/screens/purchase-entry-dialog.jsx
@@ -1539,6 +1541,183 @@ msgstr "Cargando turnos…"
 #: src/screens/caja-turnos.jsx
 msgid "No hay turnos de caja en esta vista."
 msgstr "No hay turnos de caja en esta vista."
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Dom"
+msgstr "Dom"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Lun"
+msgstr "Lun"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Mar"
+msgstr "Mar"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Mié"
+msgstr "Mié"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Jue"
+msgstr "Jue"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Vie"
+msgstr "Vie"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Sáb"
+msgstr "Sáb"
+
+#: src/screens/cash-settings.jsx
+msgid "Cargando ajustes de Cash…"
+msgstr "Cargando ajustes de Cash…"
+
+#: src/screens/cash-settings.jsx
+msgid "No se pudieron cargar los ajustes de Cash."
+msgstr "No se pudieron cargar los ajustes de Cash."
+
+#: src/screens/cash-settings.jsx
+msgid "No se pudieron guardar los ajustes."
+msgstr "No se pudieron guardar los ajustes."
+
+#: src/screens/cash-settings.jsx
+msgid "Ajustes de Cash"
+msgstr "Ajustes de Cash"
+
+#: src/screens/cash-settings.jsx
+msgid "Configura el pase, la promoción y el registro del programa."
+msgstr "Configura el pase, la promoción y el registro del programa."
+
+#: src/screens/cash-settings.jsx
+msgid "Apariencia"
+msgstr "Apariencia"
+
+#: src/screens/cash-settings.jsx
+msgid "Los colores se aplican al pase y a la tarjeta del cliente."
+msgstr "Los colores se aplican al pase y a la tarjeta del cliente."
+
+#: src/screens/cash-settings.jsx
+msgid "Color principal"
+msgstr "Color principal"
+
+#: src/screens/cash-settings.jsx
+msgid "Valor del color principal"
+msgstr "Valor del color principal"
+
+#: src/screens/cash-settings.jsx
+msgid "Color secundario"
+msgstr "Color secundario"
+
+#: src/screens/cash-settings.jsx
+msgid "Valor del color secundario"
+msgstr "Valor del color secundario"
+
+#: src/screens/cash-settings.jsx
+msgid "Promoción"
+msgstr "Promoción"
+
+#: src/screens/cash-settings.jsx
+msgid "El mensaje se envía por WhatsApp y aparece en el pase."
+msgstr "El mensaje se envía por WhatsApp y aparece en el pase."
+
+#: src/screens/cash-settings.jsx
+msgid "Mensaje · máx. 200 caracteres"
+msgstr "Mensaje · máx. 200 caracteres"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Inicio de la vigencia"
+msgstr "Inicio de la vigencia"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Fin de la vigencia"
+msgstr "Fin de la vigencia"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Días de la semana"
+msgstr "Días de la semana"
+
+#: src/screens/cash-settings.jsx
+msgid "Cumpleaños"
+msgstr "Cumpleaños"
+
+#: src/screens/cash-settings.jsx
+msgid "Un premio que se emite solo el día del cumpleaños."
+msgstr "Un premio que se emite solo el día del cumpleaños."
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Regalo de cumpleaños"
+msgstr "Regalo de cumpleaños"
+
+#: src/screens/cash-settings.jsx
+msgid "Nombre del premio"
+msgstr "Nombre del premio"
+
+#: src/screens/cash-settings.jsx
+msgid "Registro y monedero"
+msgstr "Registro y monedero"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Autorregistro"
+msgstr "Autorregistro"
+
+#: src/screens/cash-settings.jsx
+msgid "El cliente puede entrar al programa escaneando un código QR."
+msgstr "El cliente puede entrar al programa escaneando un código QR."
+
+#: src/screens/cash-settings.jsx
+msgid "Recargas del monedero"
+msgstr "Recargas del monedero"
+
+#: src/screens/cash-settings.jsx
+msgid "Permite abonar saldo a la tarjeta del cliente."
+msgstr "Permite abonar saldo a la tarjeta del cliente."
+
+#: src/screens/cash-settings.jsx
+msgid "Sellos múltiples"
+msgstr "Sellos múltiples"
+
+#: src/screens/cash-settings.jsx
+msgid "Permite más de un sello por visita cuando la promoción lo indica."
+msgstr "Permite más de un sello por visita cuando la promoción lo indica."
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings-inventory-alerts.jsx
+#: src/screens/settings-purchase-days.jsx
+#: src/screens/settings.jsx
+msgid "Cambios guardados"
+msgstr "Cambios guardados"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings-purchase-days.jsx
+#: src/screens/settings.jsx
+msgid "Sin guardar"
+msgstr "Sin guardar"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/devices.jsx
+msgid "Guardar cambios"
+msgstr "Guardar cambios"
 
 #: src/screens/catalog-inventory.jsx
 #~ msgid "Facturas"
@@ -3156,10 +3335,6 @@ msgid "Revocar caja"
 msgstr "Revocar caja"
 
 #: src/screens/devices.jsx
-msgid "Guardar cambios"
-msgstr "Guardar cambios"
-
-#: src/screens/devices.jsx
 msgid "UmiPOS · Acceso"
 msgstr "UmiPOS · Acceso"
 
@@ -4230,20 +4405,10 @@ msgid "Lunes"
 msgstr "Lunes"
 
 #: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Lun"
-msgstr "Lun"
-
-#: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Martes"
 msgstr "Martes"
-
-#: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Mar"
-msgstr "Mar"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
@@ -4252,20 +4417,10 @@ msgid "Miércoles"
 msgstr "Miércoles"
 
 #: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Mié"
-msgstr "Mié"
-
-#: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Jueves"
 msgstr "Jueves"
-
-#: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Jue"
-msgstr "Jue"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
@@ -4274,31 +4429,16 @@ msgid "Viernes"
 msgstr "Viernes"
 
 #: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Vie"
-msgstr "Vie"
-
-#: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Sábado"
 msgstr "Sábado"
 
 #: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Sáb"
-msgstr "Sáb"
-
-#: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Domingo"
 msgstr "Domingo"
-
-#: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Dom"
-msgstr "Dom"
 
 #: src/screens/hours.jsx
 msgid "ConversaFlow · Pedidos WhatsApp"
@@ -11141,12 +11281,6 @@ msgstr "Cargando ajustes…"
 msgid "Enviar avisos por correo al dueño"
 msgstr "Enviar avisos por correo al dueño"
 
-#: src/screens/settings-inventory-alerts.jsx
-#: src/screens/settings-purchase-days.jsx
-#: src/screens/settings.jsx
-msgid "Cambios guardados"
-msgstr "Cambios guardados"
-
 #: src/screens/settings-purchase-days.jsx
 msgid "Días de compra"
 msgstr "Días de compra"
@@ -11154,11 +11288,6 @@ msgstr "Días de compra"
 #: src/screens/settings-purchase-days.jsx
 msgid "Selecciona los días en que sueles comprar."
 msgstr "Selecciona los días en que sueles comprar."
-
-#: src/screens/settings-purchase-days.jsx
-#: src/screens/settings.jsx
-msgid "Sin guardar"
-msgstr "Sin guardar"
 
 #: src/screens/settings.jsx
 #~ msgid "Los cambios de Cash se guardan solo porque Umi Cash está activo."
@@ -11209,10 +11338,6 @@ msgid "Cancelada"
 msgstr "Cancelada"
 
 #: src/screens/settings.jsx
-msgid "Regalo de cumpleaños"
-msgstr "Regalo de cumpleaños"
-
-#: src/screens/settings.jsx
 msgid "Recompensa de temporada"
 msgstr "Recompensa de temporada"
 
@@ -11227,6 +11352,10 @@ msgstr "Configura el negocio, la lealtad y la voz del asistente."
 #: src/screens/settings.jsx
 msgid "Información del negocio"
 msgstr "Información del negocio"
+
+#: src/screens/settings.jsx
+msgid "La ciudad se muestra desde el registro del negocio; no se edita aquí."
+msgstr "La ciudad se muestra desde el registro del negocio; no se edita aquí."
 
 #: src/screens/settings.jsx
 msgid "Inicio del día operativo"
@@ -11432,22 +11561,6 @@ msgstr "Mensaje · se envía por WhatsApp · máx. 200 caracteres"
 #: src/screens/settings.jsx
 msgid "Vigencia · desde / hasta"
 msgstr "Vigencia · desde / hasta"
-
-#: src/screens/settings.jsx
-msgid "Inicio de la vigencia"
-msgstr "Inicio de la vigencia"
-
-#: src/screens/settings.jsx
-msgid "Fin de la vigencia"
-msgstr "Fin de la vigencia"
-
-#: src/screens/settings.jsx
-msgid "Días de la semana"
-msgstr "Días de la semana"
-
-#: src/screens/settings.jsx
-msgid "Autorregistro"
-msgstr "Autorregistro"
 
 #: src/screens/settings.jsx
 msgid "El cliente entra al programa de lealtad escaneando un código QR en la mesa, sin ayuda del personal."

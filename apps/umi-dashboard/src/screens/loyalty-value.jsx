@@ -14,6 +14,7 @@ import { useMerchantData } from '@/data.jsx';
 import { DomainWorkspace } from './operations-workspace.jsx';
 import MembersScreen from './members.jsx';
 import GiftCardsScreen from './gift-cards.jsx';
+import CashSettingsScreen from './cash-settings.jsx';
 import './loyalty-value.css';
 
 /**
@@ -38,7 +39,7 @@ export default function LoyaltyValueScreen() {
   const { tab: routeTab } = useParams();
   const navigate = useNavigate();
   const merchant = useMerchant();
-  const { data: merchantData } = useMerchantData();
+  const { data: merchantData, loading: merchantDataLoading } = useMerchantData();
   const capabilities = merchant?.capabilities;
   const allowed = allowedCashTabs(capabilities);
   const fallbackTab = allowed[0] || null;
@@ -136,6 +137,15 @@ export default function LoyaltyValueScreen() {
       {activeTab === 'gift-cards' && <GiftCardsScreen />}
       {activeTab === 'rewards' && <DomainWorkspace key="rewards" domain="rewards" />}
       {activeTab === 'wallet' && <DomainWorkspace key="wallet" domain="wallet" />}
+      {activeTab === 'settings' &&
+        (merchantData ? (
+          <CashSettingsScreen
+            key={merchant?.selectedMerchantId || merchantData.handle || 'cash-settings'}
+            merchant={merchantData}
+          />
+        ) : (
+          <CashSettingsScreen merchant={null} loading={merchantDataLoading} />
+        ))}
     </div>
   );
 }

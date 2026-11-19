@@ -29,4 +29,10 @@ describe('Cash table alignment and narrow layout', () => {
     expect(css).toMatch(/\.cash-summary\s*\{\s*grid-template-columns: 1fr 1fr;/s);
     expect(css).toContain('.app:has(.cash-screen) .profile-toggle-name');
   });
+
+  it('flushes the first mobile field and styles the Cash settings panel', () => {
+    expect(css).toMatch(/\.cash-table td:first-child\s*\{[^}]*padding-left: 0;/s);
+    expect(css).toContain('.cash-settings-grid');
+    expect(css).toContain('.cash-settings-save');
+  });
 });

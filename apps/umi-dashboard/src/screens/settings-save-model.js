@@ -2,11 +2,16 @@
  * Which endpoint receives which Settings field.
  *
  * The Settings screen edits two records: the merchant record and the Cash
- * program. Their DTOs do not overlap. `passStyle`, the promotion, the birthday
- * reward and the brand colours are Cash columns; `name`, `businessDayStart`,
- * `posDayClosePolicy` and the segment cutoffs are merchant columns. Sending a
- * Cash field to the merchant PATCH is a silent discard — the route accepts the
- * body, the DTO strips the key, and the screen still says "saved".
+ * program. Their DTOs do not overlap. The promotion, the birthday reward and the
+ * brand colours are Cash columns; `name`, `businessDayStart`, `posDayClosePolicy`
+ * and the segment cutoffs are merchant columns. Sending a Cash field to the
+ * merchant PATCH is a silent discard — the route accepts the body, the DTO strips
+ * the key, and the screen still says "saved".
+ *
+ * `city` is deliberately absent: the merchant DTO does not accept it, and the
+ * screen shows it read-only. `passStyle` is also absent because this screen does
+ * not edit it; leaving the key out preserves an existing `grid` café instead of
+ * resetting it to `stamps`.
  *
  * This function is the one place that split is decided. It is pure so a unit
  * test can assert the merchant body carries no Cash-only key, and that the
@@ -28,7 +33,6 @@ export function buildSettingsSaves({
 }) {
   const merchant = {
     name: biz.name,
-    city: biz.city,
     businessDayStart: biz.businessDayStart,
     posDayClosePolicy: biz.posDayClosePolicy,
   };
@@ -47,7 +51,6 @@ export function buildSettingsSaves({
     ? {
         primaryColor: brand.primary,
         secondaryColor: brand.secondary,
-        passStyle: 'stamps',
         promoMessage: promo.message,
         promoStartsAt: promo.from ? promo.from + 'T00:00:00.000Z' : null,
         promoEndsAt: promo.to ? promo.to + 'T23:59:59.000Z' : null,

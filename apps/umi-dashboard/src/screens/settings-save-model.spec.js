@@ -34,6 +34,7 @@ const base = {
       rewardCostCentavos: 25000,
     },
   },
+  passStyle: 'grid',
   cashActive: true,
 };
 
@@ -54,9 +55,9 @@ describe('settings save split', () => {
     ]) {
       expect(merchant, key).not.toHaveProperty(key);
     }
+    expect(merchant).not.toHaveProperty('city');
     expect(merchant).toMatchObject({
       name: 'Café Norte',
-      city: 'Mérida',
       businessDayStart: '04:00',
       posDayClosePolicy: 'manual',
     });
@@ -74,7 +75,6 @@ describe('settings save split', () => {
     expect(cash).toMatchObject({
       primaryColor: '#1A5632',
       secondaryColor: '#E8C9A3',
-      passStyle: 'stamps',
       promoMessage: 'Doble sello',
       promoStartsAt: '2026-11-01T00:00:00.000Z',
       promoEndsAt: '2026-11-30T23:59:59.000Z',
@@ -85,6 +85,11 @@ describe('settings save split', () => {
       birthdayRewardEnabled: true,
       birthdayRewardName: 'Pastel',
     });
+  });
+
+  it('does not reset a grid pass style when the screen does not edit it', () => {
+    const { cash } = buildSettingsSaves({ ...base, passStyle: 'grid' });
+    expect(cash).not.toHaveProperty('passStyle');
   });
 
   it('omits the switches when the merchant record does not carry them', () => {

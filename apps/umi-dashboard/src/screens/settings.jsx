@@ -526,8 +526,16 @@ const SettingsScreen = () => {
                 id={`${uid}-city`}
                 className="input tall"
                 value={biz.city || ''}
-                onChange={(e) => setBiz((b) => ({ ...b, city: e.target.value }))}
+                readOnly
+                aria-readonly="true"
+                aria-describedby={`${uid}-city-note`}
               />
+              <div
+                id={`${uid}-city-note`}
+                style={{ fontSize: 13.5, color: 'var(--ink-2)', marginTop: 4 }}
+              >
+                <Trans>La ciudad se muestra desde el registro del negocio; no se edita aquí.</Trans>
+              </div>
             </div>
             <div className="field">
               <label htmlFor={`${uid}-business-day-start`}>
