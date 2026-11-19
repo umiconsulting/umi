@@ -48,6 +48,7 @@ const option = (name) => {
 
 const baseUrl = (process.env.UMIPOS_API_BASE_URL ?? 'http://127.0.0.1:4001').replace(/\/$/, '');
 const merchantId = process.env.UMIPOS_MERCHANT_ID ?? contract.merchant.id;
+let customerId = null;
 const localPasswordDefault = 'Umi2026!';
 const password = process.env.UMIPOS_ROLE_PASSWORD ?? localPasswordDefault;
 const passwordIsFallback = process.env.UMIPOS_ROLE_PASSWORD === undefined;
@@ -68,8 +69,27 @@ function fail(message) {
 /** Expand the contract's placeholders into a real URL for this merchant. */
 function url(path) {
   return (
-    baseUrl + path.replaceAll('{ref}', contract.merchant.ref).replaceAll('{merchantId}', merchantId)
+    baseUrl +
+    path
+      .replaceAll('{ref}', contract.merchant.ref)
+      .replaceAll('{merchantId}', merchantId)
+      .replaceAll('{customerId}', customerId ?? '{customerId}')
   );
+}
+
+/**
+ * The detail rows name a customer that the seeded café already has. Resolve it
+ * once with a role that may read the member list, so the gate measures the
+ * detail guard instead of a literal placeholder.
+ */
+async function resolveCustomerId(session) {
+  const response = await fetch(
+    `${baseUrl}/api/merchants/${merchantId}/cash/customers?limit=1`,
+    { headers: { cookie: session.jar.cookieHeader() }, redirect: 'manual' },
+  );
+  if (!response.ok) return null;
+  const data = await response.json().catch(() => null);
+  return data?.customers?.[0]?.id ?? null;
 }
 
 function validateContract() {
@@ -248,7 +268,23 @@ async function run() {
 
   const rows = [];
   const failures = [];
+  if (contract.surfaces.some((surface) => surface.request.path.includes('{customerId}'))) {
+    const readerRole = ['owner', 'admin', 'manager', 'cashier', 'viewer'].find((role) =>
+      sessions.has(role),
+    );
+    if (readerRole) customerId = await resolveCustomerId(sessions.get(readerRole));
+  }
   for (const surface of contract.surfaces) {
+    if (surface.request.path.includes('{customerId}') && !customerId) {
+      failures.push({
+        surface: surface.id,
+        role: 'fixture',
+        expected: 'allowed',
+        actual: 'missing',
+        detail: 'the gate could not resolve a customer id from the seeded café',
+      });
+      continue;
+    }
     let body = surface.request.body;
     if (surface.request.bodyFrom) {
       const source = contract.surfaces.find((entry) => entry.id === surface.request.bodyFrom);

@@ -368,6 +368,95 @@
       }
     },
     {
+      "id": "cash.staffRegister",
+      "module": "loyalty-value",
+      "client": {
+        "gate": ["customer.create"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:1534 (registerMember → POST /api/merchants/{merchantId}/cash/customers)"
+      },
+      "request": {
+        "method": "POST",
+        "path": "/api/merchants/{merchantId}/cash/customers",
+        "body": { "name": "R0 Surface Gate", "phone": "+525500000000", "birthDate": "1990-01-01" }
+      },
+      "note": "Authenticated counter registration. Returns the card, never a customer session. The public by-reference route stays proof-required and token-free. The gate body creates or reuses one synthetic member in the gate database.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "cash.settings.read",
+      "module": "settings",
+      "client": {
+        "gate": ["merchant.manage"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/screens/settings.jsx:382 (Cash settings → GET /api/merchants/{merchantId}/cash/settings)"
+      },
+      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/cash/settings" },
+      "note": "Cash-only settings on merchant.loyalty_program. The merchant settings route cannot persist these fields.",
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "cash.settings.write",
+      "module": "settings",
+      "client": {
+        "gate": ["merchant.manage"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/screens/settings.jsx:382 (Cash settings → PATCH /api/merchants/{merchantId}/cash/settings)"
+      },
+      "request": { "method": "PATCH", "path": "/api/merchants/{merchantId}/cash/settings", "body": {} },
+      "note": "Cash-only settings write. The guard runs before the handler, so a refused role never reaches the write.",
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "cash.customerDetail",
+      "module": "loyalty-value",
+      "client": {
+        "gate": ["loyalty.read"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:451 (member detail → GET /api/merchants/{merchantId}/cash/customers/{customerId})"
+      },
+      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/cash/customers/{customerId}" },
+      "note": "Contact fields follow customer.contact.read. A caller without it receives null phone, email and birthday plus contactRestricted.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "cash.memberDetail",
+      "module": "loyalty-value",
+      "client": {
+        "gate": ["loyalty.read"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:451 (members alias → GET /api/merchants/{merchantId}/cash/members/{customerId})"
+      },
+      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/cash/members/{customerId}" },
+      "note": "Alias of cash.customerDetail. Same projection and contact policy.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
       "id": "merchant.settings-shell",
       "module": "overview",
       "client": {
