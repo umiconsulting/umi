@@ -369,7 +369,21 @@ export class CashReadService {
     return { active: active[0] || null, upgrade: upgrade[0] || null, history };
   }
 
-  async updateRewardConfig(merchantId: string, body: Row): Promise<Row> {
+  /**
+   * Save the reward ladder.
+   *
+   * `PUT` replaces the whole configuration: an absent `upgrade` turns a ladder
+   * off, and an absent `rewardDescription` clears it. `PATCH` is partial: a field
+   * the caller omits keeps its stored value. The distinction matters because the
+   * dashboard Settings screen sends only the name, the visit target and the cost;
+   * treating that PATCH as a replacement used to erase the reward description and
+   * the whole second tier.
+   */
+  async updateRewardConfig(
+    merchantId: string,
+    body: Row,
+    mode: 'replace' | 'patch' = 'replace',
+  ): Promise<Row> {
     const { visitsRequired, rewardName, rewardDescription, rewardCostCentavos, upgrade } = body;
     if (!visitsRequired || !rewardName) {
       throw new BadRequestException('visitsRequired and rewardName are required');
@@ -381,20 +395,35 @@ export class CashReadService {
       throw new BadRequestException('visitsRequired must be a positive integer');
     }
 
-    // The optional upper tier. `null`/absent means a single reward, which is how a
-    // café turns an existing ladder off, so its absence is meaningful and is passed
-    // through rather than defaulted.
+    const current = mode === 'patch' ? await this.getRewardConfig(merchantId) : null;
+    const currentActive = (current?.active ?? null) as Row | null;
+    const currentUpgrade = (current?.upgrade ?? null) as Row | null;
+
+    const effectiveDescription =
+      mode === 'patch' && rewardDescription === undefined
+        ? (currentActive?.rewardDescription ?? null)
+        : (rewardDescription ?? null);
+    const effectiveCost =
+      mode === 'patch' && rewardCostCentavos === undefined
+        ? Number(currentActive?.rewardCostCentavos ?? 0)
+        : Number(rewardCostCentavos ?? 0);
+
+    // On PUT, `null`/absent means a single reward: that is how a café turns a
+    // ladder off. On PATCH, an absent `upgrade` means "leave the ladder alone";
+    // an explicit `null` still turns it off.
+    const upgradeSource = mode === 'patch' && upgrade === undefined ? currentUpgrade : upgrade;
+
     let upgradeTier: {
       visitsRequired: number;
       rewardName: string;
       rewardDescription: string | null;
       rewardCostCentavos: number;
     } | null = null;
-    if (upgrade !== null && upgrade !== undefined) {
-      if (!upgrade || typeof upgrade !== 'object' || !upgrade.rewardName) {
+    if (upgradeSource !== null && upgradeSource !== undefined) {
+      if (!upgradeSource || typeof upgradeSource !== 'object' || !upgradeSource.rewardName) {
         throw new BadRequestException('upgrade.rewardName is required');
       }
-      const upgradeVisits = parseInt(upgrade.visitsRequired, 10);
+      const upgradeVisits = parseInt(upgradeSource.visitsRequired, 10);
       if (!Number.isInteger(upgradeVisits) || upgradeVisits <= 0) {
         throw new BadRequestException('upgrade.visitsRequired must be a positive integer');
       }
@@ -406,9 +435,19 @@ export class CashReadService {
       }
       upgradeTier = {
         visitsRequired: upgradeVisits,
-        rewardName: upgrade.rewardName,
-        rewardDescription: upgrade.rewardDescription ?? null,
-        rewardCostCentavos: Number(upgrade.rewardCostCentavos ?? 0),
+        rewardName: upgradeSource.rewardName,
+        rewardDescription:
+          mode === 'patch' &&
+          upgradeSource.rewardDescription === undefined &&
+          currentUpgrade !== null
+            ? (currentUpgrade.rewardDescription ?? null)
+            : (upgradeSource.rewardDescription ?? null),
+        rewardCostCentavos:
+          mode === 'patch' &&
+          upgradeSource.rewardCostCentavos === undefined &&
+          currentUpgrade !== null
+            ? Number(currentUpgrade.rewardCostCentavos ?? 0)
+            : Number(upgradeSource.rewardCostCentavos ?? 0),
       };
     }
 
@@ -417,8 +456,8 @@ export class CashReadService {
     const newConfig = await this.repo.upsertRewardConfig(merchantId, programId, {
       visitsRequired: visits,
       rewardName,
-      rewardDescription: rewardDescription ?? null,
-      rewardCostCentavos: Number(rewardCostCentavos ?? 0),
+      rewardDescription: effectiveDescription,
+      rewardCostCentavos: effectiveCost,
       upgrade: upgradeTier,
     });
     return { ok: true, newConfig };

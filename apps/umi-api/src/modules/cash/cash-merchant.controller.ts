@@ -81,12 +81,12 @@ export class CashMerchantController {
   @Put('reward-config')
   @RequirePermission('merchant.manage')
   putRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
-    return this.cash.updateRewardConfig(t.merchantId, body);
+    return this.cash.updateRewardConfig(t.merchantId, body, 'replace');
   }
 
   @Patch('reward-config')
   @RequirePermission('merchant.manage')
   patchRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
-    return this.cash.updateRewardConfig(t.merchantId, body);
+    return this.cash.updateRewardConfig(t.merchantId, body, 'patch');
   }
 }

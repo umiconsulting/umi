@@ -142,6 +142,111 @@ describe('CashReadService.updateRewardConfig', () => {
     expect(r.ok).toBe(true);
   });
 
+  it('PATCH keeps the stored description and second tier when the body omits them', async () => {
+    h.repo.branding.mockResolvedValue({ programId: 'prog1' });
+    h.repo.rewardConfig.mockResolvedValue({
+      active: [
+        {
+          visitsRequired: 7,
+          rewardName: 'Capuccino',
+          rewardDescription: 'Con crema',
+          rewardCostCentavos: 4500,
+        },
+      ],
+      upgrade: [
+        {
+          visitsRequired: 9,
+          rewardName: 'Latte rocas',
+          rewardDescription: 'Con leche',
+          rewardCostCentavos: 6000,
+        },
+      ],
+      history: [],
+    });
+    h.repo.upsertRewardConfig.mockResolvedValue({ id: 'rc2', isActive: true });
+
+    await h.svc.updateRewardConfig(
+      't1',
+      { visitsRequired: 7, rewardName: 'Capuccino', rewardCostCentavos: 5000 },
+      'patch',
+    );
+
+    expect(h.repo.upsertRewardConfig).toHaveBeenCalledWith('t1', 'prog1', {
+      visitsRequired: 7,
+      rewardName: 'Capuccino',
+      rewardDescription: 'Con crema',
+      rewardCostCentavos: 5000,
+      upgrade: {
+        visitsRequired: 9,
+        rewardName: 'Latte rocas',
+        rewardDescription: 'Con leche',
+        rewardCostCentavos: 6000,
+      },
+    });
+  });
+
+  it('PATCH with an explicit null still turns the ladder off', async () => {
+    h.repo.branding.mockResolvedValue({ programId: 'prog1' });
+    h.repo.rewardConfig.mockResolvedValue({
+      active: [{ rewardDescription: 'Con crema', rewardCostCentavos: 4500 }],
+      upgrade: [{ visitsRequired: 9, rewardName: 'Latte rocas' }],
+      history: [],
+    });
+    h.repo.upsertRewardConfig.mockResolvedValue({ id: 'rc2', isActive: true });
+
+    await h.svc.updateRewardConfig(
+      't1',
+      { visitsRequired: 7, rewardName: 'Capuccino', upgrade: null },
+      'patch',
+    );
+
+    expect(h.repo.upsertRewardConfig).toHaveBeenCalledWith(
+      't1',
+      'prog1',
+      expect.objectContaining({ upgrade: null }),
+    );
+  });
+
+  it('PATCH keeps an omitted upgrade description and cost', async () => {
+    h.repo.branding.mockResolvedValue({ programId: 'prog1' });
+    h.repo.rewardConfig.mockResolvedValue({
+      active: [{ rewardDescription: null, rewardCostCentavos: 0 }],
+      upgrade: [
+        {
+          visitsRequired: 9,
+          rewardName: 'Latte rocas',
+          rewardDescription: 'Con leche',
+          rewardCostCentavos: 6000,
+        },
+      ],
+      history: [],
+    });
+    h.repo.upsertRewardConfig.mockResolvedValue({ id: 'rc2', isActive: true });
+
+    await h.svc.updateRewardConfig(
+      't1',
+      {
+        visitsRequired: 7,
+        rewardName: 'Capuccino',
+        upgrade: { visitsRequired: 10, rewardName: 'Latte rocas' },
+      },
+      'patch',
+    );
+
+    expect(h.repo.upsertRewardConfig).toHaveBeenCalledWith(
+      't1',
+      'prog1',
+      expect.objectContaining({
+        upgrade: {
+          visitsRequired: 10,
+          rewardName: 'Latte rocas',
+          rewardDescription: 'Con leche',
+          rewardCostCentavos: 6000,
+        },
+      }),
+    );
+  });
+
   it('carries the second rung of a ladder through to the writer', async () => {
     h.repo.branding.mockResolvedValue({ programId: 'prog1' });
     h.repo.upsertRewardConfig.mockResolvedValue({ id: 'rc2', isActive: true });

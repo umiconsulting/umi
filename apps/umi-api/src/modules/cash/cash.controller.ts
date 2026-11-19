@@ -262,7 +262,7 @@ export class CashController {
   @Put('reward-config')
   @RequirePermission('merchant.manage')
   async putRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
-    const result = await this.cash.updateRewardConfig(t.merchantId, body);
+    const result = await this.cash.updateRewardConfig(t.merchantId, body, 'replace');
     void this.walletPass.refreshMerchant(t.merchantId);
     return result;
   }
@@ -270,7 +270,7 @@ export class CashController {
   @Patch('reward-config')
   @RequirePermission('merchant.manage')
   async patchRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
-    const result = await this.cash.updateRewardConfig(t.merchantId, body);
+    const result = await this.cash.updateRewardConfig(t.merchantId, body, 'patch');
     void this.walletPass.refreshMerchant(t.merchantId);
     return result;
   }
