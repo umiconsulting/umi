@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { type ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { describe, expect, it } from 'vitest';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { PERMISSION_KEY, ROLES_KEY } from '../auth/roles.decorator';
@@ -29,6 +31,21 @@ const permissionOf = (controller: { prototype: object }, handler: string): strin
     PERMISSION_KEY,
     (controller.prototype as Record<string, unknown>)[handler] as object,
   ) ?? null;
+
+/** Run the real RolesGuard against a synthetic membership with the seeded grants. */
+const allows = (role: string, permission: string): boolean => {
+  const reflector = {
+    getAllAndOverride: (key: string) => (key === PERMISSION_KEY ? permission : undefined),
+  } as unknown as Reflector;
+  const context = {
+    getHandler: () => () => undefined,
+    getClass: () => class {},
+    switchToHttp: () => ({
+      getRequest: () => ({ merchantAccess: { roles: [role], permissions: held(role) } }),
+    }),
+  } as unknown as ExecutionContext;
+  return new RolesGuard(reflector).canActivate(context);
+};
 
 describe('Cash action permissions', () => {
   it('names a permission on every register action and keeps the guard stack', () => {
@@ -72,6 +89,29 @@ describe('Cash action permissions', () => {
     ) as string[];
     expect(sinkRoles).toContain('staff');
     expect(sinkRoles).toContain('cashier');
+  });
+
+  it('lets the real guard decide the measured negative and positive cases', () => {
+    // Cashier keeps the till and loses the administrative actions.
+    expect(allows('cashier', 'loyalty.read')).toBe(true);
+    expect(allows('cashier', 'loyalty.reward.redeem')).toBe(true);
+    expect(allows('cashier', 'wallet.authorize')).toBe(true);
+    expect(allows('cashier', 'wallet.redeem')).toBe(true);
+    expect(() => allows('cashier', 'insights.read')).toThrow();
+    expect(() => allows('cashier', 'customer.contact.read')).toThrow();
+    expect(() => allows('cashier', 'gift_card.issue')).toThrow();
+    expect(() => allows('cashier', 'loyalty.adjust')).toThrow();
+
+    // A viewer reads, and cannot act.
+    expect(allows('viewer', 'insights.read')).toBe(true);
+    expect(allows('viewer', 'loyalty.read')).toBe(true);
+    expect(() => allows('viewer', 'loyalty.reward.redeem')).toThrow();
+    expect(() => allows('viewer', 'wallet.authorize')).toThrow();
+
+    // A manager can export and bulk-adjust, and cannot read analytics.
+    expect(allows('manager', 'customer.contact.read')).toBe(true);
+    expect(allows('manager', 'loyalty.adjust')).toBe(true);
+    expect(() => allows('manager', 'insights.read')).toThrow();
   });
 
   it('matches the seeded grants for the actions this slice touches', () => {
