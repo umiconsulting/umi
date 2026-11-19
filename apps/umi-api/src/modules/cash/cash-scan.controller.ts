@@ -5,38 +5,42 @@ import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { RequireProduct } from '../auth/require-product.decorator';
 import { AcceptRegisterToken } from '../auth/register-token.decorator';
-import { Roles } from '../auth/roles.decorator';
+import { RequirePermission } from '../auth/roles.decorator';
 import { CurrentUser, Merchant } from '../auth/current-user.decorator';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { CashScanService } from './cash-scan.service';
 import { ScanDto, ScanPreviewDto, ScanSealsDto } from './dto/scan.dto';
 
-const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
-
 /**
  * Loyalty scan (staff operation). Same guard chain as the cash money writes:
- * session + merchant membership + `cash` product + a staff-capable role.
+ * session + merchant membership + `cash` product.
+ *
+ * Each action names its own permission. The old role list refused a cashier on
+ * scan, preview and seals, even though a cashier is the operator who runs the
+ * register. Scan and preview now use `loyalty.reward.redeem` (a cashier holds it);
+ * bulk seals stay on `loyalty.adjust` (a cashier does not hold it). A role that may
+ * scan therefore cannot bulk-credit by accident.
  */
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard)
 @RequireProduct('cash')
 @AcceptRegisterToken()
-@Roles(...STAFF_ROLES)
 @Controller('api/:merchantRef/admin/scan')
 export class CashScanController {
   constructor(private readonly scan: CashScanService) {}
 
   @Post()
+  @RequirePermission('loyalty.reward.redeem')
   run(@Merchant() t: MerchantAccess, @CurrentUser() user: AuthUser, @Body() dto: ScanDto) {
     return this.scan.scan(t.merchantId, user.id, dto);
   }
 
   /**
-   * Read the card before committing. Same guard chain as the write: preview
-   * exposes a customer's name, balance and reward state, so it is staff-only for
-   * the same reason the scan is.
+   * Read the card before committing. Same permission as the scan: preview exposes a
+   * customer's name, balance and reward state to the operator who is about to act.
    */
   @Post('preview')
   @HttpCode(200)
+  @RequirePermission('loyalty.reward.redeem')
   preview(
     @Merchant() t: MerchantAccess,
     @CurrentUser() user: AuthUser,
@@ -48,9 +52,11 @@ export class CashScanController {
   /**
    * Credit several stamps at once (catch-up for a customer who came from another
    * loyalty system). Gated per café by `merchant.loyalty_program.multi_seal_enabled`,
-   * checked in the service — a role that may scan may not automatically bulk-credit.
+   * checked in the service, and by `loyalty.adjust`: a role that may scan may not
+   * automatically bulk-credit.
    */
   @Post('seals')
+  @RequirePermission('loyalty.adjust')
   seals(@Merchant() t: MerchantAccess, @CurrentUser() user: AuthUser, @Body() dto: ScanSealsDto) {
     return this.scan.seals(t.merchantId, user.id, dto);
   }

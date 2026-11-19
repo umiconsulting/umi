@@ -27,8 +27,10 @@ import { registerRole } from './cash-roles';
  * its "Recompensa activa" panel from the reference-addressed twin. Gating the
  * read on `merchant.manage` refused a cashier a value her own screens display, so
  * it is `loyalty.read`; the write keeps the manager gate because it changes what
- * every issued pass shows. `stats`, `analytics`, `customers`, `members` and
- * `gift-cards` stay open to a cashier — her own screens call them.
+ * every issued pass shows. Every read names the permission its caller already
+ * holds: `stats`, `customers` and `members` use `loyalty.read`; `analytics` uses
+ * `insights.read`; `gift-cards` uses `gift_card.read`. A cashier keeps the till
+ * reads and is refused analytics, which is the policy for that action.
  */
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard)
 @RequireProduct('cash')
@@ -37,27 +39,32 @@ export class CashMerchantController {
   constructor(private readonly cash: CashReadService) {}
 
   @Get('stats')
+  @RequirePermission('loyalty.read')
   getStats(@Merchant() t: MerchantAccess) {
     return this.cash.getStats(t.merchantId, registerRole(t));
   }
 
   @Get('analytics')
+  @RequirePermission('insights.read')
   getAnalytics(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
     return this.cash.getAnalytics(t.merchantId, query);
   }
 
   @Get('customers')
+  @RequirePermission('loyalty.read')
   getCustomers(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
     return this.cash.getCustomers(t.merchantId, query);
   }
 
   // server.js maps `members` -> `customers`.
   @Get('members')
+  @RequirePermission('loyalty.read')
   getMembers(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
     return this.cash.getCustomers(t.merchantId, query);
   }
 
   @Get('gift-cards')
+  @RequirePermission('gift_card.read')
   getGiftCards(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
     return this.cash.getGiftCards(t.merchantId, query);
   }

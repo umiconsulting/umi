@@ -45,16 +45,15 @@ const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
  * Cash READ side (D11 — always live) + admin-config writes (settings branding,
  * reward-config) which are dashboard-owned and non-conflicting with umi-cash.
  * Gated on the `cash` product. Customer-facing wallet/ledger writes are NOT here
- * — see cash-write.controller (inert, unmounted unless CASH_WRITE_ENABLED).
+ * — see cash-write.controller.
  *
- * THE ADMIN-CONFIG ROUTES ARE PERMISSION-GATED, THE REST ARE NOT, and that split
- * is the point (workstream C step 4: "the client hides; the API decides").
+ * EVERY HANDLER NAMES A PERMISSION (workstream C step 4: "the client hides; the
+ * API decides"). The product gate and the membership gate are separate checks;
+ * the permission is the authority for the action.
+ *
  * `settings` is the manager surface: the Dashboard's `settings` module
  * (`module-registry.js`) declares `merchant.manage` and hides the screen from a
- * cashier. Every read of it used to be ungated here, so the cashier who could not
- * see the screen could still read the café's branding and promo copy over
- * `/api/{ref}/admin/settings` — and, with the same URL and a body the service
- * accepts, change them. Both halves of `settings` sit on `merchant.manage`.
+ * cashier. Both halves of `settings` sit on `merchant.manage`.
  *
  * `reward-config` is SPLIT, and the split is deliberate: the READ is
  * `loyalty.read` (the weaker permission) and only the WRITE is `merchant.manage`.
@@ -76,9 +75,11 @@ const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
  * what every issued pass shows and the only writer is the Settings screen, which
  * the client hides from a cashier. Do not re-tighten the read to match the write.
  *
- * The till's remaining register reads (`stats`, `analytics`, `customers`,
- * `gift-cards`) stay open to a cashier on purpose: the same cashier's own screens
- * call them, and tightening those would break a screen the client shows.
+ * The remaining register reads name the permission their readers already hold:
+ * `stats`, `customers` and `customers/:id` use `loyalty.read` (every café role
+ * holds it, so the till's own screens still work); `analytics` uses
+ * `insights.read`; `gift-cards` uses `gift_card.read`; the customer CSV uses
+ * `customer.contact.read`, because it exports every customer's phone and email.
  */
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard)
 @RequireProduct('cash')
@@ -154,25 +155,29 @@ export class CashController {
   }
 
   @Get('stats')
+  @RequirePermission('loyalty.read')
   getStats(@Merchant() t: MerchantAccess) {
     return this.cash.getStats(t.merchantId, registerRole(t));
   }
 
   @Get('analytics')
+  @RequirePermission('insights.read')
   getAnalytics(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
     return this.cash.getAnalytics(t.merchantId, query);
   }
 
   @Get('customers')
+  @RequirePermission('loyalty.read')
   getCustomers(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
     return this.cash.getCustomers(t.merchantId, query);
   }
 
   /**
-   * One customer. Same guards as the list beside it, which already exposes her
-   * phone, email and balance — the detail adds history, not a new class of data.
+   * One customer. Same permission as the list beside it: the detail adds history,
+   * not a new class of data.
    */
   @Get('customers/:id')
+  @RequirePermission('loyalty.read')
   getCustomer(@Merchant() t: MerchantAccess, @Param('id', ParseUUIDPipe) id: string) {
     return this.cash.getCustomer(t.merchantId, id, registerRole(t));
   }
@@ -207,6 +212,7 @@ export class CashController {
    * who can download it. Ten an hour, as umi-cash allows.
    */
   @Get('export')
+  @RequirePermission('customer.contact.read')
   async exportCustomers(
     @Merchant() t: MerchantAccess,
     @CurrentUser() user: AuthUser,
@@ -320,6 +326,7 @@ export class CashController {
   }
 
   @Get('gift-cards')
+  @RequirePermission('gift_card.read')
   getGiftCards(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
     return this.cash.getGiftCards(t.merchantId, query);
   }
