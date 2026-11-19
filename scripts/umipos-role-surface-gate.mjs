@@ -53,6 +53,8 @@ const localPasswordDefault = 'Umi2026!';
 const password = process.env.UMIPOS_ROLE_PASSWORD ?? localPasswordDefault;
 const passwordIsFallback = process.env.UMIPOS_ROLE_PASSWORD === undefined;
 const jsonOut = flag('--json');
+const allowWrites = flag('--allow-writes') || process.env.UMIPOS_GATE_ALLOW_WRITES === '1';
+const MUTATING_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 const requestedRoles = option('--roles')
   ? option('--roles')
       .split(',')
@@ -64,6 +66,16 @@ const REFUSED = new Set([401, 403]);
 
 function fail(message) {
   throw new Error(`Role surface gate failed: ${message}`);
+}
+
+/** The gate may only mutate a database it can see on this machine. */
+function isLoopbackTarget(target) {
+  try {
+    const host = new URL(target).hostname.toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+  } catch {
+    return false;
+  }
 }
 
 /** Expand the contract's placeholders into a real URL for this merchant. */
@@ -244,6 +256,19 @@ async function run() {
   );
   if (roles.length === 0) fail(`no contract role matches --roles ${requestedRoles?.join(',')}.`);
   const selected = new Set(roles.map((entry) => entry.role));
+
+  const mutatingProbe = contract.surfaces.some(
+    (surface) =>
+      MUTATING_METHODS.has(surface.request.method) &&
+      Object.keys(surface.expect).some((role) => selected.has(role)),
+  );
+  if (mutatingProbe && !isLoopbackTarget(baseUrl) && !allowWrites) {
+    fail(
+      `refusing mutating probes against ${baseUrl}: use a loopback host ` +
+        '(localhost, 127.0.0.1 or [::1]), or pass --allow-writes / ' +
+        'UMIPOS_GATE_ALLOW_WRITES=1 after confirming the target is disposable.',
+    );
+  }
 
   // A run that skips a role must SAY so. `--roles` is for iterating on one row;
   // the acceptance run is the one with no `--roles`, and it must cover every role

@@ -133,9 +133,17 @@ export class CashReadService {
     };
   }
 
-  async updateSettings(merchantId: string, d: Row): Promise<void> {
+  /**
+   * Apply the Cash settings patch. Returns true when it changed anything.
+   *
+   * An empty body is a valid no-op: the controller must not refresh every issued
+   * pass for a PATCH that wrote nothing.
+   */
+  async updateSettings(merchantId: string, d: Row): Promise<boolean> {
+    let changed = false;
     if (d.name !== undefined) {
       await this.repo.updateMerchantName(merchantId, d.name);
+      changed = true;
     }
     // Column-keyed patch (see CashRepository.updateProgram): only keys present here
     // change; a present key with null clears the column. card_prefix/pass_style keep the
@@ -165,7 +173,9 @@ export class CashReadService {
 
     if (Object.keys(patch).length > 0) {
       await this.repo.updateProgram(merchantId, patch);
+      changed = true;
     }
+    return changed;
   }
 
   async getStats(merchantId: string, role: string | null = null): Promise<Row> {

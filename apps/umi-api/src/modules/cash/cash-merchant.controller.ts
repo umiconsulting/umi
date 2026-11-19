@@ -148,10 +148,11 @@ export class CashMerchantController {
   @Patch('settings')
   @RequirePermission('merchant.manage')
   async updateSettings(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
-    await this.cash.updateSettings(t.merchantId, body);
+    const changed = await this.cash.updateSettings(t.merchantId, body);
     // Not awaited. A café-wide refresh reaches every issued pass, and the save
-    // must not wait for Apple. The adapter never throws.
-    void this.walletPass.refreshMerchant(t.merchantId);
+    // must not wait for Apple. The adapter never throws. An empty PATCH wrote
+    // nothing, so it must not refresh every pass.
+    if (changed) void this.walletPass.refreshMerchant(t.merchantId);
     return { ok: true };
   }
 

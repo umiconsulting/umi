@@ -316,8 +316,15 @@ describe('CashReadService.updateSettings', () => {
 
   it('skips the program update when only the name changes', async () => {
     const h = make();
-    await h.svc.updateSettings('t1', { name: 'Only Name' });
+    await expect(h.svc.updateSettings('t1', { name: 'Only Name' })).resolves.toBe(true);
     expect(h.repo.updateProgram).not.toHaveBeenCalled();
+  });
+
+  it('reports no change for an empty body', async () => {
+    const h = make();
+    await expect(h.svc.updateSettings('t1', {})).resolves.toBe(false);
+    expect(h.repo.updateProgram).not.toHaveBeenCalled();
+    expect(h.repo.updateMerchantName).not.toHaveBeenCalled();
   });
 });
 
