@@ -535,18 +535,20 @@ describe('contact projection over the mounted HTTP pipeline', () => {
     }
   });
 
-  it('lets a manager search by phone and returns the contact fields', async () => {
-    const res = await request(
-      'GET',
-      `/api/merchants/${MERCHANT_ID}/cash/customers?search=Ana`,
-      'manager',
-    );
-    expect(res.status).toBe(200);
-    const body = json<{ total: number; customers: Array<Record<string, unknown>> }>(res.body);
-    expect(body.total).toBe(1);
-    expect(body.customers[0].phone).toBe('+5215550001111');
-    expect(body.customers[0].email).toBe('ana@example.test');
-    expect(body.customers[0].contactRestricted).toBe(false);
+  it('lets a manager search by phone or email and returns the contact fields', async () => {
+    for (const term of ['5550001111', 'ana@example.test']) {
+      const res = await request(
+        'GET',
+        `/api/merchants/${MERCHANT_ID}/cash/customers?search=${encodeURIComponent(term)}`,
+        'manager',
+      );
+      expect(res.status, term).toBe(200);
+      const body = json<{ total: number; customers: Array<Record<string, unknown>> }>(res.body);
+      expect(body.total, term).toBe(1);
+      expect(body.customers[0].phone, term).toBe('+5215550001111');
+      expect(body.customers[0].email, term).toBe('ana@example.test');
+      expect(body.customers[0].contactRestricted, term).toBe(false);
+    }
   });
 
   it('keeps the viewer row aggregate-only and still lets the viewer read analytics', async () => {
