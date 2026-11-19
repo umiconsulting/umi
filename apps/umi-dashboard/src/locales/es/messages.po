@@ -137,6 +137,18 @@ msgstr "No se pudo cargar la conversación."
 msgid "Sin mensajes en esta conversación."
 msgstr "Sin mensajes en esta conversación."
 
+#: src/components/login-glass-settings.jsx
+msgid "Vidrio"
+msgstr "Vidrio"
+
+#: src/components/login-glass-settings.jsx
+msgid "Tinte en modo claro"
+msgstr "Tinte en modo claro"
+
+#: src/components/login-glass-settings.jsx
+msgid "Tinte en modo oscuro"
+msgstr "Tinte en modo oscuro"
+
 #: src/components/page-head.jsx
 #~ msgid "{value} {of} {noun}"
 #~ msgstr "{value} {of} {noun}"
@@ -1556,6 +1568,10 @@ msgstr "Aún no hay categorías. Crea la primera arriba."
 #~ msgstr "El desglose por categoría no está disponible. Actualiza la consulta para reintentar."
 
 #: src/screens/category-sales.jsx
+#~ msgid "Ver informe"
+#~ msgstr "Ver informe"
+
+#: src/screens/category-sales.jsx
 msgid "Participación de venta neta por categoría"
 msgstr "Participación de venta neta por categoría"
 
@@ -1585,9 +1601,10 @@ msgstr "<0.1%"
 msgid "Venta neta por categoría"
 msgstr "Venta neta por categoría"
 
+#. placeholder {0}: rows.length
 #: src/screens/category-sales.jsx
-msgid "Ver informe"
-msgstr "Ver informe"
+msgid "Ver las {0} categorías"
+msgstr "Ver las {0} categorías"
 
 #: src/screens/category-sales.jsx
 msgid "El desglose por categoría no está disponible."
@@ -1605,10 +1622,14 @@ msgstr "La venta neta es cero. No hay una participación porcentual que mostrar.
 msgid "Categorías y venta neta"
 msgstr "Categorías y venta neta"
 
-#. placeholder {0}: rows.length
 #: src/screens/category-sales.jsx
-msgid "Ver las {0} categorías"
-msgstr "Ver las {0} categorías"
+msgid "Categorías sin ventas"
+msgstr "Categorías sin ventas"
+
+#. placeholder {0}: entry.label
+#: src/screens/category-sales.jsx
+msgid "{0}: sin ventas en el periodo."
+msgstr "{0}: sin ventas en el periodo."
 
 #: src/screens/category-sales.jsx
 msgid "Importes exactos por categoría"
@@ -1622,6 +1643,14 @@ msgid "Categoría"
 msgstr "Categoría"
 
 #: src/screens/category-sales.jsx
+#: src/screens/inventory-costing.jsx
+#: src/screens/overview.jsx
+#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
+msgid "Venta neta"
+msgstr "Venta neta"
+
+#: src/screens/category-sales.jsx
 msgid "Ventas antes de devoluciones"
 msgstr "Ventas antes de devoluciones"
 
@@ -1629,14 +1658,6 @@ msgstr "Ventas antes de devoluciones"
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Devoluciones"
 msgstr "Devoluciones"
-
-#: src/screens/category-sales.jsx
-#: src/screens/inventory-costing.jsx
-#: src/screens/overview.jsx
-#: src/screens/sales-purchase-analysis.jsx
-#: src/screens/sales-widgets.jsx
-msgid "Venta neta"
-msgstr "Venta neta"
 
 #: src/screens/category-sales.jsx
 msgid "Participación"
@@ -2142,7 +2163,6 @@ msgstr "en total"
 #: src/screens/orders.jsx
 #: src/screens/overview.jsx
 #: src/screens/sales-purchase-analysis.jsx
-#: src/screens/sales-widgets.jsx
 msgid "Ticket promedio"
 msgstr "Ticket promedio"
 
@@ -6922,6 +6942,22 @@ msgid "El pedido esperaba {order}"
 msgstr "El pedido esperaba {order}"
 
 #: src/screens/login.jsx
+#~ msgid "Supervisa la operación de tu negocio al momento, desde un solo panel."
+#~ msgstr "Supervisa la operación de tu negocio al momento, desde un solo panel."
+
+#: src/screens/login.jsx
+#~ msgid "Inicia sesión para entrar a tu panel."
+#~ msgstr "Inicia sesión para entrar a tu panel."
+
+#: src/screens/login.jsx
+#~ msgid "Escríbenos tu correo y te mandamos un enlace para recuperarla."
+#~ msgstr "Escríbenos tu correo y te mandamos un enlace para recuperarla."
+
+#: src/screens/login.jsx
+#~ msgid "Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu contraseña. Caduca en 15 minutos."
+#~ msgstr "Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu contraseña. Caduca en 15 minutos."
+
+#: src/screens/login.jsx
 msgid "Te enviamos un código de seis dígitos a tu correo."
 msgstr "Te enviamos un código de seis dígitos a tu correo."
 
@@ -6938,6 +6974,22 @@ msgid "Tu código venció. Inicia sesión otra vez."
 msgstr "Tu código venció. Inicia sesión otra vez."
 
 #: src/screens/login.jsx
+msgid "Escribe tu correo."
+msgstr "Escribe tu correo."
+
+#: src/screens/login.jsx
+msgid "Escribe un correo válido, como nombre@negocio.mx."
+msgstr "Escribe un correo válido, como nombre@negocio.mx."
+
+#: src/screens/login.jsx
+msgid "Escribe los seis dígitos del código."
+msgstr "Escribe los seis dígitos del código."
+
+#: src/screens/login.jsx
+msgid "Escribe tu contraseña."
+msgstr "Escribe tu contraseña."
+
+#: src/screens/login.jsx
 msgid "Correo o contraseña incorrectos. Revísalos e inténtalo otra vez."
 msgstr "Correo o contraseña incorrectos. Revísalos e inténtalo otra vez."
 
@@ -6950,16 +7002,12 @@ msgid "Tu operación,<0/>en tiempo real."
 msgstr "Tu operación,<0/>en tiempo real."
 
 #: src/screens/login.jsx
-msgid "Supervisa la operación de tu negocio al momento, desde un solo panel."
-msgstr "Supervisa la operación de tu negocio al momento, desde un solo panel."
-
-#: src/screens/login.jsx
 msgid "Hola de nuevo"
 msgstr "Hola de nuevo"
 
 #: src/screens/login.jsx
-msgid "Inicia sesión para entrar a tu panel."
-msgstr "Inicia sesión para entrar a tu panel."
+msgid "nombre@negocio.mx"
+msgstr "nombre@negocio.mx"
 
 #: src/screens/login.jsx
 msgid "Contraseña"
@@ -7012,8 +7060,8 @@ msgid "Volver a iniciar sesión"
 msgstr "Volver a iniciar sesión"
 
 #: src/screens/login.jsx
-msgid "Escríbenos tu correo y te mandamos un enlace para recuperarla."
-msgstr "Escríbenos tu correo y te mandamos un enlace para recuperarla."
+msgid "Para restablecer tu contraseña, escribe tu correo."
+msgstr "Para restablecer tu contraseña, escribe tu correo."
 
 #: src/screens/login.jsx
 msgid "Enviar enlace"
@@ -7024,8 +7072,8 @@ msgid "Revisa tu correo"
 msgstr "Revisa tu correo"
 
 #: src/screens/login.jsx
-msgid "Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu contraseña. Caduca en 15 minutos."
-msgstr "Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu contraseña. Caduca en 15 minutos."
+msgid "Si hay una cuenta con ese correo, te mandamos un enlace para restablecer tu contraseña. Caduca en 15 minutos."
+msgstr "Si hay una cuenta con ese correo, te mandamos un enlace para restablecer tu contraseña. Caduca en 15 minutos."
 
 #: src/screens/loyalty-value.jsx
 #: src/screens/operations-workspace.jsx
@@ -8530,6 +8578,14 @@ msgstr "en curso · {0}"
 #~ msgstr "Canjes"
 
 #: src/screens/overview.jsx
+#~ msgid "No se pudo cargar el periodo anterior. La comparación no está disponible."
+#~ msgstr "No se pudo cargar el periodo anterior. La comparación no está disponible."
+
+#: src/screens/overview.jsx
+#~ msgid "Consulta los módulos disponibles para tu función."
+#~ msgstr "Consulta los módulos disponibles para tu función."
+
+#: src/screens/overview.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/sales-widgets.jsx
 msgid "Tickets de venta"
@@ -8609,7 +8665,7 @@ msgstr "Explorar ventas"
 msgid "Actualizando ventas…"
 msgstr "Actualizando ventas…"
 
-#. placeholder {0}: formatTime(report.dataUpdatedAt, { timeZone: options.timezone })
+#. placeholder {0}: formatTime(report.data.capturedAt, { timeZone: options.timezone })
 #: src/screens/overview.jsx
 msgid "Datos de las {0}. Actualiza para ver el estado actual."
 msgstr "Datos de las {0}. Actualiza para ver el estado actual."
@@ -8642,8 +8698,8 @@ msgid "Reintentar análisis"
 msgstr "Reintentar análisis"
 
 #: src/screens/overview.jsx
-msgid "No se pudo cargar el periodo anterior. La comparación no está disponible."
-msgstr "No se pudo cargar el periodo anterior. La comparación no está disponible."
+msgid "La comparación con el periodo anterior no está disponible."
+msgstr "La comparación con el periodo anterior no está disponible."
 
 #: src/screens/overview.jsx
 msgid "Elige tus indicadores en Personalizar inicio."
@@ -8718,10 +8774,6 @@ msgstr "Revisar turnos de caja"
 #: src/screens/overview.jsx
 msgid "Revisar inventario"
 msgstr "Revisar inventario"
-
-#: src/screens/overview.jsx
-msgid "Consulta los módulos disponibles para tu función."
-msgstr "Consulta los módulos disponibles para tu función."
 
 #: src/screens/permission-labels.js
 msgid "Ver el historial de auditoría"
@@ -10485,6 +10537,15 @@ msgstr "Un administrador del negocio puede modificar los grupos."
 #~ msgstr "El análisis combina demasiados productos. Consulta un periodo menor."
 
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
+msgid "No tienes permiso para consultar estas ventas."
+msgstr "No tienes permiso para consultar estas ventas."
+
+#: src/screens/sales-purchase-analysis.jsx
+msgid "Volver a inicio"
+msgstr "Volver a inicio"
+
+#: src/screens/sales-purchase-analysis.jsx
 msgid "No se pudo consultar este periodo. Elige un rango menor, de hasta 731 días y 20,000 tickets."
 msgstr "No se pudo consultar este periodo. Elige un rango menor, de hasta 731 días y 20,000 tickets."
 
@@ -10542,6 +10603,7 @@ msgid "Consultar"
 msgstr "Consultar"
 
 #: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
 msgid "Ticket promedio sin propina"
 msgstr "Ticket promedio sin propina"
 
@@ -10564,6 +10626,11 @@ msgstr "Descuentos de las ventas"
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Ventas y ticket promedio"
 msgstr "Ventas y ticket promedio"
+
+#: src/screens/sales-purchase-analysis.jsx
+#: src/screens/sales-widgets.jsx
+msgid "Sin tickets para calcular"
+msgstr "Sin tickets para calcular"
 
 #: src/screens/sales-purchase-analysis.jsx
 msgid "Venta neta de productos, después de descuentos y devoluciones. Excluye propinas."
@@ -10834,10 +10901,6 @@ msgid "Consultando ventas…"
 msgstr "Consultando ventas…"
 
 #: src/screens/sales-widgets.jsx
-msgid "No tienes permiso para consultar estas ventas."
-msgstr "No tienes permiso para consultar estas ventas."
-
-#: src/screens/sales-widgets.jsx
 msgid "El periodo supera el límite de 20,000 tickets. Consulta menos días."
 msgstr "El periodo supera el límite de 20,000 tickets. Consulta menos días."
 
@@ -10849,6 +10912,11 @@ msgstr "No se pudieron cargar las ventas. Los importes no están disponibles."
 #: src/screens/sales-widgets.jsx
 msgid "{0} tickets carecen de productos identificados. Permanecen en el total de tickets."
 msgstr "{0} tickets carecen de productos identificados. Permanecen en el total de tickets."
+
+#. placeholder {0}: coverage.ticketsWithoutVisit
+#: src/screens/sales-widgets.jsx
+msgid "{0} tickets no tienen una visita de mesa identificada."
+msgstr "{0} tickets no tienen una visita de mesa identificada."
 
 #. placeholder {0}: coverage.legacyDiscountTickets
 #: src/screens/sales-widgets.jsx
@@ -10884,10 +10952,6 @@ msgstr "Consulta: {0}. El día actual puede estar incompleto."
 #: src/screens/sales-widgets.jsx
 msgid "vs. periodo anterior"
 msgstr "vs. periodo anterior"
-
-#: src/screens/sales-widgets.jsx
-msgid "Sin tickets para calcular"
-msgstr "Sin tickets para calcular"
 
 #: src/screens/sales-widgets.jsx
 msgid "Periodo anterior sin base de comparación"
@@ -12103,19 +12167,3 @@ msgstr "reintentar"
 #: src/shell.jsx
 msgid "Secciones"
 msgstr "Secciones"
-
-#: src/screens/sales-purchase-analysis.jsx
-msgid "Volver a inicio"
-msgstr "Volver a inicio"
-
-#: src/screens/sales-widgets.jsx
-msgid "{0} tickets no tienen una visita de mesa identificada."
-msgstr "{0} tickets no tienen una visita de mesa identificada."
-
-#: src/screens/category-sales.jsx
-msgid "{0}: sin ventas en el periodo."
-msgstr "{0}: sin ventas en el periodo."
-
-#: src/screens/overview.jsx
-msgid "La comparación con el periodo anterior no está disponible."
-msgstr "La comparación con el periodo anterior no está disponible."

@@ -5,7 +5,10 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { apiUrl, withCreds, errMessage } from '@/lib/config.js';
 import { signIn, isMfaChallenge, verifyMfaCode } from '@/lib/auth.jsx';
 import { LocaleSelect } from '@/shell.jsx';
+import LoginGoldfish from '@/components/login-goldfish.jsx';
+import LoginGlassSettings from '@/components/login-glass-settings.jsx';
 import '@/styles.css';
+import '@/styles-login-glass.css';
 
 const REMEMBER_KEY = 'umi.login.rememberedEmail';
 
@@ -150,12 +153,12 @@ export default function LoginScreen() {
   const [challenge, setChallenge] = useState(null);
   const [code, setCode] = useState('');
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(false);
 
-  // Honest "remember": persist only the email for prefill (session lifetime is
-  // owned by the rolling refresh, not this checkbox).
+  // Prefill the remembered email. The same choice requests persistent auth cookies.
   useEffect(() => {
     try {
       const saved = localStorage.getItem(REMEMBER_KEY);
@@ -180,6 +183,7 @@ export default function LoginScreen() {
       setCode('');
       setPassword('');
       setView('login');
+      setFieldErrors({});
       setError(t`Tu código venció. Inicia sesión otra vez.`);
     }, ms);
     return () => clearTimeout(timer);
@@ -194,9 +198,49 @@ export default function LoginScreen() {
     }
   };
 
+  const validate = (form) => {
+    const next = {};
+    for (const input of form.querySelectorAll('.input')) {
+      if (input.validity.valid) continue;
+      next[input.id] =
+        input.type === 'email'
+          ? input.validity.valueMissing
+            ? t`Escribe tu correo.`
+            : t`Escribe un correo válido, como nombre@negocio.mx.`
+          : input.id === 'login-mfa'
+            ? t`Escribe los seis dígitos del código.`
+            : t`Escribe tu contraseña.`;
+    }
+    setFieldErrors(next);
+    const first = Object.keys(next)[0];
+    if (first) requestAnimationFrame(() => document.getElementById(first)?.focus());
+    return !first;
+  };
+  const edit = (id, setter, value) => {
+    setter(value);
+    setError(null);
+    setFieldErrors((current) => {
+      if (!current[id]) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  };
+  const errorProps = (id) => ({
+    'aria-invalid': fieldErrors[id] ? true : undefined,
+    'aria-describedby': fieldErrors[id] ? `${id}-error` : undefined,
+  });
+  const fieldMessage = (id) =>
+    fieldErrors[id] ? (
+      <p id={`${id}-error`} className="login-field-error">
+        {fieldErrors[id]}
+      </p>
+    ) : null;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    if (loading || !validate(e.currentTarget)) return;
     setLoading(true);
     try {
       const addr = email.trim();
@@ -221,6 +265,7 @@ export default function LoginScreen() {
   const handleMfa = async (e) => {
     e.preventDefault();
     setError(null);
+    if (loading || !validate(e.currentTarget)) return;
     setLoading(true);
     try {
       await verifyMfaCode(challenge.challengeToken, code.trim(), remember);
@@ -236,6 +281,7 @@ export default function LoginScreen() {
   const handleForgot = async (e) => {
     e.preventDefault();
     setError(null);
+    if (loading || !validate(e.currentTarget)) return;
     setLoading(true);
     try {
       const res = await fetch(
@@ -251,6 +297,7 @@ export default function LoginScreen() {
         throw new Error(errMessage(data, t`Error al enviar el correo`));
       }
       setView('sent');
+      requestAnimationFrame(() => document.getElementById('login-sent-title')?.focus());
     } catch (err) {
       setError(err.message);
     } finally {
@@ -261,10 +308,11 @@ export default function LoginScreen() {
   const go = (v) => {
     setView(v);
     setError(null);
+    setFieldErrors({});
   };
 
   const alertBox = error && (
-    <div className="login-alert" role="alert">
+    <div id="login-error" className="login-alert" role="alert">
       <AlertIcon />
       <span>{error}</span>
     </div>
@@ -276,12 +324,15 @@ export default function LoginScreen() {
       disabled={loading}
     >
       {loading && <span className="login-spinner" />}
-      <span>{loading ? busy : label}</span>
+      <span role="status" aria-live="polite">
+        {loading ? busy : label}
+      </span>
     </button>
   );
 
   return (
-    <div className="login-wrap">
+    <div className="login-wrap login-wrap--goldfish">
+      <LoginGoldfish />
       {/* Left — brand panel */}
       <aside className="login-brand">
         <div className="login-brandmark">
@@ -296,9 +347,6 @@ export default function LoginScreen() {
               en tiempo real.
             </Trans>
           </h1>
-          <p>
-            <Trans>Supervisa la operación de tu negocio al momento, desde un solo panel.</Trans>
-          </p>
         </div>
       </aside>
 
@@ -308,6 +356,7 @@ export default function LoginScreen() {
           {/* The language control sits above the form: a person who cannot read the
               screen yet must be able to change it before anything else. */}
           <div className="login-locale">
+            <LoginGlassSettings />
             <LocaleSelect />
           </div>
           {view === 'login' && (
@@ -315,10 +364,12 @@ export default function LoginScreen() {
               <h2>
                 <Trans>Hola de nuevo</Trans>
               </h2>
-              <p className="sub">
-                <Trans>Inicia sesión para entrar a tu panel.</Trans>
-              </p>
-              <form onSubmit={handleSubmit} noValidate>
+              <form
+                onSubmit={handleSubmit}
+                noValidate
+                aria-busy={loading}
+                aria-describedby={error ? 'login-error' : undefined}
+              >
                 <div className="field">
                   <label htmlFor="login-email">
                     <Trans>Correo</Trans>
@@ -328,12 +379,17 @@ export default function LoginScreen() {
                     className="input tall"
                     type="email"
                     autoComplete="email"
-                    placeholder="admin@tunegocio.mx"
+                    placeholder={t`nombre@negocio.mx`}
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => edit('login-email', setEmail, e.target.value)}
+                    {...errorProps('login-email')}
                     required
-                    autoFocus
+                    autoFocus={
+                      typeof window !== 'undefined' &&
+                      window.matchMedia('(hover: hover) and (pointer: fine)').matches
+                    }
                   />
+                  {fieldMessage('login-email')}
                 </div>
                 <div className="field">
                   <label htmlFor="login-pw">
@@ -347,7 +403,8 @@ export default function LoginScreen() {
                       autoComplete="current-password"
                       placeholder={t`Tu contraseña`}
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => edit('login-pw', setPassword, e.target.value)}
+                      {...errorProps('login-pw')}
                       required
                     />
                     <button
@@ -359,6 +416,7 @@ export default function LoginScreen() {
                       <EyeIcon off={showPw} />
                     </button>
                   </div>
+                  {fieldMessage('login-pw')}
                 </div>
                 <div className="login-row-between">
                   <label className="login-remember">
@@ -372,7 +430,12 @@ export default function LoginScreen() {
                     </span>
                     <Trans>Recordarme</Trans>
                   </label>
-                  <button type="button" className="login-link" onClick={() => go('forgot')}>
+                  <button
+                    type="button"
+                    className="login-link"
+                    disabled={loading}
+                    onClick={() => go('forgot')}
+                  >
                     <Trans>¿Olvidaste tu contraseña?</Trans>
                   </button>
                 </div>
@@ -388,7 +451,12 @@ export default function LoginScreen() {
                 <Trans>Verifica que eres tú</Trans>
               </h2>
               <p className="sub">{i18n._(mfaInstruction(challenge && challenge.method))}</p>
-              <form onSubmit={handleMfa} noValidate>
+              <form
+                onSubmit={handleMfa}
+                noValidate
+                aria-busy={loading}
+                aria-describedby={error ? 'login-error' : undefined}
+              >
                 <div className="field">
                   <label htmlFor="login-mfa">
                     <Trans>Código</Trans>
@@ -403,10 +471,12 @@ export default function LoginScreen() {
                     maxLength={6}
                     placeholder="000000"
                     value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                    onChange={(e) => edit('login-mfa', setCode, e.target.value.replace(/\D/g, ''))}
+                    {...errorProps('login-mfa')}
                     required
                     autoFocus
                   />
+                  {fieldMessage('login-mfa')}
                 </div>
                 {alertBox}
                 {submitBtn(t`Verificar`, t`Verificando…`)}
@@ -414,6 +484,7 @@ export default function LoginScreen() {
               <button
                 type="button"
                 className="btn btn-ghost login-back"
+                disabled={loading}
                 onClick={() => {
                   // Drop the challenge. It is a credential, however short-lived.
                   setChallenge(null);
@@ -433,9 +504,14 @@ export default function LoginScreen() {
                 <Trans>¿Olvidaste tu contraseña?</Trans>
               </h2>
               <p className="sub">
-                <Trans>Escríbenos tu correo y te mandamos un enlace para recuperarla.</Trans>
+                <Trans>Para restablecer tu contraseña, escribe tu correo.</Trans>
               </p>
-              <form onSubmit={handleForgot} noValidate>
+              <form
+                onSubmit={handleForgot}
+                noValidate
+                aria-busy={loading}
+                aria-describedby={error ? 'login-error' : undefined}
+              >
                 <div className="field">
                   <label htmlFor="forgot-email">
                     <Trans>Correo</Trans>
@@ -445,12 +521,14 @@ export default function LoginScreen() {
                     className="input tall"
                     type="email"
                     autoComplete="email"
-                    placeholder="admin@tunegocio.mx"
+                    placeholder={t`nombre@negocio.mx`}
                     value={forgot}
-                    onChange={(e) => setForgot(e.target.value)}
+                    onChange={(e) => edit('forgot-email', setForgot, e.target.value)}
+                    {...errorProps('forgot-email')}
                     required
                     autoFocus
                   />
+                  {fieldMessage('forgot-email')}
                 </div>
                 {alertBox}
                 {submitBtn(t`Enviar enlace`, t`Enviando…`)}
@@ -458,6 +536,7 @@ export default function LoginScreen() {
               <button
                 type="button"
                 className="btn btn-ghost login-back"
+                disabled={loading}
                 onClick={() => go('login')}
               >
                 <BackIcon /> <Trans>Volver a iniciar sesión</Trans>
@@ -470,12 +549,12 @@ export default function LoginScreen() {
               <div className="login-success-ico">
                 <MailIcon />
               </div>
-              <h2>
+              <h2 id="login-sent-title" tabIndex={-1}>
                 <Trans>Revisa tu correo</Trans>
               </h2>
               <p className="sub">
                 <Trans>
-                  Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu
+                  Si hay una cuenta con ese correo, te mandamos un enlace para restablecer tu
                   contraseña. Caduca en 15&nbsp;minutos.
                 </Trans>
               </p>

@@ -16,6 +16,15 @@ await import('../build/build.mjs'); // regenerate dist/ as a side effect
 const require = createRequire(import.meta.url);
 const distText = (f) => readFileSync(join(PKG, 'dist', f), 'utf8');
 
+const glassTokens = JSON.parse(readFileSync(join(PKG, 'tokens/dashboard.json'), 'utf8'))[
+  'login-glass'
+];
+const expectedGlass = Object.fromEntries(
+  Object.entries(glassTokens)
+    .filter(([name]) => !name.startsWith('$'))
+    .map(([name, token]) => [name, String(token.$value)]),
+);
+
 // Captured verbatim from apps/umi-dashboard/src/styles.css :root (lines 6-77).
 const EXPECTED_DASHBOARD = {
   'umi-navy': '#223979',
@@ -128,7 +137,15 @@ function parseCssVars(css) {
 // value in every theme (see dashboard.json — a leaf's $themes map). 'dark' is the
 // deep ocean-at-night palette (and the OS-dark default, $themeMeta.prefersDark);
 // 'midnight' is the all-black palette. Both override the SAME set of tokens.
+const expectedGlassTheme = (theme) =>
+  Object.fromEntries(
+    Object.entries(glassTokens)
+      .filter(([, token]) => token.$themes?.[theme] != null)
+      .map(([name, token]) => [name, String(token.$themes[theme])]),
+  );
+
 const EXPECTED_DASHBOARD_DARK = {
+  ...expectedGlassTheme('dark'),
   canvas: '#070C18',
   'canvas-2': '#0C1322',
   surface: '#0F1728',
@@ -161,6 +178,7 @@ const EXPECTED_DASHBOARD_DARK = {
 };
 
 const EXPECTED_DASHBOARD_MIDNIGHT = {
+  ...expectedGlassTheme('midnight'),
   canvas: '#000000',
   'canvas-2': '#0D0D0D',
   surface: '#000000',
@@ -193,7 +211,15 @@ const EXPECTED_DASHBOARD_MIDNIGHT = {
 };
 
 test('dashboard.css :root reproduces the default Umi token set 1:1', () => {
-  assert.deepEqual(parseCssVars(block(distText('dashboard.css'), ':root {')), EXPECTED_DASHBOARD);
+  assert.deepEqual(parseCssVars(block(distText('dashboard.css'), ':root {')), {
+    ...EXPECTED_DASHBOARD,
+    ...expectedGlass,
+    'login-type-title': '1.875rem',
+    'login-type-body': '1rem',
+    'login-type-label': '0.875rem',
+    'login-type-action': '0.875rem',
+    'login-type-leading': '1.5',
+  });
 });
 
 test('dashboard.css dark themes override exactly the tokens that declare them', () => {
@@ -255,5 +281,17 @@ test('shared brand hues resolve from core in BOTH apps (single source, no drift)
 test('no unresolved DTCG references leak into any generated artifact', () => {
   for (const f of ['dashboard.css', 'landing.cjs', 'landing.mjs', 'tokens.json']) {
     assert.doesNotMatch(distText(f), /\{[a-z]+(\.[a-z]+)+\}/i, `unresolved {ref} in dist/${f}`);
+  }
+});
+
+// A typed declaration must have a literal initial value and preserve inheritance.
+test('glass tokens emit typed properties without changing the existing themes', () => {
+  const css = distText('dashboard.css');
+  for (const [name, token] of Object.entries(glassTokens)) {
+    if (!token.$cssSyntax) continue;
+    const declaration = block(css, `@property --${name} {`);
+    assert.ok(declaration.includes(`syntax: "${token.$cssSyntax}";`));
+    assert.ok(declaration.includes(`initial-value: ${token.$value};`));
+    assert.ok(declaration.includes('inherits: true;'));
   }
 });

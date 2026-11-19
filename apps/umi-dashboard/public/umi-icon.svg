@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#061324"/>
+  <!-- Existing UmiX geometry, inset into the safe maskable region. -->
+  <g transform="translate(18 18) scale(.64)" stroke="#f5f5f7" stroke-width="14" stroke-linecap="round" fill="none">
+    <path d="M14 14 86 86M86 14 14 86"/>
+  </g>
+</svg>

@@ -3873,17 +3873,15 @@ time,
 
 /* ===== Login (redesign: split-navy, "elegant") ===== */
 /* ============================================================
-   LOGIN — "ocean at night" (umi = the sea), told the way Apple's marketing
-   pages are: one solid, deep, near-black ground; no glass, no blur, no glow.
-   The work is done by type — large, tight, confident — generous negative space,
-   and a single precise blue. The palette lives here as local custom properties
-   so the shared .input / .select / checkbox pick up the dark ground without a
-   rule each. */
+   LOGIN — mobile first, over the shared ocean scene.
+   Typography comes from the login roles in @umi/tokens.
+   ============================================================ */
 .login-wrap {
   position: relative;
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 1.05fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
   color: #f5f5f7;
   /* A goldfish leaving the sea over deep navy — umi's ground made literal. The
      photo sits under a scrim: darker on the right, where the form must stay
@@ -3921,7 +3919,8 @@ time,
 /* Left · brand panel — the marketing statement on the shared ground. */
 .login-brand {
   position: relative;
-  padding: 56px 64px;
+  padding: max(20px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) 0
+    max(24px, env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -3931,6 +3930,38 @@ time,
 .login-brand > * {
   position: relative;
   z-index: 1;
+}
+.login-wrap--goldfish {
+  min-height: 100svh;
+  min-height: 100dvh;
+  background: #061324;
+  isolation: isolate;
+}
+.login-wrap--goldfish .login-brand,
+.login-wrap--goldfish .login-form-pane {
+  z-index: 1;
+}
+.login-wrap--goldfish .login-brandmark {
+  width: fit-content;
+}
+.login-wrap--goldfish .login-goldfish {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.login-goldfish canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace);
+}
+.login-goldfish canvas[hidden] {
+  display: none;
+}
+.login-wrap--goldfish .login-hero {
+  display: none;
+  margin: auto 0 0;
 }
 .login-brandmark {
   display: flex;
@@ -3986,7 +4017,9 @@ time,
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 44px 56px;
+  padding: 36px max(24px, env(safe-area-inset-right)) max(36px, env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
+  min-width: 0;
   background: transparent;
 }
 .login-form {
@@ -4010,27 +4043,42 @@ time,
   color: var(--ink-3);
 }
 .login-form h2 {
-  font-size: 28px;
+  font-size: var(--login-type-title);
+  line-height: 1.18;
   font-weight: 600;
   letter-spacing: -0.02em;
   margin: 0 0 8px;
   color: #f5f5f7;
 }
 .login-form .sub {
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: var(--login-type-body);
+  line-height: var(--login-type-leading);
   color: var(--ink-2);
   margin: 0 0 32px;
 }
-/* Clean flat fields: a placeholder that recedes and a crisp Apple-blue focus ring. */
+/* Labels remain visible. Placeholders only provide an example. */
 .login-wrap .input::placeholder {
-  color: var(--ink-4);
+  color: var(--ink-2);
+  opacity: 1;
 }
-.login-wrap .input:focus,
-.login-wrap .select:focus {
-  border-color: var(--lg-accent);
-  background: #121c33;
-  box-shadow: 0 0 0 4px rgba(41, 151, 255, 0.28);
+.login-form .field label {
+  font-size: var(--login-type-label);
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #bbc5d4;
+}
+.login-form .input {
+  font-size: var(--login-type-body);
+  line-height: var(--login-type-leading);
+}
+.login-form .input.tall {
+  height: auto;
+  min-height: 52px;
+  padding-block: 12px;
+}
+.login-view > h2:has(+ form) {
+  margin-bottom: 28px;
 }
 .login-form form {
   display: flex;
@@ -4069,7 +4117,6 @@ time,
 }
 .login-reveal:hover {
   color: var(--ink-1);
-  background: rgba(255, 255, 255, 0.06);
 }
 
 /* remember + forgot row */
@@ -4083,8 +4130,9 @@ time,
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 13px;
-  color: var(--ink-2);
+  font-size: var(--login-type-action);
+  min-height: var(--control-min);
+  color: #bbc5d4;
   cursor: pointer;
   user-select: none;
 }
@@ -4126,8 +4174,8 @@ time,
 .login-link {
   background: none;
   border: none;
-  color: var(--lg-accent);
-  font-size: 13px;
+  color: #c9d8eb;
+  font-size: var(--login-type-action);
   font-weight: 500;
   cursor: pointer;
   font-family: inherit;
@@ -4141,7 +4189,7 @@ time,
   min-height: var(--control-min);
 }
 .login-link:hover {
-  color: var(--lg-accent);
+  color: #ffffff;
   text-decoration: underline;
 }
 
@@ -4151,26 +4199,29 @@ time,
   justify-content: center;
   position: relative;
 }
-/* The Apple key: one flat system blue, a pill, no gradient, no shadow, no glow.
-   The `.btn-primary.login-submit` pairing raises specificity to match (and, being
-   later, beat) the dark-scheme `.btn-primary` rule that would otherwise repaint
-   this the app's brand blue. */
+/* A single primary action, with the same palette in every state and viewport. */
 .login-wrap .btn-primary.login-submit {
-  height: 50px;
+  min-height: 52px;
+  height: auto;
+  padding: 13px 20px;
   border-radius: 980px;
-  background: #0071e3;
+  background: #e2eaf3;
   border: none;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  color: #152234;
+  font-size: var(--login-type-body);
+  font-weight: 600;
+  letter-spacing: 0;
   box-shadow: none;
 }
 .login-wrap .btn-primary.login-submit:hover {
-  background: #0077ed;
+  background: #f4f7fc;
 }
 .login-wrap .btn-primary.login-submit:active {
-  background: #006edb;
+  background: #cfdae8;
+}
+.login-wrap .login-submit:disabled {
+  opacity: 1;
+  cursor: wait;
 }
 .login-spinner {
   width: 16px;
@@ -4195,8 +4246,8 @@ time,
   border: 1px solid rgba(179, 58, 53, 0.28);
   border-radius: 12px;
   padding: 11px 13px;
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: var(--login-type-label);
+  line-height: var(--login-type-leading);
   color: var(--danger);
   animation: login-rise 0.28s var(--ease);
 }
@@ -4217,8 +4268,8 @@ time,
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: rgba(41, 151, 255, 0.12);
-  border: 1px solid rgba(41, 151, 255, 0.28);
+  background: rgb(201 216 235 / 0.08);
+  border: 1px solid rgb(201 216 235 / 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4243,7 +4294,10 @@ time,
   align-items: center;
   gap: 7px;
   margin-top: 24px;
-  color: var(--ink-3);
+  color: #bbc5d4;
+  font-size: var(--login-type-action);
+  white-space: normal;
+  text-align: start;
 }
 .login-back:hover {
   color: var(--ink-1);
@@ -4262,14 +4316,46 @@ time,
   .login-pw .input.tall {
     font-size: 16px;
   }
+}
+@media (min-width: 841px) and (min-height: 501px) {
   .login-wrap {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1.05fr 1fr;
+    grid-template-rows: 1fr;
   }
   .login-brand {
-    display: none;
+    padding: max(56px, env(safe-area-inset-top)) max(64px, env(safe-area-inset-right))
+      max(56px, env(safe-area-inset-bottom)) max(64px, env(safe-area-inset-left));
+  }
+  .login-wrap--goldfish .login-hero {
+    display: block;
   }
   .login-form-pane {
-    padding: 44px 28px;
+    padding: max(44px, env(safe-area-inset-top)) max(56px, env(safe-area-inset-right))
+      max(44px, env(safe-area-inset-bottom)) 56px;
+  }
+}
+@media (max-width: 359px) {
+  .login-row-between {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+  }
+}
+/* Safari exposes the document behind its floating bars and during overscroll. */
+html:has(.login-wrap--goldfish),
+body:has(.login-wrap--goldfish) {
+  background-color: #061324;
+  color-scheme: dark;
+}
+.login-wrap {
+  scroll-margin-block: 24px;
+}
+.login-form .input {
+  scroll-margin-block: 24px;
+}
+@media (display-mode: standalone) {
+  .login-wrap--goldfish {
+    min-height: 100dvh;
   }
 }
 
@@ -4548,12 +4634,13 @@ time,
 /* Language control on the login form: right-aligned, narrow, quiet. */
 .login-locale {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   margin-bottom: 18px;
 }
 .login-locale .locale-select {
   width: auto !important;
-  min-width: 120px;
+  min-width: max-content;
 }
 
 /* ============================================================

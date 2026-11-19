@@ -1,0 +1,343 @@
+/* Material values live in @umi/tokens. Only the login opts into this surface. */
+[data-login-glass='true'] {
+  --login-glass-gain: 1;
+  --login-glass-background:
+    radial-gradient(
+      ellipse calc(12% + var(--login-glass-activation) * 88%) 180% at
+        calc(var(--login-glass-touch-x) * 100%) calc(var(--login-glass-touch-y) * 100%),
+      rgb(
+        from var(--glass-light-tint) r g b /
+          calc(var(--login-glass-activation) * var(--glass-touch-strength))
+      ),
+      transparent 80%
+    ),
+    radial-gradient(
+      ellipse at top left,
+      color-mix(
+        in srgb,
+        var(--login-glass-highlight) calc(min(1, var(--login-glass-scale)) * 100%),
+        transparent
+      ),
+      transparent 55%
+    ),
+    rgb(
+      from var(--login-glass-tint) r g b /
+        min(1, calc(var(--login-glass-alpha) * var(--login-glass-scale) * var(--login-glass-gain)))
+    );
+  --login-glass-filter: blur(calc(var(--glass-blur) * 1px))
+    saturate(calc(1 + (var(--login-glass-saturation) - 1) * min(1, var(--login-glass-scale))))
+    brightness(calc(1 + (var(--login-glass-brightness) - 1) * min(1, var(--login-glass-scale))));
+  background: var(--login-glass-background);
+  -webkit-backdrop-filter: var(--login-glass-filter);
+  backdrop-filter: var(--login-glass-filter) var(--login-glass-lens, blur(0px));
+  box-shadow: var(--login-glass-edge);
+  color: var(--login-glass-ink);
+  transition:
+    --login-glass-activation 240ms var(--ease),
+    --login-glass-alpha 220ms var(--ease),
+    --login-glass-scale 220ms var(--ease),
+    --login-glass-tint 220ms var(--ease),
+    --login-glass-ink 220ms var(--ease),
+    --login-glass-secondary 220ms var(--ease),
+    --login-glass-highlight 220ms var(--ease),
+    --login-glass-brightness 220ms var(--ease),
+    --login-glass-saturation 220ms var(--ease),
+    border-color 160ms var(--ease);
+}
+/* Existing selectors retain their geometry, semantic colors, and disabled states. */
+.login-wrap .input[data-login-glass],
+.login-wrap .select[data-login-glass],
+.login-wrap .btn-primary.login-submit[data-login-glass],
+.login-wrap .login-remember .box[data-login-glass],
+.login-glass-settings-panel[data-login-glass] {
+  background: var(--login-glass-background);
+  backdrop-filter: var(--login-glass-filter) var(--login-glass-lens, blur(0px));
+  box-shadow: var(--login-glass-edge);
+  color: var(--login-glass-ink);
+}
+[data-login-glass]:hover {
+  --login-glass-gain: var(--glass-hover-gain);
+}
+.login-wrap .input[data-login-glass]::placeholder {
+  color: var(--login-glass-secondary);
+  opacity: 1;
+}
+/* A lit inner rim marks editing. A crisp neutral ring keeps keyboard focus visible. */
+.login-wrap {
+  --login-focus-ink: var(--glass-focus-light);
+  --login-focus-gap: var(--glass-shade-tint);
+}
+.login-wrap [data-glass-ink='dark'] {
+  --login-focus-ink: var(--glass-focus-dark);
+  --login-focus-gap: var(--glass-light-tint);
+}
+.login-wrap .input:focus,
+.login-wrap .select:focus {
+  border-color: rgb(from var(--login-glass-ink, var(--ink-1)) r g b / 0.28);
+  box-shadow:
+    inset 0 1px 0 var(--glass-focus-rim),
+    inset 0 0 0 0.5px var(--glass-focus-rim),
+    0 0 0 1px var(--glass-focus-separator);
+}
+.login-wrap .input[data-login-glass]:focus,
+.login-wrap .select[data-login-glass]:focus {
+  background: var(--login-glass-background);
+  box-shadow:
+    inset 0 0 0 0.5px var(--glass-focus-rim),
+    var(--login-glass-edge),
+    0 0 0 1px var(--glass-focus-separator);
+}
+.login-wrap .input:focus-visible,
+.login-wrap .select:focus-visible,
+.login-wrap .input[data-login-glass]:focus-visible,
+.login-wrap .select[data-login-glass]:focus-visible {
+  outline: 2px solid var(--login-focus-ink);
+  outline-offset: 3px;
+  box-shadow:
+    var(--login-glass-edge, inset 0 0 transparent),
+    0 0 0 3px var(--login-focus-gap);
+}
+/* Pointer feedback stays inside the glass. Keyboard navigation retains its own cue. */
+.login-wrap[data-login-input='pointer'] .input:focus-visible,
+.login-wrap[data-login-input='pointer'] .select:focus-visible {
+  outline: none;
+  box-shadow: var(--login-glass-edge, inset 0 1px 0 var(--glass-focus-rim));
+}
+.login-wrap :is(.input, .select)[data-login-glass]:focus {
+  --login-glass-activation: 0.55;
+}
+.login-wrap :is(.input, .select, .login-submit)[data-login-glass]:active,
+.login-wrap :is(.input, .select, .login-submit)[data-login-glass][data-glass-pressed='true'] {
+  --login-glass-activation: 1;
+}
+.login-wrap .login-remember input:checked + .box[data-login-glass] {
+  background: rgb(201 216 235 / 0.22);
+  border-color: rgb(201 216 235 / 0.55);
+}
+.login-wrap .login-remember input:focus-visible + .box {
+  box-shadow:
+    var(--login-glass-edge, inset 0 0 transparent),
+    0 0 0 1px var(--glass-focus-separator);
+  outline: 2px solid var(--glass-focus-light);
+  outline-offset: 3px;
+}
+/* Blend only inner paint. A blended ancestor would hide the scene from its children. */
+[data-login-glass] > .ui-select-value,
+[data-login-glass] > .ui-select-caret,
+[data-login-glass] > span:not(.login-spinner),
+[data-login-glass] .ui-select-option-label,
+[data-login-glass] .ui-select-check {
+  mix-blend-mode: var(--login-glass-blend);
+}
+[data-login-glass] > .ui-select-caret {
+  color: rgb(from var(--login-glass-ink) r g b);
+}
+.login-glass-settings-panel[data-login-glass] > label {
+  mix-blend-mode: var(--login-glass-blend);
+}
+.login-wrap .login-pw:has(.input[data-login-glass]) .login-reveal {
+  color: rgb(from var(--glass-dark-ink) r g b);
+  opacity: 0.64;
+}
+.login-wrap .login-pw:has(.input[data-glass-ink='dark']) .login-reveal {
+  color: rgb(from var(--glass-light-ink) r g b);
+}
+.login-wrap .login-pw:has(.input[data-login-glass]) .login-reveal svg {
+  mix-blend-mode: var(--login-glass-blend, plus-lighter);
+}
+.login-wrap .login-pw:has(.input[data-glass-ink='dark']) .login-reveal svg {
+  mix-blend-mode: multiply;
+}
+.ui-select-pop[data-login-glass] .ui-select-option {
+  color: var(--login-glass-ink);
+}
+.ui-select-pop[data-login-glass],
+.login-glass-settings-panel[data-login-glass] {
+  --glass-blur: var(--glass-panel-blur);
+}
+body:has(.login-wrap) .ui-select-pop {
+  font-size: var(--login-type-action);
+}
+body:has(.login-wrap) .ui-select-option {
+  min-height: 44px;
+}
+/* A check marks the saved value. Only the explored row receives a highlight. */
+body:has(.login-wrap) .ui-select-pop .ui-select-option {
+  background: transparent;
+  box-shadow: none;
+  color: var(--login-glass-ink, var(--ink-1));
+}
+body:has(.login-wrap) .ui-select-pop .ui-select-option.active {
+  background: var(--glass-selected-row);
+}
+body:has(.login-wrap) .ui-select-pop .ui-select-option .ui-select-check {
+  color: currentColor;
+}
+.login-wrap ::selection,
+body:has(.login-wrap) .ui-select-pop ::selection {
+  background: var(--glass-selection-fill);
+  color: var(--glass-selection-ink);
+}
+.login-wrap .login-submit[data-login-glass] .login-spinner {
+  border-color: rgb(from var(--login-glass-ink) r g b / 0.35);
+  border-top-color: var(--login-glass-ink);
+}
+
+/* The sole new UI is the owner-approved tint control beside the language selector. */
+.login-locale {
+  position: relative;
+  gap: 10px;
+}
+.login-glass-settings {
+  position: static;
+}
+.login-glass-settings > summary {
+  list-style: none;
+  min-height: 44px;
+  height: auto;
+  font-size: var(--login-type-action);
+  cursor: pointer;
+  color: var(--ink-2);
+}
+.login-glass-settings > summary::-webkit-details-marker {
+  display: none;
+}
+.login-glass-settings-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  width: min(280px, calc(100vw - 56px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  color: var(--ink-1);
+}
+.login-glass-settings-panel label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.login-glass-settings-panel output {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.login-glass-settings-panel input {
+  display: block;
+  width: 100%;
+  accent-color: #c9d8eb;
+}
+.login-glass-settings-panel input:focus-visible {
+  outline: 2px solid var(--login-focus-ink);
+  outline-offset: 2px;
+}
+
+.login-field-error {
+  margin: 4px 0 0;
+  color: var(--danger);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.login-wrap .input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.login-wrap .login-success-ico {
+  color: #c9d8eb;
+}
+.login-wrap .login-link:disabled,
+.login-wrap .login-back:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.login-wrap :is(button, summary):focus-visible {
+  outline: 2px solid var(--login-focus-ink);
+  outline-offset: 3px;
+}
+/* The reveal action has no button fill. Keyboard focus follows the eye glyph. */
+.login-wrap .login-reveal:is(:hover, :active, :focus) {
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+.login-wrap .login-reveal:focus-visible {
+  outline: none;
+}
+.login-wrap .login-reveal:focus-visible svg {
+  border-radius: 50%;
+  outline: 2px solid var(--login-focus-ink);
+  outline-offset: 4px;
+}
+.login-wrap[data-login-input='pointer'] .login-reveal:focus-visible svg {
+  outline: none;
+}
+.login-wrap h2[tabindex='-1']:focus {
+  outline: none;
+}
+
+@supports not (backdrop-filter: blur(2px)) {
+  [data-login-glass='true'] {
+    background: var(--login-glass-tint) !important;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  [data-login-glass='true'] {
+    background: var(--login-glass-tint) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+@media (forced-colors: active) {
+  html[data-login-scene],
+  html[data-login-scene] body,
+  .login-wrap--goldfish {
+    background: Canvas !important;
+    color: CanvasText;
+  }
+  .login-wrap--goldfish .login-goldfish {
+    display: none;
+  }
+  .login-wrap .login-brandmark svg path {
+    stroke: CanvasText;
+  }
+  .login-wrap .login-success-ico {
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
+  }
+  [data-login-glass='true'] {
+    background: Canvas !important;
+    color: CanvasText !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    outline: 1px solid CanvasText;
+  }
+  .login-wrap .login-reveal:focus-visible svg {
+    outline-color: Highlight;
+  }
+  .login-wrap .input:focus-visible,
+  .login-wrap .select:focus-visible,
+  .login-wrap .input[data-login-glass]:focus-visible,
+  .login-wrap .select[data-login-glass]:focus-visible,
+  .login-wrap .login-remember input:focus-visible + .box,
+  .login-glass-settings-panel input:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 3px;
+  }
+  [data-login-glass] * {
+    mix-blend-mode: normal !important;
+  }
+  .login-wrap .input[data-login-glass]::placeholder {
+    color: GrayText;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-login-glass='true'] {
+    transition: none;
+  }
+}
