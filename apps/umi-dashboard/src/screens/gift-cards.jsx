@@ -436,7 +436,7 @@ const GiftCardsScreen = () => {
               <th>
                 <Trans>Destinatario</Trans>
               </th>
-              <th style={{ textAlign: 'right' }}>
+              <th className="cash-num">
                 <Trans>Monto</Trans>
               </th>
               <th>

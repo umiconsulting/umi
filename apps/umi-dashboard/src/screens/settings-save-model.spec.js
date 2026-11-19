@@ -19,6 +19,8 @@ const base = {
   promo: { message: 'Doble sello', from: '2026-11-01', to: '2026-11-30' },
   promoDayNums: '1,2,3',
   selfReg: false,
+  topupEnabled: true,
+  multiSealEnabled: false,
   birthday: { on: true, rewardName: 'Pastel' },
   loyalty: {
     rewardName: 'Café gratis',
@@ -78,9 +80,21 @@ describe('settings save split', () => {
       promoEndsAt: '2026-11-30T23:59:59.000Z',
       promoDays: '1,2,3',
       selfRegistration: false,
+      topupEnabled: true,
+      multiSealEnabled: false,
       birthdayRewardEnabled: true,
       birthdayRewardName: 'Pastel',
     });
+  });
+
+  it('omits the switches when the merchant record does not carry them', () => {
+    const { cash } = buildSettingsSaves({
+      ...base,
+      topupEnabled: undefined,
+      multiSealEnabled: undefined,
+    });
+    expect(cash).not.toHaveProperty('topupEnabled');
+    expect(cash).not.toHaveProperty('multiSealEnabled');
   });
 
   it('echoes rewardDescription and the second tier instead of erasing them', () => {

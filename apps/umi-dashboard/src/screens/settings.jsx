@@ -24,9 +24,10 @@ import { buildSettingsSaves } from './settings-save-model.js';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 
 // Screen 5 — Settings (Branding + Loyalty + Promotions)
-// Data: useMerchantData() → umi-cash GET /api/[merchantRef]/admin/settings + reward-config
-// Save: saveMerchantSettings(patch) → PATCH /api/[merchantRef]/admin/settings
-//       saveRewardConfig(patch)   → PATCH /api/[merchantRef]/admin/reward-config
+// Data: useMerchantData() → GET /api/merchants/:id/cash/settings + reward-config
+// Save: saveMerchantSettings(patch) → PATCH /api/merchants/:id/settings
+//       saveCashSettings(patch)     → PATCH /api/merchants/:id/cash/settings
+//       saveRewardConfig(patch)     → PATCH /api/merchants/:id/cash/reward-config
 
 const DOW = [
   { id: 'dom', l: msg`Dom` },
@@ -395,6 +396,8 @@ const SettingsScreen = () => {
       promo,
       promoDayNums,
       selfReg,
+      topupEnabled: merchant?.topupEnabled,
+      multiSealEnabled: merchant?.multiSealEnabled,
       birthday,
       loyalty,
       cashActive,

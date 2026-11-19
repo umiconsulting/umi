@@ -76,6 +76,13 @@ describe('GiftCardsScreen permission surface', () => {
     expect(markup).not.toContain('Solo consulta');
   });
 
+  it('right-aligns the amount header and the amount cells', () => {
+    state.merchant = { capabilities: capabilitiesFor('owner') };
+    const markup = renderToStaticMarkup(withI18n(<GiftCardsScreen />));
+    expect(markup).toMatch(/<th class="cash-num">Monto<\/th>/);
+    expect(markup).toMatch(/<td class="cash-num">/);
+  });
+
   it('lets the cashier redeem but not issue', () => {
     state.merchant = { capabilities: capabilitiesFor('cashier') };
     const markup = renderToStaticMarkup(withI18n(<GiftCardsScreen />));

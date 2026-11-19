@@ -368,15 +368,13 @@ async function _loadMerchant(ctx) {
   // request the signed-in person has no authority for.
   if (!ctx?.capabilities) return null;
   const s = await _apiFetch(_merchantPath(ctx, '/settings'));
-  // Reach the cash admin surface by merchant ID, not by the published handle. The two
-  // used to be the same string; they are not, and a café created after cutover has no
-  // handle at all. The route accepts either, and the id is the one that always exists.
+  // The Cash settings contract is merchant-id scoped: GET /api/merchants/:id/cash/settings.
+  // It returns the Cash-only switches (`topupEnabled`, `selfRegistration`,
+  // `multiSealEnabled`) that the merchant settings DTO never declared.
   // Permission-gated on the server (`merchant.manage`); a role that cannot read it
   // does not ask, and falls through to the merchant record below.
   const cashSettings = _canReadCashSettings(ctx)
-    ? await _apiFetch(`/api/${encodeURIComponent(_merchantId(ctx))}/admin/settings`).catch(
-        () => null,
-      )
+    ? await _apiFetch(cashSettingsPath(_merchantId(ctx))).catch(() => null)
     : null;
   // The reward read is `loyalty.read`, not the product alone. A membership with
   // only `wallet.read` reaches the hub but would receive a 403 here, and the
@@ -401,7 +399,8 @@ async function _loadMerchant(ctx) {
     businessDayStart: s.businessDayStart || '00:00',
     // Effective segment cutoffs (code defaults merged with the owner's overrides).
     segmentThresholds: s.segmentThresholds || {},
-    topupEnabled: s.topupEnabled,
+    topupEnabled: cashSettings?.topupEnabled ?? s.topupEnabled,
+    multiSealEnabled: cashSettings?.multiSealEnabled ?? s.multiSealEnabled,
     selfRegistration: cashSettings?.selfRegistration ?? s.selfRegistration,
     birthdayRewardEnabled: cashSettings?.birthdayRewardEnabled ?? s.birthdayRewardEnabled,
     birthdayRewardName: cashSettings?.birthdayRewardName ?? s.birthdayRewardName,
@@ -671,19 +670,26 @@ async function saveMerchantSettings(
   });
 }
 
+/** The merchant-id Cash settings contract: read and write use the same path. */
+export function cashSettingsPath(merchantId) {
+  return `/api/merchants/${encodeURIComponent(merchantId)}/cash/settings`;
+}
+
 /**
  * The Cash program writer.
  *
  * `saveMerchantSettings` targets the merchant DTO, which does NOT declare the
- * Cash-only fields (pass style, promotion, birthday reward, brand colours).
- * Sending them there was a silent discard: the UI said "saved" and the values
- * never changed. The cash admin settings route accepts them and is guarded by
- * `merchant.manage`, the same authority the Settings module already requires.
+ * Cash-only fields (pass style, promotion, birthday reward, brand colours,
+ * self-registration, top-up and multi-seal switches). Sending them there was a
+ * silent discard: the UI said "saved" and the values never changed. The
+ * merchant-id Cash settings route persists them under `merchant.manage`.
  */
-async function saveCashSettings(patch) {
-  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+async function saveCashSettings(
+  patch,
+  merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant'),
+) {
   if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
-  return _apiFetch(`/api/${encodeURIComponent(merchantId)}/admin/settings`, {
+  return _apiFetch(cashSettingsPath(merchantId), {
     method: 'PATCH',
     body: JSON.stringify(patch),
   });
@@ -1591,14 +1597,18 @@ async function issueGiftCard({
   });
 }
 
-// Register a new loyalty member from the dashboard. Same endpoint the customer
-// self-service page uses; it returns the new card in the BODY (no cookies), so it
-// does not touch the operator's dashboard session. `phone` is the assembled
-// `+<dial><national>` the API validates against the country's digit count.
-async function registerMember({ name, phone, birthDate }) {
-  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+// Register a new loyalty member from the dashboard. This is the authenticated
+// staff route (`customer.create`), not the public customer self-service path. It
+// returns the card in the BODY and never opens a customer session. `phone` is the
+// assembled `+<dial><national>` the API validates against the country's digit
+// count. The response is `{ alreadyRegistered, customerId, cardId, cardNumber,
+// name, message }`; the dialog keeps support for a verification challenge too.
+async function registerMember(
+  { name, phone, birthDate },
+  merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant'),
+) {
   if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
-  return _apiFetch(routes.cash.byRef.registerMember(merchantId), {
+  return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/cash/customers`, {
     method: 'POST',
     body: JSON.stringify({ name, phone, birthDate }),
   });

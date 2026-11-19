@@ -89,6 +89,27 @@ describe('MembersScreen permission surface', () => {
     expect(markup).toContain('3/10');
   });
 
+  it('trusts the server contactRestricted flag even when the capability allows contact', () => {
+    state.merchant = { capabilities: capabilitiesFor('owner') };
+    state.members = {
+      ...loadedMembers,
+      data: {
+        ...loadedMembers.data,
+        customers: [
+          {
+            ...loadedMembers.data.customers[0],
+            phone: null,
+            email: null,
+            contactRestricted: true,
+          },
+        ],
+      },
+    };
+    const markup = renderToStaticMarkup(withI18n(<MembersScreen />));
+    expect(markup).toContain('Contacto restringido');
+    expect(markup).not.toContain('+52 55 1234 5678');
+  });
+
   it('turns a 403 into a refusal instead of an empty member list', () => {
     state.merchant = { capabilities: capabilitiesFor('viewer') };
     state.members = {

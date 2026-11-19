@@ -463,6 +463,10 @@ const MemberRow = ({
     .join('')
     .toUpperCase();
   const visitsRequired = c.visitsRequired || null;
+  // The server is the authority. It returns `contactRestricted: true` and null
+  // contact fields when the membership lacks `customer.contact.read`. Trust that
+  // flag even if a cached capability list still says the key is present.
+  const contactRestricted = !canSeeContact || c.contactRestricted === true;
 
   return (
     <tr className={'cash-row' + (isSelected ? ' is-selected' : '')}>
@@ -473,13 +477,13 @@ const MemberRow = ({
           </div>
           <div className="cash-member-id">
             <span className="cash-member-name">{c.name || t`Sin nombre`}</span>
-            {canSeeContact ? (
-              <span className="cash-member-phone">{c.phone || '—'}</span>
-            ) : (
+            {contactRestricted ? (
               <span className="cash-masked" data-masked-contact="">
                 <I.Lock size={11} aria-hidden="true" />
                 <Trans>Contacto restringido</Trans>
               </span>
+            ) : (
+              <span className="cash-member-phone">{c.phone || '—'}</span>
             )}
           </div>
         </div>
@@ -545,6 +549,7 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, canSeeContact, onClose }
     : Array.isArray(c.history)
       ? c.history
       : [];
+  const contactRestricted = !canSeeContact || c.contactRestricted === true;
 
   useEffect(() => {
     const onKey = (event) => {
@@ -631,13 +636,13 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, canSeeContact, onClose }
                 <span>
                   <Trans>Teléfono</Trans>
                 </span>
-                {canSeeContact ? (
-                  <span className="cash-mono">{c.phone || '—'}</span>
-                ) : (
+                {contactRestricted ? (
                   <span className="cash-masked" data-masked-contact="">
                     <I.Lock size={11} aria-hidden="true" />
                     <Trans>Contacto restringido</Trans>
                   </span>
+                ) : (
+                  <span className="cash-mono">{c.phone || '—'}</span>
                 )}
               </div>
               {c.email ? (
@@ -645,7 +650,7 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, canSeeContact, onClose }
                   <span>
                     <Trans>Correo</Trans>
                   </span>
-                  <span className="cash-mono">{canSeeContact ? c.email : '••••••••'}</span>
+                  <span className="cash-mono">{contactRestricted ? '••••••••' : c.email}</span>
                 </div>
               ) : null}
               <div className="cash-row-line">
@@ -661,14 +666,14 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, canSeeContact, onClose }
                 <span>{c.lastVisit ? fmtDate(c.lastVisit) : t`Nunca`}</span>
               </div>
             </div>
-            {canSeeContact ? null : (
+            {contactRestricted ? (
               <p className="cash-note">
                 <I.Lock size={13} aria-hidden="true" />
                 <Trans>
                   Tu rol puede operar la lealtad, pero no ver los datos de contacto del cliente.
                 </Trans>
               </p>
-            )}
+            ) : null}
           </section>
 
           <section className="cash-drawer-section">

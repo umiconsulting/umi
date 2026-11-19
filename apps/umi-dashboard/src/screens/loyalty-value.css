@@ -191,14 +191,21 @@
   background: var(--canvas-2);
 }
 
-.cash-num {
+.cash-table .cash-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.cash-center {
+.cash-table .cash-center {
   text-align: center;
+}
+
+.cash-table td.cash-cell-action,
+.cash-table th.cash-cell-action {
+  width: 44px;
+  padding-right: 12px;
+  text-align: right;
 }
 
 .cash-money {
@@ -603,6 +610,76 @@
 .cash-register-result {
   display: grid;
   gap: 10px;
+}
+
+@media (max-width: 1180px) {
+  .cash-table {
+    min-width: 760px;
+  }
+
+  .cash-table th,
+  .cash-table td {
+    padding: 10px 10px;
+    font-size: 12.5px;
+  }
+
+  .cash-table th:first-child,
+  .cash-table td:first-child {
+    padding-left: 14px;
+  }
+
+  .cash-table th:last-child,
+  .cash-table td:last-child {
+    padding-right: 12px;
+  }
+
+  .cash-table .cash-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    font-size: 11px;
+  }
+
+  .cash-table .cash-member {
+    gap: 8px;
+  }
+
+  .cash-table .cash-member-name {
+    font-size: 12.5px;
+  }
+
+  .cash-table .cash-member-phone {
+    font-size: 10.5px;
+  }
+
+  .cash-table .cash-card-number {
+    font-size: 11px;
+  }
+
+  .cash-table .cash-money {
+    font-size: 13px;
+  }
+
+  .cash-table .cash-stamp {
+    gap: 6px;
+  }
+
+  .cash-table .cash-stamp-segs {
+    gap: 2px;
+  }
+
+  .cash-table .cash-stamp-seg {
+    width: 6px;
+  }
+
+  .cash-table .cash-stamp-label {
+    font-size: 11px;
+  }
+
+  .cash-table .cash-badge {
+    padding: 2px 6px;
+    font-size: 10px;
+  }
 }
 
 @media (max-width: 720px) {

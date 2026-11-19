@@ -20,6 +20,8 @@ export function buildSettingsSaves({
   promo,
   promoDayNums,
   selfReg,
+  topupEnabled,
+  multiSealEnabled,
   birthday,
   loyalty,
   cashActive,
@@ -51,6 +53,8 @@ export function buildSettingsSaves({
         promoEndsAt: promo.to ? promo.to + 'T23:59:59.000Z' : null,
         promoDays: promoDayNums || null,
         selfRegistration: selfReg,
+        ...(typeof topupEnabled === 'boolean' ? { topupEnabled } : {}),
+        ...(typeof multiSealEnabled === 'boolean' ? { multiSealEnabled } : {}),
         birthdayRewardEnabled: birthday.on,
         birthdayRewardName: birthday.rewardName,
       }
