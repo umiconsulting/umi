@@ -390,7 +390,7 @@
     },
     {
       "id": "cash.settings.read",
-      "module": "settings",
+      "module": "loyalty-value",
       "client": {
         "gate": ["merchant.manage"],
         "gateMode": "any",
@@ -407,7 +407,7 @@
     },
     {
       "id": "cash.settings.write",
-      "module": "settings",
+      "module": "loyalty-value",
       "client": {
         "gate": ["merchant.manage"],
         "gateMode": "any",
