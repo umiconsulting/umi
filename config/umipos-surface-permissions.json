@@ -413,7 +413,11 @@
         "gateMode": "any",
         "source": "apps/umi-dashboard/src/screens/settings.jsx:382 (Cash settings → PATCH /api/merchants/{merchantId}/cash/settings)"
       },
-      "request": { "method": "PATCH", "path": "/api/merchants/{merchantId}/cash/settings", "body": {} },
+      "request": {
+        "method": "PATCH",
+        "path": "/api/merchants/{merchantId}/cash/settings",
+        "body": {}
+      },
       "note": "Cash-only settings write. The guard runs before the handler, so a refused role never reaches the write.",
       "expect": {
         "cashier": "refused",
@@ -430,7 +434,10 @@
         "gateMode": "any",
         "source": "apps/umi-dashboard/src/data.jsx:451 (member detail → GET /api/merchants/{merchantId}/cash/customers/{customerId})"
       },
-      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/cash/customers/{customerId}" },
+      "request": {
+        "method": "GET",
+        "path": "/api/merchants/{merchantId}/cash/customers/{customerId}"
+      },
       "note": "Contact fields follow customer.contact.read. A caller without it receives null phone, email and birthday plus contactRestricted.",
       "expect": {
         "cashier": "allowed",
@@ -447,7 +454,10 @@
         "gateMode": "any",
         "source": "apps/umi-dashboard/src/data.jsx:451 (members alias → GET /api/merchants/{merchantId}/cash/members/{customerId})"
       },
-      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/cash/members/{customerId}" },
+      "request": {
+        "method": "GET",
+        "path": "/api/merchants/{merchantId}/cash/members/{customerId}"
+      },
       "note": "Alias of cash.customerDetail. Same projection and contact policy.",
       "expect": {
         "cashier": "allowed",

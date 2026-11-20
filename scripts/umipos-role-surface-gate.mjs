@@ -95,10 +95,10 @@ function url(path) {
  * detail guard instead of a literal placeholder.
  */
 async function resolveCustomerId(session) {
-  const response = await fetch(
-    `${baseUrl}/api/merchants/${merchantId}/cash/customers?limit=1`,
-    { headers: { cookie: session.jar.cookieHeader() }, redirect: 'manual' },
-  );
+  const response = await fetch(`${baseUrl}/api/merchants/${merchantId}/cash/customers?limit=1`, {
+    headers: { cookie: session.jar.cookieHeader() },
+    redirect: 'manual',
+  });
   if (!response.ok) return null;
   const data = await response.json().catch(() => null);
   return data?.customers?.[0]?.id ?? null;

@@ -20,11 +20,7 @@ function byRef(changed: boolean) {
 function merchantId(changed: boolean) {
   const cash = { updateSettings: vi.fn().mockResolvedValue(changed) };
   const walletPass = { refreshMerchant: vi.fn() };
-  const controller = new CashMerchantController(
-    cash as never,
-    {} as never,
-    walletPass as never,
-  );
+  const controller = new CashMerchantController(cash as never, {} as never, walletPass as never);
   return { controller, cash, walletPass };
 }
 

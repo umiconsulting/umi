@@ -77,7 +77,12 @@ describe('Cash action permissions', () => {
       expect(permissionOf(controller, handler), `${handler} permission`).toBe(permission);
     }
 
-    for (const controller of [CashController, CashMerchantController, CashWriteController, CashScanController]) {
+    for (const controller of [
+      CashController,
+      CashMerchantController,
+      CashWriteController,
+      CashScanController,
+    ]) {
       const guards = (Reflect.getMetadata(GUARDS_METADATA, controller) ?? []) as unknown[];
       expect(guards).toContain(RolesGuard);
     }
@@ -122,7 +127,9 @@ describe('Cash action permissions', () => {
   it('matches the seeded grants for the actions this slice touches', () => {
     // Each row names the action and the permission the handler asks for. `true`
     // means the role holds it in the same matrix the live logins are seeded from.
-    const cases: ReadonlyArray<[role: string, handler: string, permission: string, allowed: boolean]> = [
+    const cases: ReadonlyArray<
+      [role: string, handler: string, permission: string, allowed: boolean]
+    > = [
       ['cashier', 'scan', 'loyalty.reward.redeem', true],
       ['cashier', 'topup', 'wallet.authorize', true],
       ['cashier', 'purchase', 'wallet.redeem', true],
@@ -156,9 +163,10 @@ describe('Cash action permissions', () => {
     ];
     for (const [role, action, permission, allowed] of cases) {
       const has = held(role).includes(permission);
-      expect(has, `${role} ${allowed ? 'must hold' : 'must not hold'} ${permission} for ${action}`).toBe(
-        allowed,
-      );
+      expect(
+        has,
+        `${role} ${allowed ? 'must hold' : 'must not hold'} ${permission} for ${action}`,
+      ).toBe(allowed);
     }
   });
 });

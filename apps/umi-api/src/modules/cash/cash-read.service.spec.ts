@@ -11,7 +11,9 @@ function make() {
     analytics: vi.fn(),
     adminCustomers: vi.fn(),
     rewardConfig: vi.fn(),
-    withRewardConfigLock: vi.fn(async (_merchantId: string, work: (client: never) => Promise<unknown>) => work({} as never)),
+    withRewardConfigLock: vi.fn(
+      async (_merchantId: string, work: (client: never) => Promise<unknown>) => work({} as never),
+    ),
     upsertRewardConfig: vi.fn(),
     giftCards: vi.fn(),
     adminCustomerDetail: vi.fn(),
@@ -173,18 +175,23 @@ describe('CashReadService.updateRewardConfig', () => {
       'patch',
     );
 
-    expect(h.repo.upsertRewardConfig).toHaveBeenCalledWith('t1', 'prog1', {
-      visitsRequired: 7,
-      rewardName: 'Capuccino',
-      rewardDescription: 'Con crema',
-      rewardCostCentavos: 5000,
-      upgrade: {
-        visitsRequired: 9,
-        rewardName: 'Latte rocas',
-        rewardDescription: 'Con leche',
-        rewardCostCentavos: 6000,
+    expect(h.repo.upsertRewardConfig).toHaveBeenCalledWith(
+      't1',
+      'prog1',
+      {
+        visitsRequired: 7,
+        rewardName: 'Capuccino',
+        rewardDescription: 'Con crema',
+        rewardCostCentavos: 5000,
+        upgrade: {
+          visitsRequired: 9,
+          rewardName: 'Latte rocas',
+          rewardDescription: 'Con leche',
+          rewardCostCentavos: 6000,
+        },
       },
-    }, expect.anything());
+      expect.anything(),
+    );
     // The read and the write share one advisory-lock transaction.
     expect(h.repo.withRewardConfigLock).toHaveBeenCalledWith('t1', expect.any(Function));
     expect(h.repo.rewardConfig).toHaveBeenCalledWith('t1', expect.anything());

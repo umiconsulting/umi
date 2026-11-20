@@ -44,7 +44,10 @@ const MERCHANT = { id: MERCHANT_ID, name: 'Kala', handle: 'kalala' };
 
 type Profile = { role: string; permissions: string[] };
 const matrix = JSON.parse(
-  readFileSync(resolve(__dirname, '../../../../..', 'config/umipos-pilot-role-grants.json'), 'utf8'),
+  readFileSync(
+    resolve(__dirname, '../../../../..', 'config/umipos-pilot-role-grants.json'),
+    'utf8',
+  ),
 ) as { profiles: Profile[] };
 const permissionsOf = (role: string): string[] =>
   matrix.profiles.find((profile) => profile.role === role)?.permissions ?? [];
@@ -402,7 +405,12 @@ describe('staff member registration over the mounted HTTP pipeline', () => {
   const body = { name: 'Ana', phone: '+525550001111', birthDate: '1990-04-12' };
 
   it('lets a cashier register a member and returns the card, not a session', async () => {
-    const res = await request('POST', `/api/merchants/${MERCHANT_ID}/cash/customers`, 'cashier', body);
+    const res = await request(
+      'POST',
+      `/api/merchants/${MERCHANT_ID}/cash/customers`,
+      'cashier',
+      body,
+    );
 
     expect(res.status).toBe(200);
     expect(json(res.body)).toEqual({
@@ -418,7 +426,12 @@ describe('staff member registration over the mounted HTTP pipeline', () => {
   });
 
   it('refuses a viewer without customer.create', async () => {
-    const res = await request('POST', `/api/merchants/${MERCHANT_ID}/cash/customers`, 'viewer', body);
+    const res = await request(
+      'POST',
+      `/api/merchants/${MERCHANT_ID}/cash/customers`,
+      'viewer',
+      body,
+    );
     expect(res.status).toBe(403);
     expect(json(res.body).error).toBe('insufficient_permission');
   });
@@ -431,7 +444,12 @@ describe('staff member registration over the mounted HTTP pipeline', () => {
       cardId: 'card-9',
       cardNumber: 'KAL-9999999999',
     });
-    const res = await request('POST', `/api/merchants/${MERCHANT_ID}/cash/customers`, 'owner', body);
+    const res = await request(
+      'POST',
+      `/api/merchants/${MERCHANT_ID}/cash/customers`,
+      'owner',
+      body,
+    );
 
     expect(res.status).toBe(200);
     expect(json(res.body)).toMatchObject({
@@ -651,12 +669,7 @@ describe('the Cash permission matrix over the mounted HTTP pipeline', () => {
     ];
 
     for (const testCase of cases) {
-      const res = await request(
-        testCase.method,
-        testCase.url,
-        testCase.role,
-        testCase.payload,
-      );
+      const res = await request(testCase.method, testCase.url, testCase.role, testCase.payload);
       expect(res.status, `${testCase.role} ${testCase.method} ${testCase.url}`).toBe(
         testCase.expected,
       );

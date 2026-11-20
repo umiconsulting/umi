@@ -446,9 +446,9 @@ export class CashRepository {
     // Matching phone or email would still answer "is this person a member?" even
     // when the response masks the field: a search oracle. The same filter feeds
     // the page query and the count query, so `total` cannot diverge from the rows.
-    const filter = opts.includeContact
-      ? `($2 = '' OR name ILIKE $3 OR phone ILIKE $3 OR email ILIKE $3 OR card_number ILIKE $3)`
-      : `($2 = '' OR name ILIKE $3 OR card_number ILIKE $3)`;
+    const filterWithContact = `($2 = '' OR name ILIKE $3 OR phone ILIKE $3 OR email ILIKE $3 OR card_number ILIKE $3)`;
+    const filterWithoutContact = `($2 = '' OR name ILIKE $3 OR card_number ILIKE $3)`;
+    const filter = opts.includeContact ? filterWithContact : filterWithoutContact;
     return this.pg.withMerchant(async (c) => {
       const rows = (
         await c.query<Row>(
@@ -472,8 +472,11 @@ export class CashRepository {
       ).rows;
       const total = (
         await c.query<Row>(
-          `WITH ${CUST_CTE}
-           SELECT count(*)::int AS n FROM cust WHERE ${filter}`,
+          opts.includeContact
+            ? `WITH ${CUST_CTE}
+               SELECT count(*)::int AS n FROM cust WHERE ${filterWithContact}`
+            : `WITH ${CUST_CTE}
+               SELECT count(*)::int AS n FROM cust WHERE ${filterWithoutContact}`,
           [merchantId, opts.search, like],
         )
       ).rows[0]?.n;
@@ -695,9 +698,7 @@ export class CashRepository {
     work: (client: PoolClient) => Promise<T>,
   ): Promise<T> {
     return this.pg.withMerchant(async (c) => {
-      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-        `reward_config:${merchantId}`,
-      ]);
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`reward_config:${merchantId}`]);
       return work(c);
     });
   }

@@ -99,12 +99,7 @@ describe('public Cash registration identity boundary', () => {
       hasCard: true,
       cardId: 'card-9',
       cardNumber: 'LYL-9999999999',
-    }).svc.register(
-      't1',
-      'Kala',
-      INPUT,
-      null,
-    );
+    }).svc.register('t1', 'Kala', INPUT, null);
     expect(Object.keys(fresh).sort()).toEqual(Object.keys(known).sort());
     expect(fresh).toEqual(known);
   });
