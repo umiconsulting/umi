@@ -48,46 +48,19 @@ and `apps/umi-api/.env.example`.
 ## Run
 
 ```sh
-tools/ux-sweep/pos-native-launch.sh          # refuses if one is already running
-tools/ux-sweep/pos-native-launch.sh --force  # replace the running one
-tools/ux-sweep/pos-native-launch.sh --stop
+cd apps/umi-pos && flutter run -d linux \
+  --dart-define=UMIPOS_API_BASE_URL=http://127.0.0.1:4001
 ```
 
-It talks to `UMIPOS_API_BASE_URL`, default `http://127.0.0.1:4001`, and passes the full
-`--dart-define` set; `docs/development/RUNNING_UMIPOS.md` documents every flag.
+`docs/development/RUNNING_UMIPOS.md` documents the full `--dart-define` set.
 
-On a Wayland session the launcher's readiness check cannot see the window and may report
-`timed out waiting for the POS window` while the app is running fine. Confirm with `hyprctl`.
+## Observe & Drive
 
-## Observe
-
-Debug builds publish a **Dart VM service**, and the launcher prints its URL — also written to
-`/tmp/umi-pos-linux.log`:
-
-```text
-vm_service=http://127.0.0.1:<port>/<token>/
-```
+`test_driver/driver_main.dart` enables the **Flutter Driver extension** over the Dart VM service:
 
 ```sh
-flutter attach --debug-url <uri>                   # live logs, hot reload
-dart devtools <uri>                                # inspector, timeline, memory, network
-node tools/ux-sweep/pos-semantics-inventory.mjs    # every control, by label and size
+cd apps/umi-pos && flutter run -d linux -t test_driver/driver_main.dart --print-dtd
 ```
-
-Prefer reading that log stream to guessing: the app usually says what is wrong. The full method
-table, with SDK locations, is `docs/research/2026-09-16-agent-toolbox-and-devtools.md` §4.3.
-
-## Drive
-
-`test_driver/driver_main.dart` enables the **Flutter Driver extension** — tap, type, read text,
-screenshot — over the VM service:
-
-```sh
-flutter run -d linux -t test_driver/driver_main.dart --print-dtd
-```
-
-Use it to drive the app. `tools/ux-sweep/pos-native-driver.mjs` clicks with `xdotool`, so it is
-limited to X11.
 
 ## Conventions
 
