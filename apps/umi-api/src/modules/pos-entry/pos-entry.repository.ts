@@ -168,7 +168,9 @@ export class PosEntryRepository {
       );
       const authorized = authorization.rows[0];
       if (!authorized) return null;
-      // Serialize starts for this user across devices before any recovery write.
+      // Normal operators remain exclusive across devices. The enabled Android review
+      // owner can enter from a fresh installation without access to the previous POS.
+      // The grant table is constrained to the reserved demo merchant.
       const otherPos = await client.query(
         `SELECT os.id FROM runtime.operator_session os
          JOIN runtime.session s ON s.id=os.durable_session_id
@@ -176,8 +178,16 @@ export class PosEntryRepository {
          WHERE os.merchant_id=$1::uuid AND os.user_id=$2::uuid
            AND os.device_id<>$3::uuid AND os.state IN ('active','locked')
            AND os.expires_at>now() AND s.is_active AND s.expires_at>now()
-           AND d.status='active' LIMIT 1`,
-        [input.merchantId, input.userId, input.deviceId],
+           AND d.status='active'
+           AND NOT EXISTS (
+             SELECT 1 FROM runtime.app_review_access review
+             JOIN merchant.device incoming ON incoming.id=$3::uuid
+               AND incoming.merchant_id=review.merchant_id
+               AND incoming.kind='pos_terminal' AND incoming.platform='android'
+             WHERE review.merchant_id=$1::uuid AND review.location_id=$4::uuid
+               AND review.created_by=$2::uuid AND review.enabled
+           ) LIMIT 1`,
+        [input.merchantId, input.userId, input.deviceId, input.locationId],
       );
       if (otherPos.rowCount) {
         throw new ConflictException({ code: 'OPERATOR_SESSION_BUSY' });

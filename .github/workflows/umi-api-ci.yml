@@ -1,34 +1,15 @@
 name: API validation
+
 'on':
-  pull_request:
   workflow_call: {}
+
 permissions:
   contents: read
+
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22'
-      - name: Enable pnpm (corepack)
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.29.3 --activate
-      - name: Install
-        run: pnpm install --frozen-lockfile --filter @umi/api...
-      - name: Build
-        run: pnpm --filter @umi/api... build
-      - name: Typecheck
-        run: pnpm --filter @umi/api typecheck
-      - name: Test
-        run: pnpm --filter @umi/api test
-    timeout-minutes: 15
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: pgvector/pgvector:0.8.5-pg17-bookworm
@@ -50,10 +31,10 @@ jobs:
       PGPASSWORD: postgres
       GATE_DB: umi_ci
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
       - name: Enable pnpm (corepack)
@@ -62,8 +43,11 @@ jobs:
           corepack prepare pnpm@10.29.3 --activate
       - name: Install
         run: pnpm install --frozen-lockfile --filter @umi/api...
-      - name: Build workspace deps
+      - name: Build
         run: pnpm --filter @umi/api... build
+      - name: Typecheck
+        run: pnpm --filter @umi/api typecheck
+      - name: Unit tests
+        run: pnpm --filter @umi/api test
       - name: Database and integration verification
         run: pnpm ci:db
-    timeout-minutes: 20

@@ -29,8 +29,12 @@ Umi is a multi-product monorepo. This file defines product boundaries, ownership
 
 ## Branch and pull request workflow
 
-- Create each feature or fix branch from `origin/staging` and open PRs into `staging` (`gh pr create --base staging`). Do not stack unmerged feature branches.
-- Pass `CI ready` before merge (`docs/development/CI.md`) and validate on `staging` before promoting to `main` via `--merge`.
+- Use the 3-branch flow (`dev` -> `staging` -> `main`).
+- Create each feature, fix, or agent branch from `origin/dev` and open PRs into `dev` (`gh pr create --base dev`). Do not stack unmerged feature branches.
+- PRs into `dev` run CI validation only (`docs/development/CI.md`) with no VPS or Cloudflare push deployment.
+- Promote `dev` to `staging` for QA deployment and validation.
+- Pass `CI ready` before merge (`docs/development/CI.md`). Validate on `staging`, then promote `staging` to `main` via `--merge`.
+- POS CI runs the macOS iOS build only when `apps/umi-pos/**` or `.github/workflows/umi-pos-ios.yml` changes.
 
 ## Architecture and research rules
 

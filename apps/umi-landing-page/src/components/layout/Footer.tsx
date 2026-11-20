@@ -13,12 +13,15 @@ export default function Footer() {
         <nav aria-label="Enlaces del pie de página">
           <Link href="/#clientes">Clientes</Link>
           <Link href="/#sistema">Sistema</Link>
+          <Link href="/descargas">Descargas</Link>
           <Link href="/#demo">Solicitar demo</Link>
         </nav>
         <div className="footer-contact">
           <span>Hablemos</span>
           <a href="mailto:hola@umiconsulting.co">hola@umiconsulting.co</a>
           <Link href="/aviso-de-privacidad">Aviso de privacidad</Link>
+          <Link href="/privacidad-umipos">Privacidad de UmiPOS</Link>
+          <Link href="/terminos-umipos">Términos de UmiPOS</Link>
         </div>
       </div>
       <div className="site-width footer-bottom">

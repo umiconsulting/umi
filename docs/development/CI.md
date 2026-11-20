@@ -17,23 +17,24 @@ It requires each selected app to pass and each unselected app to skip.
 Use this stable check for branch rules after its first successful GitHub run.
 This change does not configure those rules.
 
-| Change                                          | Selected app checks                                        |
-| ----------------------------------------------- | ---------------------------------------------------------- |
-| `apps/umi-api/**`, `db/**`, `deploy/staging/**` | API build, typecheck, unit tests, and database integration |
-| `apps/umi-dashboard/**`                         | Dashboard build                                            |
-| `apps/umi-landing-page/**`                      | Landing static build                                       |
-| `apps/umi-cash/**`                              | Cash tests and build with its npm lockfile                 |
-| `apps/umi-pos/**`                               | Existing unsigned iOS build on macOS                       |
-| `packages/contract/**`                          | API, Dashboard, and POS                                    |
-| `packages/tokens/**`                            | Dashboard, Landing, and POS                                |
-| Root pnpm configuration or lockfile             | API, Dashboard, and Landing                                |
-| CI entry point or selection rules               | All apps                                                   |
-| Documentation only                              | Shared checks                                              |
+| Change                                                 | Selected app checks                                        |
+| ------------------------------------------------------ | ---------------------------------------------------------- |
+| `apps/umi-api/**`, `db/**`, `deploy/staging/**`        | API build, typecheck, unit tests, and database integration |
+| `apps/umi-dashboard/**`                                | Dashboard build                                            |
+| `apps/umi-landing-page/**`                             | Landing static build                                       |
+| `apps/umi-cash/**`                                     | Cash tests and build with its npm lockfile                 |
+| `apps/umi-pos/**`, `.github/workflows/umi-pos-ios.yml` | Existing unsigned iOS build on macOS                       |
+| `packages/contract/**`                                 | API and Dashboard                                          |
+| `packages/tokens/**`                                   | Dashboard and Landing                                      |
+| Root pnpm configuration or lockfile                    | API, Dashboard, and Landing                                |
+| CI entry point or selection rules                      | API, Dashboard, Landing, and Cash                          |
+| Documentation only                                     | Shared checks                                              |
 
 The mapping includes source imports outside package manifests.
 Dashboard imports contract sources through Vite aliases.
 Landing imports token files through its Tailwind configuration.
-POS uses the generated Dart contract and token files.
+POS CI runs only when `apps/umi-pos/**` or `.github/workflows/umi-pos-ios.yml` changes.
+Changes to `packages/contract/**`, `packages/tokens/**`, `.github/workflows/ci.yml`, or `.github/ci-paths.yml` do not select POS.
 Update the mapping when these dependencies change.
 
 The common lint command still checks the pnpm workspace.
@@ -43,11 +44,15 @@ Measure GitHub durations before further changes to caching or job division.
 
 ## Events and release selection
 
-- Pull requests run validation against changes from the target branch.
+- The repository uses the 3-branch flow: `dev` -> `staging` -> `main`.
+- Create feature, fix, and agent branches from `origin/dev` and open pull requests into `dev`.
+- Promote `dev` to `staging` for QA deployment, and promote `staging` to `main` via `--merge`.
+- Pull requests validate against changes from their target branch (`dev`, `staging`, or `main`).
+- Feature and agent pull requests into `dev` run CI validation only, with no VPS or Cloudflare push deployment.
 - Internal, non-draft pull requests can publish affected Cloudflare previews after `CI ready` passes.
 - Draft and fork pull requests run validation without deployment credentials.
-- Pushes to `staging` and `main` run validation, then deploy affected services.
-- Manual runs support validation. Set `deploy=true` on a release branch to validate and deploy all server and web services.
+- Push auto-deployments run only on `staging` and `main`. Pushes to `staging` and `main` run validation, then deploy affected services.
+- Manual runs support validation. Set `deploy=true` on a release branch (`staging` or `main`) to validate and deploy all server and web services.
 - Signed TestFlight distribution stays in its existing manual workflow.
 
 Push selection compares against the last successful release on that branch.

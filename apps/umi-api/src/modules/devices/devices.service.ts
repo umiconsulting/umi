@@ -89,10 +89,38 @@ export class DevicesService {
     const installationHash = hash(dto.installationId);
     this.enforceRateLimit(`device-pairing:ip:${ipAddress}`, 20, 5 * 60_000);
     this.enforceRateLimit(`device-pairing:installation:${installationHash}`, 10, 5 * 60_000);
+    // Store reviewers use the same enrollment surface. The grant can target only
+    // the reserved demo merchant; each installation still gets a normal device.
+    const review =
+      dto.platform === 'android' && dto.deviceType === 'pos_terminal'
+        ? await this.repo.findReviewAccess(hash(normalizedCode))
+        : null;
+    let setupCodeHash = this.pairingCodeHash(normalizedCode);
+    let reviewRequestId: string | null = null;
+    if (review) {
+      this.enforceRateLimit(`device-pairing:review:${review.merchantId}`, 40, 60 * 60_000);
+      reviewRequestId = randomUUID();
+      setupCodeHash = hash(randomUUID());
+      const request = await this.repo.beginPairing({
+        id: reviewRequestId,
+        merchantId: review.merchantId,
+        locationId: review.locationId,
+        actorUserId: review.actorUserId,
+        displayName: `Google Play review ${installationHash.slice(0, 8)}`,
+        type: 'pos_terminal',
+        platform: 'android',
+        mobility: 'mobile',
+        codeHash: setupCodeHash,
+        idempotencyKey: randomUUID(),
+        expiresAt: new Date(Date.now() + 5 * 60_000),
+      });
+      // Use the per-attempt hash, never the reusable secret, on normal requests.
+      reviewRequestId = request.id;
+    }
     const pairingSessionId = randomUUID();
     const pollingCredential = this.pollingCredential(pairingSessionId, dto.installationId);
     const result = await this.repo.claimPairing({
-      setupCodeHash: this.pairingCodeHash(normalizedCode),
+      setupCodeHash,
       installationHash,
       installationReference: installationHash.slice(0, 16),
       platform: dto.platform,
@@ -102,6 +130,11 @@ export class DevicesService {
       pollingCredentialHash: hash(pollingCredential),
     });
     if (result.state !== 'claimed') this.rejectPairing();
+    if (review && reviewRequestId) {
+      await this.approve(review.merchantId, review.actorUserId, reviewRequestId, randomUUID(), [
+        review.locationId,
+      ]);
+    }
     const credential = this.pollingCredential(result.pairingSessionId, dto.installationId);
     return {
       pairingSessionId: result.pairingSessionId,
