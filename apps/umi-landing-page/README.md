@@ -23,6 +23,16 @@ Use `pnpm dlx wrangler@4.129.0 pages dev out --binding API_ORIGIN=https://api-st
 
 The page names ONCA for the full integration and Kalala Café and El Gran Ribera for Umi Cash. The images in `public/editorial` come from Umi product evidence and existing client brand files. The ONCA team photo is pending; do not substitute stock or generated people imagery for it.
 
-## Publication gate
+## UmiPOS privacy policy
+
+The public app policy lives at `/privacidad-umipos`. The footer links to this route.
+It covers operator access, restaurant and customer records, local recovery data, Firebase notifications, and privacy requests.
+The page identifies the individual responsible for Umi and the public contact address supplied on 12 November 2026.
+Its `noindex` directive requests exclusion from search indexes; the page remains public and requires no login.
+
+Review the policy when the app's data practices change. Google Play also requires access to the policy inside UmiPOS.
+The website deployment does not add that native app link.
+
+## Demo notice publication gate
 
 The page at `/aviso-de-privacidad` is a draft. Confirm the responsible legal entity, address, processors, transfers, and retention period, then update the public notice. The production deploy keeps the demo form enabled as requested. The source for the current notice draft is the [Mexican personal data law](https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPDPPP.pdf), articles 14 to 16.
