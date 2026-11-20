@@ -11,7 +11,7 @@ pnpm --filter @umi/landing dev
 pnpm --filter @umi/landing build
 ```
 
-The app uses Next.js 15.5.20 and exports static pages to `out`. Cloudflare Pages serves the pages and images. A Pages Function at `/api/contact` forwards the form to the central Umi API. The central API sends the team notification and visitor confirmation. The old Next API routes are archived in `archive/next-api`; they are not deployed.
+The app uses Next.js 15.5.20 and exports static pages to `out`. Cloudflare Pages serves the pages and images. A Pages Function at `/api/contact` forwards the form to the central Umi API. The central API sends the team notification and visitor confirmation.
 
 GitHub Actions deploys a push only when `apps/umi-landing-page/**` changes. A push to `main` updates production. A push to any other branch updates that branch's Cloudflare preview alias; for example, `staging.umi-landing-d8n.pages.dev` for `staging`. Changes elsewhere in the monorepo do not trigger a landing deployment. Manual `workflow_dispatch` remains available for recovery.
 
