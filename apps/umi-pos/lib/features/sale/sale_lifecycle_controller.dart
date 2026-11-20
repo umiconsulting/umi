@@ -50,7 +50,9 @@ final class SaleLifecycleController extends ChangeNotifier {
     this.localFirstFastPathEnabled = false,
   }) : _repository = repository,
        _cart = cart,
-       _telemetry = telemetry;
+       _telemetry = telemetry {
+    _cart.addListener(_cartChanged);
+  }
 
   final SaleRepository _repository;
   final CartController _cart;
@@ -98,6 +100,23 @@ final class SaleLifecycleController extends ChangeNotifier {
   String? _historyState;
   String _historySearch = '';
   String _historySort = 'newest';
+
+  void _cartChanged() {
+    final confirmed = _cart.replayedCheckout;
+    final saleId = _state.sale?.id;
+    if (_disposed ||
+        confirmed == null ||
+        _cart.state.cart?.id != confirmed.cartId ||
+        (saleId != null && !confirmed.cartIds.contains(saleId)) ||
+        _opening ||
+        _mutationActive ||
+        _state.phase == SalePhase.checkingOut ||
+        _state.phase == SalePhase.committed) {
+      return;
+    }
+    finishCheckoutPresentation(force: true);
+    _event('replayed_checkout_released');
+  }
 
   Future<void> open(
     String merchantId,
@@ -179,6 +198,7 @@ final class SaleLifecycleController extends ChangeNotifier {
       _event('sale_restore_unavailable');
     } finally {
       _opening = false;
+      _cartChanged();
       if (!_disposed) notifyListeners();
     }
   }
@@ -186,6 +206,8 @@ final class SaleLifecycleController extends ChangeNotifier {
   /// Refresh the lifecycle after the server selects an account for this operator.
   Future<bool> refreshCurrent({required String expectedCartId}) async {
     if (_merchantId == null || _opening || _mutationActive) return false;
+    _opening = true;
+    notifyListeners();
     try {
       final sale = await _repository.current(_merchantId!, _query());
       if (sale.id != expectedCartId) {
@@ -200,6 +222,10 @@ final class SaleLifecycleController extends ChangeNotifier {
     } on AppException catch (error) {
       _failure(error);
       return false;
+    } finally {
+      _opening = false;
+      _cartChanged();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -341,6 +367,7 @@ final class SaleLifecycleController extends ChangeNotifier {
       _failure(error, fallbackPhase: previous.phase);
     } finally {
       _mutationActive = false;
+      _cartChanged();
     }
     if (_state.errorCode == null) {
       await loadHistory(state: 'suspended');
@@ -524,6 +551,7 @@ final class SaleLifecycleController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _cart.removeListener(_cartChanged);
     _historyGeneration++;
     super.dispose();
   }
@@ -580,6 +608,7 @@ final class SaleLifecycleController extends ChangeNotifier {
         receipt: _state.receipt,
       ),
     );
+    _cartChanged();
   }
 
   Future<void> checkoutCommitted() async {
@@ -760,6 +789,7 @@ final class SaleLifecycleController extends ChangeNotifier {
       _failure(error);
     } finally {
       _mutationActive = false;
+      _cartChanged();
     }
   }
 
@@ -792,6 +822,7 @@ final class SaleLifecycleController extends ChangeNotifier {
       _failure(error, fallbackPhase: previous.phase);
     } finally {
       _mutationActive = false;
+      _cartChanged();
     }
   }
 
