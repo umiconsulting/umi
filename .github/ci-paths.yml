@@ -46,8 +46,4 @@ cash:
   - '.npmrc'
 pos:
   - 'apps/umi-pos/**'
-  - 'packages/contract/**'
-  - 'packages/tokens/**'
-  - '.github/workflows/ci.yml'
   - '.github/workflows/umi-pos-ios.yml'
-  - '.github/ci-paths.yml'
