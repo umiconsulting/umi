@@ -60,6 +60,29 @@ const DEVICE_PROJECTION = `
 
 @Injectable()
 export class DevicesRepository {
+  /** Only the database operator can configure the isolated store-review fixture. */
+  async findReviewAccess(codeHash: string): Promise<{
+    merchantId: string;
+    locationId: string;
+    actorUserId: string;
+  } | null> {
+    const { rows } = await this.pg.worker.query<{
+      merchantId: string;
+      locationId: string;
+      actorUserId: string;
+    }>(
+      `SELECT a.merchant_id::text AS "merchantId", a.location_id::text AS "locationId",
+              a.created_by::text AS "actorUserId"
+       FROM runtime.app_review_access a
+       JOIN merchant.merchant m ON m.id=a.merchant_id AND m.status='active'
+       JOIN merchant.location l ON l.id=a.location_id AND l.merchant_id=a.merchant_id AND l.status='active'
+       JOIN merchant.staff s ON s.user_id=a.created_by AND s.merchant_id=a.merchant_id AND s.status='active'
+       JOIN umi."user" u ON u.id=s.user_id AND u.status='active'
+       WHERE a.setup_code_hash=$1 AND a.enabled`,
+      [codeHash],
+    );
+    return rows[0] ?? null;
+  }
   constructor(private readonly pg: PgService) {}
 
   async beginEnrollment(input: {
