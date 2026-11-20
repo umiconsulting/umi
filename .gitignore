@@ -11,6 +11,9 @@ prod-db-handoff-2026-05-13/
 *.sql.gz
 artifacts/
 .hermes/
+.worktrees/
+.agent-work/
+.umi-runs/
 *.tar.gz.enc
 
 # Screenshots / visual artifacts
