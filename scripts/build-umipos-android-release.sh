@@ -13,18 +13,41 @@ Required:
 Optional:
   UMIPOS_API_BASE_URL       Default: https://api.umiconsulting.co
   UMIPOS_ANDROID_APP_ID     Default: co.umiconsulting.umi_pos.estacion
+                             Required for appbundle builds
+  UMIPOS_ANDROID_ARTIFACT_FORMAT
+                             apk (default) or appbundle
+  BUNDLETOOL_JAR            Required for appbundle verification
   UMIPOS_ANDROID_KEYSTORE_PATH
                              Default: ~/.local/share/umi-pos-signing/umi-pos-release.jks
   UMIPOS_ANDROID_KEY_ALIAS  Default: umi-pos-release
   UMIPOS_ANDROID_KEYSTORE_PASSWORD and UMIPOS_ANDROID_KEY_PASSWORD
                              Default: Secret Service values for service
                              umipos-android-release, account juan
-  UMIPOS_ARTIFACT_PATH      Default: ~/Downloads/UmiPOS-<version>-production-release-build<code>.apk
+  UMIPOS_ARTIFACT_PATH      Default: ~/Downloads/UmiPOS-<version>-production-release-build<code>.<apk|aab>
   UMIPOS_ANDROID_CERT_SHA256
                              Expected signing certificate fingerprint
   UMIPOS_ALLOW_DEBUG_SIGNER Set to 1 only for a controlled signing migration.
 EOF
 }
+
+artifact_format="${UMIPOS_ANDROID_ARTIFACT_FORMAT:-apk}"
+case "$artifact_format" in
+  apk|appbundle) ;;
+  *) printf 'UMIPOS_ANDROID_ARTIFACT_FORMAT must be apk or appbundle.\n' >&2; exit 2 ;;
+esac
+if [[ "$artifact_format" == appbundle && -z "${UMIPOS_ANDROID_APP_ID:-}" ]]; then
+  printf 'App bundles require UMIPOS_ANDROID_APP_ID.\n' >&2
+  exit 2
+fi
+if [[ ! "${UMIPOS_RELEASE_VERSION:-}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  printf 'UMIPOS_RELEASE_VERSION must use major.minor.patch.\n' >&2
+  exit 2
+fi
+if [[ ! "${UMIPOS_BUILD_NUMBER:-}" =~ ^[1-9][0-9]{0,9}$ ]] ||
+  (( UMIPOS_BUILD_NUMBER > 2100000000 )); then
+  printf 'UMIPOS_BUILD_NUMBER must be between 1 and 2100000000.\n' >&2
+  exit 2
+fi
 
 if [[ -z "${UMIPOS_ANDROID_KEYSTORE_PATH:-}" ]]; then
   UMIPOS_ANDROID_KEYSTORE_PATH="$HOME/.local/share/umi-pos-signing/umi-pos-release.jks"
@@ -67,10 +90,6 @@ if (( ${#missing[@]} > 0 )); then
   usage >&2
   exit 2
 fi
-if [[ ! "$UMIPOS_BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
-  printf 'UMIPOS_BUILD_NUMBER must be a positive integer.\n' >&2
-  exit 2
-fi
 if [[ ! "$UMIPOS_CONTRACT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   printf 'UMIPOS_CONTRACT_VERSION must use major.minor.patch.\n' >&2
   exit 2
@@ -100,8 +119,15 @@ if [[ ! -x "$flutter_bin" ]]; then
 fi
 
 cd "$app_dir"
-"$flutter_bin" build apk --release --flavor production \
-  --target-platform android-arm64 \
+platform_options=()
+if [[ "$artifact_format" == apk ]]; then
+  platform_options+=(--target-platform android-arm64)
+elif [[ ! -f "${BUNDLETOOL_JAR:-}" ]]; then
+  printf 'Set BUNDLETOOL_JAR to the bundletool release JAR.\n' >&2
+  exit 2
+fi
+"$flutter_bin" build "$artifact_format" --release --flavor production \
+  "${platform_options[@]}" \
   --build-name "$UMIPOS_RELEASE_VERSION" \
   --build-number "$UMIPOS_BUILD_NUMBER" \
   "-PumiposApplicationId=$app_id" \
@@ -118,62 +144,98 @@ cd "$app_dir"
   --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=false \
   --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=false
 
-apk="$app_dir/build/app/outputs/flutter-apk/app-production-release.apk"
-if [[ ! -f "$apk" ]]; then
-  printf 'Flutter did not produce the release APK: %s\n' "$apk" >&2
+if [[ "$artifact_format" == apk ]]; then
+  artifact="$app_dir/build/app/outputs/flutter-apk/app-production-release.apk"
+  extension=apk
+else
+  artifact="$app_dir/build/app/outputs/bundle/productionRelease/app-production-release.aab"
+  extension=aab
+fi
+if [[ ! -f "$artifact" ]]; then
+  printf 'Flutter did not produce the release artifact: %s\n' "$artifact" >&2
   exit 1
 fi
-if unzip -l "$apk" | grep -q 'libvmservice_snapshot.so'; then
+if unzip -l "$artifact" | grep -q 'libvmservice_snapshot.so'; then
   printf 'Refusing to publish a profile artifact as production.\n' >&2
   exit 1
 fi
 
-aapt2="${AAPT2:-}"
-if [[ -z "$aapt2" ]]; then
-  aapt2="$(
-    find "${ANDROID_HOME:-$HOME/Android/Sdk}/build-tools" \
-      -type f -name aapt2 2>/dev/null |
-      sort -V |
-      tail -1
+if [[ "$artifact_format" == appbundle ]]; then
+  java -jar "$BUNDLETOOL_JAR" validate --bundle="$artifact" >/dev/null
+  manifest="$(java -jar "$BUNDLETOOL_JAR" dump manifest --bundle="$artifact")"
+  python3 -c '
+import sys
+import xml.etree.ElementTree as ET
+root = ET.fromstring(sys.stdin.read())
+android = "{http://schemas.android.com/apk/res/android}"
+application = root.find("application")
+valid = (
+    root.get("package") == sys.argv[1]
+    and root.get(android + "versionCode") == sys.argv[2]
+    and root.get(android + "versionName") == sys.argv[3]
+    and application is not None
+    and application.get(android + "debuggable", "false") == "false"
+)
+if not valid:
+    sys.exit("The bundle identity or release mode does not match.")
+' "$app_id" "$UMIPOS_BUILD_NUMBER" "$UMIPOS_RELEASE_VERSION" <<<"$manifest"
+  signature="$(LC_ALL=C jarsigner -verify -strict \
+    -keystore "$UMIPOS_ANDROID_KEYSTORE_PATH" \
+    -storepass:env UMIPOS_ANDROID_KEYSTORE_PASSWORD "$artifact")"
+  if ! grep -q 'jar verified\.' <<<"$signature"; then
+    printf 'The bundle signature is invalid or absent.\n' >&2
+    exit 1
+  fi
+  certificate="$(LC_ALL=C keytool -printcert -jarfile "$artifact")"
+  certificate_sha256="$(sed -n 's/.*SHA256: //p' <<<"$certificate" | head -1 | tr -d ':')"
+else
+  aapt2="${AAPT2:-}"
+  if [[ -z "$aapt2" ]]; then
+    aapt2="$(
+      find "${ANDROID_HOME:-$HOME/Android/Sdk}/build-tools" \
+        -type f -name aapt2 2>/dev/null |
+        sort -V |
+        tail -1
+    )"
+  fi
+  if [[ -z "$aapt2" || ! -x "$aapt2" ]]; then
+    printf 'aapt2 not found. Set AAPT2 or ANDROID_HOME.\n' >&2
+    exit 2
+  fi
+
+  badging="$("$aapt2" dump badging "$artifact")"
+  grep -q "package: name='$app_id' versionCode='$UMIPOS_BUILD_NUMBER'" \
+    <<<"$badging" || {
+    printf 'The APK package or versionCode does not match the release.\n' >&2
+    exit 1
+  }
+  "$aapt2" dump xmltree --file AndroidManifest.xml "$artifact" |
+    grep -q 'android:debuggable(0x0101000f)=true' && {
+    printf 'Refusing to publish a debuggable APK.\n' >&2
+    exit 1
+  }
+
+  apksigner="${APKSIGNER:-$(dirname "$aapt2")/apksigner}"
+  certificate="$("$apksigner" verify --print-certs "$artifact")"
+  if grep -q 'CN=Android Debug' <<<"$certificate" &&
+    [[ "${UMIPOS_ALLOW_DEBUG_SIGNER:-0}" != "1" ]]; then
+    printf 'Refusing to publish the Android debug certificate.\n' >&2
+    exit 1
+  fi
+  certificate_sha256="$(
+    grep 'certificate SHA-256 digest:' <<<"$certificate" |
+      head -1 |
+      sed 's/.*: //'
   )"
 fi
-if [[ -z "$aapt2" || ! -x "$aapt2" ]]; then
-  printf 'aapt2 not found. Set AAPT2 or ANDROID_HOME.\n' >&2
-  exit 2
-fi
-
-badging="$("$aapt2" dump badging "$apk")"
-grep -q "package: name='$app_id' versionCode='$UMIPOS_BUILD_NUMBER'" \
-  <<<"$badging" || {
-  printf 'The APK package or versionCode does not match the release.\n' >&2
-  exit 1
-}
-"$aapt2" dump xmltree --file AndroidManifest.xml "$apk" |
-  grep -q 'android:debuggable(0x0101000f)=true' && {
-  printf 'Refusing to publish a debuggable APK.\n' >&2
-  exit 1
-}
-
-apksigner="${APKSIGNER:-$(dirname "$aapt2")/apksigner}"
-certificate="$("$apksigner" verify --print-certs "$apk")"
-if grep -q 'CN=Android Debug' <<<"$certificate" &&
-  [[ "${UMIPOS_ALLOW_DEBUG_SIGNER:-0}" != "1" ]]; then
-  printf 'Refusing to publish the Android debug certificate.\n' >&2
-  exit 1
-fi
-certificate_sha256="$(
-  grep 'certificate SHA-256 digest:' <<<"$certificate" |
-    head -1 |
-    sed 's/.*: //'
-)"
 expected_certificate_sha256="${UMIPOS_ANDROID_CERT_SHA256:-14975f2c374e03b155ab363e17d4a79d4ab32b888ab381bedc3264934cb5c051}"
 if [[ "${certificate_sha256,,}" != "${expected_certificate_sha256,,}" ]]; then
   printf 'Unexpected signing certificate: %s\n' "$certificate_sha256" >&2
   exit 1
 fi
 
-destination="${UMIPOS_ARTIFACT_PATH:-$HOME/Downloads/UmiPOS-${UMIPOS_RELEASE_VERSION}-production-release-build${UMIPOS_BUILD_NUMBER}.apk}"
-install -m 0644 "$apk" "$destination"
+destination="${UMIPOS_ARTIFACT_PATH:-$HOME/Downloads/UmiPOS-${UMIPOS_RELEASE_VERSION}-production-release-build${UMIPOS_BUILD_NUMBER}.$extension}"
+install -m 0644 "$artifact" "$destination"
 sha256="$(sha256sum "$destination" | cut -d' ' -f1)"
 
 printf 'artifact=%s\n' "$destination"
