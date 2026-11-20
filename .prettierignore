@@ -102,3 +102,10 @@ apps/umi-api/test/fixtures/semantic-gate3/
 
 # Gate-3 dashboard evidence: screenshots and the recorded network/DOM JSON.
 docs/verification/2026-11-16-semantic-api-gate3/dashboard/
+
+# Local nested git worktrees, pnpm store, run artifacts, and sandbox agent lab (untracked workstation state)
+.worktrees/
+.agent-work/
+.umi-runs/
+**/.pnpm-store/
+tools/agent-lab/
