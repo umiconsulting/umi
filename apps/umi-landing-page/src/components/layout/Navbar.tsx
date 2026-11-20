@@ -9,10 +9,13 @@ const links = [
   { label: 'Clientes', href: '/#clientes' },
   { label: 'Sistema', href: '/#sistema' },
   { label: 'Umi Cash', href: '/#cash' },
+  { label: 'Descargas', href: '/descargas' },
 ];
 
 export default function Navbar() {
-  const isHome = usePathname() === '/';
+  const pathname = usePathname();
+  const isHome = pathname === '/';
+  const isDownloads = pathname === '/descargas';
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -44,9 +47,11 @@ export default function Navbar() {
             </Link>
           ))}
         </div>
-        <Link className="nav-cta" href="/#demo">
-          Solicitar demo <ArrowUpRight size={17} aria-hidden="true" />
-        </Link>
+        {!isDownloads && (
+          <Link className="nav-cta" href="/#demo">
+            Solicitar demo <ArrowUpRight size={17} aria-hidden="true" />
+          </Link>
+        )}
         <button
           className="nav-menu-button"
           type="button"
@@ -65,9 +70,11 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
-          <Link href="/#demo" onClick={() => setOpen(false)}>
-            Solicitar demo <ArrowUpRight size={17} aria-hidden="true" />
-          </Link>
+          {!isDownloads && (
+            <Link href="/#demo" onClick={() => setOpen(false)}>
+              Solicitar demo <ArrowUpRight size={17} aria-hidden="true" />
+            </Link>
+          )}
         </nav>
       )}
     </header>
