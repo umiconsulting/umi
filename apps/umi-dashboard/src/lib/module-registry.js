@@ -248,8 +248,10 @@ export const MODULES = {
     icon: 'CreditCard',
     section: 'CUSTOMERS',
     product: 'cash',
-    // Absorbs Lealtad and Tarjetas de regalo as tabs; adds rewards and wallet.
-    permissions: ['loyalty.read', 'gift_card.read', 'wallet.read'],
+    // Absorbs Lealtad and Tarjetas de regalo as tabs; adds rewards, wallet and
+    // the Cash settings tab. `merchant.manage` alone may open the settings tab
+    // for a Cash-only owner.
+    permissions: ['loyalty.read', 'gift_card.read', 'wallet.read', 'merchant.manage'],
   },
   kitchen: {
     id: 'kitchen',

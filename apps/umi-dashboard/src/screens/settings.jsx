@@ -8,6 +8,7 @@ import { Segmented } from '@/components/segmented.jsx';
 import {
   useMerchantData,
   saveMerchantSettings,
+  saveCashSettings,
   saveMerchantLogo,
   removeMerchantLogo,
   saveRewardConfig,
@@ -19,12 +20,14 @@ import {
   geocodeAddress,
 } from '@/data.jsx';
 import { PurchaseDays } from './settings-purchase-days.jsx';
+import { buildSettingsSaves } from './settings-save-model.js';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 
 // Screen 5 — Settings (Branding + Loyalty + Promotions)
-// Data: useMerchantData() → umi-cash GET /api/[merchantRef]/admin/settings + reward-config
-// Save: saveMerchantSettings(patch) → PATCH /api/[merchantRef]/admin/settings
-//       saveRewardConfig(patch)   → PATCH /api/[merchantRef]/admin/reward-config
+// Data: useMerchantData() → GET /api/merchants/:id/cash/settings + reward-config
+// Save: saveMerchantSettings(patch) → PATCH /api/merchants/:id/settings
+//       saveCashSettings(patch)     → PATCH /api/merchants/:id/cash/settings
+//       saveRewardConfig(patch)     → PATCH /api/merchants/:id/cash/reward-config
 
 const DOW = [
   { id: 'dom', l: msg`Dom` },
@@ -306,11 +309,18 @@ const SettingsScreen = () => {
           rewardName: (merchant.rewardConfig.rewardName || '').slice(0, MAX_REWARD_NAME_LENGTH),
           visitsRequired,
           rewardCost: Math.round(merchant.rewardConfig.rewardCostCentavos / 100),
+          // Read them back so the next PATCH can echo them. `updateRewardConfig`
+          // treats an omitted `rewardDescription` as null and an omitted
+          // `upgrade` as "no second tier", so a partial save would erase both.
+          rewardDescription: merchant.rewardConfig.rewardDescription ?? null,
+          upgrade: merchant.rewardConfig.upgrade ?? null,
         }
       : {
           rewardName: t`Recompensa de temporada`,
           visitsRequired,
           rewardCost: 0,
+          rewardDescription: null,
+          upgrade: null,
         };
     // Parse promoDays "2,3,4" → ['mar','mie','jue']
     const promoNumToId = Object.fromEntries(Object.entries(DOW_NUM).map(([id, n]) => [n, id]));
@@ -379,41 +389,31 @@ const SettingsScreen = () => {
       .map((id) => DOW_NUM[id])
       .filter(Boolean)
       .join(',');
+    const saves = buildSettingsSaves({
+      biz,
+      seg,
+      brand,
+      promo,
+      promoDayNums,
+      selfReg,
+      topupEnabled: merchant?.topupEnabled,
+      multiSealEnabled: merchant?.multiSealEnabled,
+      birthday,
+      loyalty,
+      cashActive,
+    });
     const saveResults = await Promise.allSettled([
-      saveMerchantSettings({
-        name: biz.name,
-        city: biz.city,
-        businessDayStart: biz.businessDayStart,
-        posDayClosePolicy: biz.posDayClosePolicy,
-        ...(seg
-          ? {
-              segmentThresholds: {
-                vipMinSpendCents: Math.max(0, Math.round(Number(seg.vipMinPesos || 0) * 100)),
-                vipMinVisits: Math.max(1, Math.round(Number(seg.vipMinVisits || 1))),
-                regularMinVisits: Math.max(1, Math.round(Number(seg.regularMinVisits || 1))),
-                activeWindowDays: Math.max(1, Math.round(Number(seg.activeWindowDays || 1))),
-                lapsedDays: Math.max(1, Math.round(Number(seg.lapsedDays || 1))),
-              },
-            }
-          : {}),
-        primaryColor: brand.primary,
-        secondaryColor: brand.secondary,
-        passStyle: 'stamps',
-        promoMessage: promo.message,
-        promoStartsAt: promo.from ? promo.from + 'T00:00:00.000Z' : null,
-        promoEndsAt: promo.to ? promo.to + 'T23:59:59.000Z' : null,
-        promoDays: promoDayNums || null,
-        selfRegistration: selfReg,
-        birthdayRewardEnabled: birthday.on,
-        birthdayRewardName: birthday.rewardName,
-      }),
-      cashActive &&
-        loyalty &&
-        saveRewardConfig({
-          rewardName: loyalty.rewardName.slice(0, MAX_REWARD_NAME_LENGTH),
-          visitsRequired: loyalty.visitsRequired,
-          rewardCostCentavos: Math.round((loyalty.rewardCost || 0) * 100),
-        }),
+      // The merchant DTO owns name, day close and segment cutoffs only. It does
+      // NOT declare the Cash-only fields below; sending them here was a silent
+      // discard with a "saved" message.
+      saveMerchantSettings(saves.merchant),
+      saves.cash ? saveCashSettings(saves.cash) : null,
+      saves.reward
+        ? saveRewardConfig({
+            ...saves.reward,
+            rewardName: saves.reward.rewardName.slice(0, MAX_REWARD_NAME_LENGTH),
+          })
+        : null,
       // Always send tone + assistant_name together: picking a chip with an empty
       // custom-tone field clears any stale freeform override (preset wins again).
       conversaflowActive &&
@@ -526,8 +526,16 @@ const SettingsScreen = () => {
                 id={`${uid}-city`}
                 className="input tall"
                 value={biz.city || ''}
-                onChange={(e) => setBiz((b) => ({ ...b, city: e.target.value }))}
+                readOnly
+                aria-readonly="true"
+                aria-describedby={`${uid}-city-note`}
               />
+              <div
+                id={`${uid}-city-note`}
+                style={{ fontSize: 13.5, color: 'var(--ink-2)', marginTop: 4 }}
+              >
+                <Trans>La ciudad se muestra desde el registro del negocio; no se edita aquí.</Trans>
+              </div>
             </div>
             <div className="field">
               <label htmlFor={`${uid}-business-day-start`}>

@@ -7,8 +7,10 @@ import { subscribeTheme } from '@/lib/theme.js';
 
 import { useAuth, signOut } from '@/lib/auth.jsx';
 import { MerchantProvider, useMerchant } from '@/lib/merchant-context.jsx';
-import { MODULES, missingLocationFor } from '@/lib/module-registry.js';
-import { landingRouteFor } from '@/lib/role-landing.js';
+import { MODULES, getModuleAvailability, missingLocationFor } from '@/lib/module-registry.js';
+import { landingRouteFor, moduleForRoute } from '@/lib/role-landing.js';
+import { firstAllowedCashTab } from '@/lib/cash-tabs.js';
+import PermissionUnavailable from '@/components/permission-unavailable.jsx';
 import { I } from '@/icons.jsx';
 import {
   useTweaks,
@@ -195,16 +197,48 @@ function LocationUnavailable({ state }) {
 function GuardedScreen({ moduleKey, children }) {
   const merchantState = useMerchant();
   const { i18n } = useLingui();
-  if (!merchantState?.canShowModule?.(moduleKey)) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const capabilities = merchantState?.capabilities;
+  const mod = MODULES[moduleKey] || {};
+
+  if (!capabilities) {
     // No café, no product information: this is not the product card's question.
-    if (!merchantState?.capabilities) {
-      return <MerchantUnavailable state={merchantState} />;
-    }
-    const mod = MODULES[moduleKey] || {};
+    return <MerchantUnavailable state={merchantState} />;
+  }
+
+  const availability = getModuleAvailability(moduleKey, capabilities, merchantState?.platformRole);
+
+  if (!availability.available) {
     const label = mod.label ? i18n._(mod.label) : moduleKey;
-    return mod.platform && !mod.product ? (
-      <PlatformOnly moduleName={label} />
-    ) : (
+
+    if (availability.reason === 'platform_grant_required') {
+      return <PlatformOnly moduleName={label} />;
+    }
+
+    if (availability.reason === 'permission_required') {
+      // PLATFORM VERSUS PERMISSION. A product refusal says the café did not
+      // subscribe; a permission refusal says this person's role is narrower.
+      // They were the same card, so a role could read "Umi Cash no está activo
+      // en este café" while the café was paying for it.
+      const fallback = landingRouteFor({
+        roleKey: capabilities.membership?.role,
+        permissions: capabilities.membership?.permissions,
+        canShow: (key) => merchantState.canShowModule(key),
+      });
+      const safeRoute = fallback && fallback !== location.pathname ? fallback : null;
+      const fallbackModule = safeRoute ? MODULES[moduleForRoute(safeRoute)] : null;
+      return (
+        <PermissionUnavailable
+          title={label}
+          permissions={mod.permissions || []}
+          backLabel={fallbackModule?.label ? i18n._(fallbackModule.label) : null}
+          onBack={safeRoute ? () => navigate(safeRoute) : undefined}
+        />
+      );
+    }
+
+    return (
       <ProductUnavailable
         moduleName={label}
         product={PRODUCT_LABELS[mod.product] || mod.product || undefined}
@@ -212,10 +246,32 @@ function GuardedScreen({ moduleKey, children }) {
     );
   }
   // Entitled, but a screen that reads per branch has no branch to read.
-  if (missingLocationFor(moduleKey, merchantState?.capabilities)) {
+  if (missingLocationFor(moduleKey, capabilities)) {
     return <LocationUnavailable state={merchantState} />;
   }
   return children;
+}
+
+/**
+ * The first route a session opens.
+ *
+ * `landingRouteFor` answers the module. A Cash hub is not one screen, though:
+ * it opens the first tab the membership may read. Doing that here keeps the
+ * role map and the tab gate from disagreeing — a Cash-only owner lands on
+ * `/loyalty-value/members`, and a viewer without gift-card permission never
+ * lands on a gift-card URL the hub would then refuse.
+ */
+function landingTargetFor(capabilities, canShowModule) {
+  let route = landingRouteFor({
+    roleKey: capabilities?.membership?.role,
+    permissions: capabilities?.membership?.permissions,
+    canShow: canShowModule,
+  });
+  if (route === '/loyalty-value') {
+    const tab = firstAllowedCashTab(capabilities);
+    if (tab) route = `/loyalty-value/${tab}`;
+  }
+  return route;
 }
 
 function DashboardLayout() {
@@ -282,11 +338,9 @@ function DashboardLayout() {
     if (landedRef.current || !capabilities) return;
     landedRef.current = true;
     if (location.pathname !== '/' || new URLSearchParams(location.search).has('home')) return;
-    const route = landingRouteFor({
-      roleKey: capabilities.membership?.role,
-      permissions: capabilities.membership?.permissions,
-      canShow: (moduleKey) => merchantState.canShowModule(moduleKey),
-    });
+    const route = landingTargetFor(capabilities, (moduleKey) =>
+      merchantState.canShowModule(moduleKey),
+    );
     if (route && route !== location.pathname) navigate(route, { replace: true });
   }, [capabilities, location.pathname, location.search, merchantState, navigate]);
 
@@ -294,6 +348,38 @@ function DashboardLayout() {
     setNavOpen(false);
     navigate(id === 'overview' ? '/?home=1' : '/' + id);
   };
+
+  // The first render after capabilities resolve still holds the index route.
+  // For a Cash-only café that route is Overview, which its entitlement cannot
+  // open: without this gate the person sees "Resumen no está activo" for one
+  // frame before the landing effect moves them. Land in the effect, but show a
+  // neutral sentence until it does.
+  //
+  // A bare `/` is the only address that means "no destination chosen". The
+  // sidebar's own home command adds `?home=1`, so a person who chose Overview is
+  // never moved again. No latch is read during render: the ref belongs to the
+  // effect, and the URL is the rest of the answer.
+  const pendingLanding =
+    capabilities && location.pathname === '/' && !new URLSearchParams(location.search).has('home')
+      ? landingTargetFor(capabilities, (moduleKey) => merchantState.canShowModule(moduleKey))
+      : null;
+
+  if (pendingLanding && pendingLanding !== '/') {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--ink-3)',
+          fontSize: 14,
+        }}
+      >
+        <Trans>Abriendo tu pantalla…</Trans>
+      </div>
+    );
+  }
 
   if (merchantState?.loading && !merchantState?.capabilities) {
     return (
@@ -509,7 +595,7 @@ function DashboardLayout() {
               }
             />
             <Route
-              path="loyalty-value"
+              path="loyalty-value/:tab?"
               element={
                 <GuardedScreen moduleKey="loyalty-value">
                   <LoyaltyValueScreen />
@@ -517,9 +603,13 @@ function DashboardLayout() {
               }
             />
             {/* Old single-domain routes fold into the Lealtad y valor hub. Keep the
-                paths as redirects so no bookmark 404s. */}
-            <Route path="members" element={<Navigate to="/loyalty-value" replace />} />
-            <Route path="gift-cards" element={<Navigate to="/loyalty-value" replace />} />
+                paths as redirects so no bookmark 404s; the tab gate then decides
+                whether that tab is readable for this membership. */}
+            <Route path="members" element={<Navigate to="/loyalty-value/members" replace />} />
+            <Route
+              path="gift-cards"
+              element={<Navigate to="/loyalty-value/gift-cards" replace />}
+            />
             <Route path="insights" element={<Navigate to="/customers" replace />} />
             <Route
               path="conversations/*"

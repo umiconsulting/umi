@@ -98,6 +98,10 @@ msgid "Los planos, el catálogo y las ventas se guardan por sucursal, así que e
 msgstr "Floor plans, the catalog and sales are stored per location, so this screen needs one. Create the first location for this business and come back here."
 
 #: src/app.jsx
+msgid "Abriendo tu pantalla…"
+msgstr "Opening your screen…"
+
+#: src/app.jsx
 msgid "Cargando negocio…"
 msgstr "Loading business…"
 
@@ -152,6 +156,35 @@ msgstr "Dark mode tint"
 #: src/components/page-head.jsx
 #~ msgid "{value} {of} {noun}"
 #~ msgstr "{value} {of} {noun}"
+
+#: src/components/permission-unavailable.jsx
+msgid "Acceso restringido"
+msgstr "Restricted access"
+
+#: src/components/permission-unavailable.jsx
+msgid "No tienes acceso a"
+msgstr "You do not have access to"
+
+#: src/components/permission-unavailable.jsx
+msgid "esta sección"
+msgstr "this section"
+
+#: src/components/permission-unavailable.jsx
+msgid "Tu rol no incluye el permiso necesario. Esta pantalla no cargó los datos y el servidor también rechaza la lectura."
+msgstr "Your role does not include the required permission. This screen did not load data, and the server also refuses the read."
+
+#: src/components/permission-unavailable.jsx
+msgid "Permiso requerido"
+msgstr "Required permission"
+
+#: src/components/permission-unavailable.jsx
+#: src/screens/inventory-count.jsx
+msgid "Volver"
+msgstr "Back"
+
+#: src/components/permission-unavailable.jsx
+msgid "Ir a {backLabel}"
+msgstr "Go to {backLabel}"
 
 #: src/data.jsx
 #~ msgid "Elige una imagen PNG o JPG."
@@ -223,6 +256,41 @@ msgstr "The server did not return a session. Try again."
 #: src/screens/login.jsx
 msgid "Código incorrecto o vencido."
 msgstr "Incorrect or expired code."
+
+#: src/lib/cash-tabs.js
+#: src/screens/customers.jsx
+#: src/screens/members.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/staff.jsx
+#: src/shell.jsx
+msgid "Lealtad"
+msgstr "Loyalty"
+
+#: src/lib/cash-tabs.js
+#: src/screens/operations-workspace.jsx
+msgid "Recompensas"
+msgstr "Rewards"
+
+#: src/lib/cash-tabs.js
+#: src/screens/customers.jsx
+#: src/screens/gift-cards.jsx
+#: src/screens/members.jsx
+#: src/screens/staff.jsx
+#: src/shell.jsx
+msgid "Tarjetas de regalo"
+msgstr "Gift cards"
+
+#: src/lib/cash-tabs.js
+#: src/screens/loyalty-value.jsx
+#: src/screens/recibos.jsx
+msgid "Monedero"
+msgstr "Wallet"
+
+#: src/lib/cash-tabs.js
+#: src/lib/module-registry.js
+#: src/shell.jsx
+msgid "Ajustes"
+msgstr "Settings"
 
 #: src/lib/inventory-import/copy.js
 msgid "Código único del artículo. Conserva los ceros iniciales."
@@ -610,8 +678,10 @@ msgstr "Saved"
 #: src/lib/inventory-import/display.js
 #: src/screens/category-sales.jsx
 #: src/screens/floor-plan.jsx
+#: src/screens/gift-cards.jsx
 #: src/screens/inventory-count.jsx
 #: src/screens/inventory-workspace.jsx
+#: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/sales-widgets.jsx
@@ -702,11 +772,6 @@ msgstr "Attention"
 #: src/lib/module-registry.js
 msgid "Horarios"
 msgstr "Hours"
-
-#: src/lib/module-registry.js
-#: src/shell.jsx
-msgid "Ajustes"
-msgstr "Settings"
 
 #: src/lib/module-registry.js
 #: src/shell.jsx
@@ -1207,6 +1272,7 @@ msgid "Escribe la CLABE o el número de cuenta. Puedes guardar ambos."
 msgstr "Enter a CLABE or account number. You can save both."
 
 #: src/screens/caja-turnos.jsx
+#: src/screens/cash-settings.jsx
 #: src/screens/devices.jsx
 #: src/screens/hours.jsx
 #: src/screens/purchase-entry-dialog.jsx
@@ -1487,6 +1553,183 @@ msgstr "Loading shifts…"
 #: src/screens/caja-turnos.jsx
 msgid "No hay turnos de caja en esta vista."
 msgstr "No cash shifts in this view."
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Dom"
+msgstr "Sun"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Lun"
+msgstr "Mon"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Mar"
+msgstr "Tue"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Mié"
+msgstr "Wed"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Jue"
+msgstr "Thu"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Vie"
+msgstr "Fri"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Sáb"
+msgstr "Sat"
+
+#: src/screens/cash-settings.jsx
+msgid "Cargando ajustes de Cash…"
+msgstr "Loading Cash settings…"
+
+#: src/screens/cash-settings.jsx
+msgid "No se pudieron cargar los ajustes de Cash."
+msgstr "Could not load Cash settings."
+
+#: src/screens/cash-settings.jsx
+msgid "No se pudieron guardar los ajustes."
+msgstr "Could not save the settings."
+
+#: src/screens/cash-settings.jsx
+msgid "Ajustes de Cash"
+msgstr "Cash settings"
+
+#: src/screens/cash-settings.jsx
+msgid "Configura el pase, la promoción y el registro del programa."
+msgstr "Configure the pass, the promotion and the program registration."
+
+#: src/screens/cash-settings.jsx
+msgid "Apariencia"
+msgstr "Appearance"
+
+#: src/screens/cash-settings.jsx
+msgid "Los colores se aplican al pase y a la tarjeta del cliente."
+msgstr "The colors apply to the pass and the customer card."
+
+#: src/screens/cash-settings.jsx
+msgid "Color principal"
+msgstr "Primary color"
+
+#: src/screens/cash-settings.jsx
+msgid "Valor del color principal"
+msgstr "Primary color value"
+
+#: src/screens/cash-settings.jsx
+msgid "Color secundario"
+msgstr "Secondary color"
+
+#: src/screens/cash-settings.jsx
+msgid "Valor del color secundario"
+msgstr "Secondary color value"
+
+#: src/screens/cash-settings.jsx
+msgid "Promoción"
+msgstr "Promotion"
+
+#: src/screens/cash-settings.jsx
+msgid "El mensaje se envía por WhatsApp y aparece en el pase."
+msgstr "The message is sent by WhatsApp and appears on the pass."
+
+#: src/screens/cash-settings.jsx
+msgid "Mensaje · máx. 200 caracteres"
+msgstr "Message · max. 200 characters"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Inicio de la vigencia"
+msgstr "Validity start"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Fin de la vigencia"
+msgstr "Validity end"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Días de la semana"
+msgstr "Days of the week"
+
+#: src/screens/cash-settings.jsx
+msgid "Cumpleaños"
+msgstr "Birthday"
+
+#: src/screens/cash-settings.jsx
+msgid "Un premio que se emite solo el día del cumpleaños."
+msgstr "A reward issued only on the customer birthday."
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Regalo de cumpleaños"
+msgstr "Birthday gift"
+
+#: src/screens/cash-settings.jsx
+msgid "Nombre del premio"
+msgstr "Reward name"
+
+#: src/screens/cash-settings.jsx
+msgid "Registro y monedero"
+msgstr "Registration and wallet"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Autorregistro"
+msgstr "Self-registration"
+
+#: src/screens/cash-settings.jsx
+msgid "El cliente puede entrar al programa escaneando un código QR."
+msgstr "The customer can join the program by scanning a QR code."
+
+#: src/screens/cash-settings.jsx
+msgid "Recargas del monedero"
+msgstr "Wallet top-ups"
+
+#: src/screens/cash-settings.jsx
+msgid "Permite abonar saldo a la tarjeta del cliente."
+msgstr "Allow adding balance to the customer card."
+
+#: src/screens/cash-settings.jsx
+msgid "Sellos múltiples"
+msgstr "Multiple stamps"
+
+#: src/screens/cash-settings.jsx
+msgid "Permite más de un sello por visita cuando la promoción lo indica."
+msgstr "Allow more than one stamp per visit when the promotion permits it."
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings-inventory-alerts.jsx
+#: src/screens/settings-purchase-days.jsx
+#: src/screens/settings.jsx
+msgid "Cambios guardados"
+msgstr "Changes saved"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings-purchase-days.jsx
+#: src/screens/settings.jsx
+msgid "Sin guardar"
+msgstr "Unsaved"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/devices.jsx
+msgid "Guardar cambios"
+msgstr "Save changes"
 
 #: src/screens/catalog-inventory.jsx
 #~ msgid "Facturas"
@@ -1925,14 +2168,6 @@ msgstr "Waiting"
 #: src/screens/staff.jsx
 msgid "Todos"
 msgstr "All"
-
-#: src/screens/customers.jsx
-#: src/screens/loyalty-value.jsx
-#: src/screens/operations-workspace.jsx
-#: src/screens/staff.jsx
-#: src/shell.jsx
-msgid "Lealtad"
-msgstr "Loyalty"
 
 #: src/screens/customers.jsx
 msgid "Notas"
@@ -2422,6 +2657,7 @@ msgid "Elige una recompensa. Conserva las visitas que sobren."
 msgstr "Choose one reward. Keep any visits left over."
 
 #: src/screens/customers.jsx
+#: src/screens/members.jsx
 msgid "Saldo del monedero"
 msgstr "Wallet balance"
 
@@ -2430,7 +2666,6 @@ msgid "Sin tarjeta"
 msgstr "No card"
 
 #: src/screens/customers.jsx
-#: src/screens/members.jsx
 msgid "Visitas totales"
 msgstr "Total visits"
 
@@ -2600,14 +2835,6 @@ msgstr "Back to Customers"
 #: src/screens/customers.jsx
 msgid "activo"
 msgstr "active"
-
-#: src/screens/customers.jsx
-#: src/screens/gift-cards.jsx
-#: src/screens/loyalty-value.jsx
-#: src/screens/staff.jsx
-#: src/shell.jsx
-msgid "Tarjetas de regalo"
-msgstr "Gift cards"
 
 #: src/screens/customers.jsx
 msgid "Perfil del cliente"
@@ -3118,10 +3345,6 @@ msgstr "Revoking…"
 #: src/screens/devices.jsx
 msgid "Revocar caja"
 msgstr "Revoke register"
-
-#: src/screens/devices.jsx
-msgid "Guardar cambios"
-msgstr "Save changes"
 
 #: src/screens/devices.jsx
 msgid "UmiPOS · Acceso"
@@ -3987,6 +4210,22 @@ msgid "Selecciona una sucursal para editar su plano."
 msgstr "Select a location to edit its floor plan."
 
 #: src/screens/gift-cards.jsx
+#~ msgid "Saldo abierto en esta página"
+#~ msgstr "Open balance on this page"
+
+#: src/screens/gift-cards.jsx
+#~ msgid "Canjeado en esta página"
+#~ msgstr "Redeemed on this page"
+
+#: src/screens/gift-cards.jsx
+#~ msgid "CANJEADA"
+#~ msgstr "REDEEMED"
+
+#: src/screens/gift-cards.jsx
+#~ msgid "ABIERTA"
+#~ msgstr "OPEN"
+
+#: src/screens/gift-cards.jsx
 msgid "No se pudo canjear la tarjeta."
 msgstr "The card could not be redeemed."
 
@@ -4024,6 +4263,7 @@ msgstr "Phone"
 
 #: src/screens/gift-cards.jsx
 #: src/screens/login.jsx
+#: src/screens/members.jsx
 #: src/screens/profile.jsx
 msgid "Correo"
 msgstr "Email"
@@ -4089,21 +4329,38 @@ msgid "Emitir tarjeta"
 msgstr "Issue card"
 
 #: src/screens/gift-cards.jsx
-msgid "Saldo abierto en esta página"
-msgstr "Open balance on this page"
+#: src/screens/members.jsx
+msgid "Solo consulta"
+msgstr "Read only"
+
+#: src/screens/gift-cards.jsx
+msgid "No se pudieron cargar las tarjetas"
+msgstr "Could not load the gift cards"
+
+#: src/screens/gift-cards.jsx
+msgid "con saldo en esta página"
+msgstr "with balance on this page"
+
+#: src/screens/gift-cards.jsx
+msgid "Saldo abierto"
+msgstr "Open balance"
+
+#: src/screens/gift-cards.jsx
+msgid "en esta página"
+msgstr "on this page"
 
 #: src/screens/gift-cards.jsx
 msgid "Canjeadas"
 msgstr "Redeemed"
 
-#: src/screens/gift-cards.jsx
-msgid "Canjeado en esta página"
-msgstr "Redeemed on this page"
-
 #. placeholder {0}: cards.length
 #: src/screens/gift-cards.jsx
 msgid "{0} en pantalla"
 msgstr "{0} shown"
+
+#: src/screens/gift-cards.jsx
+msgid "Tarjetas de regalo emitidas"
+msgstr "Issued gift cards"
 
 #: src/screens/gift-cards.jsx
 msgid "Destinatario"
@@ -4128,12 +4385,13 @@ msgid "Sin contacto"
 msgstr "No contact"
 
 #: src/screens/gift-cards.jsx
-msgid "CANJEADA"
-msgstr "REDEEMED"
+msgid "Canjeada"
+msgstr "Redeemed"
 
 #: src/screens/gift-cards.jsx
-msgid "ABIERTA"
-msgstr "OPEN"
+#: src/screens/settings.jsx
+msgid "Abierta"
+msgstr "Open"
 
 #: src/screens/gift-cards.jsx
 #: src/screens/inventory-import-table.jsx
@@ -4159,20 +4417,10 @@ msgid "Lunes"
 msgstr "Monday"
 
 #: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Lun"
-msgstr "Mon"
-
-#: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Martes"
 msgstr "Tuesday"
-
-#: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Mar"
-msgstr "Tue"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
@@ -4181,20 +4429,10 @@ msgid "Miércoles"
 msgstr "Wednesday"
 
 #: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Mié"
-msgstr "Wed"
-
-#: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Jueves"
 msgstr "Thursday"
-
-#: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Jue"
-msgstr "Thu"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
@@ -4203,31 +4441,16 @@ msgid "Viernes"
 msgstr "Friday"
 
 #: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Vie"
-msgstr "Fri"
-
-#: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Sábado"
 msgstr "Saturday"
 
 #: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Sáb"
-msgstr "Sat"
-
-#: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Domingo"
 msgstr "Sunday"
-
-#: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Dom"
-msgstr "Sun"
 
 #: src/screens/hours.jsx
 msgid "ConversaFlow · Pedidos WhatsApp"
@@ -5282,10 +5505,6 @@ msgid "El historial se conserva. Debes registrar de nuevo las cantidades."
 msgstr "History stays available. You must enter the quantities again."
 
 #: src/screens/inventory-count.jsx
-msgid "Volver"
-msgstr "Back"
-
-#: src/screens/inventory-count.jsx
 msgid "Confirmar cancelación"
 msgstr "Confirm cancellation"
 
@@ -6126,6 +6345,7 @@ msgid "Costo estimado"
 msgstr "Estimated cost"
 
 #: src/screens/inventory-planning.jsx
+#: src/screens/loyalty-value.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Sin configurar"
 msgstr "Not configured"
@@ -7075,15 +7295,86 @@ msgstr "Check your email"
 msgid "Si hay una cuenta con ese correo, te mandamos un enlace para restablecer tu contraseña. Caduca en 15 minutos."
 msgstr "If an account exists with that email, we sent a link to reset your password. It expires in 15 minutes."
 
+#. placeholder {0}: CASH_TABS.length
 #: src/screens/loyalty-value.jsx
-#: src/screens/operations-workspace.jsx
-msgid "Recompensas"
-msgstr "Rewards"
+#~ msgid "de {0}"
+#~ msgstr "of {0}"
 
 #: src/screens/loyalty-value.jsx
-#: src/screens/recibos.jsx
-msgid "Monedero"
-msgstr "Wallet"
+msgid "Recompensa"
+msgstr "Reward"
+
+#. placeholder {0}: rewardConfig.visitsRequired || 0
+#: src/screens/loyalty-value.jsx
+msgid "{0} visitas"
+msgstr "{0} visits"
+
+#: src/screens/loyalty-value.jsx
+msgid "Sin meta activa"
+msgstr "No active target"
+
+#: src/screens/loyalty-value.jsx
+msgid "Secciones disponibles"
+msgstr "Available sections"
+
+#. placeholder {0}: CASH_TABS.length
+#: src/screens/loyalty-value.jsx
+msgid "de {0} secciones"
+msgstr "of {0} sections"
+
+#: src/screens/loyalty-value.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/products-billing.jsx
+#: src/screens/profile.jsx
+msgid "Activo"
+msgstr "Active"
+
+#: src/screens/loyalty-value.jsx
+msgid "Consulta y recargas"
+msgstr "View and top-ups"
+
+#: src/screens/loyalty-value.jsx
+msgid "Resumen de Lealtad y valor"
+msgstr "Loyalty and value summary"
+
+#: src/screens/members.jsx
+#~ msgid "total"
+#~ msgstr "total"
+
+#. placeholder {0}: c.visitsThisCycle || 0
+#: src/screens/members.jsx
+#~ msgid "{0} ciclo"
+#~ msgstr "{0} cycle"
+
+#: src/screens/members.jsx
+#~ msgid "Saldo · monedero"
+#~ msgstr "Balance · wallet"
+
+#: src/screens/members.jsx
+#~ msgid "LTV estimado"
+#~ msgstr "Estimated LTV"
+
+#: src/screens/members.jsx
+#~ msgid "Número de tarjeta"
+#~ msgstr "Card number"
+
+#: src/screens/members.jsx
+#~ msgid "Progreso en ciclo actual"
+#~ msgstr "Progress in current cycle"
+
+#. placeholder {0}: c.visitsThisCycle || 0
+#: src/screens/members.jsx
+#~ msgid "{0, plural, one {# visita completada} other {# visitas completadas}}"
+#~ msgstr "{0, plural, one {# visit completed} other {# visits completed}}"
+
+#. placeholder {0}: c.visitsRequired
+#: src/screens/members.jsx
+#~ msgid "meta: {0}"
+#~ msgstr "goal: {0}"
+
+#: src/screens/members.jsx
+#~ msgid "meta sin configurar"
+#~ msgstr "goal not set"
 
 #: src/screens/members.jsx
 msgid "Más recientes"
@@ -7116,6 +7407,10 @@ msgstr "Register member"
 #: src/screens/members.jsx
 msgid "Inscribe a un cliente en el programa de lealtad."
 msgstr "Enroll a customer in the loyalty program."
+
+#: src/screens/members.jsx
+msgid "Enviamos un paso de verificación al cliente. El miembro se crea cuando lo completa."
+msgstr "We sent a verification step to the customer. The member is created when they complete it."
 
 #: src/screens/members.jsx
 msgid "Miembro registrado."
@@ -7151,18 +7446,30 @@ msgid "miembros"
 msgstr "members"
 
 #: src/screens/members.jsx
-msgid "Ordenar clientes"
-msgstr "Sort customers"
+msgid "Tu rol no incluye registrar miembros"
+msgstr "Your role does not include registering members"
 
 #: src/screens/members.jsx
 msgid "Buscar por nombre, teléfono o tarjeta…"
 msgstr "Search by name, phone, or card…"
+
+#: src/screens/members.jsx
+msgid "Ordenar clientes"
+msgstr "Sort customers"
 
 #. placeholder {0}: customers.length
 #. placeholder {1}: formatNumber(total)
 #: src/screens/members.jsx
 msgid "{0} de {1} miembros"
 msgstr "{0} of {1} members"
+
+#: src/screens/members.jsx
+msgid "No se pudieron cargar los miembros"
+msgstr "Could not load the members"
+
+#: src/screens/members.jsx
+msgid "Miembros"
+msgstr "Members"
 
 #: src/screens/members.jsx
 msgid "Miembro"
@@ -7196,19 +7503,30 @@ msgid "Sin miembros en este filtro."
 msgstr "No members in this filter."
 
 #: src/screens/members.jsx
+msgid "Sin meta"
+msgstr "No target"
+
+#: src/screens/members.jsx
+msgid "{done} de {total} visitas para la recompensa"
+msgstr "{done} of {total} visits toward the reward"
+
+#: src/screens/members.jsx
 #: src/screens/orders.jsx
 #: src/screens/profile.jsx
 msgid "Sin nombre"
 msgstr "No name"
 
 #: src/screens/members.jsx
-msgid "total"
-msgstr "total"
+msgid "Contacto restringido"
+msgstr "Contact restricted"
 
-#. placeholder {0}: c.visitsThisCycle || 0
 #: src/screens/members.jsx
-msgid "{0} ciclo"
-msgstr "{0} cycle"
+msgid "visitas"
+msgstr "visits"
+
+#: src/screens/members.jsx
+msgid "por canjear"
+msgstr "to redeem"
 
 #: src/screens/members.jsx
 msgid "Nunca"
@@ -7219,38 +7537,49 @@ msgid "Miembro · Umi Cash"
 msgstr "Member · Umi Cash"
 
 #: src/screens/members.jsx
-msgid "Saldo · monedero"
-msgstr "Balance · wallet"
+msgid "Resumen del miembro"
+msgstr "Member summary"
 
 #: src/screens/members.jsx
-msgid "LTV estimado"
-msgstr "Estimated LTV"
+msgid "Progreso de sellos"
+msgstr "Stamp progress"
 
 #: src/screens/members.jsx
-msgid "Número de tarjeta"
-msgstr "Card number"
+msgid "Identidad y contacto"
+msgstr "Identity and contact"
 
 #: src/screens/members.jsx
 msgid "Miembro desde"
 msgstr "Member since"
 
 #: src/screens/members.jsx
-msgid "Progreso en ciclo actual"
-msgstr "Progress in current cycle"
-
-#. placeholder {0}: c.visitsThisCycle || 0
-#: src/screens/members.jsx
-msgid "{0, plural, one {# visita completada} other {# visitas completadas}}"
-msgstr "{0, plural, one {# visit completed} other {# visits completed}}"
-
-#. placeholder {0}: c.visitsRequired
-#: src/screens/members.jsx
-msgid "meta: {0}"
-msgstr "goal: {0}"
+msgid "Tu rol puede operar la lealtad, pero no ver los datos de contacto del cliente."
+msgstr "Your role can operate loyalty, but cannot see the customer's contact data."
 
 #: src/screens/members.jsx
-msgid "meta sin configurar"
-msgstr "goal not set"
+msgid "Acciones rápidas"
+msgstr "Quick actions"
+
+#: src/screens/members.jsx
+msgid "Copiado"
+msgstr "Copied"
+
+#: src/screens/members.jsx
+msgid "Copiar tarjeta"
+msgstr "Copy card"
+
+#: src/screens/members.jsx
+#: src/screens/recibos.jsx
+msgid "Actividad"
+msgstr "Activity"
+
+#: src/screens/members.jsx
+msgid "Movimiento"
+msgstr "Movement"
+
+#: src/screens/members.jsx
+msgid "Sin visitas, canjes o recargas recientes en este panel."
+msgstr "No recent visits, redemptions or top-ups in this panel."
 
 #: src/screens/menu-engineering.jsx
 msgid "Estrella"
@@ -7453,12 +7782,6 @@ msgstr "Recover"
 #: src/screens/operations-workspace.jsx
 msgid "Reembolsar"
 msgstr "Refund"
-
-#: src/screens/operations-workspace.jsx
-#: src/screens/products-billing.jsx
-#: src/screens/profile.jsx
-msgid "Activo"
-msgstr "Active"
 
 #: src/screens/operations-workspace.jsx
 #: src/screens/registros.jsx
@@ -9856,10 +10179,6 @@ msgid "cambio"
 msgstr "change"
 
 #: src/screens/recibos.jsx
-msgid "Actividad"
-msgstr "Activity"
-
-#: src/screens/recibos.jsx
 msgid "Emitido"
 msgstr "Issued"
 
@@ -11002,12 +11321,6 @@ msgstr "Loading settings…"
 msgid "Enviar avisos por correo al dueño"
 msgstr "Email inventory alerts to the owner"
 
-#: src/screens/settings-inventory-alerts.jsx
-#: src/screens/settings-purchase-days.jsx
-#: src/screens/settings.jsx
-msgid "Cambios guardados"
-msgstr "Changes saved"
-
 #: src/screens/settings-purchase-days.jsx
 msgid "Días de compra"
 msgstr "Purchase days"
@@ -11015,11 +11328,6 @@ msgstr "Purchase days"
 #: src/screens/settings-purchase-days.jsx
 msgid "Selecciona los días en que sueles comprar."
 msgstr "Select the days when you usually make purchases."
-
-#: src/screens/settings-purchase-days.jsx
-#: src/screens/settings.jsx
-msgid "Sin guardar"
-msgstr "Unsaved"
 
 #: src/screens/settings.jsx
 #~ msgid "Los cambios de Cash se guardan solo porque Umi Cash está activo."
@@ -11070,10 +11378,6 @@ msgid "Cancelada"
 msgstr "Canceled"
 
 #: src/screens/settings.jsx
-msgid "Regalo de cumpleaños"
-msgstr "Birthday gift"
-
-#: src/screens/settings.jsx
 msgid "Recompensa de temporada"
 msgstr "Seasonal reward"
 
@@ -11088,6 +11392,10 @@ msgstr "Set up the business, the loyalty programme, and the assistant voice."
 #: src/screens/settings.jsx
 msgid "Información del negocio"
 msgstr "Business information"
+
+#: src/screens/settings.jsx
+msgid "La ciudad se muestra desde el registro del negocio; no se edita aquí."
+msgstr "The city comes from the business record and is not edited here."
 
 #: src/screens/settings.jsx
 msgid "Inicio del día operativo"
@@ -11295,22 +11603,6 @@ msgid "Vigencia · desde / hasta"
 msgstr "Validity · from / to"
 
 #: src/screens/settings.jsx
-msgid "Inicio de la vigencia"
-msgstr "Validity start"
-
-#: src/screens/settings.jsx
-msgid "Fin de la vigencia"
-msgstr "Validity end"
-
-#: src/screens/settings.jsx
-msgid "Días de la semana"
-msgstr "Days of the week"
-
-#: src/screens/settings.jsx
-msgid "Autorregistro"
-msgstr "Self-registration"
-
-#: src/screens/settings.jsx
 msgid "El cliente entra al programa de lealtad escaneando un código QR en la mesa, sin ayuda del personal."
 msgstr "The customer joins the loyalty program by scanning a QR code at the table, without staff help."
 
@@ -11437,10 +11729,6 @@ msgstr "Location name"
 #: src/screens/settings.jsx
 msgid "Estado del negocio"
 msgstr "Business status"
-
-#: src/screens/settings.jsx
-msgid "Abierta"
-msgstr "Open"
 
 #: src/screens/settings.jsx
 msgid "Cerrada"

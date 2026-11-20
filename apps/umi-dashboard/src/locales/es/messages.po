@@ -98,6 +98,10 @@ msgid "Los planos, el catálogo y las ventas se guardan por sucursal, así que e
 msgstr "Los planos, el catálogo y las ventas se guardan por sucursal, así que esta pantalla necesita una. Crea la primera sucursal para este negocio y vuelve aquí."
 
 #: src/app.jsx
+msgid "Abriendo tu pantalla…"
+msgstr "Abriendo tu pantalla…"
+
+#: src/app.jsx
 msgid "Cargando negocio…"
 msgstr "Cargando negocio…"
 
@@ -152,6 +156,35 @@ msgstr "Tinte en modo oscuro"
 #: src/components/page-head.jsx
 #~ msgid "{value} {of} {noun}"
 #~ msgstr "{value} {of} {noun}"
+
+#: src/components/permission-unavailable.jsx
+msgid "Acceso restringido"
+msgstr "Acceso restringido"
+
+#: src/components/permission-unavailable.jsx
+msgid "No tienes acceso a"
+msgstr "No tienes acceso a"
+
+#: src/components/permission-unavailable.jsx
+msgid "esta sección"
+msgstr "esta sección"
+
+#: src/components/permission-unavailable.jsx
+msgid "Tu rol no incluye el permiso necesario. Esta pantalla no cargó los datos y el servidor también rechaza la lectura."
+msgstr "Tu rol no incluye el permiso necesario. Esta pantalla no cargó los datos y el servidor también rechaza la lectura."
+
+#: src/components/permission-unavailable.jsx
+msgid "Permiso requerido"
+msgstr "Permiso requerido"
+
+#: src/components/permission-unavailable.jsx
+#: src/screens/inventory-count.jsx
+msgid "Volver"
+msgstr "Volver"
+
+#: src/components/permission-unavailable.jsx
+msgid "Ir a {backLabel}"
+msgstr "Ir a {backLabel}"
 
 #: src/data.jsx
 #~ msgid "Elige una imagen PNG o JPG."
@@ -223,6 +256,41 @@ msgstr "El servidor no devolvió una sesión. Inténtalo otra vez."
 #: src/screens/login.jsx
 msgid "Código incorrecto o vencido."
 msgstr "Código incorrecto o vencido."
+
+#: src/lib/cash-tabs.js
+#: src/screens/customers.jsx
+#: src/screens/members.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/staff.jsx
+#: src/shell.jsx
+msgid "Lealtad"
+msgstr "Lealtad"
+
+#: src/lib/cash-tabs.js
+#: src/screens/operations-workspace.jsx
+msgid "Recompensas"
+msgstr "Recompensas"
+
+#: src/lib/cash-tabs.js
+#: src/screens/customers.jsx
+#: src/screens/gift-cards.jsx
+#: src/screens/members.jsx
+#: src/screens/staff.jsx
+#: src/shell.jsx
+msgid "Tarjetas de regalo"
+msgstr "Tarjetas de regalo"
+
+#: src/lib/cash-tabs.js
+#: src/screens/loyalty-value.jsx
+#: src/screens/recibos.jsx
+msgid "Monedero"
+msgstr "Monedero"
+
+#: src/lib/cash-tabs.js
+#: src/lib/module-registry.js
+#: src/shell.jsx
+msgid "Ajustes"
+msgstr "Ajustes"
 
 #: src/lib/inventory-import/copy.js
 msgid "Código único del artículo. Conserva los ceros iniciales."
@@ -610,8 +678,10 @@ msgstr "Guardado"
 #: src/lib/inventory-import/display.js
 #: src/screens/category-sales.jsx
 #: src/screens/floor-plan.jsx
+#: src/screens/gift-cards.jsx
 #: src/screens/inventory-count.jsx
 #: src/screens/inventory-workspace.jsx
+#: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/sales-widgets.jsx
@@ -702,11 +772,6 @@ msgstr "Atención"
 #: src/lib/module-registry.js
 msgid "Horarios"
 msgstr "Horarios"
-
-#: src/lib/module-registry.js
-#: src/shell.jsx
-msgid "Ajustes"
-msgstr "Ajustes"
 
 #: src/lib/module-registry.js
 #: src/shell.jsx
@@ -1207,6 +1272,7 @@ msgid "Escribe la CLABE o el número de cuenta. Puedes guardar ambos."
 msgstr "Escribe la CLABE o el número de cuenta. Puedes guardar ambos."
 
 #: src/screens/caja-turnos.jsx
+#: src/screens/cash-settings.jsx
 #: src/screens/devices.jsx
 #: src/screens/hours.jsx
 #: src/screens/purchase-entry-dialog.jsx
@@ -1487,6 +1553,183 @@ msgstr "Cargando turnos…"
 #: src/screens/caja-turnos.jsx
 msgid "No hay turnos de caja en esta vista."
 msgstr "No hay turnos de caja en esta vista."
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Dom"
+msgstr "Dom"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Lun"
+msgstr "Lun"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Mar"
+msgstr "Mar"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Mié"
+msgstr "Mié"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Jue"
+msgstr "Jue"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Vie"
+msgstr "Vie"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Sáb"
+msgstr "Sáb"
+
+#: src/screens/cash-settings.jsx
+msgid "Cargando ajustes de Cash…"
+msgstr "Cargando ajustes de Cash…"
+
+#: src/screens/cash-settings.jsx
+msgid "No se pudieron cargar los ajustes de Cash."
+msgstr "No se pudieron cargar los ajustes de Cash."
+
+#: src/screens/cash-settings.jsx
+msgid "No se pudieron guardar los ajustes."
+msgstr "No se pudieron guardar los ajustes."
+
+#: src/screens/cash-settings.jsx
+msgid "Ajustes de Cash"
+msgstr "Ajustes de Cash"
+
+#: src/screens/cash-settings.jsx
+msgid "Configura el pase, la promoción y el registro del programa."
+msgstr "Configura el pase, la promoción y el registro del programa."
+
+#: src/screens/cash-settings.jsx
+msgid "Apariencia"
+msgstr "Apariencia"
+
+#: src/screens/cash-settings.jsx
+msgid "Los colores se aplican al pase y a la tarjeta del cliente."
+msgstr "Los colores se aplican al pase y a la tarjeta del cliente."
+
+#: src/screens/cash-settings.jsx
+msgid "Color principal"
+msgstr "Color principal"
+
+#: src/screens/cash-settings.jsx
+msgid "Valor del color principal"
+msgstr "Valor del color principal"
+
+#: src/screens/cash-settings.jsx
+msgid "Color secundario"
+msgstr "Color secundario"
+
+#: src/screens/cash-settings.jsx
+msgid "Valor del color secundario"
+msgstr "Valor del color secundario"
+
+#: src/screens/cash-settings.jsx
+msgid "Promoción"
+msgstr "Promoción"
+
+#: src/screens/cash-settings.jsx
+msgid "El mensaje se envía por WhatsApp y aparece en el pase."
+msgstr "El mensaje se envía por WhatsApp y aparece en el pase."
+
+#: src/screens/cash-settings.jsx
+msgid "Mensaje · máx. 200 caracteres"
+msgstr "Mensaje · máx. 200 caracteres"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Inicio de la vigencia"
+msgstr "Inicio de la vigencia"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Fin de la vigencia"
+msgstr "Fin de la vigencia"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Días de la semana"
+msgstr "Días de la semana"
+
+#: src/screens/cash-settings.jsx
+msgid "Cumpleaños"
+msgstr "Cumpleaños"
+
+#: src/screens/cash-settings.jsx
+msgid "Un premio que se emite solo el día del cumpleaños."
+msgstr "Un premio que se emite solo el día del cumpleaños."
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Regalo de cumpleaños"
+msgstr "Regalo de cumpleaños"
+
+#: src/screens/cash-settings.jsx
+msgid "Nombre del premio"
+msgstr "Nombre del premio"
+
+#: src/screens/cash-settings.jsx
+msgid "Registro y monedero"
+msgstr "Registro y monedero"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings.jsx
+msgid "Autorregistro"
+msgstr "Autorregistro"
+
+#: src/screens/cash-settings.jsx
+msgid "El cliente puede entrar al programa escaneando un código QR."
+msgstr "El cliente puede entrar al programa escaneando un código QR."
+
+#: src/screens/cash-settings.jsx
+msgid "Recargas del monedero"
+msgstr "Recargas del monedero"
+
+#: src/screens/cash-settings.jsx
+msgid "Permite abonar saldo a la tarjeta del cliente."
+msgstr "Permite abonar saldo a la tarjeta del cliente."
+
+#: src/screens/cash-settings.jsx
+msgid "Sellos múltiples"
+msgstr "Sellos múltiples"
+
+#: src/screens/cash-settings.jsx
+msgid "Permite más de un sello por visita cuando la promoción lo indica."
+msgstr "Permite más de un sello por visita cuando la promoción lo indica."
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings-inventory-alerts.jsx
+#: src/screens/settings-purchase-days.jsx
+#: src/screens/settings.jsx
+msgid "Cambios guardados"
+msgstr "Cambios guardados"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/settings-purchase-days.jsx
+#: src/screens/settings.jsx
+msgid "Sin guardar"
+msgstr "Sin guardar"
+
+#: src/screens/cash-settings.jsx
+#: src/screens/devices.jsx
+msgid "Guardar cambios"
+msgstr "Guardar cambios"
 
 #: src/screens/catalog-inventory.jsx
 #~ msgid "Facturas"
@@ -1925,14 +2168,6 @@ msgstr "Espera"
 #: src/screens/staff.jsx
 msgid "Todos"
 msgstr "Todos"
-
-#: src/screens/customers.jsx
-#: src/screens/loyalty-value.jsx
-#: src/screens/operations-workspace.jsx
-#: src/screens/staff.jsx
-#: src/shell.jsx
-msgid "Lealtad"
-msgstr "Lealtad"
 
 #: src/screens/customers.jsx
 msgid "Notas"
@@ -2422,6 +2657,7 @@ msgid "Elige una recompensa. Conserva las visitas que sobren."
 msgstr "Elige una recompensa. Conserva las visitas que sobren."
 
 #: src/screens/customers.jsx
+#: src/screens/members.jsx
 msgid "Saldo del monedero"
 msgstr "Saldo del monedero"
 
@@ -2430,7 +2666,6 @@ msgid "Sin tarjeta"
 msgstr "Sin tarjeta"
 
 #: src/screens/customers.jsx
-#: src/screens/members.jsx
 msgid "Visitas totales"
 msgstr "Visitas totales"
 
@@ -2600,14 +2835,6 @@ msgstr "Volver a Clientes"
 #: src/screens/customers.jsx
 msgid "activo"
 msgstr "activo"
-
-#: src/screens/customers.jsx
-#: src/screens/gift-cards.jsx
-#: src/screens/loyalty-value.jsx
-#: src/screens/staff.jsx
-#: src/shell.jsx
-msgid "Tarjetas de regalo"
-msgstr "Tarjetas de regalo"
 
 #: src/screens/customers.jsx
 msgid "Perfil del cliente"
@@ -3118,10 +3345,6 @@ msgstr "Revocando…"
 #: src/screens/devices.jsx
 msgid "Revocar caja"
 msgstr "Revocar caja"
-
-#: src/screens/devices.jsx
-msgid "Guardar cambios"
-msgstr "Guardar cambios"
 
 #: src/screens/devices.jsx
 msgid "UmiPOS · Acceso"
@@ -3987,6 +4210,22 @@ msgid "Selecciona una sucursal para editar su plano."
 msgstr "Selecciona una sucursal para editar su plano."
 
 #: src/screens/gift-cards.jsx
+#~ msgid "Saldo abierto en esta página"
+#~ msgstr "Saldo abierto en esta página"
+
+#: src/screens/gift-cards.jsx
+#~ msgid "Canjeado en esta página"
+#~ msgstr "Canjeado en esta página"
+
+#: src/screens/gift-cards.jsx
+#~ msgid "CANJEADA"
+#~ msgstr "CANJEADA"
+
+#: src/screens/gift-cards.jsx
+#~ msgid "ABIERTA"
+#~ msgstr "ABIERTA"
+
+#: src/screens/gift-cards.jsx
 msgid "No se pudo canjear la tarjeta."
 msgstr "No se pudo canjear la tarjeta."
 
@@ -4024,6 +4263,7 @@ msgstr "Teléfono"
 
 #: src/screens/gift-cards.jsx
 #: src/screens/login.jsx
+#: src/screens/members.jsx
 #: src/screens/profile.jsx
 msgid "Correo"
 msgstr "Correo"
@@ -4089,21 +4329,38 @@ msgid "Emitir tarjeta"
 msgstr "Emitir tarjeta"
 
 #: src/screens/gift-cards.jsx
-msgid "Saldo abierto en esta página"
-msgstr "Saldo abierto en esta página"
+#: src/screens/members.jsx
+msgid "Solo consulta"
+msgstr "Solo consulta"
+
+#: src/screens/gift-cards.jsx
+msgid "No se pudieron cargar las tarjetas"
+msgstr "No se pudieron cargar las tarjetas"
+
+#: src/screens/gift-cards.jsx
+msgid "con saldo en esta página"
+msgstr "con saldo en esta página"
+
+#: src/screens/gift-cards.jsx
+msgid "Saldo abierto"
+msgstr "Saldo abierto"
+
+#: src/screens/gift-cards.jsx
+msgid "en esta página"
+msgstr "en esta página"
 
 #: src/screens/gift-cards.jsx
 msgid "Canjeadas"
 msgstr "Canjeadas"
 
-#: src/screens/gift-cards.jsx
-msgid "Canjeado en esta página"
-msgstr "Canjeado en esta página"
-
 #. placeholder {0}: cards.length
 #: src/screens/gift-cards.jsx
 msgid "{0} en pantalla"
 msgstr "{0} en pantalla"
+
+#: src/screens/gift-cards.jsx
+msgid "Tarjetas de regalo emitidas"
+msgstr "Tarjetas de regalo emitidas"
 
 #: src/screens/gift-cards.jsx
 msgid "Destinatario"
@@ -4128,12 +4385,13 @@ msgid "Sin contacto"
 msgstr "Sin contacto"
 
 #: src/screens/gift-cards.jsx
-msgid "CANJEADA"
-msgstr "CANJEADA"
+msgid "Canjeada"
+msgstr "Canjeada"
 
 #: src/screens/gift-cards.jsx
-msgid "ABIERTA"
-msgstr "ABIERTA"
+#: src/screens/settings.jsx
+msgid "Abierta"
+msgstr "Abierta"
 
 #: src/screens/gift-cards.jsx
 #: src/screens/inventory-import-table.jsx
@@ -4159,20 +4417,10 @@ msgid "Lunes"
 msgstr "Lunes"
 
 #: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Lun"
-msgstr "Lun"
-
-#: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Martes"
 msgstr "Martes"
-
-#: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Mar"
-msgstr "Mar"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
@@ -4181,20 +4429,10 @@ msgid "Miércoles"
 msgstr "Miércoles"
 
 #: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Mié"
-msgstr "Mié"
-
-#: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Jueves"
 msgstr "Jueves"
-
-#: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Jue"
-msgstr "Jue"
 
 #: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
@@ -4203,31 +4441,16 @@ msgid "Viernes"
 msgstr "Viernes"
 
 #: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Vie"
-msgstr "Vie"
-
-#: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Sábado"
 msgstr "Sábado"
 
 #: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Sáb"
-msgstr "Sáb"
-
-#: src/screens/hours.jsx
 #: src/screens/sales-purchase-analysis.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Domingo"
 msgstr "Domingo"
-
-#: src/screens/hours.jsx
-#: src/screens/settings.jsx
-msgid "Dom"
-msgstr "Dom"
 
 #: src/screens/hours.jsx
 msgid "ConversaFlow · Pedidos WhatsApp"
@@ -5282,10 +5505,6 @@ msgid "El historial se conserva. Debes registrar de nuevo las cantidades."
 msgstr "El historial se conserva. Debes registrar de nuevo las cantidades."
 
 #: src/screens/inventory-count.jsx
-msgid "Volver"
-msgstr "Volver"
-
-#: src/screens/inventory-count.jsx
 msgid "Confirmar cancelación"
 msgstr "Confirmar cancelación"
 
@@ -6126,6 +6345,7 @@ msgid "Costo estimado"
 msgstr "Costo estimado"
 
 #: src/screens/inventory-planning.jsx
+#: src/screens/loyalty-value.jsx
 #: src/screens/settings-purchase-days.jsx
 msgid "Sin configurar"
 msgstr "Sin configurar"
@@ -7075,15 +7295,86 @@ msgstr "Revisa tu correo"
 msgid "Si hay una cuenta con ese correo, te mandamos un enlace para restablecer tu contraseña. Caduca en 15 minutos."
 msgstr "Si hay una cuenta con ese correo, te mandamos un enlace para restablecer tu contraseña. Caduca en 15 minutos."
 
+#. placeholder {0}: CASH_TABS.length
 #: src/screens/loyalty-value.jsx
-#: src/screens/operations-workspace.jsx
-msgid "Recompensas"
-msgstr "Recompensas"
+#~ msgid "de {0}"
+#~ msgstr "de {0}"
 
 #: src/screens/loyalty-value.jsx
-#: src/screens/recibos.jsx
-msgid "Monedero"
-msgstr "Monedero"
+msgid "Recompensa"
+msgstr "Recompensa"
+
+#. placeholder {0}: rewardConfig.visitsRequired || 0
+#: src/screens/loyalty-value.jsx
+msgid "{0} visitas"
+msgstr "{0} visitas"
+
+#: src/screens/loyalty-value.jsx
+msgid "Sin meta activa"
+msgstr "Sin meta activa"
+
+#: src/screens/loyalty-value.jsx
+msgid "Secciones disponibles"
+msgstr "Secciones disponibles"
+
+#. placeholder {0}: CASH_TABS.length
+#: src/screens/loyalty-value.jsx
+msgid "de {0} secciones"
+msgstr "de {0} secciones"
+
+#: src/screens/loyalty-value.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/products-billing.jsx
+#: src/screens/profile.jsx
+msgid "Activo"
+msgstr "Activo"
+
+#: src/screens/loyalty-value.jsx
+msgid "Consulta y recargas"
+msgstr "Consulta y recargas"
+
+#: src/screens/loyalty-value.jsx
+msgid "Resumen de Lealtad y valor"
+msgstr "Resumen de Lealtad y valor"
+
+#: src/screens/members.jsx
+#~ msgid "total"
+#~ msgstr "total"
+
+#. placeholder {0}: c.visitsThisCycle || 0
+#: src/screens/members.jsx
+#~ msgid "{0} ciclo"
+#~ msgstr "{0} ciclo"
+
+#: src/screens/members.jsx
+#~ msgid "Saldo · monedero"
+#~ msgstr "Saldo · monedero"
+
+#: src/screens/members.jsx
+#~ msgid "LTV estimado"
+#~ msgstr "LTV estimado"
+
+#: src/screens/members.jsx
+#~ msgid "Número de tarjeta"
+#~ msgstr "Número de tarjeta"
+
+#: src/screens/members.jsx
+#~ msgid "Progreso en ciclo actual"
+#~ msgstr "Progreso en ciclo actual"
+
+#. placeholder {0}: c.visitsThisCycle || 0
+#: src/screens/members.jsx
+#~ msgid "{0, plural, one {# visita completada} other {# visitas completadas}}"
+#~ msgstr "{0, plural, one {# visita completada} other {# visitas completadas}}"
+
+#. placeholder {0}: c.visitsRequired
+#: src/screens/members.jsx
+#~ msgid "meta: {0}"
+#~ msgstr "meta: {0}"
+
+#: src/screens/members.jsx
+#~ msgid "meta sin configurar"
+#~ msgstr "meta sin configurar"
 
 #: src/screens/members.jsx
 msgid "Más recientes"
@@ -7116,6 +7407,10 @@ msgstr "Registrar miembro"
 #: src/screens/members.jsx
 msgid "Inscribe a un cliente en el programa de lealtad."
 msgstr "Inscribe a un cliente en el programa de lealtad."
+
+#: src/screens/members.jsx
+msgid "Enviamos un paso de verificación al cliente. El miembro se crea cuando lo completa."
+msgstr "Enviamos un paso de verificación al cliente. El miembro se crea cuando lo completa."
 
 #: src/screens/members.jsx
 msgid "Miembro registrado."
@@ -7151,18 +7446,30 @@ msgid "miembros"
 msgstr "miembros"
 
 #: src/screens/members.jsx
-msgid "Ordenar clientes"
-msgstr "Ordenar clientes"
+msgid "Tu rol no incluye registrar miembros"
+msgstr "Tu rol no incluye registrar miembros"
 
 #: src/screens/members.jsx
 msgid "Buscar por nombre, teléfono o tarjeta…"
 msgstr "Buscar por nombre, teléfono o tarjeta…"
+
+#: src/screens/members.jsx
+msgid "Ordenar clientes"
+msgstr "Ordenar clientes"
 
 #. placeholder {0}: customers.length
 #. placeholder {1}: formatNumber(total)
 #: src/screens/members.jsx
 msgid "{0} de {1} miembros"
 msgstr "{0} de {1} miembros"
+
+#: src/screens/members.jsx
+msgid "No se pudieron cargar los miembros"
+msgstr "No se pudieron cargar los miembros"
+
+#: src/screens/members.jsx
+msgid "Miembros"
+msgstr "Miembros"
 
 #: src/screens/members.jsx
 msgid "Miembro"
@@ -7196,19 +7503,30 @@ msgid "Sin miembros en este filtro."
 msgstr "Sin miembros en este filtro."
 
 #: src/screens/members.jsx
+msgid "Sin meta"
+msgstr "Sin meta"
+
+#: src/screens/members.jsx
+msgid "{done} de {total} visitas para la recompensa"
+msgstr "{done} de {total} visitas para la recompensa"
+
+#: src/screens/members.jsx
 #: src/screens/orders.jsx
 #: src/screens/profile.jsx
 msgid "Sin nombre"
 msgstr "Sin nombre"
 
 #: src/screens/members.jsx
-msgid "total"
-msgstr "total"
+msgid "Contacto restringido"
+msgstr "Contacto restringido"
 
-#. placeholder {0}: c.visitsThisCycle || 0
 #: src/screens/members.jsx
-msgid "{0} ciclo"
-msgstr "{0} ciclo"
+msgid "visitas"
+msgstr "visitas"
+
+#: src/screens/members.jsx
+msgid "por canjear"
+msgstr "por canjear"
 
 #: src/screens/members.jsx
 msgid "Nunca"
@@ -7219,38 +7537,49 @@ msgid "Miembro · Umi Cash"
 msgstr "Miembro · Umi Cash"
 
 #: src/screens/members.jsx
-msgid "Saldo · monedero"
-msgstr "Saldo · monedero"
+msgid "Resumen del miembro"
+msgstr "Resumen del miembro"
 
 #: src/screens/members.jsx
-msgid "LTV estimado"
-msgstr "LTV estimado"
+msgid "Progreso de sellos"
+msgstr "Progreso de sellos"
 
 #: src/screens/members.jsx
-msgid "Número de tarjeta"
-msgstr "Número de tarjeta"
+msgid "Identidad y contacto"
+msgstr "Identidad y contacto"
 
 #: src/screens/members.jsx
 msgid "Miembro desde"
 msgstr "Miembro desde"
 
 #: src/screens/members.jsx
-msgid "Progreso en ciclo actual"
-msgstr "Progreso en ciclo actual"
-
-#. placeholder {0}: c.visitsThisCycle || 0
-#: src/screens/members.jsx
-msgid "{0, plural, one {# visita completada} other {# visitas completadas}}"
-msgstr "{0, plural, one {# visita completada} other {# visitas completadas}}"
-
-#. placeholder {0}: c.visitsRequired
-#: src/screens/members.jsx
-msgid "meta: {0}"
-msgstr "meta: {0}"
+msgid "Tu rol puede operar la lealtad, pero no ver los datos de contacto del cliente."
+msgstr "Tu rol puede operar la lealtad, pero no ver los datos de contacto del cliente."
 
 #: src/screens/members.jsx
-msgid "meta sin configurar"
-msgstr "meta sin configurar"
+msgid "Acciones rápidas"
+msgstr "Acciones rápidas"
+
+#: src/screens/members.jsx
+msgid "Copiado"
+msgstr "Copiado"
+
+#: src/screens/members.jsx
+msgid "Copiar tarjeta"
+msgstr "Copiar tarjeta"
+
+#: src/screens/members.jsx
+#: src/screens/recibos.jsx
+msgid "Actividad"
+msgstr "Actividad"
+
+#: src/screens/members.jsx
+msgid "Movimiento"
+msgstr "Movimiento"
+
+#: src/screens/members.jsx
+msgid "Sin visitas, canjes o recargas recientes en este panel."
+msgstr "Sin visitas, canjes o recargas recientes en este panel."
 
 #: src/screens/menu-engineering.jsx
 msgid "Estrella"
@@ -7453,12 +7782,6 @@ msgstr "Recuperar"
 #: src/screens/operations-workspace.jsx
 msgid "Reembolsar"
 msgstr "Reembolsar"
-
-#: src/screens/operations-workspace.jsx
-#: src/screens/products-billing.jsx
-#: src/screens/profile.jsx
-msgid "Activo"
-msgstr "Activo"
 
 #: src/screens/operations-workspace.jsx
 #: src/screens/registros.jsx
@@ -9856,10 +10179,6 @@ msgid "cambio"
 msgstr "cambio"
 
 #: src/screens/recibos.jsx
-msgid "Actividad"
-msgstr "Actividad"
-
-#: src/screens/recibos.jsx
 msgid "Emitido"
 msgstr "Emitido"
 
@@ -11002,12 +11321,6 @@ msgstr "Cargando ajustes…"
 msgid "Enviar avisos por correo al dueño"
 msgstr "Enviar avisos por correo al dueño"
 
-#: src/screens/settings-inventory-alerts.jsx
-#: src/screens/settings-purchase-days.jsx
-#: src/screens/settings.jsx
-msgid "Cambios guardados"
-msgstr "Cambios guardados"
-
 #: src/screens/settings-purchase-days.jsx
 msgid "Días de compra"
 msgstr "Días de compra"
@@ -11015,11 +11328,6 @@ msgstr "Días de compra"
 #: src/screens/settings-purchase-days.jsx
 msgid "Selecciona los días en que sueles comprar."
 msgstr "Selecciona los días en que sueles comprar."
-
-#: src/screens/settings-purchase-days.jsx
-#: src/screens/settings.jsx
-msgid "Sin guardar"
-msgstr "Sin guardar"
 
 #: src/screens/settings.jsx
 #~ msgid "Los cambios de Cash se guardan solo porque Umi Cash está activo."
@@ -11070,10 +11378,6 @@ msgid "Cancelada"
 msgstr "Cancelada"
 
 #: src/screens/settings.jsx
-msgid "Regalo de cumpleaños"
-msgstr "Regalo de cumpleaños"
-
-#: src/screens/settings.jsx
 msgid "Recompensa de temporada"
 msgstr "Recompensa de temporada"
 
@@ -11088,6 +11392,10 @@ msgstr "Configura el negocio, la lealtad y la voz del asistente."
 #: src/screens/settings.jsx
 msgid "Información del negocio"
 msgstr "Información del negocio"
+
+#: src/screens/settings.jsx
+msgid "La ciudad se muestra desde el registro del negocio; no se edita aquí."
+msgstr "La ciudad se muestra desde el registro del negocio; no se edita aquí."
 
 #: src/screens/settings.jsx
 msgid "Inicio del día operativo"
@@ -11295,22 +11603,6 @@ msgid "Vigencia · desde / hasta"
 msgstr "Vigencia · desde / hasta"
 
 #: src/screens/settings.jsx
-msgid "Inicio de la vigencia"
-msgstr "Inicio de la vigencia"
-
-#: src/screens/settings.jsx
-msgid "Fin de la vigencia"
-msgstr "Fin de la vigencia"
-
-#: src/screens/settings.jsx
-msgid "Días de la semana"
-msgstr "Días de la semana"
-
-#: src/screens/settings.jsx
-msgid "Autorregistro"
-msgstr "Autorregistro"
-
-#: src/screens/settings.jsx
 msgid "El cliente entra al programa de lealtad escaneando un código QR en la mesa, sin ayuda del personal."
 msgstr "El cliente entra al programa de lealtad escaneando un código QR en la mesa, sin ayuda del personal."
 
@@ -11437,10 +11729,6 @@ msgstr "Nombre de la sucursal"
 #: src/screens/settings.jsx
 msgid "Estado del negocio"
 msgstr "Estado del negocio"
-
-#: src/screens/settings.jsx
-msgid "Abierta"
-msgstr "Abierta"
 
 #: src/screens/settings.jsx
 msgid "Cerrada"

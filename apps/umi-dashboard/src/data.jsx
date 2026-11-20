@@ -19,6 +19,7 @@ import {
 } from '@/lib/auth.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { MODULES, hasRequiredPermission, isProductActive } from '@/lib/module-registry.js';
+import { canShowCashTab, hasCashPermission } from '@/lib/cash-tabs.js';
 import { routes } from '@umi/contract/routes';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { queryClient } from '@/lib/query-client.js';
@@ -207,12 +208,18 @@ function _useAsync(asyncFn, deps, seed) {
     loading: true,
     error: null,
     errorCode: null,
+    errorStatus: null,
     loaded: false,
   });
   useEffectD(function () {
     var active = true;
     setState(function (s) {
-      return Object.assign({}, s, { loading: true, error: null, errorCode: null });
+      return Object.assign({}, s, {
+        loading: true,
+        error: null,
+        errorCode: null,
+        errorStatus: null,
+      });
     });
     Promise.resolve()
       .then(function () {
@@ -220,7 +227,14 @@ function _useAsync(asyncFn, deps, seed) {
       })
       .then(function (data) {
         if (active)
-          setState({ data: data, loading: false, error: null, errorCode: null, loaded: true });
+          setState({
+            data: data,
+            loading: false,
+            error: null,
+            errorCode: null,
+            errorStatus: null,
+            loaded: true,
+          });
       })
       .catch(function (err) {
         if (active)
@@ -230,6 +244,7 @@ function _useAsync(asyncFn, deps, seed) {
               loading: false,
               error: err.message,
               errorCode: err.code || null,
+              errorStatus: err.status || null,
             });
           });
       });
@@ -242,12 +257,20 @@ function _useAsync(asyncFn, deps, seed) {
 
 function _deps(ctx, extra) {
   const products = ctx?.capabilities?.products || {};
+  const permissions = ctx?.capabilities?.membership?.permissions;
+  // A role change on the same merchant must re-run a loader. The merchant id
+  // alone does not move in that case, and a loader that branched on a
+  // permission would keep the prior answer. Sort so list order is not a dep.
+  const permissionSignature = Array.isArray(permissions)
+    ? permissions.slice().sort().join('|')
+    : '';
   return [
     _merchantId(ctx) || '',
     _locationId(ctx) || '',
     products.cash?.status || '',
     products.kds?.status || '',
     products.conversaflow?.status || '',
+    permissionSignature,
     // `_loadMerchant` branches on one permission before it will call the cash
     // admin surface. A loader's deps carry everything it branches on — the same
     // rule the product statuses above follow — or it can answer from a stale
@@ -259,8 +282,11 @@ function _deps(ctx, extra) {
 }
 
 async function _loadOverviewAndStations(ctx) {
-  const cashEnabled =
-    _active(ctx, 'cash') && hasRequiredPermission(MODULES.loyalty, ctx?.capabilities);
+  // `MODULES.loyalty` never existed, and the permission helper answers `true`
+  // for an unknown module. The result was one undeclared read of the cash
+  // analytics route for any membership with the cash product. The analytics
+  // tab is `insights.read`; use that key, and keep the product test.
+  const cashEnabled = _active(ctx, 'cash') && hasCashPermission(ctx?.capabilities, 'insights.read');
   const kitchenEnabled =
     _active(ctx, 'kds') && hasRequiredPermission(MODULES.orders, ctx?.capabilities);
   const [cash, kitchen] = await Promise.allSettled([
@@ -334,59 +360,87 @@ async function _loadDevicePairings(ctx) {
   return result.pairings || [];
 }
 
-async function _loadMerchant(ctx) {
-  const s = await _apiFetch(_merchantPath(ctx, '/settings'));
-  // Reach the cash admin surface by merchant ID, not by the published handle. The two
-  // used to be the same string; they are not, and a café created after cutover has no
-  // handle at all. The route accepts either, and the id is the one that always exists.
+// eslint-disable-next-line react-refresh/only-export-components
+export async function loadMerchantData(ctx) {
+  // Wait for the membership and its capabilities. A merchant id in localStorage
+  // is a hint, not proof: a nonmember can still hold the previous merchant's id,
+  // and asking for that merchant's settings before the list resolves is one
+  // request the signed-in person has no authority for.
+  if (!ctx?.capabilities) return null;
+  const merchantId = _merchantId(ctx);
+  if (!merchantId) return null;
+
+  // `/api/merchants/:id/settings` is a DASHBOARD-product route. A Cash-only owner
+  // gets 403 there even though every Cash route works. Do not ask when the product
+  // is inactive; if it is active but the request still refuses, keep the 403
+  // contained and build the model from the membership metadata and the Cash
+  // settings contract instead.
+  const dashboardActive = _active(ctx, 'dashboard');
+  const s = dashboardActive
+    ? await _apiFetch(_merchantPath(ctx, '/settings')).catch(() => null)
+    : null;
+
+  // The Cash settings contract is merchant-id scoped: GET /api/merchants/:id/cash/settings.
+  // It returns the Cash-only switches (`topupEnabled`, `selfRegistration`,
+  // `multiSealEnabled`) that the merchant settings DTO never declared.
   // Permission-gated on the server (`merchant.manage`); a role that cannot read it
-  // does not ask, and falls through to the merchant record below.
+  // does not ask.
   const cashSettings = _canReadCashSettings(ctx)
-    ? await _apiFetch(`/api/${encodeURIComponent(_merchantId(ctx))}/admin/settings`).catch(
-        () => null,
-      )
+    ? await _apiFetch(cashSettingsPath(merchantId)).catch(() => null)
     : null;
-  const rc = _active(ctx, 'cash')
-    ? await _apiFetch(_merchantPath(ctx, '/cash/reward-config')).catch(() => null)
-    : null;
-  if (!s) return null;
+
+  // The reward read is `loyalty.read`, not the product alone. A membership with
+  // only `wallet.read` reaches the hub but would receive a 403 here, and the
+  // `.catch` hid it as a missing value.
+  const rc =
+    _active(ctx, 'cash') && hasCashPermission(ctx?.capabilities, 'loyalty.read')
+      ? await _apiFetch(_merchantPath(ctx, '/cash/reward-config')).catch(() => null)
+      : null;
+
+  const base = s || {};
+  const meta = ctx?.capabilities?.merchant || {};
   return {
-    name: cashSettings?.name || s.name,
-    city: cashSettings?.city || s.city,
-    handle: cashSettings?.handle || s.handle || null,
-    cardPrefix: cashSettings?.cardPrefix || s.cardPrefix || '',
-    primaryColor: cashSettings?.primaryColor || s.primaryColor || '#B5605A',
-    secondaryColor: cashSettings?.secondaryColor || s.secondaryColor || '#E8C9A3',
-    logoUrl: cashSettings?.logoUrl || s.logoUrl || '',
-    stripImageUrl: cashSettings?.stripImageUrl || s.stripImageUrl || '',
-    passStyle: cashSettings?.passStyle || s.passStyle || 'stamps',
-    subscriptionStatus: s.subscriptionStatus || 'ACTIVE',
-    purchaseDays: s.purchaseDays ?? [],
-    businessDayStart: s.businessDayStart || '00:00',
+    name: cashSettings?.name || base.name || meta.name || '',
+    city: cashSettings?.city || base.city || meta.city || '',
+    handle: cashSettings?.handle || base.handle || meta.handle || null,
+    cardPrefix: cashSettings?.cardPrefix || base.cardPrefix || '',
+    primaryColor: cashSettings?.primaryColor || base.primaryColor || '#B5605A',
+    secondaryColor: cashSettings?.secondaryColor || base.secondaryColor || '#E8C9A3',
+    logoUrl: cashSettings?.logoUrl || base.logoUrl || '',
+    stripImageUrl: cashSettings?.stripImageUrl || base.stripImageUrl || '',
+    passStyle: cashSettings?.passStyle || base.passStyle || 'stamps',
+    subscriptionStatus: base.subscriptionStatus || 'ACTIVE',
+    purchaseDays: base.purchaseDays ?? [],
+    businessDayStart: base.businessDayStart || '00:00',
     // Effective segment cutoffs (code defaults merged with the owner's overrides).
-    segmentThresholds: s.segmentThresholds || {},
-    topupEnabled: s.topupEnabled,
-    selfRegistration: cashSettings?.selfRegistration ?? s.selfRegistration,
-    birthdayRewardEnabled: cashSettings?.birthdayRewardEnabled ?? s.birthdayRewardEnabled,
-    birthdayRewardName: cashSettings?.birthdayRewardName ?? s.birthdayRewardName,
-    promoMessage: cashSettings?.promoMessage || s.promoMessage || '',
+    segmentThresholds: base.segmentThresholds || {},
+    topupEnabled: cashSettings?.topupEnabled ?? base.topupEnabled,
+    multiSealEnabled: cashSettings?.multiSealEnabled ?? base.multiSealEnabled,
+    selfRegistration: cashSettings?.selfRegistration ?? base.selfRegistration,
+    birthdayRewardEnabled: cashSettings?.birthdayRewardEnabled ?? base.birthdayRewardEnabled,
+    birthdayRewardName: cashSettings?.birthdayRewardName ?? base.birthdayRewardName,
+    promoMessage: cashSettings?.promoMessage || base.promoMessage || '',
     promoStartsAt:
-      cashSettings?.promoStartsAt || s.promoStartsAt
-        ? (cashSettings?.promoStartsAt || s.promoStartsAt).slice(0, 10)
+      cashSettings?.promoStartsAt || base.promoStartsAt
+        ? (cashSettings?.promoStartsAt || base.promoStartsAt).slice(0, 10)
         : '',
     promoEndsAt:
-      cashSettings?.promoEndsAt || s.promoEndsAt
-        ? (cashSettings?.promoEndsAt || s.promoEndsAt).slice(0, 10)
+      cashSettings?.promoEndsAt || base.promoEndsAt
+        ? (cashSettings?.promoEndsAt || base.promoEndsAt).slice(0, 10)
         : '',
-    promoDays: cashSettings?.promoDays || s.promoDays || '',
-    products: s.products || ctx?.capabilities?.products || {},
-    locations: s.locations || ctx?.capabilities?.locations || [],
+    promoDays: cashSettings?.promoDays || base.promoDays || '',
+    products: base.products || ctx?.capabilities?.products || {},
+    locations: base.locations || ctx?.capabilities?.locations || [],
     rewardConfig: rc?.active
       ? {
           visitsRequired: rc.active.visitsRequired,
           rewardName: rc.active.rewardName,
+          rewardDescription: rc.active.rewardDescription ?? null,
           rewardCostCentavos: rc.active.rewardCostCentavos ?? 0,
           isActive: rc.active.isActive !== false,
+          // The second rung. A partial PATCH that omits it ERASES the ladder:
+          // `updateRewardConfig` treats an absent `upgrade` as "single reward".
+          upgrade: rc.upgrade ?? null,
         }
       : null,
   };
@@ -405,7 +459,11 @@ async function _loadOrders(ctx, filter, channel) {
 }
 
 async function _loadMembers(ctx, opts) {
-  if (!_active(ctx, 'cash')) return EMPTY_MEMBERS;
+  // The tab gate is the same key the screen uses. A membership that holds only
+  // `wallet.read` reaches the hub but never asks for the member list.
+  if (!_active(ctx, 'cash') || !canShowCashTab('members', ctx?.capabilities)) {
+    return EMPTY_MEMBERS;
+  }
   opts = opts || {};
   const q = new URLSearchParams({
     page: String(opts.page || 1),
@@ -475,7 +533,9 @@ async function _loadRoles(ctx) {
 }
 
 async function _loadGiftCards(ctx, opts) {
-  if (!_active(ctx, 'cash')) return EMPTY_GIFT_CARDS;
+  if (!_active(ctx, 'cash') || !canShowCashTab('gift-cards', ctx?.capabilities)) {
+    return EMPTY_GIFT_CARDS;
+  }
   opts = opts || {};
   const q = new URLSearchParams({ page: String(opts.page || 1), limit: String(opts.limit || 20) });
   return _apiFetch(_merchantPath(ctx, '/cash/gift-cards?' + q));
@@ -621,6 +681,32 @@ async function saveMerchantSettings(
   return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/settings`, {
     method: 'PATCH',
     headers,
+    body: JSON.stringify(patch),
+  });
+}
+
+/** The merchant-id Cash settings contract: read and write use the same path. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function cashSettingsPath(merchantId) {
+  return `/api/merchants/${encodeURIComponent(merchantId)}/cash/settings`;
+}
+
+/**
+ * The Cash program writer.
+ *
+ * `saveMerchantSettings` targets the merchant DTO, which does NOT declare the
+ * Cash-only fields (pass style, promotion, birthday reward, brand colours,
+ * self-registration, top-up and multi-seal switches). Sending them there was a
+ * silent discard: the UI said "saved" and the values never changed. The
+ * merchant-id Cash settings route persists them under `merchant.manage`.
+ */
+async function saveCashSettings(
+  patch,
+  merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant'),
+) {
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  return _apiFetch(cashSettingsPath(merchantId), {
+    method: 'PATCH',
     body: JSON.stringify(patch),
   });
 }
@@ -1224,7 +1310,7 @@ function useMerchantData() {
   const ctx = useMerchant();
   return _useAsync(
     function () {
-      return _loadMerchant(ctx);
+      return loadMerchantData(ctx);
     },
     _deps(ctx),
     EMPTY_MERCHANT,
@@ -1527,14 +1613,18 @@ async function issueGiftCard({
   });
 }
 
-// Register a new loyalty member from the dashboard. Same endpoint the customer
-// self-service page uses; it returns the new card in the BODY (no cookies), so it
-// does not touch the operator's dashboard session. `phone` is the assembled
-// `+<dial><national>` the API validates against the country's digit count.
-async function registerMember({ name, phone, birthDate }) {
-  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+// Register a new loyalty member from the dashboard. This is the authenticated
+// staff route (`customer.create`), not the public customer self-service path. It
+// returns the card in the BODY and never opens a customer session. `phone` is the
+// assembled `+<dial><national>` the API validates against the country's digit
+// count. The response is `{ alreadyRegistered, customerId, cardId, cardNumber,
+// name, message }`; the dialog keeps support for a verification challenge too.
+async function registerMember(
+  { name, phone, birthDate },
+  merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant'),
+) {
   if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
-  return _apiFetch(routes.cash.byRef.registerMember(merchantId), {
+  return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/cash/customers`, {
     method: 'POST',
     body: JSON.stringify({ name, phone, birthDate }),
   });
@@ -1937,6 +2027,8 @@ export {
   loadSaleReceipt,
   saveMerchantSettings,
   // Data-module functions, not components. Keeps the react-refresh baseline flat.
+  // eslint-disable-next-line react-refresh/only-export-components
+  saveCashSettings,
   // eslint-disable-next-line react-refresh/only-export-components
   saveMerchantLogo,
   // eslint-disable-next-line react-refresh/only-export-components
