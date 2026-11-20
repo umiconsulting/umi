@@ -14,7 +14,6 @@ pnpm-lock.yaml
 **/package-lock.json
 **/*.tsbuildinfo
 **/next-env.d.ts
-packages/contract/generated/
 
 # The contract artifact. Emitted byte-for-byte by packages/contract/scripts/generate.mjs
 # and guarded by `generate:check`, which compares exact bytes. Prettier reformatting it
@@ -73,25 +72,6 @@ apps/umi-dashboard/src/locales/**/*.mjs
 # Active sources and current documentation under apps/umi-menu remain checked.
 apps/umi-menu/docs/entrega-2026-11-04/
 
-# Gate-1 verifier report: a signed, imported artifact. The committed copy must
-# stay byte-identical to the verifier's file, and its SHA-256 is in the gate
-# evidence. Prettier must not rewrite it.
-docs/verification/2026-11-16-semantic-api-gate1-verifier.md
-
-# Gate-2 verifier report: a signed, imported artifact. The committed copy must
-# stay byte-identical to the verifier's file, and its SHA-256 is in the gate
-# evidence. Prettier must not rewrite it.
-docs/verification/2026-11-16-semantic-api-gate2-verifier.md
-
-# Gate-2 parity ledger: generated evidence. The test writes these bytes and a
-# rerun must reproduce them exactly, so Prettier must not reformat the file.
-docs/verification/2026-11-16-semantic-api-gate2-parity.json
-
-# Gate-3 verifier report: a signed, imported artifact. The committed copy must
-# stay byte-identical to the verifier's file, and its SHA-256 is in the gate
-# evidence. Prettier must not rewrite it.
-docs/verification/2026-11-16-semantic-api-gate3-verifier-final.md
-
 # Accepted gate-2 SPEC v1.1: the signed acceptance text. Its SHA-256 is recorded
 # in the gate-2 evidence. Prettier must not rewrite the accepted bytes.
 docs/architecture/2026-11-16-semantic-analytics-api-spec.md
@@ -99,9 +79,6 @@ docs/architecture/2026-11-16-semantic-analytics-api-spec.md
 # Gate-3 frozen legacy oracle: captured evidence. The test checks the stored bytes
 # against the manifest, so Prettier must not rewrite them.
 apps/umi-api/test/fixtures/semantic-gate3/
-
-# Gate-3 dashboard evidence: screenshots and the recorded network/DOM JSON.
-docs/verification/2026-11-16-semantic-api-gate3/dashboard/
 
 # Local nested git worktrees, pnpm store, run artifacts, and sandbox agent lab (untracked workstation state)
 .worktrees/

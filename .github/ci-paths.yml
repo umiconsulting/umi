@@ -1,4 +1,12 @@
 # Include source aliases as well as declared workspace dependencies.
+packages:
+  - 'packages/tokens/**'
+  - 'packages/contract/**'
+  - 'apps/umi-api/src/modules/**/*.controller.ts'
+  - '.github/workflows/packages-ci.yml'
+  - 'package.json'
+  - 'pnpm-lock.yaml'
+  - 'pnpm-workspace.yaml'
 api:
   - 'apps/umi-api/**'
   - 'db/**'

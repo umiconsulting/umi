@@ -41,27 +41,7 @@ jobs:
 
       - name: Native POS client tests
         working-directory: apps/umi-pos
-        run: |
-          flutter test --no-pub \
-            test/cart_test.dart \
-            test/cart_optimism_test.dart \
-            test/cart_command_queue_test.dart \
-            test/offline_journal_test.dart \
-            test/offline_policy_test.dart \
-            test/recovery_orchestrator_test.dart \
-            test/catalog_test.dart \
-            test/checkout_test.dart \
-            test/local_first_checkout_test.dart \
-            test/checkout_point_tender_test.dart \
-            test/sale_lifecycle_test.dart \
-            test/cash_equation_test.dart \
-            test/cash_restart_recovery_test.dart \
-            test/cash_center_test.dart \
-            test/incoming_orders_test.dart \
-            test/operator_permissions_test.dart \
-            test/features/tables/table_state_test.dart \
-            test/features/tables/local_first_table_state_repository_test.dart \
-            test/features/kitchen/
+        run: flutter test --no-pub
 
   build-ios:
     name: build the iOS target

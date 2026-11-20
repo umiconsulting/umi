@@ -27,6 +27,7 @@ jobs:
       pull-requests: read
       actions: read
     outputs:
+      packages: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.packages == 'true' }}
       api: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.api == 'true' }}
       dashboard: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.dashboard == 'true' }}
       landing: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.landing == 'true' }}
@@ -72,6 +73,11 @@ jobs:
   lint:
     uses: ./.github/workflows/lint.yml
 
+  packages:
+    needs: [changes]
+    if: needs.changes.outputs.packages == 'true'
+    uses: ./.github/workflows/packages-ci.yml
+
   api:
     needs: [changes]
     if: needs.changes.outputs.api == 'true' || inputs.deploy
@@ -105,7 +111,7 @@ jobs:
 
   ready:
     name: CI ready
-    needs: [changes, lint, api, dashboard, landing, cash, pos]
+    needs: [changes, lint, packages, api, dashboard, landing, cash, pos]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -121,6 +127,7 @@ jobs:
               .[$name].result == (if $selected then "success" else "skipped" end);
             (.changes | passed) and
             (.lint | passed) and
+            selected("packages"; .changes.outputs.packages == "true") and
             selected("api"; .changes.outputs.api == "true" or $redeploy == "true") and
             selected("dashboard"; .changes.outputs.dashboard == "true" or $redeploy == "true") and
             selected("landing"; .changes.outputs.landing == "true" or $redeploy == "true") and

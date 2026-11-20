@@ -621,7 +621,6 @@ export function startSessionAutoRefresh() {
   };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components -- Session recovery is a public auth operation.
 export async function restoreSession() {
   const cached = getLocalSession();
   if (!COOKIE_AUTH) return cached;

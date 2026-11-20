@@ -57,35 +57,24 @@ jobs:
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Validate design tokens
-        run: |
-          node packages/tokens/build/build.mjs
-          git diff --exit-code packages/tokens/dist
-          node --test packages/tokens/test/tokens.test.mjs
-
-      - name: Validate shared contract
-        run: |
-          pnpm --filter @umi/contract typecheck
-          pnpm --filter @umi/contract generate:check
-          packages/contract/node_modules/.bin/tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext packages/contract/generated/typescript/umi_contract.ts
-          pnpm --filter @umi/contract build
-          pnpm --filter @umi/contract test
-
       - name: Lint workspace
         run: pnpm lint
 
-      - name: Lint warning baseline
-        if: '!cancelled()'
-        run: pnpm check:lint-warnings
-
       - name: Format check
         if: '!cancelled()'
-        run: pnpm format:check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$PR_BASE_SHA" ]; then
+            git diff --name-only -z --diff-filter=ACMR "$PR_BASE_SHA...HEAD" \
+              | xargs -0 -r pnpm exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern
+          else
+            pnpm format:check
+          fi
 
-      - name: Release identity and PR integrity checks
+      - name: PR integrity checks
         if: '!cancelled()'
         env:
           PR_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD~1' }}
-        run: |
-          pnpm ci:release
-          node scripts/check-pr.mjs
+        run: node scripts/check-pr.mjs

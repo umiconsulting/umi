@@ -55,11 +55,24 @@ export default [
   { files: ['**/*.{js,jsx}'], ...reactHooks.configs.flat['recommended-latest'] },
 
   // Vite fast-refresh only works when a module exports components consistently.
+  // Keep the plugin registered on all .jsx files, and turn off the rule on
+  // shared data/context/dev-tweak modules that intentionally export hooks or helpers.
   {
     files: ['**/*.jsx'],
     plugins: { 'react-refresh': reactRefresh },
     rules: {
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    },
+  },
+  {
+    files: [
+      'src/data.jsx',
+      'src/lib/auth.jsx',
+      'src/lib/merchant-context.jsx',
+      'src/tweaks-panel.jsx',
+    ],
+    rules: {
+      'react-refresh/only-export-components': 'off',
     },
   },
 

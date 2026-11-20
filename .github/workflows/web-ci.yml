@@ -34,6 +34,7 @@ jobs:
           case "$APP" in
             dashboard)
               pnpm install --frozen-lockfile --filter @umi/dashboard...
+              pnpm --filter @umi/dashboard test
               bash apps/umi-dashboard/scripts/build-ci.sh
               echo "path=apps/umi-dashboard/dist" >> "$GITHUB_OUTPUT"
               ;;

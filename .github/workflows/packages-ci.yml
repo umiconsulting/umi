@@ -1,0 +1,43 @@
+name: Shared packages
+
+'on':
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: validate tokens and contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Enable pnpm (corepack)
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile --filter @umi/tokens --filter @umi/contract
+
+      - name: Validate design tokens
+        run: |
+          node packages/tokens/build/build.mjs
+          git diff --exit-code packages/tokens/dist
+          node --test packages/tokens/test/tokens.test.mjs
+
+      - name: Validate shared contract
+        run: |
+          pnpm --filter @umi/contract typecheck
+          pnpm --filter @umi/contract build
+          node packages/contract/scripts/generate.mjs --check
+          packages/contract/node_modules/.bin/tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext packages/contract/generated/typescript/umi_contract.ts
+          pnpm --filter @umi/contract test

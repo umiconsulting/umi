@@ -48,6 +48,8 @@ jobs:
       - name: Typecheck
         run: pnpm --filter @umi/api typecheck
       - name: Unit tests
-        run: pnpm --filter @umi/api test
+        run: |
+          pnpm --filter @umi/api test
+          pnpm ci:release
       - name: Database and integration verification
         run: pnpm ci:db

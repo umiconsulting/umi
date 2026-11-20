@@ -152,18 +152,21 @@ export function MerchantProvider({ children }) {
     window.localStorage.removeItem(SELECTED_LOCATION_KEY);
   };
 
-  const setSelectedLocationId = (locationId) => {
-    if (
-      locationId &&
-      locationId !== selectedLocationId &&
-      capabilities?.canSwitchLocations !== true
-    ) {
-      return;
-    }
-    setSelectedLocationIdState(locationId || '');
-    if (locationId) window.localStorage.setItem(SELECTED_LOCATION_KEY, locationId);
-    else window.localStorage.removeItem(SELECTED_LOCATION_KEY);
-  };
+  const setSelectedLocationId = useCallback(
+    (locationId) => {
+      if (
+        locationId &&
+        locationId !== selectedLocationId &&
+        capabilities?.canSwitchLocations !== true
+      ) {
+        return;
+      }
+      setSelectedLocationIdState(locationId || '');
+      if (locationId) window.localStorage.setItem(SELECTED_LOCATION_KEY, locationId);
+      else window.localStorage.removeItem(SELECTED_LOCATION_KEY);
+    },
+    [selectedLocationId, capabilities?.canSwitchLocations],
+  );
 
   // useCallback + an explicit dep so the memo below can track it. It closes over
   // selectedMerchantId; today that value is also in the memo's deps, so the closure
@@ -219,6 +222,7 @@ export function MerchantProvider({ children }) {
       loading,
       capabilitiesLoading,
       error,
+      setSelectedLocationId,
       updateSelectedMerchant,
       platformRole,
     ],
