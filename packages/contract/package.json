@@ -43,9 +43,8 @@
     "build:runtime": "tsup",
     "generate": "pnpm run build:runtime && node scripts/generate.mjs",
     "generate:check": "pnpm run build:runtime && node scripts/generate.mjs --check",
-    "build": "pnpm run generate && tsup",
+    "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "pretest": "npm run build",
     "test": "node --test test/*.test.mjs",
     "test:dart": "node scripts/test-dart.mjs"
   },

@@ -12,7 +12,7 @@
     "prebuild": "lingui compile --strict",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
     "pretest": "lingui compile",
     "test": "vitest run",

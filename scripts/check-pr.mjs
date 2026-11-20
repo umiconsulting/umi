@@ -5,7 +5,6 @@ import { spawnSync } from 'node:child_process';
 const jsonFiles = [
   'package.json',
   'config/git-whitespace-baseline.json',
-  'config/lint-warning-baseline.json',
   'docs/architecture-transition/CURRENT_PLATFORM_STATE.json',
   'docs/architecture-transition/PHASE_INDEX.json',
   'docs/product/umipos-product-roadmap.json',

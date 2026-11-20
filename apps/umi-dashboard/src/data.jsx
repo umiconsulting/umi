@@ -360,7 +360,6 @@ async function _loadDevicePairings(ctx) {
   return result.pairings || [];
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export async function loadMerchantData(ctx) {
   // Wait for the membership and its capabilities. A merchant id in localStorage
   // is a hint, not proof: a nonmember can still hold the previous merchant's id,
@@ -686,7 +685,7 @@ async function saveMerchantSettings(
 }
 
 /** The merchant-id Cash settings contract: read and write use the same path. */
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function cashSettingsPath(merchantId) {
   return `/api/merchants/${encodeURIComponent(merchantId)}/cash/settings`;
 }
@@ -1724,7 +1723,6 @@ function useClearDeniedSales(result, merchantId) {
   }, [merchantId, result.data, result.dataUpdatedAt, result.error]);
 }
 
-// eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
 export function useSalesAnalysisOptions() {
   const ctx = useMerchant();
   const merchantId = _merchantId(ctx);
@@ -1739,7 +1737,6 @@ export function useSalesAnalysisOptions() {
   return salesResult(result);
 }
 
-// eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
 export function useSalesAnalysis(query) {
   const ctx = useMerchant();
   const merchantId = _merchantId(ctx);
@@ -1752,7 +1749,6 @@ export function useSalesAnalysis(query) {
   return salesResult(result);
 }
 
-// eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
 export async function saveSalesAnalysisGroup(merchantId, group) {
   const { id, ...body } = group;
   const saved = await _apiFetch(routes.salesAnalysis.saveGroup(merchantId, id), {
@@ -1763,7 +1759,6 @@ export async function saveSalesAnalysisGroup(merchantId, group) {
   return saved;
 }
 
-// eslint-disable-next-line react-refresh/only-export-components -- This data module exports API helpers.
 export async function deleteSalesAnalysisGroup(merchantId, group) {
   const deleted = await _apiFetch(
     `${routes.salesAnalysis.deleteGroup(merchantId, group.id)}?expectedVersion=${group.version}`,
@@ -2012,26 +2007,17 @@ export {
   useConversationsData,
   useTriageData,
   // This hook follows the existing data module boundary. Do not increase the warning baseline.
-  // eslint-disable-next-line react-refresh/only-export-components
   useOperationsData,
-  // eslint-disable-next-line react-refresh/only-export-components
   useSalesSummary,
   useSalesInsight,
-  // eslint-disable-next-line react-refresh/only-export-components
   useCashShiftDetail,
-  // eslint-disable-next-line react-refresh/only-export-components
   useSaleReceipt,
-  // eslint-disable-next-line react-refresh/only-export-components
   executeAdministrativeCommand,
-  // eslint-disable-next-line react-refresh/only-export-components
   loadSaleReceipt,
   saveMerchantSettings,
   // Data-module functions, not components. Keeps the react-refresh baseline flat.
-  // eslint-disable-next-line react-refresh/only-export-components
   saveCashSettings,
-  // eslint-disable-next-line react-refresh/only-export-components
   saveMerchantLogo,
-  // eslint-disable-next-line react-refresh/only-export-components
   removeMerchantLogo,
   saveRewardConfig,
   saveBusinessHours,
@@ -2047,17 +2033,11 @@ export {
   updateMerchantRole,
   archiveMerchantRole,
   // Data-module function, not a component. Keeps the react-refresh baseline flat.
-  // eslint-disable-next-line react-refresh/only-export-components
   creditLoyaltySeals,
-  // eslint-disable-next-line react-refresh/only-export-components
   topupWallet,
-  // eslint-disable-next-line react-refresh/only-export-components
   loyaltyScan,
-  // eslint-disable-next-line react-refresh/only-export-components
   issueGiftCard,
-  // eslint-disable-next-line react-refresh/only-export-components
   redeemGiftCardByCode,
-  // eslint-disable-next-line react-refresh/only-export-components
   registerMember,
   provisionDevice,
   generateDevicePairingPin,
@@ -2073,21 +2053,13 @@ export {
   // `creditLoyaltySeals` above does: this file has always been a data module, and the rule
   // exists to protect fast refresh in files that export components. Marking them keeps the
   // baseline flat instead of raising it once per feature.
-  // eslint-disable-next-line react-refresh/only-export-components
   getMpPointCredentialStatus,
-  // eslint-disable-next-line react-refresh/only-export-components
   getMpPointAuthorization,
-  // eslint-disable-next-line react-refresh/only-export-components
   getMpPointTerminals,
-  // eslint-disable-next-line react-refresh/only-export-components
   bindMpPointTerminal,
-  // eslint-disable-next-line react-refresh/only-export-components
   unbindMpPointTerminal,
-  // eslint-disable-next-line react-refresh/only-export-components
   disconnectMpPointAccount,
-  // eslint-disable-next-line react-refresh/only-export-components
   createMpPointStore,
-  // eslint-disable-next-line react-refresh/only-export-components
   useMpPointData,
   approveDevicePairing,
   denyDevicePairing,
@@ -2098,11 +2070,8 @@ export {
   updateKdsStation,
   deleteKdsStation,
   useKdsConnection,
-  // eslint-disable-next-line react-refresh/only-export-components
   useCatalogCategories,
-  // eslint-disable-next-line react-refresh/only-export-components
   createCatalogCategory,
-  // eslint-disable-next-line react-refresh/only-export-components
   updateCatalogCategory,
   _LIVE as DATA_IS_LIVE,
 };
@@ -2117,13 +2086,13 @@ export {
 // non-component exports above, because `_apiFetch` is what gives them the
 // cookie-session recovery (a save landing on an expired access cookie must
 // refresh and retry, not fall over).
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function fetchFloorPlan(merchantId, locationId) {
   return _apiFetch(
     `${buildPath('floorPlan.read', { merchantId })}?locationId=${encodeURIComponent(locationId)}`,
   );
 }
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function changeFloorPlan(merchantId, payload, publish = false) {
   return _apiFetch(buildPath(publish ? 'floorPlan.publish' : 'floorPlan.save', { merchantId }), {
     method: publish ? 'POST' : 'PUT',
@@ -2139,7 +2108,7 @@ export function changeFloorPlan(merchantId, payload, publish = false) {
 // A read failure is NOT a load failure. The editor keeps working on the last
 // room it saw, because a manager who cannot read the room must still be able to
 // edit the floor.
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function fetchTableState(merchantId, locationId) {
   return _apiFetch(
     `${buildPath('tableState.read', { merchantId })}?locationId=${encodeURIComponent(locationId)}`,
@@ -2150,13 +2119,13 @@ export function fetchTableState(merchantId, locationId) {
 // writes it; the till reads the same row before it counts. The two fields travel
 // together — a blind location counts by denomination, a visible one only needs
 // the total — so the switch sends one boolean and the server moves both.
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function fetchCashPolicy(merchantId, locationId) {
   return _apiFetch(
     `${routes.merchants.operations(merchantId)}/cash-policy?locationId=${encodeURIComponent(locationId)}`,
   );
 }
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function setCashPolicy(merchantId, locationId, blindCountRequired) {
   return _apiFetch(`${routes.merchants.operations(merchantId)}/cash-policy`, {
     method: 'PATCH',
@@ -2164,13 +2133,12 @@ export function setCashPolicy(merchantId, locationId, blindCountRequired) {
   });
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function fetchCheckoutPolicy(merchantId, locationId) {
   return _apiFetch(
     `${routes.merchants.operations(merchantId)}/checkout-policy?locationId=${encodeURIComponent(locationId)}`,
   );
 }
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function setCheckoutPolicy(merchantId, locationId, policy) {
   return _apiFetch(`${routes.merchants.operations(merchantId)}/checkout-policy`, {
     method: 'PATCH',
@@ -2192,7 +2160,7 @@ export function setCheckoutPolicy(merchantId, locationId, policy) {
 // The two reads come back as RAW ROWS (snake_case columns), and the screen that consumes
 // them — and the routing model behind it — speak the contract's language. The mapping
 // happens here, once, so the model stays a pure function of tidy objects.
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function fetchKitchenStations(merchantId, locationId) {
   return _apiFetch(
     `${routes.merchants.base(merchantId)}/kds/stations?locationId=${encodeURIComponent(locationId)}`,
@@ -2207,7 +2175,7 @@ export function fetchKitchenStations(merchantId, locationId) {
     })),
   }));
 }
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function fetchKitchenRoutes(merchantId, locationId) {
   return _apiFetch(
     `${routes.merchants.base(merchantId)}/kds/routes?locationId=${encodeURIComponent(locationId)}`,
@@ -2226,7 +2194,7 @@ export function fetchKitchenRoutes(merchantId, locationId) {
   }));
 }
 /** One category, one product, or the general route: at most one of the two ids is set. */
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function createKitchenRoute(merchantId, locationId, route) {
   return _apiFetch(
     `${routes.merchants.base(merchantId)}/kds/routes?locationId=${encodeURIComponent(locationId)}`,
@@ -2234,7 +2202,7 @@ export function createKitchenRoute(merchantId, locationId, route) {
   );
 }
 /** Move a route to another station, or switch it off (`active: false`). */
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function updateKitchenRoute(merchantId, routeId, route) {
   return _apiFetch(`${routes.merchants.base(merchantId)}/kds/routes/${routeId}`, {
     method: 'PATCH',
@@ -2242,7 +2210,6 @@ export function updateKitchenRoute(merchantId, routeId, route) {
   });
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function saveKitchenStation(merchantId, locationId, stationId, station) {
   const base = `${routes.merchants.base(merchantId)}/kds/stations`;
   return _apiFetch(
@@ -2254,7 +2221,6 @@ export function saveKitchenStation(merchantId, locationId, stationId, station) {
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function searchKitchenProducts(merchantId, search) {
   return _apiFetch(
     `${routes.merchants.base(merchantId)}/kds/products?search=${encodeURIComponent(search)}`,
@@ -2344,7 +2310,7 @@ async function _loadInventoryCosting(ctx, rangeDays) {
 // The Costos y márgenes screen's one read. Re-fetches when the range, merchant or
 // location changes; the location is in `_deps` because two of the four reads are
 // location-scoped and would otherwise answer from the previous branch.
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function useInventoryCosting(rangeDays) {
   const ctx = useMerchant();
   return _useAsync(
@@ -2412,7 +2378,6 @@ async function _loadInventoryItems(ctx, includeArchived) {
   };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useInventoryItems(options, refresh) {
   const ctx = useMerchant();
   const includeArchived = options?.includeArchived === true;
@@ -2443,7 +2408,6 @@ async function _loadInventoryUnitConversions(ctx) {
   };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useInventoryUnitConversions(refresh) {
   const ctx = useMerchant();
   return _useAsync(
@@ -2473,7 +2437,6 @@ async function _loadInventoryAllergens(ctx) {
   };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useInventoryAllergens(refresh) {
   const ctx = useMerchant();
   return _useAsync(
@@ -2507,7 +2470,6 @@ async function _loadInventoryRecipes(ctx, includeRetired) {
   return { recipes, page: null, correlationId: null };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useInventoryRecipes(options, refresh) {
   const ctx = useMerchant();
   const includeRetired = options?.includeRetired === true;
@@ -2542,7 +2504,6 @@ async function _loadInventoryRecipeExplosion(ctx, recipeId) {
   return Object.assign({}, EMPTY_RECIPE_EXPLOSION, response || {});
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useInventoryRecipeExplosion(recipeId, refresh) {
   const ctx = useMerchant();
   return _useAsync(
@@ -2557,7 +2518,6 @@ export function useInventoryRecipeExplosion(recipeId, refresh) {
 // Load every page so variants without a prior sales mapping remain selectable.
 const EMPTY_RECIPE_TARGETS = { targets: [] };
 
-// eslint-disable-next-line react-refresh/only-export-components
 export async function fetchRecipeTargets(merchantId) {
   const targets = [];
   const cursors = new Set();
@@ -2575,7 +2535,6 @@ export async function fetchRecipeTargets(merchantId) {
   throw new Error(t`No se pudieron cargar todos los productos. Vuelve a intentar.`);
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export async function fetchInventoryImportSnapshot(merchantId) {
   const [items, recipes, targetResponse] = await Promise.all([
     loadPreparationPages((cursor) => {
@@ -2597,7 +2556,6 @@ export async function fetchInventoryImportSnapshot(merchantId) {
   return { merchantId, items, recipes, targets: targetResponse.targets };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export async function executeInventoryImportCommand(
   merchantId,
   operation,
@@ -2627,7 +2585,6 @@ async function _loadRecipeTargets(ctx) {
   return fetchRecipeTargets(merchantId);
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useRecipeTargets(refresh) {
   const ctx = useMerchant();
   return _useAsync(
@@ -2657,7 +2614,6 @@ async function _loadInventoryCostBasis(ctx) {
   };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useInventoryCostBasis(refresh) {
   const ctx = useMerchant();
   return _useAsync(
@@ -2707,7 +2663,6 @@ async function _loadPrepList(ctx, includeAbovePar) {
   };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function usePrepList(options, refresh) {
   const ctx = useMerchant();
   const includeAbovePar = options?.includeAbovePar === true;
@@ -2727,7 +2682,7 @@ export function usePrepList(options, refresh) {
 // The label sheet is a PNG the SERVER renders (plan D14), so it is fetched as a
 // blob and saved. `_apiFetch` reads JSON, so this helper repeats that path's auth
 // and its single session refresh, and returns the blob instead.
-// eslint-disable-next-line react-refresh/only-export-components
+
 export async function downloadPrepListLabels(merchantId, locationId) {
   const base = routes.inventory.prepListLabels(merchantId);
   const path = locationId ? `${base}?locationId=${encodeURIComponent(locationId)}` : base;
@@ -2807,7 +2762,6 @@ async function _loadUsageVariance(ctx, from, to) {
   };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useInventoryUsageVariance(period, refresh) {
   const ctx = useMerchant();
   const from = (period && period.from) || null;
@@ -2855,7 +2809,6 @@ async function _loadMenuEngineering(ctx, from, to) {
   };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useMenuEngineering(period, refresh) {
   const ctx = useMerchant();
   const from = (period && period.from) || null;
@@ -2940,7 +2893,6 @@ async function _loadSupplierInvoiceInbox(ctx, status) {
   };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useSupplierInvoiceInbox(options, refresh) {
   const ctx = useMerchant();
   const status = (options && options.status) || null;
@@ -2953,7 +2905,6 @@ export function useSupplierInvoiceInbox(options, refresh) {
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export async function fetchPurchaseEntrySnapshot(merchantId, locationId) {
   if (!merchantId || !locationId) throw new Error(t`Elige una sucursal para registrar la compra.`);
   const [context, items, suppliers] = await Promise.all([
@@ -2980,14 +2931,12 @@ export async function fetchPurchaseEntrySnapshot(merchantId, locationId) {
   return { merchantId, context, items, suppliers };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export async function fetchSupplierInvoiceArtifact(merchantId, supplierInvoiceId) {
   return _apiFetch(
     buildPath('procurement.supplierInvoiceArtifact', { merchantId, supplierInvoiceId }),
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export async function sendPurchaseEntryAttempt(merchantId, envelope) {
   return _apiFetch(routes.merchants.administrativeCommands(merchantId), {
     method: 'POST',

@@ -18,13 +18,13 @@ open(f'{w}/release.jq', 'w').write(rel + '\n')
 PY
 
 cat > "$W/ready-docs-only.json" <<'JSON'
-{"changes":{"result":"success","outputs":{"api":"false","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"lint":{"result":"success"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
+{"changes":{"result":"success","outputs":{"packages":"false","api":"false","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"lint":{"result":"success"},"packages":{"result":"skipped"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
 JSON
 cat > "$W/ready-failing.json" <<'JSON'
-{"changes":{"result":"success","outputs":{"api":"false","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"lint":{"result":"failure"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
+{"changes":{"result":"success","outputs":{"packages":"false","api":"false","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"lint":{"result":"failure"},"packages":{"result":"skipped"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
 JSON
 cat > "$W/ready-cancelled.json" <<'JSON'
-{"changes":{"result":"success","outputs":{"api":"true","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"lint":{"result":"success"},"api":{"result":"cancelled"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
+{"changes":{"result":"success","outputs":{"packages":"false","api":"true","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"lint":{"result":"success"},"packages":{"result":"skipped"},"api":{"result":"cancelled"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
 JSON
 cat > "$W/release-complete.json" <<'JSON'
 {"ready":{"result":"success"},"changes":{"result":"success","outputs":{"api":"true","dashboard":"true","landing":"true"}},"deploy-api-staging":{"result":"success"},"deploy-api-production":{"result":"skipped"},"deploy-dashboard":{"result":"success"},"deploy-landing":{"result":"skipped"}}

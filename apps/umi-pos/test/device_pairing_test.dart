@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
@@ -16,10 +17,29 @@ import 'package:umi_pos/features/entry/entry_gateway.dart';
 import 'package:umi_pos/features/entry/entry_surface.dart';
 import 'package:umi_pos/shared/widgets/station_signature.dart';
 
+import 'support/fakes.dart';
+
 // The product's own fonts: without them the test lays out with the engine's box font and the
 // geometry would not be the geometry the till draws.
-import 'receipt_document_test.dart' show fonts;
-import 'support/fakes.dart';
+Future<void> _loadFonts() async {
+  for (final family in <String, List<String>>{
+    'IBM Plex Sans': [
+      'Regular',
+      'Medium',
+      'SemiBold',
+      'Bold',
+    ].map((weight) => 'assets/fonts/IBMPlexSans-$weight.ttf').toList(),
+    'Bricolage Grotesque': ['SemiBold', 'Bold']
+        .map((weight) => 'assets/fonts/BricolageGrotesque12pt-$weight.ttf')
+        .toList(),
+  }.entries) {
+    final loader = FontLoader(family.key);
+    for (final path in family.value) {
+      loader.addFont(rootBundle.load(path));
+    }
+    await loader.load();
+  }
+}
 
 const _installationId = '00000000-0000-4000-8000-000000000001';
 const _sessionId = '00000000-0000-4000-8000-000000000002';
@@ -180,7 +200,7 @@ void main() {
       testWidgets('the $phase action stays on screen at ${(scale * 100).round()}% text', (
         tester,
       ) async {
-        await fonts();
+        await _loadFonts();
         // THE iMin'S OWN SCREEN, ITS OWN DENSITY. 1920x1080 device pixels at 220 dpi is a
         // device pixel ratio of 1.375, and the navigation bar leaves the app a 1014-pixel-tall
         // window: 1396 x 737 LOGICAL pixels. A test at 1920x1014 logical is a canvas half again
