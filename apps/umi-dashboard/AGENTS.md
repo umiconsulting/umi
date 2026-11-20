@@ -4,8 +4,8 @@ This file is the agent-agnostic operating contract for `apps/umi-dashboard`.
 
 Read with:
 
-- [../../AGENTS.md](/Users/juanlopez1/Documents/Repositories/Umi/AGENTS.md:1)
-- [REPO_CONTEXT.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-dashboard/REPO_CONTEXT.md:1)
+- [../../AGENTS.md](../../AGENTS.md)
+- [REPO_CONTEXT.md](REPO_CONTEXT.md)
 
 ## Repository identity
 

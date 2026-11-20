@@ -141,6 +141,18 @@ msgstr "No se pudo cargar la conversación."
 msgid "Sin mensajes en esta conversación."
 msgstr "Sin mensajes en esta conversación."
 
+#: src/components/login-glass-settings.jsx
+msgid "Vidrio"
+msgstr "Vidrio"
+
+#: src/components/login-glass-settings.jsx
+msgid "Tinte en modo claro"
+msgstr "Tinte en modo claro"
+
+#: src/components/login-glass-settings.jsx
+msgid "Tinte en modo oscuro"
+msgstr "Tinte en modo oscuro"
+
 #: src/components/page-head.jsx
 #~ msgid "{value} {of} {noun}"
 #~ msgstr "{value} {of} {noun}"
@@ -7150,6 +7162,22 @@ msgid "El pedido esperaba {order}"
 msgstr "El pedido esperaba {order}"
 
 #: src/screens/login.jsx
+#~ msgid "Supervisa la operación de tu negocio al momento, desde un solo panel."
+#~ msgstr "Supervisa la operación de tu negocio al momento, desde un solo panel."
+
+#: src/screens/login.jsx
+#~ msgid "Inicia sesión para entrar a tu panel."
+#~ msgstr "Inicia sesión para entrar a tu panel."
+
+#: src/screens/login.jsx
+#~ msgid "Escríbenos tu correo y te mandamos un enlace para recuperarla."
+#~ msgstr "Escríbenos tu correo y te mandamos un enlace para recuperarla."
+
+#: src/screens/login.jsx
+#~ msgid "Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu contraseña. Caduca en 15 minutos."
+#~ msgstr "Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu contraseña. Caduca en 15 minutos."
+
+#: src/screens/login.jsx
 msgid "Te enviamos un código de seis dígitos a tu correo."
 msgstr "Te enviamos un código de seis dígitos a tu correo."
 
@@ -7166,6 +7194,22 @@ msgid "Tu código venció. Inicia sesión otra vez."
 msgstr "Tu código venció. Inicia sesión otra vez."
 
 #: src/screens/login.jsx
+msgid "Escribe tu correo."
+msgstr "Escribe tu correo."
+
+#: src/screens/login.jsx
+msgid "Escribe un correo válido, como nombre@negocio.mx."
+msgstr "Escribe un correo válido, como nombre@negocio.mx."
+
+#: src/screens/login.jsx
+msgid "Escribe los seis dígitos del código."
+msgstr "Escribe los seis dígitos del código."
+
+#: src/screens/login.jsx
+msgid "Escribe tu contraseña."
+msgstr "Escribe tu contraseña."
+
+#: src/screens/login.jsx
 msgid "Correo o contraseña incorrectos. Revísalos e inténtalo otra vez."
 msgstr "Correo o contraseña incorrectos. Revísalos e inténtalo otra vez."
 
@@ -7178,16 +7222,12 @@ msgid "Tu operación,<0/>en tiempo real."
 msgstr "Tu operación,<0/>en tiempo real."
 
 #: src/screens/login.jsx
-msgid "Supervisa la operación de tu negocio al momento, desde un solo panel."
-msgstr "Supervisa la operación de tu negocio al momento, desde un solo panel."
-
-#: src/screens/login.jsx
 msgid "Hola de nuevo"
 msgstr "Hola de nuevo"
 
 #: src/screens/login.jsx
-msgid "Inicia sesión para entrar a tu panel."
-msgstr "Inicia sesión para entrar a tu panel."
+msgid "nombre@negocio.mx"
+msgstr "nombre@negocio.mx"
 
 #: src/screens/login.jsx
 msgid "Contraseña"
@@ -7240,8 +7280,8 @@ msgid "Volver a iniciar sesión"
 msgstr "Volver a iniciar sesión"
 
 #: src/screens/login.jsx
-msgid "Escríbenos tu correo y te mandamos un enlace para recuperarla."
-msgstr "Escríbenos tu correo y te mandamos un enlace para recuperarla."
+msgid "Para restablecer tu contraseña, escribe tu correo."
+msgstr "Para restablecer tu contraseña, escribe tu correo."
 
 #: src/screens/login.jsx
 msgid "Enviar enlace"
@@ -7252,8 +7292,8 @@ msgid "Revisa tu correo"
 msgstr "Revisa tu correo"
 
 #: src/screens/login.jsx
-msgid "Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu contraseña. Caduca en 15 minutos."
-msgstr "Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu contraseña. Caduca en 15 minutos."
+msgid "Si hay una cuenta con ese correo, te mandamos un enlace para restablecer tu contraseña. Caduca en 15 minutos."
+msgstr "Si hay una cuenta con ese correo, te mandamos un enlace para restablecer tu contraseña. Caduca en 15 minutos."
 
 #. placeholder {0}: CASH_TABS.length
 #: src/screens/loyalty-value.jsx

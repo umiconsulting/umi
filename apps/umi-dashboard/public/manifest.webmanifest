@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "Umi",
+  "short_name": "Umi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#061324",
+  "theme_color": "#061324",
+  "icons": [
+    { "src": "/umi-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/umi-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

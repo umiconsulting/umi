@@ -215,10 +215,14 @@ const LocaleSelect = ({ variant = 'panel' }) => {
       className={'select locale-select' + (topbar ? ' topbar-select' : '')}
       value={i18n.locale}
       onChange={(e) => activateLocale(e.target.value)}
-      hideCheck
+      hideCheck={topbar}
       aria-label={t`Idioma`}
       title={t`Idioma`}
-      style={topbar ? undefined : { width: '100%', borderRadius: 8, fontSize: 12 }}
+      style={
+        topbar
+          ? undefined
+          : { width: '100%', borderRadius: 8, fontSize: 'var(--login-type-action)' }
+      }
     >
       {LOCALES.map((l) => (
         <option key={l.tag} value={l.tag}>

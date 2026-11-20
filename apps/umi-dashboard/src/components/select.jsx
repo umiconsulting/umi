@@ -86,6 +86,7 @@ const Select = ({
 
   const triggerRef = React.useRef(null);
   const listRef = React.useRef(null);
+  const searchRef = React.useRef({ text: '', time: 0 });
   const listboxId = React.useId();
   const optionId = (i) => `${listboxId}-opt-${i}`;
 
@@ -99,6 +100,7 @@ const Select = ({
     setOpen(true);
   };
   const closeList = (refocus = true) => {
+    searchRef.current.text = '';
     setOpen(false);
     setActiveIndex(-1);
     if (refocus) triggerRef.current?.focus();
@@ -128,13 +130,16 @@ const Select = ({
     const list = listRef.current;
     if (!t || !list) return;
     const m = 8;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const width = Math.max(t.width, list.offsetWidth);
+    const viewport = window.visualViewport;
+    const x = viewport?.offsetLeft || 0;
+    const y = viewport?.offsetTop || 0;
+    const vw = viewport?.width || window.innerWidth;
+    const vh = viewport?.height || window.innerHeight;
+    const width = Math.min(vw - m * 2, Math.max(t.width, list.offsetWidth));
     let left = t.left;
-    if (left + width > vw - m) left = Math.max(m, vw - m - width);
-    const spaceBelow = vh - t.bottom - m;
-    const spaceAbove = t.top - m;
+    left = Math.max(x + m, Math.min(left, x + vw - m - width));
+    const spaceBelow = Math.max(0, y + vh - t.bottom - m - 4);
+    const spaceAbove = Math.max(0, t.top - y - m - 4);
     const desired = list.scrollHeight;
     let top;
     let maxHeight;
@@ -145,7 +150,7 @@ const Select = ({
       maxHeight = spaceAbove;
       top = t.top - Math.min(desired, maxHeight) - 4;
     }
-    setPos({ left, top, width, maxHeight: Math.max(120, maxHeight) });
+    setPos({ left, top, width, maxHeight: Math.max(0, maxHeight) });
   }, [open, tick, options.length]);
 
   // While open: reposition on scroll/resize, close on outside pointer.
@@ -159,11 +164,15 @@ const Select = ({
     };
     window.addEventListener('scroll', bump, true);
     window.addEventListener('resize', bump);
-    document.addEventListener('mousedown', onDown, true);
+    window.visualViewport?.addEventListener('resize', bump);
+    window.visualViewport?.addEventListener('scroll', bump);
+    document.addEventListener('pointerdown', onDown, true);
     return () => {
       window.removeEventListener('scroll', bump, true);
       window.removeEventListener('resize', bump);
-      document.removeEventListener('mousedown', onDown, true);
+      window.visualViewport?.removeEventListener('resize', bump);
+      window.visualViewport?.removeEventListener('scroll', bump);
+      document.removeEventListener('pointerdown', onDown, true);
     };
   }, [open]);
 
@@ -177,10 +186,44 @@ const Select = ({
 
   const onKeyDown = (e) => {
     if (disabled) return;
+    if (e.key.length === 1 && e.key !== ' ' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const now = Date.now();
+      const text = (now - searchRef.current.time < 700 ? searchRef.current.text : '') + e.key;
+      searchRef.current = { text, time: now };
+      const repeated = [...text].every(
+        (letter) => letter.toLocaleLowerCase() === text[0].toLocaleLowerCase(),
+      );
+      const prefix = (repeated ? text[0] : text).toLocaleLowerCase();
+      const start = repeated
+        ? (open ? activeIndex : options.findIndex((o) => o.value === effective)) + 1
+        : 0;
+      for (let step = 0; step < options.length; step += 1) {
+        const index = (start + step) % options.length;
+        if (
+          !options[index].disabled &&
+          options[index].text.toLocaleLowerCase().startsWith(prefix)
+        ) {
+          if (!open) openList();
+          setActiveIndex(index);
+          break;
+        }
+      }
+      return;
+    }
     if (!open) {
-      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' ', 'Home', 'End'].includes(e.key)) {
         e.preventDefault();
         openList();
+        if (e.key === 'Home') setActiveIndex(firstEnabled());
+        if (e.key === 'End') {
+          for (let index = options.length - 1; index >= 0; index -= 1) {
+            if (!options[index].disabled) {
+              setActiveIndex(index);
+              break;
+            }
+          }
+        }
       }
       return;
     }
@@ -227,6 +270,7 @@ const Select = ({
     <>
       <button
         type="button"
+        role="combobox"
         ref={triggerRef}
         id={id}
         title={title}
@@ -253,14 +297,14 @@ const Select = ({
             id={listboxId}
             aria-label={ariaLabel}
             aria-labelledby={ariaLabelledby}
-            aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
             tabIndex={-1}
             className="ui-select-pop"
             style={{
               position: 'fixed',
               left: pos ? pos.left : -9999,
               top: pos ? pos.top : -9999,
-              minWidth: pos ? pos.width : undefined,
+              width: pos ? pos.width : undefined,
+              maxWidth: 'calc(100vw - 16px)',
               maxHeight: pos ? pos.maxHeight : undefined,
               visibility: pos ? 'visible' : 'hidden',
             }}

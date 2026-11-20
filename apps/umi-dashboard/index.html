@@ -2,10 +2,24 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#eef1f8" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Umi" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/umi-icon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/umi-touch-icon.png" />
     <!-- Let native controls (scrollbars, selects, date pickers) match the theme. -->
     <meta name="color-scheme" content="light dark" />
     <title>Umi · Dash — Owner Console</title>
+    <style>
+      html[data-login-scene],
+      html[data-login-scene] body {
+        background: #061324;
+        color-scheme: dark;
+      }
+    </style>
     <!-- Set the theme BEFORE first paint so the first frame is never the wrong
          color. A stored value is a theme name (e.g. 'umi', 'midnight'); 'system'
          stores nothing, so the OS preference governs through @media
@@ -15,6 +29,10 @@
          Mirrors the storage key in src/lib/theme.js. -->
     <script>
       (function () {
+        if (location.pathname === '/login') {
+          document.documentElement.setAttribute('data-login-scene', '');
+          document.querySelector('meta[name="theme-color"]').content = '#061324';
+        }
         try {
           var t = localStorage.getItem('umi-theme');
           if (t && /^[a-z][a-z0-9-]*$/.test(t))

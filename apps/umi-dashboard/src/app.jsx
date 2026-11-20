@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import { Trans, useLingui } from '@lingui/react/macro';
 import { msg } from '@lingui/core/macro';
 import { applyMerchantLocale, activateLocale } from '@/lib/i18n.js';
+import { subscribeTheme } from '@/lib/theme.js';
 
 import { useAuth, signOut } from '@/lib/auth.jsx';
 import { MerchantProvider, useMerchant } from '@/lib/merchant-context.jsx';
@@ -734,6 +735,19 @@ function RequireAuth({ children }) {
 }
 
 export default function App() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    // Safari may sample the document; other browsers also use theme-color.
+    const syncChrome = () => {
+      const root = document.documentElement;
+      const login = pathname === '/login';
+      root.toggleAttribute('data-login-scene', login);
+      const color = login ? '#061324' : getComputedStyle(root).getPropertyValue('--canvas').trim();
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', color);
+    };
+    syncChrome();
+    return subscribeTheme(syncChrome);
+  }, [pathname]);
   return (
     <Routes>
       <Route path="/login" element={<LoginScreen />} />

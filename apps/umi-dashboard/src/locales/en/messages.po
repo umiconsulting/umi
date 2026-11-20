@@ -141,6 +141,18 @@ msgstr "The conversation could not be loaded."
 msgid "Sin mensajes en esta conversación."
 msgstr "No messages in this conversation."
 
+#: src/components/login-glass-settings.jsx
+msgid "Vidrio"
+msgstr "Glass"
+
+#: src/components/login-glass-settings.jsx
+msgid "Tinte en modo claro"
+msgstr "Light mode tint"
+
+#: src/components/login-glass-settings.jsx
+msgid "Tinte en modo oscuro"
+msgstr "Dark mode tint"
+
 #: src/components/page-head.jsx
 #~ msgid "{value} {of} {noun}"
 #~ msgstr "{value} {of} {noun}"
@@ -1855,7 +1867,7 @@ msgstr "Categories and net sales"
 
 #: src/screens/category-sales.jsx
 msgid "Categorías sin ventas"
-msgstr "Categories without sales"
+msgstr "Categories with no sales"
 
 #. placeholder {0}: entry.label
 #: src/screens/category-sales.jsx
@@ -7150,6 +7162,22 @@ msgid "El pedido esperaba {order}"
 msgstr "The order expected {order}"
 
 #: src/screens/login.jsx
+#~ msgid "Supervisa la operación de tu negocio al momento, desde un solo panel."
+#~ msgstr "Oversee your business as it happens, from one panel."
+
+#: src/screens/login.jsx
+#~ msgid "Inicia sesión para entrar a tu panel."
+#~ msgstr "Sign in to open your dashboard."
+
+#: src/screens/login.jsx
+#~ msgid "Escríbenos tu correo y te mandamos un enlace para recuperarla."
+#~ msgstr "Enter your email and we will send you a link to recover it."
+
+#: src/screens/login.jsx
+#~ msgid "Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu contraseña. Caduca en 15 minutos."
+#~ msgstr "If there is an account with that email, we sent a link to reset your password. It expires in 15 minutes."
+
+#: src/screens/login.jsx
 msgid "Te enviamos un código de seis dígitos a tu correo."
 msgstr "We sent a six-digit code to your email."
 
@@ -7166,6 +7194,22 @@ msgid "Tu código venció. Inicia sesión otra vez."
 msgstr "Your code expired. Sign in again."
 
 #: src/screens/login.jsx
+msgid "Escribe tu correo."
+msgstr "Enter your email."
+
+#: src/screens/login.jsx
+msgid "Escribe un correo válido, como nombre@negocio.mx."
+msgstr "Enter a valid email, such as name@business.com."
+
+#: src/screens/login.jsx
+msgid "Escribe los seis dígitos del código."
+msgstr "Enter the six-digit code."
+
+#: src/screens/login.jsx
+msgid "Escribe tu contraseña."
+msgstr "Enter your password."
+
+#: src/screens/login.jsx
 msgid "Correo o contraseña incorrectos. Revísalos e inténtalo otra vez."
 msgstr "Incorrect email or password. Check them and try again."
 
@@ -7178,16 +7222,12 @@ msgid "Tu operación,<0/>en tiempo real."
 msgstr "Your operation,<0/>in real time."
 
 #: src/screens/login.jsx
-msgid "Supervisa la operación de tu negocio al momento, desde un solo panel."
-msgstr "Oversee your business as it happens, from one panel."
-
-#: src/screens/login.jsx
 msgid "Hola de nuevo"
 msgstr "Welcome back"
 
 #: src/screens/login.jsx
-msgid "Inicia sesión para entrar a tu panel."
-msgstr "Sign in to open your dashboard."
+msgid "nombre@negocio.mx"
+msgstr "name@business.com"
 
 #: src/screens/login.jsx
 msgid "Contraseña"
@@ -7240,8 +7280,8 @@ msgid "Volver a iniciar sesión"
 msgstr "Back to sign in"
 
 #: src/screens/login.jsx
-msgid "Escríbenos tu correo y te mandamos un enlace para recuperarla."
-msgstr "Enter your email and we will send you a link to recover it."
+msgid "Para restablecer tu contraseña, escribe tu correo."
+msgstr "To reset your password, enter your email."
 
 #: src/screens/login.jsx
 msgid "Enviar enlace"
@@ -7252,8 +7292,8 @@ msgid "Revisa tu correo"
 msgstr "Check your email"
 
 #: src/screens/login.jsx
-msgid "Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu contraseña. Caduca en 15 minutos."
-msgstr "If there is an account with that email, we sent a link to reset your password. It expires in 15 minutes."
+msgid "Si hay una cuenta con ese correo, te mandamos un enlace para restablecer tu contraseña. Caduca en 15 minutos."
+msgstr "If an account exists with that email, we sent a link to reset your password. It expires in 15 minutes."
 
 #. placeholder {0}: CASH_TABS.length
 #: src/screens/loyalty-value.jsx

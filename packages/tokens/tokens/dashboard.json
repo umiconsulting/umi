@@ -231,5 +231,329 @@
     "dur-1": { "$type": "duration", "$value": "120ms" },
     "dur-2": { "$type": "duration", "$value": "220ms" },
     "dur-3": { "$type": "duration", "$value": "320ms" }
+  },
+  "login-glass": {
+    "$description": "Opt-in liquid glass for the login. Existing surfaces use their current tokens.",
+    "glass-light-tint": {
+      "$type": "color",
+      "$value": "#ffffff",
+      "$cssSyntax": "<color>"
+    },
+    "glass-light-thin": {
+      "$type": "number",
+      "$value": 0.06,
+      "$cssSyntax": "<number>"
+    },
+    "glass-light-dense": {
+      "$type": "number",
+      "$value": 0.22,
+      "$cssSyntax": "<number>"
+    },
+    "glass-light-saturation": {
+      "$type": "number",
+      "$value": 1.8,
+      "$cssSyntax": "<number>"
+    },
+    "glass-light-brightness": {
+      "$type": "number",
+      "$value": 1.06,
+      "$cssSyntax": "<number>"
+    },
+    "glass-shade-tint": {
+      "$type": "color",
+      "$value": "#101216",
+      "$cssSyntax": "<color>"
+    },
+    "glass-shade-thin": {
+      "$type": "number",
+      "$value": 0.1,
+      "$cssSyntax": "<number>"
+    },
+    "glass-shade-dense": {
+      "$type": "number",
+      "$value": 0.3,
+      "$cssSyntax": "<number>"
+    },
+    "glass-shade-saturation": {
+      "$type": "number",
+      "$value": 1.7,
+      "$cssSyntax": "<number>"
+    },
+    "glass-shade-brightness": {
+      "$type": "number",
+      "$value": 0.85,
+      "$cssSyntax": "<number>"
+    },
+    "glass-dark-tint": {
+      "$type": "color",
+      "$value": "#141418",
+      "$cssSyntax": "<color>"
+    },
+    "glass-dark-thin": {
+      "$type": "number",
+      "$value": 0.16,
+      "$cssSyntax": "<number>"
+    },
+    "glass-dark-dense": {
+      "$type": "number",
+      "$value": 0.38,
+      "$cssSyntax": "<number>"
+    },
+    "glass-dark-saturation": {
+      "$type": "number",
+      "$value": 1.6,
+      "$cssSyntax": "<number>"
+    },
+    "glass-dark-brightness": {
+      "$type": "number",
+      "$value": 0.8,
+      "$cssSyntax": "<number>"
+    },
+    "glass-light-edge": {
+      "$type": "shadow",
+      "$value": "inset 1.5px 1.5px 1px -1px rgb(255 255 255 / .95), inset -1.5px -1.5px 1px -1px rgb(255 255 255 / .55), inset 0 0 0 .5px rgb(255 255 255 / .3), inset 0 4px 8px -6px rgb(255 255 255 / .3), 0 0 0 .5px rgb(0 0 0 / .06), 0 6px 24px rgb(0 0 0 / .08)"
+    },
+    "glass-light-highlight": {
+      "$type": "color",
+      "$value": "rgb(255 255 255 / .3)",
+      "$cssSyntax": "<color>"
+    },
+    "glass-shade-edge": {
+      "$type": "shadow",
+      "$value": "inset 1.5px 1.5px 1px -1px rgb(255 255 255 / .45), inset -1.5px -1.5px 1px -1px rgb(255 255 255 / .18), inset 0 0 0 .5px rgb(255 255 255 / .12), inset 0 4px 8px -6px rgb(255 255 255 / .12), inset 0 -4px 8px -6px rgb(0 0 0 / .2), 0 0 0 .5px rgb(0 0 0 / .2), 0 6px 24px rgb(0 0 0 / .12)"
+    },
+    "glass-shade-highlight": {
+      "$type": "color",
+      "$value": "rgb(255 255 255 / .15)",
+      "$cssSyntax": "<color>"
+    },
+    "glass-dark-edge": {
+      "$type": "shadow",
+      "$value": "inset 1.5px 1.5px 1px -1px rgb(255 255 255 / .32), inset -1.5px -1.5px 1px -1px rgb(255 255 255 / .18), inset 0 0 0 .5px rgb(255 255 255 / .1), inset 0 4px 8px -6px rgb(255 255 255 / .1), inset 0 -4px 8px -6px rgb(0 0 0 / .3), 0 0 0 .5px rgb(0 0 0 / .35), 0 6px 24px rgb(0 0 0 / .24)"
+    },
+    "glass-dark-highlight": {
+      "$type": "color",
+      "$value": "rgb(255 255 255 / .1)",
+      "$cssSyntax": "<color>"
+    },
+    "glass-light-ink": {
+      "$type": "color",
+      "$value": "rgb(0 0 0 / .86)",
+      "$cssSyntax": "<color>"
+    },
+    "glass-light-secondary": {
+      "$type": "color",
+      "$value": "rgb(58 58 65 / .7)",
+      "$cssSyntax": "<color>"
+    },
+    "glass-dark-ink": {
+      "$type": "color",
+      "$value": "rgb(255 255 255 / .94)",
+      "$cssSyntax": "<color>"
+    },
+    "glass-dark-secondary": {
+      "$type": "color",
+      "$value": "rgb(235 235 245 / .64)",
+      "$cssSyntax": "<color>"
+    },
+    "glass-row-hover": {
+      "$type": "color",
+      "$value": "rgb(255 255 255 / .42)",
+      "$cssSyntax": "<color>"
+    },
+    "glass-row-selected": {
+      "$type": "color",
+      "$value": "rgb(255 255 255 / .76)",
+      "$cssSyntax": "<color>"
+    },
+    "login-glass-tint": {
+      "$type": "color",
+      "$value": "#141418",
+      "$cssSyntax": "<color>"
+    },
+    "login-glass-highlight": {
+      "$type": "color",
+      "$value": "rgb(255 255 255 / .1)",
+      "$cssSyntax": "<color>"
+    },
+    "login-glass-ink": {
+      "$type": "color",
+      "$value": "rgb(255 255 255 / .94)",
+      "$cssSyntax": "<color>"
+    },
+    "login-glass-secondary": {
+      "$type": "color",
+      "$value": "rgb(235 235 245 / .64)",
+      "$cssSyntax": "<color>"
+    },
+    "glass-blur": {
+      "$type": "number",
+      "$value": 2,
+      "$cssSyntax": "<number>"
+    },
+    "glass-rim-max": {
+      "$type": "number",
+      "$value": 44,
+      "$cssSyntax": "<number>"
+    },
+    "glass-rim-min": {
+      "$type": "number",
+      "$value": 4,
+      "$cssSyntax": "<number>"
+    },
+    "glass-rim-ratio": {
+      "$type": "number",
+      "$value": 3.5,
+      "$cssSyntax": "<number>"
+    },
+    "glass-rim-depth": {
+      "$type": "number",
+      "$value": 1.1,
+      "$cssSyntax": "<number>"
+    },
+    "glass-rim-power": {
+      "$type": "number",
+      "$value": 2.6,
+      "$cssSyntax": "<number>"
+    },
+    "glass-color-split": {
+      "$type": "number",
+      "$value": 0.15,
+      "$cssSyntax": "<number>"
+    },
+    "glass-hover-gain": {
+      "$type": "number",
+      "$value": 1.14,
+      "$cssSyntax": "<number>"
+    },
+    "login-glass-alpha": {
+      "$type": "number",
+      "$value": 0.3,
+      "$cssSyntax": "<number>"
+    },
+    "login-glass-scale": {
+      "$type": "number",
+      "$value": 1,
+      "$cssSyntax": "<number>"
+    },
+    "login-glass-saturation": {
+      "$type": "number",
+      "$value": 1.7,
+      "$cssSyntax": "<number>"
+    },
+    "login-glass-brightness": {
+      "$type": "number",
+      "$value": 0.85,
+      "$cssSyntax": "<number>"
+    },
+    "glass-selection-fill": {
+      "$type": "color",
+      "$value": "#dceafa",
+      "$themes": {
+        "dark": "#19426c",
+        "midnight": "#183653"
+      },
+      "$cssSyntax": "<color>"
+    },
+    "glass-selection-ink": {
+      "$type": "color",
+      "$value": "#101c2c",
+      "$themes": {
+        "dark": "#f5f5f7",
+        "midnight": "#f5f5f7"
+      },
+      "$cssSyntax": "<color>"
+    },
+    "glass-selected-row": {
+      "$type": "color",
+      "$value": "rgb(41 151 255 / .16)",
+      "$themes": {
+        "dark": "rgb(41 151 255 / .24)",
+        "midnight": "rgb(41 151 255 / .18)"
+      },
+      "$cssSyntax": "<color>"
+    },
+    "glass-selected-stroke": {
+      "$type": "color",
+      "$value": "rgb(41 151 255 / .45)",
+      "$themes": {
+        "dark": "rgb(112 182 255 / .55)",
+        "midnight": "rgb(112 182 255 / .45)"
+      },
+      "$cssSyntax": "<color>"
+    },
+    "glass-focus-light": {
+      "$type": "color",
+      "$value": "#8395b5",
+      "$cssSyntax": "<color>"
+    },
+    "glass-focus-dark": {
+      "$type": "color",
+      "$value": "#3e5069",
+      "$cssSyntax": "<color>"
+    },
+    "glass-focus-rim": {
+      "$type": "color",
+      "$value": "rgb(255 255 255 / .22)",
+      "$cssSyntax": "<color>"
+    },
+    "glass-focus-separator": {
+      "$type": "color",
+      "$value": "rgb(0 0 0 / .44)",
+      "$cssSyntax": "<color>"
+    },
+    "login-glass-activation": {
+      "$type": "number",
+      "$value": 0,
+      "$cssSyntax": "<number>"
+    },
+    "login-glass-touch-x": {
+      "$type": "number",
+      "$value": 0.5,
+      "$cssSyntax": "<number>"
+    },
+    "login-glass-touch-y": {
+      "$type": "number",
+      "$value": 0.5,
+      "$cssSyntax": "<number>"
+    },
+    "glass-panel-dense": {
+      "$type": "number",
+      "$value": 0.78,
+      "$cssSyntax": "<number>"
+    },
+    "glass-panel-blur": {
+      "$type": "number",
+      "$value": 12,
+      "$cssSyntax": "<number>"
+    },
+    "glass-touch-strength": {
+      "$type": "number",
+      "$value": 0.07,
+      "$cssSyntax": "<number>"
+    }
+  },
+  "login-type": {
+    "$description": "Typography roles for the login. Body uses the existing brand family.",
+    "login-type-title": {
+      "$type": "dimension",
+      "$value": "1.875rem"
+    },
+    "login-type-body": {
+      "$type": "dimension",
+      "$value": "1rem"
+    },
+    "login-type-label": {
+      "$type": "dimension",
+      "$value": "0.875rem"
+    },
+    "login-type-action": {
+      "$type": "dimension",
+      "$value": "0.875rem"
+    },
+    "login-type-leading": {
+      "$type": "number",
+      "$value": 1.5
+    }
   }
 }
