@@ -265,6 +265,88 @@ La prueba usa refs remotas; el checkout de soporte conserva refs locales adicion
 La nueva ejecución de CI queda pendiente tras publicar la corrección.
 Evidencia: [metadatos del escaneo](./evidence/2026-11-02-onca-paid-tables/gitleaks-ci-metadata.json).
 
+## ONCA, 3 de noviembre: flota ADB recuperada y corrección del panel preparada
+
+Barra y Cocina quedaron vinculadas de nuevo con Juan-PC.
+Caja, Barra, Cocina y Mesero tienen ADB y conservan build 335.
+El doctor 335 terminó con código 0 después de la recuperación.
+Los códigos temporales de vinculación no se guardaron en la bitácora.
+
+El fallo del panel de la cuenta 001 quedó reproducido con los controladores reales y el diario cifrado.
+La corrección reconoce la venta oficial, protege otra cuenta seleccionada y retira la cuenta pagada al terminar cualquier operación en curso.
+Las 134 pruebas relacionadas pasaron. El análisis y el formato también pasaron.
+El código está en `/home/juan/umi-onca-replay-paid-account-20261103`.
+La validación de esta corrección en tablets requiere aprobar el PR y entregar otra build.
+Las ventas conciliadas de MXN 50 y MXN 270 se conservan; esta corrección no solicita otro pago.
+
+Detalle: [liberación de la cuenta tras el replay](./2026-11-03-onca-replay-paid-account-fix.md).
+
+## ONCA, 3 de noviembre: revisión de la liberación del panel
+
+La revisión reprodujo dos casos adicionales: ID provisional en el ciclo y restauración con una confirmación retenida.
+Las identidades provisional y oficial quedan vinculadas. La restauración completa ambos estados antes de liberar la cuenta pagada.
+Las tres regresiones adicionales fallaron antes de la corrección; las 137 pruebas relacionadas pasan después.
+El análisis, el formato y git diff --check pasan. La entrega en tablets sigue pendiente de aprobar el PR y generar otra build.
+
+## ONCA, 3 de noviembre: identidad confirmada del carrito
+
+La identidad del checkout también reconoce los alias de creación aceptados cuando el cobro ya usa el ID oficial.
+Un mapping de otra operación no permite liberar una venta distinta. Las 139 pruebas relacionadas pasan.
+El análisis, el formato y git diff --check pasan. La corrección sigue pendiente de entrega por APK tras aprobar el PR.
+
+## 2026-11-03 — Barra: Terminar rechaza una segunda ronda
+
+El propietario reportó que una comanda reaparece tras terminar otra ronda en la misma mesa.
+El historial confirma una secuencia equivalente en la cuenta 053 de Pared del 2 de noviembre.
+No se pudo identificar cuál fue la cuenta específica del reporte.
+
+La API contaba sólo productos pendientes de cerrar, pero comparaba ese número con una selección que incluía productos de rondas anteriores.
+La segunda ronda recibía `KITCHEN_INVALID_TRANSITION` pese a estar lista.
+La regresión reprodujo ese rechazo antes de cambiar el código.
+
+La corrección valida la selección completa y actualiza sólo los productos pendientes de confirmar.
+Conserva las fechas anteriores y el alcance de cada estación.
+Trece pruebas de estación, 23 de integración KDS y 135 unitarias de KDS aprobaron.
+Los tipos, el lint y la compilación de API aprobaron. La revisión no encontró defectos de producción.
+
+El código parte de main tras el merge del PR #249.
+La corrección de KDS requiere su propio PR, CI y aprobación antes de desplegar la API.
+El flujo real de segunda ronda queda pendiente tras ese despliegue.
+
+La build 336 de producción, desde main `d626bdc4`, ya se instaló desde Juan-PC en Caja, Barra, Cocina y Mesero.
+El propietario autorizó la instalación de forma explícita.
+Se usó `adb install --no-incremental -r`, con la firma de producción y sin borrar datos.
+El diagnóstico de flota con `--expected-build 336` terminó con código cero.
+Las cuatro tablets conservaron la fecha original de instalación y los enlaces de ADB.
+Caja mostró la pantalla principal con Cajero ONCA. El propietario confirmó UmiPOS en las otras tres tablets.
+Las capturas posteriores de esas tres tablets mostraron reposo; no se presentan como prueba visual de su flujo operativo.
+El APK incluye el PR #249. La corrección KDS de esta entrada todavía requiere desplegar la API.
+
+En D3, el acceso a pruebas y configuración de Hardware corresponde a Administrador.
+La sesión Cajero ONCA conserva lectura, impresión y apertura autorizada del cajón, pero carece de los permisos de configuración y pruebas.
+Los registros de la impresora y los cajones conservaron su configuración anterior. No se ejecutaron pruebas físicas ni cambios.
+El propietario confirmó que entendió la restricción del rol.
+
+No se alteraron pagos, cuentas ni comandas reales durante el soporte.
+Informe: [Segunda ronda de KDS](2026-11-03-onca-kds-second-round.md).
+
+## 2026-11-03 — Dashboard: barras de ventas por día y hora reducidas a una línea
+
+Las capturas del propietario y una prueba de navegador reprodujeron las barras planas.
+Los datos controlados tenían importes distintos, pero la barra máxima medía dos píxeles.
+La columna flex no tenía una altura definida y la barra dependía de su altura porcentual.
+
+Se agregó `height: '100%'` a la columna de SeriesChart.
+Chromium mostró proporciones correctas por hora y día en anchos de 1440 y 768 píxeles.
+Dos regresiones de navegador, 427 pruebas unitarias, lint sin errores y compilación aprobaron.
+La revisión independiente no encontró defectos. El lint conserva sus 68 advertencias anteriores.
+Se agregó un workflow para ejecutar la regresión de navegador en CI.
+
+Las consultas y los importes no cambiaron. Los datos de prueba no validan la contabilidad real.
+El ajuste del dashboard queda en un PR separado y espera aprobación antes de publicarse.
+No se requiere otra actualización de las tablets.
+Informe: [Gráfica de ventas](2026-11-03-onca-dashboard-sales-chart.md).
+
 ## 2026-11-04 — D3: historial confirmado bloquea el siguiente pedido
 
 Recuperación mostró historial hasta la secuencia 250, con cero pendientes.
