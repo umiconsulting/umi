@@ -1,7 +1,6 @@
 # Umi Workspace
 
-Umi is a multi-product monorepo and organization workspace.
-This file defines product boundaries, ownership, architecture rules, and the research standard.
+Umi is a multi-product monorepo. This file defines product boundaries, ownership, workflow rules, and standards.
 
 ## Start here
 
@@ -24,192 +23,37 @@ This file defines product boundaries, ownership, architecture rules, and the res
 
 ## Database ownership
 
-- `umi` owns the sealed SaaS, identity, and entitlement model.
-- `merchant` owns café business facts and row-level security policies.
-- `runtime` owns sealed operational machinery.
-- `db/` owns the base PostgreSQL schema definitions (`db/00_run.sh`).
-- `db/migrations/` owns all PostgreSQL forward migrations.
-- `db/migrate.sh` applies only unapplied forward migrations and tracks state and SHA-256 checksums in `runtime.migration_ledger`.
+- `umi` owns the sealed SaaS, identity, and entitlement model. `merchant` owns café business facts and RLS policies. `runtime` owns sealed operational machinery.
+- `db/` owns base schemas (`db/00_run.sh`). `db/migrations/` owns forward migrations (`db/migrate.sh`).
 - Legacy schemas in `docs/migration/` are historical records only. Do not add new logic to them.
 
 ## Branch and pull request workflow
 
-- Create each feature or fix branch from `origin/staging`.
-- Open each feature pull request into `staging` (`gh pr create --base staging`).
-- Do not stack an unmerged feature branch on another unmerged feature branch.
-- Pass `CI ready` before merge. It requires shared checks and all selected app checks.
-- See `docs/development/CI.md` for selection rules, release order, and local verification commands.
-- Validate the merged change on the `staging` environment before promotion to `main`.
-- Promote `staging` to `main` with a pull request (`staging` into `main`) and use a merge commit (`--merge`) so `staging` and `main` share commit history.
+- Create each feature or fix branch from `origin/staging` and open PRs into `staging` (`gh pr create --base staging`). Do not stack unmerged feature branches.
+- Pass `CI ready` before merge (`docs/development/CI.md`) and validate on `staging` before promoting to `main` via `--merge`.
 
-## Architecture rules
+## Architecture and research rules
 
-- Keep apps thin. Product apps consume normalized contracts, not raw channel payloads.
-- Keep operational truth in the backend. KDS must not become the source of truth for orders.
-- Put cross-product normalization close to the operational backend that owns the write model.
-- Prefer additive projections over destructive schema changes.
-- Prefer the narrowest existing owner before creating a new service, repo, or directory.
-- Do not move responsibility into a new repo unless the current boundary is clearly
-  failing on latency, ownership, deploy isolation, or operational simplicity.
+- Keep apps thin. Keep operational truth in `apps/umi-api` and put cross-product normalization close to the write model.
+- Prefer additive projections over destructive schema changes and the narrowest existing owner before adding a service or repo.
+- Ground structural, security, or performance decisions in official docs and primary technical research (`docs/agents/tool-and-research-doctrine.md`). Label facts, tradeoffs, and inferences explicitly.
+- Verify product surfaces locally (`docs/development/LOCAL_VERIFICATION_PLAYBOOK.md`): drive native POS directly and verify `umi-dashboard` in real Chromium (`./scripts/ux-browser.sh`).
 
-## Research standard
+## Writing standard
 
-For architecture, schema, backend placement, realtime, performance, security, or scaling
-decisions, prefer primary sources over opinion. Check official documentation first. If
-structural or performance-sensitive, consult academic or primary technical research when
-it materially improves confidence. Record the decision basis explicitly:
+- Write English output in **ASD-STE100**, Spanish technical docs/commits/PRs in **Español Técnico Simplificado (ETS)**, and Spanish chat replies in **Lenguaje claro**.
+- Keep sentences short, active, and literal. Keep technical names, paths, commands, logs, and quoted errors verbatim.
+- Read the complete writing rules in `docs/agents/writing-standard.md`.
 
-- documented fact
-- source-backed tradeoff
-- Umi-specific inference
+## Agent layer and skills
 
-Do not cargo-cult common patterns. Choose the design that best fits measured constraints,
-operational simplicity, and source-backed tradeoffs. If a recommendation adds a new repo,
-service, or infrastructure boundary, justify it against simpler options with explicit criteria.
+- Root `.agents/skills/` is the canonical procedure layer; `.claude/skills` is a symlink (`../.agents/skills`) guarded by `adapter-sync-check`.
+- Hermes, Claude Code, and `codex-claude-pipeline` are external components; use them only after approved provisioning.
+- Load `$product-feature-review` before creating, reviewing, researching, or explaining any feature.
+- Umi no longer uses Azure Boards (Trello and Plane are also retired). Track work via the task brief, run record, and GitHub PRs (`docs/agents/issue-tracker.md`).
 
-### Tool selection and research, for every task
+## Current stance and commands
 
-Find the best available tool before you build anything by hand. This applies to every task,
-including a routine check. Research the approach, not only the fact.
-
-Be persistent. When a source blocks, try another route and record what failed. Use the
-research ladder: vendor documentation, changelog, the source repository, practitioner
-writing, communities, social, then primary research.
-
-Record the tool, its version, and the source in the task output. A hand-rolled solution
-needs a written reason.
-
-The full rule is in `docs/agents/tool-and-research-doctrine.md`. Load the `research` skill
-for a research task.
-
-**Verifying a change is its own skill.** How to start the local stack, which command proves
-which claim, how to drive the native POS with real clicks, and the traps that have already cost
-time are in `docs/development/LOCAL_VERIFICATION_PLAYBOOK.md`. Read it before sweeping or
-reporting a measurement, and before concluding that a check cannot run here.
-
-**The dashboard is verified the same way the POS is: in a real browser, with real clicks.**
-Use the Chromium that Playwright drives over CDP (`./scripts/ux-browser.sh`), click the actual
-workflow, and read the result — a component test or a reading of the JSX is not evidence about
-what the operator sees. The playbook's section 2 has the commands and the cost.
-
-## Writing standard — ASD-STE100
-
-Write all agent output in Simplified Technical English (ASD-STE100). This rule is
-permanent and applies to every agent in this workspace. It covers chat replies,
-commit messages, pull request text, code comments, and documentation.
-
-Rules:
-
-- Use one word for one meaning. Do not use a second word for the same thing.
-- Use each word in its approved part of speech. Do not make a verb from a noun.
-- Write short sentences. Use a maximum of 20 words in an instruction and 25 words
-  in a description.
-- Give one instruction in one sentence.
-- Use the active voice. Write an instruction as a command: "Run the migration."
-- Use the simple tenses: past, present, and future. Do not use the `-ing` form as a verb.
-- Keep the articles "a", "an", and "the".
-- Use a maximum of three words in a noun cluster. Break a longer cluster with "of" or "for".
-- Write a maximum of six sentences in a descriptive paragraph.
-- Write positive statements. Use a negative only for a prohibition or a danger.
-- Put conditions, options, and steps in a vertical list.
-- Start a warning or a caution with the command that prevents the danger.
-- Do not use slang, jargon, idioms, or metaphors.
-
-Exceptions:
-
-- Technical names and technical verbs stay unchanged. Examples: file paths, table
-  names, column names, commands, and product names.
-- Quoted text, error output, log lines, and code blocks stay verbatim.
-
-### Language
-
-Answer in the language that the user writes. Each language has its standard:
-
-| Content                    | Standard                               |
-| -------------------------- | -------------------------------------- |
-| English, all content       | ASD-STE100                             |
-| Spanish, technical content | Español Técnico Simplificado (ETS)     |
-| Spanish, all other content | Lenguaje claro (Red de Lenguaje Claro) |
-
-Spanish technical content is documentation, a commit message, a pull request, a code
-comment, a procedure, or a schema description. All other content is a chat reply, a
-summary, a recommendation, or a message to a person.
-
-**Español Técnico Simplificado (ETS)** applies the ASD-STE100 rules above to Spanish:
-
-- Use one word for one meaning. Do not use a synonym.
-- Use the active voice and the simple tenses.
-- Write short sentences. Give one instruction in one sentence.
-- Use the imperative for an instruction: "Ejecuta la migración."
-- Keep the articles and the prepositions. Do not drop "de", "que", or "el".
-- Do not use the gerund as a main verb.
-
-**Lenguaje claro** applies to all other Spanish content:
-
-- Put the main message first. The reader must find the answer in the first paragraph.
-- Speak to the reader directly.
-- Use common words. Explain a technical term the first time that you use it.
-- Use headings, short paragraphs, and lists.
-- Give the reason for a recommendation, and give the next action.
-
-## Agent layer
-
-Agent procedures live under `.agents/skills/`.
-This path is the canonical procedure layer from the 2026-06-10 S1.5 decision.
-The `.claude/skills` path is a symlink to `../.agents/skills`.
-Write to `.agents/skills/`; the link reflects the change immediately.
-The `adapter-sync-check` skill guards the link.
-Symlinks assume macOS or Linux. Windows requires `git config core.symlinks true`.
-
-Hermes, Claude Code, and `codex-claude-pipeline` are external components.
-This repository does not install these components. Use them only after approved provisioning.
-
-For workspace-wide work, inspect root instructions first. For project-specific work,
-descend into the owning repo and follow its `AGENTS.md` / `REPO_CONTEXT.md` if present.
-Prefer existing artifacts and owners over inventing parallel structures.
-
-## Agent skills
-
-### Feature work
-
-Use `$product-feature-review` for each request to create, review, research, or
-explain a feature. Load the skill before you inspect the implementation, research
-the competition, or answer. This rule applies to short questions and routine
-changes. Use the skill's evidence, UX, reliability, and verification rules.
-
-### Issue tracker
-
-Umi no longer uses Azure Boards.
-Trello and Plane also remain retired as trackers.
-No replacement external tracker is confirmed in this documentation.
-Use the local task brief and the run's named record for current requirements and pending work.
-Do not infer a tracker or require Azure access from an old `AB#` reference.
-GitHub PRs remain the code review surface when the user authorizes publication.
-See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
-
-## Current stance
-
-- `apps/umi-api` is the canonical backend for build-v3 and owns authoritative business writes.
-- Build-v3 uses `umi`, `merchant`, and `runtime` as its canonical schemas.
-- KDS reads the API-owned kitchen projection. KDS does not own commercial order truth.
-- UmiPOS consumes the typed contract from `packages/contract`.
-- The workspace uses one Git repository at `git@github.com:umiconsulting/umi.git`.
-- App directories are not separate Git repositories.
-- Root pnpm workspaces and Turborepo own the active JavaScript workspace workflow.
-- Umi Cash stays outside pnpm and uses its separate npm lockfile.
-
-## Commands
-
-Root monorepo (pnpm + Turborepo):
-
-- Install: `pnpm install`
-- Build: `pnpm run build` (or `turbo run build`)
-- Lint: `pnpm run lint` (or `turbo run lint`)
-- Test: `pnpm run test` (or `turbo run test`)
-- Dev: `pnpm run dev` (or `turbo run dev`)
-
-Umi Cash uses its separate npm workflow:
-
-```sh
-cd apps/umi-cash && npm ci && npm run dev
-```
+- `apps/umi-api` is the canonical backend for build-v3 (`umi`, `merchant`, `runtime`) and owns business writes.
+- KDS reads API-owned kitchen projections. UmiPOS consumes `packages/contract`.
+- One Git repository (`git@github.com:umiconsulting/umi.git`); pnpm + Turborepo manage JS workspaces (`pnpm install|build|lint|test|dev`), while `apps/umi-cash` uses `npm ci && npm run dev`.
