@@ -1,6 +1,10 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sha256 } from './metrics-parity-normalize';
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
 
 /**
  * The frozen legacy sales summary. The old endpoint is gone after gate 3, so the
