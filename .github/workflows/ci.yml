@@ -101,7 +101,7 @@ jobs:
     if: needs.changes.outputs.pos == 'true'
     uses: ./.github/workflows/umi-pos-ios.yml
     with:
-      build_ios: ${{ needs.changes.outputs.pos_ios == 'true' || github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main' }}
+      build_ios: ${{ needs.changes.outputs.pos_ios == 'true' }}
 
   ready:
     name: CI ready

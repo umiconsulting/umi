@@ -40,6 +40,3 @@ pos:
   - '.github/workflows/umi-pos-ios.yml'
 pos_ios:
   - 'apps/umi-pos/ios/**'
-  - 'apps/umi-pos/pubspec.yaml'
-  - 'apps/umi-pos/pubspec.lock'
-  - '.github/workflows/umi-pos-ios.yml'
