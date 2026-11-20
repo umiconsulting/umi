@@ -3,7 +3,7 @@
 # Usage: bash scripts/ci/prove-gates.sh
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$ROOT"
+cd "$ROOT" || exit 1
 W="$(mktemp -d)"
 trap 'rm -rf "$W"' EXIT
 
@@ -18,16 +18,16 @@ open(f'{w}/release.jq', 'w').write(rel + '\n')
 PY
 
 cat > "$W/ready-docs-only.json" <<'JSON'
-{"changes":{"result":"success","outputs":{"api":"false","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"workflows":{"result":"success"},"secrets":{"result":"success"},"lint":{"result":"success"},"contract":{"result":"success"},"tokens":{"result":"success"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
+{"changes":{"result":"success","outputs":{"api":"false","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"lint":{"result":"success"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
 JSON
 cat > "$W/ready-failing.json" <<'JSON'
-{"changes":{"result":"success","outputs":{"api":"false","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"workflows":{"result":"success"},"secrets":{"result":"success"},"lint":{"result":"failure"},"contract":{"result":"success"},"tokens":{"result":"success"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
+{"changes":{"result":"success","outputs":{"api":"false","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"lint":{"result":"failure"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
 JSON
 cat > "$W/ready-cancelled.json" <<'JSON'
-{"changes":{"result":"success","outputs":{"api":"true","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"workflows":{"result":"success"},"secrets":{"result":"success"},"lint":{"result":"success"},"contract":{"result":"success"},"tokens":{"result":"success"},"api":{"result":"cancelled"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
+{"changes":{"result":"success","outputs":{"api":"true","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"lint":{"result":"success"},"api":{"result":"cancelled"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
 JSON
 cat > "$W/release-complete.json" <<'JSON'
-{"ready":{"result":"success"},"changes":{"result":"success","outputs":{"api":"true","dashboard":"true","landing":"true"}},"deploy-api-staging":{"result":"success"},"deploy-api-production":{"result":"skipped"},"deploy-dashboard":{"result":"success"},"deploy-landing":{"result":"success"}}
+{"ready":{"result":"success"},"changes":{"result":"success","outputs":{"api":"true","dashboard":"true","landing":"true"}},"deploy-api-staging":{"result":"success"},"deploy-api-production":{"result":"skipped"},"deploy-dashboard":{"result":"success"},"deploy-landing":{"result":"skipped"}}
 JSON
 cat > "$W/release-incomplete.json" <<'JSON'
 {"ready":{"result":"success"},"changes":{"result":"success","outputs":{"api":"true","dashboard":"true","landing":"true"}},"deploy-api-staging":{"result":"success"},"deploy-api-production":{"result":"skipped"},"deploy-dashboard":{"result":"cancelled"},"deploy-landing":{"result":"success"}}

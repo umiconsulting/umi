@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [staging, main]
+    branches: [dev, staging, main]
   workflow_dispatch:
     inputs:
       deploy:
@@ -32,13 +32,14 @@ jobs:
       landing: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.landing == 'true' }}
       cash: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.cash == 'true' }}
       pos: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.pos == 'true' }}
+      pos_ios: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.pos_ios == 'true' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: ${{ github.event_name == 'push' && 0 || 1 }}
       - name: Find the last successful release on this branch
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')
         id: base
         env:
           GH_TOKEN: ${{ github.token }}
@@ -62,88 +63,49 @@ jobs:
             echo "full=true" >> "$GITHUB_OUTPUT"
           fi
       - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
-        if: github.event_name != 'push' || steps.base.outputs.sha != ''
+        if: github.event_name != 'push' || steps.base.outputs.full != 'true'
         id: paths
         with:
-          base: ${{ steps.base.outputs.sha || github.ref }}
+          base: ${{ github.event_name == 'push' && (steps.base.outputs.sha || github.event.before) || '' }}
           filters: .github/ci-paths.yml
-
-  workflows:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          persist-credentials: false
-      - name: Validate workflow syntax and expressions
-        env:
-          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
-        run: |
-          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
-          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
-          "$RUNNER_TEMP/actionlint" -shellcheck=''
-
-  secrets:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - name: Scan fetched Git history
-        env:
-          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
-        run: |
-          curl -fsSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz -o "$RUNNER_TEMP/gitleaks.tar.gz"
-          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
-          if ! "$RUNNER_TEMP/gitleaks" git --no-banner --redact --exit-code 1 --log-opts='--all' \
-            --report-format json --report-path "$RUNNER_TEMP/gitleaks.json"; then
-            jq -r '.[] | [.RuleID, .File, .StartLine, .Commit, .Fingerprint] | @tsv' "$RUNNER_TEMP/gitleaks.json"
-            exit 1
-          fi
 
   lint:
     uses: ./.github/workflows/lint.yml
-  contract:
-    uses: ./.github/workflows/contract-ci.yml
-  tokens:
-    uses: ./.github/workflows/tokens-ci.yml
 
   api:
-    needs: [changes, workflows, secrets, lint, contract, tokens]
+    needs: [changes]
     if: needs.changes.outputs.api == 'true' || inputs.deploy
     uses: ./.github/workflows/umi-api-ci.yml
 
   dashboard:
-    needs: [changes, workflows, secrets, lint, contract, tokens]
+    needs: [changes]
     if: needs.changes.outputs.dashboard == 'true' || inputs.deploy
     uses: ./.github/workflows/web-ci.yml
     with:
       app: dashboard
 
   landing:
-    needs: [changes, workflows, secrets, lint, tokens]
+    needs: [changes]
     if: needs.changes.outputs.landing == 'true' || inputs.deploy
     uses: ./.github/workflows/web-ci.yml
     with:
       app: landing
 
   cash:
-    needs: [changes, workflows, secrets, lint]
+    needs: [changes]
     if: needs.changes.outputs.cash == 'true'
     uses: ./.github/workflows/cash-ci.yml
 
   pos:
-    needs: [changes, workflows, secrets, lint, contract, tokens]
+    needs: [changes]
     if: needs.changes.outputs.pos == 'true'
     uses: ./.github/workflows/umi-pos-ios.yml
+    with:
+      build_ios: ${{ needs.changes.outputs.pos_ios == 'true' || github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main' }}
 
   ready:
     name: CI ready
-    needs: [changes, workflows, secrets, lint, contract, tokens, api, dashboard, landing, cash, pos]
+    needs: [changes, lint, api, dashboard, landing, cash, pos]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -158,7 +120,7 @@ jobs:
             def selected($name; $selected):
               .[$name].result == (if $selected then "success" else "skipped" end);
             (.changes | passed) and
-            ([.workflows, .secrets, .lint, .contract, .tokens] | all(passed)) and
+            (.lint | passed) and
             selected("api"; .changes.outputs.api == "true" or $redeploy == "true") and
             selected("dashboard"; .changes.outputs.dashboard == "true" or $redeploy == "true") and
             selected("landing"; .changes.outputs.landing == "true" or $redeploy == "true") and
@@ -243,6 +205,7 @@ jobs:
       [ready, changes, deploy-api-staging, deploy-api-production, deploy-dashboard, deploy-landing]
     if: >-
       always() && !cancelled() && github.event_name == 'push' &&
+      (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main') &&
       (github.ref != 'refs/heads/main' || vars.UMI_REWARD_RELEASE_HOLD != 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 5

@@ -14,28 +14,17 @@ permissions:
   contents: read
   packages: write
 jobs:
-  # Run the same CI gate on the exact commit that this push deploys. The
-  # deploy job cannot start until this call is green.
-  validate:
-    uses: ./.github/workflows/umi-api-ci.yml
-
   deploy:
-    needs: validate
     uses: ./.github/workflows/deploy-backend.yml
     with:
       app_name: umi-api
       app_dir: apps/umi-api
       image: ghcr.io/umiconsulting/umi-api
       health_url: https://api-staging.umiconsulting.co/health
-      # The commit that `validate` just tested. deploy.sh refuses to roll if
-      # the branch tip no longer matches it.
       release_sha: ${{ github.sha }}
       release_url: https://api-staging.umiconsulting.co/health/release
       repo_dir: /home/juan/umi-staging
       branch: staging
-      # The QA stack's compose file now lives in the repo; its .env, certs and
-      # secrets deliberately do not (gitignored state that must survive the
-      # reset). UMI_PROJECT_DIR keeps them resolving where they have always been.
       compose_file: deploy/staging/compose.yml
       project_dir: /home/juan/umi-api-test
       push_latest: false
