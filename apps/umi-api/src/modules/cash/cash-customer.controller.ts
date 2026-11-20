@@ -42,23 +42,19 @@ export class CashCustomerController {
     private readonly rateLimit: RateLimitService,
   ) {}
 
+  /**
+   * Public registration returns 202 and the same proof-required body for a new
+   * and a known phone. It returns no credential and no customer identifier, so a
+   * caller cannot open a card session or learn that a phone is already known.
+   */
   @Post('customers')
-  @HttpCode(201)
-  async registerCustomer(
+  @HttpCode(202)
+  registerCustomer(
     @PubMerchant() t: PublicMerchant,
     @Body() dto: RegisterDto,
     @Headers('user-agent') ua: string | undefined,
-    @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    // A returning customer's session is a normal response, not an error detail.
-    const { alreadyRegistered, ...payload } = await this.register.register(
-      t.merchantId,
-      t.name,
-      dto,
-      ua ?? null,
-    );
-    if (alreadyRegistered) reply.status(409);
-    return payload;
+    return this.register.register(t.merchantId, t.name, dto, ua ?? null);
   }
 
   @Get('gift/:code')

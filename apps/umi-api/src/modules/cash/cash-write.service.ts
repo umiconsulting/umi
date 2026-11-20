@@ -56,6 +56,9 @@ export class CashWriteService {
     if (input.amountCentavos < 100 || input.amountCentavos > MAX_TOPUP_CENTAVOS) {
       throw new BadRequestException('Monto inválido');
     }
+    if (!(await this.repo.topupEnabled(merchantId))) {
+      throw new ForbiddenException({ error: 'Las recargas están desactivadas' });
+    }
     const card = await this.repo.findCard(merchantId, input.cardId);
     if (!card) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
 

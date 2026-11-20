@@ -211,6 +211,9 @@ export class CashRepository {
         `UPDATE merchant.loyalty_program p SET
            card_prefix             = CASE WHEN pt.j ? 'card_prefix'             THEN pt.j->>'card_prefix'                     ELSE p.card_prefix END,
            pass_style              = CASE WHEN pt.j ? 'pass_style'              THEN pt.j->>'pass_style'                      ELSE p.pass_style END,
+           self_registration       = CASE WHEN pt.j ? 'self_registration'       THEN (pt.j->>'self_registration')::boolean   ELSE p.self_registration END,
+           topup_enabled           = CASE WHEN pt.j ? 'topup_enabled'           THEN (pt.j->>'topup_enabled')::boolean        ELSE p.topup_enabled END,
+           multi_seal_enabled      = CASE WHEN pt.j ? 'multi_seal_enabled'      THEN (pt.j->>'multi_seal_enabled')::boolean   ELSE p.multi_seal_enabled END,
            birthday_reward_enabled = CASE WHEN pt.j ? 'birthday_reward_enabled' THEN (pt.j->>'birthday_reward_enabled')::boolean ELSE p.birthday_reward_enabled END,
            birthday_reward_name    = CASE WHEN pt.j ? 'birthday_reward_name'    THEN pt.j->>'birthday_reward_name'            ELSE p.birthday_reward_name END,
            primary_color           = CASE WHEN pt.j ? 'primary_color'           THEN pt.j->>'primary_color'                   ELSE p.primary_color END,
@@ -426,7 +429,7 @@ export class CashRepository {
 
   async adminCustomers(
     merchantId: string,
-    opts: { search: string; sort: string; limit: number; skip: number },
+    opts: { search: string; sort: string; limit: number; skip: number; includeContact: boolean },
   ): Promise<{ rows: Row[]; total: number }> {
     const like = `%${opts.search}%`;
     const order =
@@ -439,7 +442,13 @@ export class CashRepository {
             : opts.sort === 'ltv'
               ? 'ltv_centavos DESC NULLS LAST'
               : 'created_at DESC';
-    const filter = `($2 = '' OR name ILIKE $3 OR phone ILIKE $3 OR email ILIKE $3 OR card_number ILIKE $3)`;
+    // A caller without `customer.contact.read` may search by name or card only.
+    // Matching phone or email would still answer "is this person a member?" even
+    // when the response masks the field: a search oracle. The same filter feeds
+    // the page query and the count query, so `total` cannot diverge from the rows.
+    const filterWithContact = `($2 = '' OR name ILIKE $3 OR phone ILIKE $3 OR email ILIKE $3 OR card_number ILIKE $3)`;
+    const filterWithoutContact = `($2 = '' OR name ILIKE $3 OR card_number ILIKE $3)`;
+    const filter = opts.includeContact ? filterWithContact : filterWithoutContact;
     return this.pg.withMerchant(async (c) => {
       const rows = (
         await c.query<Row>(
@@ -463,8 +472,11 @@ export class CashRepository {
       ).rows;
       const total = (
         await c.query<Row>(
-          `WITH ${CUST_CTE}
-           SELECT count(*)::int AS n FROM cust WHERE ${filter}`,
+          opts.includeContact
+            ? `WITH ${CUST_CTE}
+               SELECT count(*)::int AS n FROM cust WHERE ${filterWithContact}`
+            : `WITH ${CUST_CTE}
+               SELECT count(*)::int AS n FROM cust WHERE ${filterWithoutContact}`,
           [merchantId, opts.search, like],
         )
       ).rows[0]?.n;
@@ -672,6 +684,25 @@ export class CashRepository {
    * and must be handed over as the LOWER tier first (see
    * shared/loyalty/reward-tiers.ts, `bankedReward`).
    */
+  /**
+   * Run a reward read-modify-write under the same advisory lock as the writer.
+   *
+   * `upsertRewardConfig` already serializes the deactivate-then-insert. A PATCH
+   * also READS the current tier before it builds the new one. Without this lock
+   * the read can see the state before a concurrent PUT and then overwrite that
+   * PUT with the old description or tier. The lock is transaction-scoped, so the
+   * caller must do the read and the write inside `work`.
+   */
+  async withRewardConfigLock<T>(
+    merchantId: string,
+    work: (client: PoolClient) => Promise<T>,
+  ): Promise<T> {
+    return this.pg.withMerchant(async (c) => {
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`reward_config:${merchantId}`]);
+      return work(c);
+    });
+  }
+
   async upsertRewardConfig(
     merchantId: string,
     _programId: string,

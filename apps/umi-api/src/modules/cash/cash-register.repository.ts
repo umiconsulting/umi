@@ -60,27 +60,42 @@ export class CashRegisterRepository {
   }
 
   /**
-   * Existing customer + whether they already hold an active card. Looks the
-   * customer up by the phone-family (e164) normalized value across the identity
-   * spine, so a WhatsApp-only contact and a cash-phone contact resolve to the same
-   * customer (the resolver's cross-channel unification).
+   * Existing customer + their active card. Looks the customer up by the
+   * phone-family (e164) normalized value across the identity spine, so a
+   * WhatsApp-only contact and a cash-phone contact resolve to the same customer
+   * (the resolver's cross-channel unification).
+   *
+   * The card id and number let the authenticated staff registration path answer
+   * with the member's card. The public path ignores both.
    */
   async findExisting(
     merchantId: string,
     normalizedPhone: string,
-  ): Promise<{ personId: string; displayName: string | null; hasCard: boolean } | null> {
+  ): Promise<{
+    personId: string;
+    displayName: string | null;
+    hasCard: boolean;
+    cardId: string | null;
+    cardNumber: string | null;
+  } | null> {
     const { rows } = await this.pg.query<Row>(
       `SELECT cu.id::text  AS person_id,
               cu.name      AS display_name,
-              EXISTS (
-                SELECT 1 FROM merchant.loyalty_card ca
-                 WHERE ca.merchant_id = cu.merchant_id
-                   AND ca.customer_id = cu.id
-                   AND ca.status = 'active'
-              )            AS has_card
+              ca.id::text  AS card_id,
+              ca.card_number,
+              (ca.id IS NOT NULL) AS has_card
          FROM merchant.contact ct
          JOIN umi.channel_type ch ON ch.id = ct.channel_id
          JOIN merchant.customer cu ON cu.id = ct.customer_id
+         LEFT JOIN LATERAL (
+           SELECT c.id, c.card_number
+             FROM merchant.loyalty_card c
+            WHERE c.merchant_id = cu.merchant_id
+              AND c.customer_id = cu.id
+              AND c.status = 'active'
+            ORDER BY c.created_at
+            LIMIT 1
+         ) ca ON true
         WHERE ct.merchant_id = $1::uuid
           AND ct.normalized_value = $2
           AND ch.key IN ('phone', 'whatsapp', 'sms')
@@ -90,7 +105,13 @@ export class CashRegisterRepository {
     );
     const r = rows[0];
     if (!r) return null;
-    return { personId: r.person_id, displayName: r.display_name, hasCard: !!r.has_card };
+    return {
+      personId: r.person_id,
+      displayName: r.display_name,
+      hasCard: r.has_card === true,
+      cardId: r.card_id ?? null,
+      cardNumber: r.card_number ?? null,
+    };
   }
 
   /** Find-or-create the customer via the identity resolver (raw phone in). */

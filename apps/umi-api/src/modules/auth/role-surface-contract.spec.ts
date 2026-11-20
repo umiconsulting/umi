@@ -38,7 +38,7 @@
  *
  * ── where the exemptions live, and why ─────────────────────────────────────────────
  *
- * Three surfaces are deliberately open (the handler carries no permission). No registry
+ * One surface is deliberately open (the handler carries no permission). No registry
  * module is exempt any more: every permission-gated module now has a contract row. Both
  * lists are below, and neither is a plain allow-list: every entry is asserted, and every
  * entry FAILS once it stops being true, so an exemption cannot rot into a silent hole.
@@ -322,11 +322,6 @@ const SERVICE_ENFORCED: Readonly<Record<string, { domain: string; selector: stri
  * is removed and the contract row re-described.
  */
 const DELIBERATELY_OPEN: Readonly<Record<string, string>> = {
-  'cash.customers':
-    "the till's own customer list (GET /api/merchants/:id/cash/customers) — the gate on " +
-    "this row is the loyalty-value hub's DISPLAY condition, not a route guard, and the " +
-    "contract's note plus its `expect` (all four roles allowed) record the API as " +
-    'deliberately open: the same cashier whose screens call it must be served',
   'merchant.settings-shell':
     'the shared café model (name, locations, segments) that every visible screen reads — ' +
     "the module registry gates `overview` on the product alone, so the contract's gate is " +

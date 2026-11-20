@@ -19,6 +19,7 @@ import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { RequirePermission, Roles } from '../auth/roles.decorator';
+import { hasPermission } from '../auth/roles';
 import { RequireProduct } from '../auth/require-product.decorator';
 import { AcceptRegisterToken } from '../auth/register-token.decorator';
 import { Merchant } from '../auth/current-user.decorator';
@@ -39,22 +40,21 @@ const HOUR = 60 * 60 * 1000;
 const EXPORT_MAX_PER_HOUR = 10;
 const DEFAULT_TZ = 'America/Mexico_City';
 /** Roles that operate the register, and so can report its failures. */
-const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
+const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'cashier', 'staff'];
 
 /**
  * Cash READ side (D11 — always live) + admin-config writes (settings branding,
  * reward-config) which are dashboard-owned and non-conflicting with umi-cash.
  * Gated on the `cash` product. Customer-facing wallet/ledger writes are NOT here
- * — see cash-write.controller (inert, unmounted unless CASH_WRITE_ENABLED).
+ * — see cash-write.controller.
  *
- * THE ADMIN-CONFIG ROUTES ARE PERMISSION-GATED, THE REST ARE NOT, and that split
- * is the point (workstream C step 4: "the client hides; the API decides").
+ * EVERY HANDLER NAMES A PERMISSION (workstream C step 4: "the client hides; the
+ * API decides"). The product gate and the membership gate are separate checks;
+ * the permission is the authority for the action.
+ *
  * `settings` is the manager surface: the Dashboard's `settings` module
  * (`module-registry.js`) declares `merchant.manage` and hides the screen from a
- * cashier. Every read of it used to be ungated here, so the cashier who could not
- * see the screen could still read the café's branding and promo copy over
- * `/api/{ref}/admin/settings` — and, with the same URL and a body the service
- * accepts, change them. Both halves of `settings` sit on `merchant.manage`.
+ * cashier. Both halves of `settings` sit on `merchant.manage`.
  *
  * `reward-config` is SPLIT, and the split is deliberate: the READ is
  * `loyalty.read` (the weaker permission) and only the WRITE is `merchant.manage`.
@@ -76,9 +76,11 @@ const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
  * what every issued pass shows and the only writer is the Settings screen, which
  * the client hides from a cashier. Do not re-tighten the read to match the write.
  *
- * The till's remaining register reads (`stats`, `analytics`, `customers`,
- * `gift-cards`) stay open to a cashier on purpose: the same cashier's own screens
- * call them, and tightening those would break a screen the client shows.
+ * The remaining register reads name the permission their readers already hold:
+ * `stats`, `customers` and `customers/:id` use `loyalty.read` (every café role
+ * holds it, so the till's own screens still work); `analytics` uses
+ * `insights.read`; `gift-cards` uses `gift_card.read`; the customer CSV uses
+ * `customer.contact.read`, because it exports every customer's phone and email.
  */
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard)
 @RequireProduct('cash')
@@ -145,36 +147,45 @@ export class CashController {
   @Patch('settings')
   @RequirePermission('merchant.manage')
   async updateSettings(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
-    await this.cash.updateSettings(t.merchantId, body);
+    const changed = await this.cash.updateSettings(t.merchantId, body);
     // Not awaited. A café-wide refresh reaches every issued pass, and the café
     // must not wait for Apple to save a setting. It never throws — see the
-    // adapter — so nothing can escape into this response.
-    void this.walletPass.refreshMerchant(t.merchantId);
+    // adapter — so nothing can escape into this response. An empty PATCH wrote
+    // nothing, so it must not refresh every pass.
+    if (changed) void this.walletPass.refreshMerchant(t.merchantId);
     return { ok: true };
   }
 
   @Get('stats')
+  @RequirePermission('loyalty.read')
   getStats(@Merchant() t: MerchantAccess) {
     return this.cash.getStats(t.merchantId, registerRole(t));
   }
 
   @Get('analytics')
+  @RequirePermission('insights.read')
   getAnalytics(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
     return this.cash.getAnalytics(t.merchantId, query);
   }
 
   @Get('customers')
+  @RequirePermission('loyalty.read')
   getCustomers(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
-    return this.cash.getCustomers(t.merchantId, query);
+    return this.cash.getCustomers(t.merchantId, query, {
+      includeContact: hasPermission(t.permissions, 'customer.contact.read'),
+    });
   }
 
   /**
-   * One customer. Same guards as the list beside it, which already exposes her
-   * phone, email and balance — the detail adds history, not a new class of data.
+   * One customer. Same permission as the list beside it: the detail adds history,
+   * not a new class of data. Contact fields follow `customer.contact.read`.
    */
   @Get('customers/:id')
+  @RequirePermission('loyalty.read')
   getCustomer(@Merchant() t: MerchantAccess, @Param('id', ParseUUIDPipe) id: string) {
-    return this.cash.getCustomer(t.merchantId, id, registerRole(t));
+    return this.cash.getCustomer(t.merchantId, id, registerRole(t), {
+      includeContact: hasPermission(t.permissions, 'customer.contact.read'),
+    });
   }
 
   /**
@@ -207,6 +218,7 @@ export class CashController {
    * who can download it. Ten an hour, as umi-cash allows.
    */
   @Get('export')
+  @RequirePermission('customer.contact.read')
   async exportCustomers(
     @Merchant() t: MerchantAccess,
     @CurrentUser() user: AuthUser,
@@ -256,7 +268,7 @@ export class CashController {
   @Put('reward-config')
   @RequirePermission('merchant.manage')
   async putRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
-    const result = await this.cash.updateRewardConfig(t.merchantId, body);
+    const result = await this.cash.updateRewardConfig(t.merchantId, body, 'replace');
     void this.walletPass.refreshMerchant(t.merchantId);
     return result;
   }
@@ -264,7 +276,7 @@ export class CashController {
   @Patch('reward-config')
   @RequirePermission('merchant.manage')
   async patchRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
-    const result = await this.cash.updateRewardConfig(t.merchantId, body);
+    const result = await this.cash.updateRewardConfig(t.merchantId, body, 'patch');
     void this.walletPass.refreshMerchant(t.merchantId);
     return result;
   }
@@ -320,6 +332,7 @@ export class CashController {
   }
 
   @Get('gift-cards')
+  @RequirePermission('gift_card.read')
   getGiftCards(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
     return this.cash.getGiftCards(t.merchantId, query);
   }

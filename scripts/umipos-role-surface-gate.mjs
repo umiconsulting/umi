@@ -48,10 +48,13 @@ const option = (name) => {
 
 const baseUrl = (process.env.UMIPOS_API_BASE_URL ?? 'http://127.0.0.1:4001').replace(/\/$/, '');
 const merchantId = process.env.UMIPOS_MERCHANT_ID ?? contract.merchant.id;
+let customerId = null;
 const localPasswordDefault = 'Umi2026!';
 const password = process.env.UMIPOS_ROLE_PASSWORD ?? localPasswordDefault;
 const passwordIsFallback = process.env.UMIPOS_ROLE_PASSWORD === undefined;
 const jsonOut = flag('--json');
+const allowWrites = flag('--allow-writes') || process.env.UMIPOS_GATE_ALLOW_WRITES === '1';
+const MUTATING_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 const requestedRoles = option('--roles')
   ? option('--roles')
       .split(',')
@@ -65,11 +68,40 @@ function fail(message) {
   throw new Error(`Role surface gate failed: ${message}`);
 }
 
+/** The gate may only mutate a database it can see on this machine. */
+function isLoopbackTarget(target) {
+  try {
+    const host = new URL(target).hostname.toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
 /** Expand the contract's placeholders into a real URL for this merchant. */
 function url(path) {
   return (
-    baseUrl + path.replaceAll('{ref}', contract.merchant.ref).replaceAll('{merchantId}', merchantId)
+    baseUrl +
+    path
+      .replaceAll('{ref}', contract.merchant.ref)
+      .replaceAll('{merchantId}', merchantId)
+      .replaceAll('{customerId}', customerId ?? '{customerId}')
   );
+}
+
+/**
+ * The detail rows name a customer that the seeded café already has. Resolve it
+ * once with a role that may read the member list, so the gate measures the
+ * detail guard instead of a literal placeholder.
+ */
+async function resolveCustomerId(session) {
+  const response = await fetch(`${baseUrl}/api/merchants/${merchantId}/cash/customers?limit=1`, {
+    headers: { cookie: session.jar.cookieHeader() },
+    redirect: 'manual',
+  });
+  if (!response.ok) return null;
+  const data = await response.json().catch(() => null);
+  return data?.customers?.[0]?.id ?? null;
 }
 
 function validateContract() {
@@ -225,6 +257,19 @@ async function run() {
   if (roles.length === 0) fail(`no contract role matches --roles ${requestedRoles?.join(',')}.`);
   const selected = new Set(roles.map((entry) => entry.role));
 
+  const mutatingProbe = contract.surfaces.some(
+    (surface) =>
+      MUTATING_METHODS.has(surface.request.method) &&
+      Object.keys(surface.expect).some((role) => selected.has(role)),
+  );
+  if (mutatingProbe && !isLoopbackTarget(baseUrl) && !allowWrites) {
+    fail(
+      `refusing mutating probes against ${baseUrl}: use a loopback host ` +
+        '(localhost, 127.0.0.1 or [::1]), or pass --allow-writes / ' +
+        'UMIPOS_GATE_ALLOW_WRITES=1 after confirming the target is disposable.',
+    );
+  }
+
   // A run that skips a role must SAY so. `--roles` is for iterating on one row;
   // the acceptance run is the one with no `--roles`, and it must cover every role
   // the contract asserts or the check is not the check.
@@ -248,7 +293,23 @@ async function run() {
 
   const rows = [];
   const failures = [];
+  if (contract.surfaces.some((surface) => surface.request.path.includes('{customerId}'))) {
+    const readerRole = ['owner', 'admin', 'manager', 'cashier', 'viewer'].find((role) =>
+      sessions.has(role),
+    );
+    if (readerRole) customerId = await resolveCustomerId(sessions.get(readerRole));
+  }
   for (const surface of contract.surfaces) {
+    if (surface.request.path.includes('{customerId}') && !customerId) {
+      failures.push({
+        surface: surface.id,
+        role: 'fixture',
+        expected: 'allowed',
+        actual: 'missing',
+        detail: 'the gate could not resolve a customer id from the seeded café',
+      });
+      continue;
+    }
     let body = surface.request.body;
     if (surface.request.bodyFrom) {
       const source = contract.surfaces.find((entry) => entry.id === surface.request.bodyFrom);

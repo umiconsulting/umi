@@ -11,6 +11,7 @@ import { GiftCardAlreadyRedeemedError, InsufficientBalanceError } from './cash-w
 function make() {
   const repo = {
     findCard: vi.fn(),
+    topupEnabled: vi.fn().mockResolvedValue(true),
     getStaffMemberId: vi.fn().mockResolvedValue('staff-1'),
     getUserPersonId: vi.fn().mockResolvedValue(null),
     topupGuards: vi.fn().mockResolvedValue({ staffSum: 0, cardSum: 0, cardCount: 0 }),
@@ -51,6 +52,15 @@ describe('CashWriteService.topup', () => {
     });
     expect(h.walletPass.refreshCard).toHaveBeenCalledWith('card-1');
     expect(r.newBalanceCentavos).toBe(15000);
+  });
+
+  it('refuses a top-up when the café disabled stored value', async () => {
+    h.repo.topupEnabled.mockResolvedValue(false);
+    await expect(
+      h.svc.topup('t1', 'u1', { cardId: 'KAL-001', amountCentavos: 10000 }),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(h.repo.findCard).not.toHaveBeenCalled();
+    expect(h.repo.creditWallet).not.toHaveBeenCalled();
   });
 
   it('rejects amounts outside the bounds', async () => {
