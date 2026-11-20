@@ -53,9 +53,7 @@ export default function LoyaltyValueScreen() {
       id: 'reward',
       label: <Trans>Recompensa</Trans>,
       value: rewardConfig?.rewardName || t`Sin configurar`,
-      meta: rewardConfig
-        ? t`${rewardConfig.visitsRequired || 0} visitas`
-        : t`Sin meta activa`,
+      meta: rewardConfig ? t`${rewardConfig.visitsRequired || 0} visitas` : t`Sin meta activa`,
     });
   }
   summary.push({

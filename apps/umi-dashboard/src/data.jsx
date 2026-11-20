@@ -286,8 +286,7 @@ async function _loadOverviewAndStations(ctx) {
   // for an unknown module. The result was one undeclared read of the cash
   // analytics route for any membership with the cash product. The analytics
   // tab is `insights.read`; use that key, and keep the product test.
-  const cashEnabled =
-    _active(ctx, 'cash') && hasCashPermission(ctx?.capabilities, 'insights.read');
+  const cashEnabled = _active(ctx, 'cash') && hasCashPermission(ctx?.capabilities, 'insights.read');
   const kitchenEnabled =
     _active(ctx, 'kds') && hasRequiredPermission(MODULES.orders, ctx?.capabilities);
   const [cash, kitchen] = await Promise.allSettled([
@@ -361,6 +360,7 @@ async function _loadDevicePairings(ctx) {
   return result.pairings || [];
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export async function loadMerchantData(ctx) {
   // Wait for the membership and its capabilities. A merchant id in localStorage
   // is a hint, not proof: a nonmember can still hold the previous merchant's id,
@@ -686,6 +686,7 @@ async function saveMerchantSettings(
 }
 
 /** The merchant-id Cash settings contract: read and write use the same path. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function cashSettingsPath(merchantId) {
   return `/api/merchants/${encodeURIComponent(merchantId)}/cash/settings`;
 }
@@ -2028,6 +2029,7 @@ export {
   // Data-module functions, not components. Keeps the react-refresh baseline flat.
   // eslint-disable-next-line react-refresh/only-export-components
   saveCashSettings,
+  // eslint-disable-next-line react-refresh/only-export-components
   saveMerchantLogo,
   // eslint-disable-next-line react-refresh/only-export-components
   removeMerchantLogo,

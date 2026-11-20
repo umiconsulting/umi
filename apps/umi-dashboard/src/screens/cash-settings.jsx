@@ -4,11 +4,7 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { RegionHead } from '@/shell.jsx';
 import { saveCashSettings } from '@/data.jsx';
-import {
-  CASH_DOW,
-  buildCashSettingsPatch,
-  cashSettingsForm,
-} from './cash-settings-model.js';
+import { CASH_DOW, buildCashSettingsPatch, cashSettingsForm } from './cash-settings-model.js';
 
 const DOW_LABELS = {
   dom: msg`Dom`,
@@ -212,9 +208,7 @@ export default function CashSettingsScreen({ merchant, loading = false }) {
                 <button
                   key={id}
                   type="button"
-                  className={
-                    'day-pill focusable' + (form.promoDays.includes(id) ? ' on' : '')
-                  }
+                  className={'day-pill focusable' + (form.promoDays.includes(id) ? ' on' : '')}
                   aria-pressed={form.promoDays.includes(id)}
                   onClick={() => toggleDay(id)}
                 >
@@ -307,10 +301,7 @@ export default function CashSettingsScreen({ merchant, loading = false }) {
         </div>
 
         <div className="cash-settings-save">
-          <span
-            role="status"
-            className={'cash-settings-status' + (error ? ' is-error' : '')}
-          >
+          <span role="status" className={'cash-settings-status' + (error ? ' is-error' : '')}>
             {error ? (
               <>
                 <I.AlertTriangle size={15} aria-hidden="true" /> {error}

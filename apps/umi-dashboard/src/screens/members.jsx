@@ -196,7 +196,12 @@ const MembersScreen = () => {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data: result, loading, error, errorStatus } = useMembersData({
+  const {
+    data: result,
+    loading,
+    error,
+    errorStatus,
+  } = useMembersData({
     page,
     search: debouncedSearch,
     sort,
@@ -424,10 +429,7 @@ const StampMeter = ({ current = 0, target }) => {
   if (!total) return <span className="cash-muted">{t`Sin meta`}</span>;
   const segmented = total <= 12;
   return (
-    <div
-      className="cash-stamp"
-      aria-label={t`${done} de ${total} visitas para la recompensa`}
-    >
+    <div className="cash-stamp" aria-label={t`${done} de ${total} visitas para la recompensa`}>
       {segmented ? (
         <span className="cash-stamp-segs" aria-hidden="true">
           {Array.from({ length: total }, (_, index) => (
@@ -446,14 +448,7 @@ const StampMeter = ({ current = 0, target }) => {
   );
 };
 
-const MemberRow = ({
-  customer: c,
-  fmtBalance,
-  fmtAgo,
-  canSeeContact,
-  onDetail,
-  isSelected,
-}) => {
+const MemberRow = ({ customer: c, fmtBalance, fmtAgo, canSeeContact, onDetail, isSelected }) => {
   const { t } = useLingui();
   const hue = Math.abs(c.id.split('').reduce((s, ch) => s + ch.charCodeAt(0), 0)) % 360;
   const initials = (c.name || 'UN')
@@ -516,8 +511,12 @@ const MemberRow = ({
           </span>
         )}
       </td>
-      <td data-label={t`Última visita`} className="cash-muted">{c.lastVisit ? fmtAgo(c.lastVisit) : t`Nunca`}</td>
-      <td data-label={t`Gasto total`} className="cash-num cash-strong">{c.ltvMXN || '—'}</td>
+      <td data-label={t`Última visita`} className="cash-muted">
+        {c.lastVisit ? fmtAgo(c.lastVisit) : t`Nunca`}
+      </td>
+      <td data-label={t`Gasto total`} className="cash-num cash-strong">
+        {c.ltvMXN || '—'}
+      </td>
       <td className="cash-cell-action">
         <button
           className={'btn-icon focusable' + (isSelected ? ' active' : '')}
@@ -581,7 +580,11 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, canSeeContact, onClose }
       >
         <div className="sheet-head cash-sheet-head">
           <div className="cash-sheet-person">
-            <div className="cash-avatar cash-avatar--lg" style={{ '--cash-avatar-hue': hue }} aria-hidden="true">
+            <div
+              className="cash-avatar cash-avatar--lg"
+              style={{ '--cash-avatar-hue': hue }}
+              aria-hidden="true"
+            >
               {initials}
             </div>
             <div>
@@ -594,7 +597,12 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, canSeeContact, onClose }
               <div className="cash-mono cash-muted">{c.cardNumber || '—'}</div>
             </div>
           </div>
-          <button className="btn-icon focusable" type="button" onClick={onClose} aria-label={t`Cerrar`}>
+          <button
+            className="btn-icon focusable"
+            type="button"
+            onClick={onClose}
+            aria-label={t`Cerrar`}
+          >
             <I.X size={16} />
           </button>
         </div>

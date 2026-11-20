@@ -21,8 +21,7 @@ afterEach(() => {
 function setup(response = {}) {
   vi.stubGlobal('window', {
     localStorage: {
-      getItem: (key) =>
-        key === 'umi-dashboard-selected-merchant' ? 'merchant-a' : null,
+      getItem: (key) => (key === 'umi-dashboard-selected-merchant' ? 'merchant-a' : null),
       setItem: () => {},
       removeItem: () => {},
     },
@@ -87,9 +86,7 @@ describe('Cash API alignment', () => {
   });
 
   it('builds one encoded path for the Cash settings read and write', () => {
-    expect(cashSettingsPath('merchant a')).toBe(
-      '/api/merchants/merchant%20a/cash/settings',
-    );
+    expect(cashSettingsPath('merchant a')).toBe('/api/merchants/merchant%20a/cash/settings');
   });
 
   it('refuses a write with no selected merchant', async () => {

@@ -207,11 +207,7 @@ function GuardedScreen({ moduleKey, children }) {
     return <MerchantUnavailable state={merchantState} />;
   }
 
-  const availability = getModuleAvailability(
-    moduleKey,
-    capabilities,
-    merchantState?.platformRole,
-  );
+  const availability = getModuleAvailability(moduleKey, capabilities, merchantState?.platformRole);
 
   if (!availability.available) {
     const label = mod.label ? i18n._(mod.label) : moduleKey;
@@ -364,9 +360,7 @@ function DashboardLayout() {
   // never moved again. No latch is read during render: the ref belongs to the
   // effect, and the URL is the rest of the answer.
   const pendingLanding =
-    capabilities &&
-    location.pathname === '/' &&
-    !new URLSearchParams(location.search).has('home')
+    capabilities && location.pathname === '/' && !new URLSearchParams(location.search).has('home')
       ? landingTargetFor(capabilities, (moduleKey) => merchantState.canShowModule(moduleKey))
       : null;
 
@@ -612,7 +606,10 @@ function DashboardLayout() {
                 paths as redirects so no bookmark 404s; the tab gate then decides
                 whether that tab is readable for this membership. */}
             <Route path="members" element={<Navigate to="/loyalty-value/members" replace />} />
-            <Route path="gift-cards" element={<Navigate to="/loyalty-value/gift-cards" replace />} />
+            <Route
+              path="gift-cards"
+              element={<Navigate to="/loyalty-value/gift-cards" replace />}
+            />
             <Route path="insights" element={<Navigate to="/customers" replace />} />
             <Route
               path="conversations/*"
