@@ -13,6 +13,7 @@ import '../../core/network/lan_discovery.dart';
 import '../../core/network/lan_node_identity.dart';
 import '../../core/storage/local_working_copy.dart';
 import '../offline/offline_journal.dart';
+import '../offline/operational_fire.dart';
 import 'hub_command_forwarder.dart';
 import 'lan_kds_store.dart';
 
@@ -78,9 +79,11 @@ final class _LanAdmission {
 /// The local API of the main station.
 ///
 /// It serves the kitchen surface only. A peer is trusted by the hash of the
-/// device credential it presents. Cloud validation pairs a new peer. The cloud
-/// answer is trusted for at most 300 seconds. A restart, a clock rollback, or
-/// an absent validation record requires a new cloud validation.
+/// device credential it presents. Cloud validation pairs a new peer and writes
+/// a bounded persisted admission lease (12 hours) so already-admitted peers
+/// keep working across extended WAN outages (>300 s) and hub restarts. The hub
+/// still probes the cloud every 30 seconds while online so explicit revocations
+/// take effect promptly; a clock rollback or lease expiry fails closed.
 final class LanKdsNode {
   LanKdsNode({
     required LocalWorkingCopy local,
@@ -111,8 +114,9 @@ final class LanKdsNode {
   final LanNodeClock _clock;
   final int port;
 
-  static const Duration _trustPeriod = Duration(seconds: 300);
+  static const Duration _trustPeriod = Duration(hours: 12);
   static const Duration _probePeriod = Duration(seconds: 30);
+  static const String _leaseNamespace = 'lan_peer_lease';
 
   HttpServer? _server;
   StreamSubscription<HttpRequest>? _requests;
@@ -284,8 +288,13 @@ final class LanKdsNode {
                 admission.locationId != device.locationId);
         if (mismatch) {
           _trusted.remove(admission.deviceId);
-          final known = admission.merchantId == null ||
-                  admission.locationId == null
+          await _deletePeerLease(
+            admission.merchantId,
+            admission.locationId,
+            admission.deviceId,
+          );
+          final known =
+              admission.merchantId == null || admission.locationId == null
               ? null
               : await _local.readNetworkDevice(
                   admission.merchantId!,
@@ -303,8 +312,9 @@ final class LanKdsNode {
           return;
         }
         final seenAt = _now();
-        final known = admission.merchantId == null ||
-                admission.locationId == null
+        final wallNow = _clock.wallNow().toUtc();
+        final known =
+            admission.merchantId == null || admission.locationId == null
             ? null
             : await _local.readNetworkDevice(
                 admission.merchantId!,
@@ -326,17 +336,29 @@ final class LanKdsNode {
             status: 'active',
           ),
         );
+        await _writePeerLease(
+          merchantId: device.merchantId,
+          locationId: device.locationId!,
+          deviceId: device.id,
+          credentialHash: admission.credentialHash,
+          validatedAt: wallNow,
+        );
         _trusted[admission.deviceId] = _LanTrust(
           credentialHash: admission.credentialHash,
           merchantId: device.merchantId,
           locationId: device.locationId!,
           monotonicAt: _clock.monotonicNow(),
-          wallAt: _clock.wallNow(),
+          wallAt: wallNow,
         );
         return;
       }
       if (status >= 400 && status < 500) {
         _trusted.remove(admission.deviceId);
+        await _deletePeerLease(
+          admission.merchantId,
+          admission.locationId,
+          admission.deviceId,
+        );
         if (admission.merchantId != null && admission.locationId != null) {
           final known = await _local.readNetworkDevice(
             admission.merchantId!,
@@ -873,21 +895,57 @@ final class LanKdsNode {
     final commandId = _uuidFrom(
       'hub-command:${peer.deviceId}:$clientCommandId',
     );
+    final operational = rawPayload[operationalFireKey];
+    final cleanPayload = Map<String, Object?>.from(rawPayload)
+      ..remove(operationalFireKey);
     final journal = await _journal.load();
     final existing = journal.entries.where(
       (entry) => entry.command.commandId == commandId,
     );
     if (existing.isNotEmpty) {
+      final current = existing.single;
+      final projected =
+          operational is Map<String, Object?> && commandType == 'pos.cart.fire';
+      if (projected) {
+        // A retried forward may have lost the host projection in a crash. The
+        // command already exists; restoring the ticket is idempotent.
+        await OperationalFireStore(_local).record(
+          merchantId: peer.merchantId,
+          locationId: peer.locationId,
+          commandId: commandId,
+          operational: operational,
+        );
+      }
       await _json(request, HttpStatus.ok, {
         'ok': true,
         'data': {
           'queued': true,
           'duplicate': true,
           'commandId': commandId,
-          'deviceSequence': existing.single.command.deviceSequence,
+          'deviceSequence': current.command.deviceSequence,
+          // A duplicate forward does not append or project again. The revision
+          // still names the durable work the peer's ticket is derived from.
+          'projectionRevision': current.command.deviceSequence,
+          'requestId': current.command.idempotencyKey,
+          'originRequestId': clientIdempotencyKey,
+          'attempts': current.attempts,
+          'projected': projected,
         },
       });
       return;
+    }
+    final projected =
+        operational is Map<String, Object?> && commandType == 'pos.cart.fire';
+    if (projected) {
+      // The ticket is durable before the command that justifies it. A crash
+      // between the two leaves an orphan the board ignores; a crash after the
+      // append leaves a recoverable ticket.
+      await OperationalFireStore(_local).record(
+        merchantId: peer.merchantId,
+        locationId: peer.locationId,
+        commandId: commandId,
+        operational: operational,
+      );
     }
     final command = await _journal.append(
       commandId: commandId,
@@ -904,7 +962,7 @@ final class LanKdsNode {
       originOperatorSessionId: originOperatorSessionId,
       hubReceivedAt: _now(),
       payload: {
-        ...rawPayload,
+        ...cleanPayload,
         'operatorSessionId': host.operatorSessionId,
         'locationId': peer.locationId,
       },
@@ -916,6 +974,13 @@ final class LanKdsNode {
         'duplicate': false,
         'commandId': command.commandId,
         'deviceSequence': command.deviceSequence,
+        // The receipt means "host journal + projection input accepted", never
+        // "the cook saw it". The board derives the ticket from this revision.
+        'projectionRevision': command.deviceSequence,
+        'requestId': command.idempotencyKey,
+        'originRequestId': clientIdempotencyKey,
+        'attempts': 0,
+        'projected': projected,
       },
     });
   }
@@ -1266,11 +1331,34 @@ final class LanKdsNode {
       (entry) => entry.command.commandId == command.commandId,
     );
     if (existing.isNotEmpty) {
-      final current = await _store.commandResult(
+      var current = await _store.commandResult(
         peer.merchantId,
         peer.locationId,
         command.kitchenOrderId,
       );
+      if (current == null) {
+        throw const _LanRefusal('RESOURCE_NOT_FOUND', HttpStatus.notFound);
+      }
+      // A previous attempt could have appended the command and died before the
+      // board write. The command is the durable fact; re-apply its transition
+      // instead of returning an older board version and leaving the bump lost.
+      final version = (current['version'] as num? ?? 0).toInt();
+      if (version <= command.expectedVersion) {
+        try {
+          final prepared = await _store.prepareCommand(
+            peer.merchantId,
+            peer.locationId,
+            command,
+          );
+          current = await _store.commitCommand(
+            peer.merchantId,
+            peer.locationId,
+            prepared,
+          );
+        } on LanKdsRefusal catch (error) {
+          if (error.code != 'KITCHEN_VERSION_CONFLICT') rethrow;
+        }
+      }
       if (current == null) {
         throw const _LanRefusal('RESOURCE_NOT_FOUND', HttpStatus.notFound);
       }
@@ -1308,7 +1396,9 @@ final class LanKdsNode {
           locationId: peer.locationId,
           operatorSessionId: sessionId,
         );
-    final result = await _store.applyCommand(
+    // Compute first, journal second, board third. The board must never show a
+    // transition that has no replayable command behind it.
+    final prepared = await _store.prepareCommand(
       peer.merchantId,
       peer.locationId,
       command,
@@ -1334,6 +1424,11 @@ final class LanKdsNode {
       ),
       payload: payload,
       commandType: 'pos.kds.command',
+    );
+    final result = await _store.commitCommand(
+      peer.merchantId,
+      peer.locationId,
+      prepared,
     );
     if (!_changed.isClosed) _changed.add(null);
     return result;
@@ -1419,34 +1514,107 @@ final class LanKdsNode {
       return _LanPeer(seen);
     }
     admission.demand = true;
-    final probed = await _tryProbeTurn(key);
-    if (probed) {
-      final validated = _freshTrust(
-        deviceId: deviceId,
-        credentialHash: hash,
-        merchantId: scopeMerchant,
-        locationId: scopeLocation,
-      );
-      final refreshed = scopeMerchant == null || scopeLocation == null
-          ? null
-          : await _local.readNetworkDevice(
-              scopeMerchant,
-              scopeLocation,
-              deviceId,
-            );
-      if (validated != null &&
-          refreshed != null &&
-          refreshed.credentialHash == hash &&
-          refreshed.status == 'active') {
-        final seen = refreshed.seen(
-          address: request.connectionInfo?.remoteAddress.address,
-          port: request.connectionInfo?.remotePort,
+    await _tryProbeTurn(key);
+    final validated =
+        _freshTrust(
+          deviceId: deviceId,
+          credentialHash: hash,
+          merchantId: scopeMerchant,
+          locationId: scopeLocation,
+        ) !=
+        null;
+    final leased =
+        validated ||
+        await _hasValidPersistedLease(
+          deviceId: deviceId,
+          credentialHash: hash,
+          merchantId: scopeMerchant,
+          locationId: scopeLocation,
         );
-        await _local.writeNetworkDevice(seen);
-        return _LanPeer(seen);
-      }
+    final refreshed = scopeMerchant == null || scopeLocation == null
+        ? null
+        : await _local.readNetworkDevice(
+            scopeMerchant,
+            scopeLocation,
+            deviceId,
+          );
+    if (leased &&
+        refreshed != null &&
+        refreshed.credentialHash == hash &&
+        refreshed.status == 'active') {
+      final seen = refreshed.seen(
+        address: request.connectionInfo?.remoteAddress.address,
+        port: request.connectionInfo?.remotePort,
+      );
+      await _local.writeNetworkDevice(seen);
+      return _LanPeer(seen);
     }
     throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
+  }
+
+  Future<void> _writePeerLease({
+    required String merchantId,
+    required String locationId,
+    required String deviceId,
+    required String credentialHash,
+    required DateTime validatedAt,
+  }) => _local.writeDocument(
+    namespace: _leaseNamespace,
+    scopeKey: '$merchantId:$locationId',
+    id: deviceId,
+    payload: {
+      'merchantId': merchantId,
+      'locationId': locationId,
+      'deviceId': deviceId,
+      'credentialHash': credentialHash,
+      'validatedAt': validatedAt.toUtc().toIso8601String(),
+      'expiresAt': validatedAt.toUtc().add(_trustPeriod).toIso8601String(),
+    },
+  );
+
+  Future<void> _deletePeerLease(
+    String? merchantId,
+    String? locationId,
+    String deviceId,
+  ) async {
+    if (merchantId == null || locationId == null) return;
+    await _local.deleteDocument(
+      _leaseNamespace,
+      '$merchantId:$locationId',
+      deviceId,
+    );
+  }
+
+  Future<bool> _hasValidPersistedLease({
+    required String deviceId,
+    required String credentialHash,
+    required String? merchantId,
+    required String? locationId,
+  }) async {
+    if (merchantId == null || locationId == null) return false;
+    final lease = await _local.readDocument(
+      _leaseNamespace,
+      '$merchantId:$locationId',
+      deviceId,
+    );
+    if (lease == null) return false;
+    if (lease['credentialHash'] != credentialHash ||
+        lease['merchantId'] != merchantId ||
+        lease['locationId'] != locationId) {
+      return false;
+    }
+    final validatedAt = DateTime.tryParse(
+      lease['validatedAt'] as String? ?? '',
+    )?.toUtc();
+    final expiresAt = DateTime.tryParse(
+      lease['expiresAt'] as String? ?? '',
+    )?.toUtc();
+    if (validatedAt == null || expiresAt == null) return false;
+    final wall = _clock.wallNow().toUtc();
+    if (wall.isBefore(validatedAt) || !wall.isBefore(expiresAt)) {
+      return false;
+    }
+    return true;
   }
 
   _LanTrust? _freshTrust({
@@ -1464,7 +1632,7 @@ final class LanKdsNode {
         trust.locationId != locationId) {
       return null;
     }
-    final wall = _clock.wallNow();
+    final wall = _clock.wallNow().toUtc();
     final monotonic = _clock.monotonicNow();
     if (wall.isBefore(trust.wallAt) || monotonic < trust.monotonicAt) {
       _trusted.remove(deviceId);

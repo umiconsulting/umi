@@ -7,6 +7,7 @@ import '../../core/errors/app_error.dart';
 import '../../core/network/api_client.dart';
 import 'connectivity_controller.dart';
 import 'offline_journal.dart';
+import 'operational_fire.dart';
 
 final class ReplayScope {
   const ReplayScope({
@@ -190,6 +191,21 @@ final class ApiReplayGateway implements ReplayGateway {
 /// Focused deterministic runner used by tests and foreground recovery tools.
 /// Production startup uses [OfflineRecoveryController], which adds authority,
 /// cursor reconciliation, and unknown-result recovery before invoking replay.
+
+/// The API contract for a fire is strict. The local operational snapshot is
+/// never part of the wire command.
+Map<String, Object?> _wireCommand(JournalEntry entry) {
+  final json = entry.command.toJson();
+  final payload = wireCommandPayload(
+    entry.command.commandType,
+    entry.command.payload,
+  );
+  if (!identical(payload, entry.command.payload)) {
+    json['payload'] = payload;
+  }
+  return json;
+}
+
 final class OrderedReplayEngine {
   OrderedReplayEngine(this._journal, this._gateway);
   final EncryptedOfflineJournal _journal;
@@ -228,7 +244,7 @@ final class OrderedReplayEngine {
           scope,
           ReplayBatch(
             replaySessionId: replaySessionId,
-            commands: slice.map((entry) => entry.command.toJson()).toList(),
+            commands: slice.map(_wireCommand).toList(),
           ),
         );
         for (final encoded in result.results) {
@@ -959,7 +975,7 @@ final class OfflineRecoveryController extends ChangeNotifier {
           scope,
           ReplayBatch(
             replaySessionId: replaySessionId,
-            commands: slice.map((entry) => entry.command.toJson()).toList(),
+            commands: slice.map(_wireCommand).toList(),
           ),
         );
       } on AppException catch (error) {

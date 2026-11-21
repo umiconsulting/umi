@@ -615,7 +615,121 @@ void main() {
     expect(sent, 0);
   });
 
-  test('a rate limit is not retried and the wait closes the cloud lane', () async {
+  test(
+    'a rate limit is not retried and the wait closes the cloud lane',
+    () async {
+      var sent = 0;
+      final api = _client(
+        MockClient((request) async {
+          sent += 1;
+          if (request.url.path == '/health/live') {
+            return http.Response('{"ok":true}', 200, headers: _jsonHeaders);
+          }
+          return http.Response(
+            jsonEncode({
+              'error': {
+                'code': 'RATE_LIMITED',
+                'message': 'Request rate limit exceeded.',
+                'retryable': true,
+                'correlationId': '00000000-0000-4000-8000-000000000000',
+                'details': {'retryAfterSeconds': 30},
+              },
+            }),
+            429,
+            headers: {..._jsonHeaders, 'retry-after': '30'},
+          );
+        }),
+      );
+
+      await expectLater(
+        api.request(method: ApiMethod.get, path: '/api/v1/kitchen/board'),
+        throwsA(
+          isA<AppException>()
+              .having((error) => error.code, 'code', 'RATE_LIMITED')
+              .having(
+                (error) => error.retryAfter,
+                'retryAfter',
+                const Duration(seconds: 30),
+              ),
+        ),
+      );
+      expect(sent, 1, reason: 'the refusal must not be sent again at once');
+
+      await expectLater(
+        api.request(method: ApiMethod.get, path: '/api/v1/kitchen/board'),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.code,
+            'code',
+            'RATE_LIMITED',
+          ),
+        ),
+      );
+      expect(sent, 1, reason: 'the closed window must not touch the wire');
+
+      final probe = await api.request(
+        method: ApiMethod.get,
+        path: '/health/live',
+      );
+      expect(probe['ok'], true, reason: 'the probe must still learn the truth');
+    },
+  );
+
+  test('a route throttle does not close unrelated cloud work', () async {
+    var sent = 0;
+    final api = _client(
+      MockClient((request) async {
+        sent += 1;
+        if (request.url.path == '/health/live') {
+          return http.Response('{"ok":true}', 200, headers: _jsonHeaders);
+        }
+        if (request.url.path == '/api/v1/cash/auth/pin') {
+          return http.Response(
+            jsonEncode({'error': 'too_many_attempts'}),
+            429,
+            headers: {..._jsonHeaders, 'retry-after': '300'},
+          );
+        }
+        return http.Response('{"ok":true}', 200, headers: _jsonHeaders);
+      }),
+    );
+
+    await expectLater(
+      api.request(
+        method: ApiMethod.post,
+        path: '/api/v1/cash/auth/pin',
+        body: const {'pin': '0000'},
+      ),
+      throwsA(
+        isA<AppException>()
+            .having((error) => error.code, 'code', 'RATE_LIMITED')
+            .having((error) => error.details?['scope'], 'scope', 'route'),
+      ),
+    );
+    expect(sent, 1);
+
+    // A different route must still reach the wire: a PIN throttle is not
+    // evidence that the device bucket is empty.
+    final board = await api.request(
+      method: ApiMethod.get,
+      path: '/api/v1/kitchen/board',
+    );
+    expect(board['ok'], true);
+    expect(sent, 2);
+
+    // The throttled route itself stays closed.
+    await expectLater(
+      api.request(
+        method: ApiMethod.post,
+        path: '/api/v1/cash/auth/pin',
+        body: const {'pin': '0000'},
+      ),
+      throwsA(isA<AppException>()),
+    );
+    expect(sent, 2);
+  });
+
+  test('a principal-scope 429 closes the cloud lane', () async {
     var sent = 0;
     final api = _client(
       MockClient((request) async {
@@ -630,11 +744,15 @@ void main() {
               'message': 'Request rate limit exceeded.',
               'retryable': true,
               'correlationId': '00000000-0000-4000-8000-000000000000',
-              'details': {'retryAfterSeconds': 30},
+              'details': {'retryAfterSeconds': 30, 'scope': 'device'},
             },
           }),
           429,
-          headers: {..._jsonHeaders, 'retry-after': '30'},
+          headers: {
+            ..._jsonHeaders,
+            'retry-after': '30',
+            'x-umi-ratelimit-scope': 'device',
+          },
         );
       }),
     );
@@ -642,31 +760,69 @@ void main() {
     await expectLater(
       api.request(method: ApiMethod.get, path: '/api/v1/kitchen/board'),
       throwsA(
-        isA<AppException>()
-            .having((error) => error.code, 'code', 'RATE_LIMITED')
-            .having(
-              (error) => error.retryAfter,
-              'retryAfter',
-              const Duration(seconds: 30),
-            ),
-      ),
-    );
-    expect(sent, 1, reason: 'the refusal must not be sent again at once');
-
-    await expectLater(
-      api.request(method: ApiMethod.get, path: '/api/v1/kitchen/board'),
-      throwsA(
         isA<AppException>().having(
-          (error) => error.code,
-          'code',
-          'RATE_LIMITED',
+          (error) => error.retryAfter,
+          'retryAfter',
+          const Duration(seconds: 30),
         ),
       ),
     );
-    expect(sent, 1, reason: 'the closed window must not touch the wire');
+    expect(sent, 1);
 
-    final probe = await api.request(method: ApiMethod.get, path: '/health/live');
-    expect(probe['ok'], true, reason: 'the probe must still learn the truth');
+    await expectLater(
+      api.request(method: ApiMethod.get, path: '/api/v1/cash/sales'),
+      throwsA(
+        isA<AppException>()
+            .having((error) => error.code, 'code', 'RATE_LIMITED')
+            .having((error) => error.details?['scope'], 'scope', 'global'),
+      ),
+    );
+    expect(sent, 1, reason: 'a device bucket closes every cloud route');
+  });
+
+  test('a header-only 429 is route scoped and keeps its wait', () async {
+    var sent = 0;
+    final api = _client(
+      MockClient((request) async {
+        sent += 1;
+        if (request.url.path == '/health/live') {
+          return http.Response('{"ok":true}', 200, headers: _jsonHeaders);
+        }
+        if (request.url.path == '/api/v1/cash/scan') {
+          return http.Response(
+            jsonEncode({'message': 'Too many attempts'}),
+            429,
+            headers: {..._jsonHeaders, 'retry-after': '5'},
+          );
+        }
+        return http.Response('{"ok":true}', 200, headers: _jsonHeaders);
+      }),
+    );
+
+    await expectLater(
+      api.request(
+        method: ApiMethod.post,
+        path: '/api/v1/cash/scan',
+        body: const {'code': 'x'},
+      ),
+      throwsA(
+        isA<AppException>()
+            .having(
+              (error) => error.retryAfter,
+              'retryAfter',
+              const Duration(seconds: 5),
+            )
+            .having((error) => error.details?['scope'], 'scope', 'route'),
+      ),
+    );
+    expect(sent, 1);
+
+    final other = await api.request(
+      method: ApiMethod.get,
+      path: '/api/v1/kitchen/board',
+    );
+    expect(other['ok'], true);
+    expect(sent, 2);
   });
 }
 

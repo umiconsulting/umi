@@ -12,8 +12,10 @@ import '../../core/storage/local_working_copy.dart';
 import '../../shared/approvals/manager_approval_repository.dart';
 import '../../shared/business_day.dart';
 import '../kitchen/hub_command_forwarder.dart';
+import '../offline/cart_provenance.dart';
 import '../offline/connectivity_controller.dart';
 import '../offline/offline_journal.dart';
+import '../offline/operational_fire.dart';
 import '../offline/replay_engine.dart';
 import 'cart_command_queue.dart';
 import 'cart_optimism.dart';
@@ -77,10 +79,12 @@ final class CartController extends ChangeNotifier {
     ConnectivityController? connectivity,
     OfflineRecoveryController? recovery,
     HubCommandForwarder? hub,
+    CartProvenanceStore? provenance,
   }) : _repository = repository,
        _approvals = approvals,
        _telemetry = telemetry,
        _workingCopy = workingCopy,
+       _provenance = provenance,
        _deviceIdentity = deviceIdentity,
        _journal = offlineJournal,
        _connectivity = connectivity {
@@ -96,6 +100,9 @@ final class CartController extends ChangeNotifier {
         onBusy: _setQueueBusy,
         onSettled: notifyListeners,
         onPaymentHold: _reconcilePaymentHold,
+        onDurabilityChanged: () {
+          if (!_disposed) notifyListeners();
+        },
         connectivity: connectivity,
         recovery: recovery,
         hub: hub,
@@ -112,11 +119,18 @@ final class CartController extends ChangeNotifier {
   final ConnectivityController? _connectivity;
   final Telemetry _telemetry;
   final LocalWorkingCopy? _workingCopy;
+  final CartProvenanceStore? _provenance;
   final CartDeviceIdentity? Function()? _deviceIdentity;
   final EncryptedOfflineJournal? _journal;
   CartCommandQueue? _queue;
   CartState _state = const CartState();
   CartState get state => _state;
+
+  /// A painted edit whose journal append has not completed. The cart surface
+  /// must show this as unsaved, not as durable work.
+  bool get hasUnconfirmedChanges => _queue?.hasUnconfirmedChanges ?? false;
+
+  int get unconfirmedCommandCount => _queue?.unconfirmedCount ?? 0;
   String? _merchantId;
   String? _locationId;
   String? _operatorSessionId;
@@ -768,7 +782,7 @@ final class CartController extends ChangeNotifier {
         idempotencyKey: idempotencyKey,
       ).toJson(),
     };
-    return _submitQueued(
+    return await _submitQueued(
       idempotencyKey: idempotencyKey,
       commandType: 'pos.cart.table.set',
       payload: payload,
@@ -777,14 +791,14 @@ final class CartController extends ChangeNotifier {
     );
   }
 
-  bool _queueTableAccountGroup({
+  Future<bool> _queueTableAccountGroup({
     required String merchantId,
     required String locationId,
     required String operatorSessionId,
     required String tableId,
     String? tableName,
     int? partySize,
-  }) {
+  }) async {
     final queue = _queue;
     if (queue == null) return false;
     clearLocal();
@@ -795,7 +809,7 @@ final class CartController extends ChangeNotifier {
     queue.initialize(local);
     _set(CartState(phase: CartPhase.ready, cart: local));
     final idempotencyKey = _uuid();
-    return _submitQueued(
+    return await _submitQueued(
       idempotencyKey: idempotencyKey,
       commandType: 'pos.command.group',
       payload: {
@@ -885,7 +899,7 @@ final class CartController extends ChangeNotifier {
       );
       _queue!.initialize(local);
       _set(CartState(phase: CartPhase.ready, cart: local));
-      _submitQueued(
+      await _submitQueued(
         idempotencyKey: idempotencyKey,
         commandType: 'pos.cart.open',
         payload: {
@@ -1059,7 +1073,7 @@ final class CartController extends ChangeNotifier {
       idempotencyKey: idempotencyKey,
     );
     if (canPredict &&
-        _submitQueued(
+        await _submitQueued(
           idempotencyKey: idempotencyKey,
           commandType: 'pos.cart.line.add',
           payload: input.toJson(),
@@ -1071,6 +1085,8 @@ final class CartController extends ChangeNotifier {
             line: provisional,
             quantity: quantity,
             courseNumber: courseNumber,
+            variant: variantId == null ? null : {'variantId': variantId},
+            modifiers: modifiers,
             note: cleanNote,
           ),
         )) {
@@ -1123,7 +1139,7 @@ final class CartController extends ChangeNotifier {
       expectedVersion: cart.version,
       idempotencyKey: idempotencyKey,
     );
-    if (_submitQueued(
+    if (await _submitQueued(
       idempotencyKey: idempotencyKey,
       commandType: 'pos.cart.line.update',
       payload: {'lineId': item.id, ...input.toJson()},
@@ -1177,7 +1193,7 @@ final class CartController extends ChangeNotifier {
       expectedVersion: cart.version,
       idempotencyKey: idempotencyKey,
     ).toJson();
-    if (_submitQueued(
+    if (await _submitQueued(
       idempotencyKey: idempotencyKey,
       commandType: 'pos.cart.line.remove',
       payload: {'lineId': item.id, ...payload},
@@ -1209,7 +1225,7 @@ final class CartController extends ChangeNotifier {
       expectedVersion: cart.version,
       idempotencyKey: idempotencyKey,
     ).toJson();
-    if (_submitQueued(
+    if (await _submitQueued(
       idempotencyKey: idempotencyKey,
       commandType: 'pos.cart.clear',
       payload: payload,
@@ -1261,7 +1277,7 @@ final class CartController extends ChangeNotifier {
           note: cleanNote,
         ) !=
         null) {
-      if (_submitQueued(
+      if (await _submitQueued(
         idempotencyKey: idempotencyKey,
         commandType: 'pos.cart.line.update',
         payload: {'lineId': item.id, ...input.toJson()},
@@ -1297,7 +1313,7 @@ final class CartController extends ChangeNotifier {
       expectedVersion: cart.version,
       idempotencyKey: idempotencyKey,
     ).toJson();
-    if (_submitQueued(
+    if (await _submitQueued(
       idempotencyKey: idempotencyKey,
       commandType: 'pos.cart.prepare',
       payload: payload,
@@ -1353,6 +1369,10 @@ final class CartController extends ChangeNotifier {
     // nothing to add to the ticket it owns.
     if (!cart.items.any((item) => item['fired'] != true)) return null;
     final idempotencyKey = _uuid();
+    final firedAt = DateTime.now().toUtc().toIso8601String();
+    // The kitchen snapshot is durable, but not part of the wire command or of
+    // the replay payload: a rollback must still be able to replay this fire
+    // against a strict API.
     final payload = FireOrderRequest(
       cartId: cart.id,
       locationId: _locationId!,
@@ -1360,21 +1380,33 @@ final class CartController extends ChangeNotifier {
       expectedVersion: cart.version,
       idempotencyKey: idempotencyKey,
     ).toJson();
+    final operational = fireOperationalSnapshot(
+      optimisticFire(cart),
+      firedAt: firedAt,
+    );
     final lineCount = cart.items.where((item) => item['fired'] != true).length;
-    if (await _submitQueuedPersisted(
+    final fireCommandId = await _submitQueuedPersisted(
       idempotencyKey: idempotencyKey,
       commandType: 'pos.cart.fire',
       payload: payload,
       event: 'order_fired',
       predict: (base, aliases) => optimisticFire(base),
-    )) {
+      operational: operational,
+    );
+    if (fireCommandId != null) {
+      _telemetry.event(
+        ClientEvent(
+          name: 'fire.journal_durable',
+          values: {'cartId': cart.id, 'commandId': fireCommandId},
+        ),
+      );
       return FireOrderResult(
         cartId: cart.id,
         cartVersion: cart.version + 1,
         orderId: _uuid(),
         reference: null,
         lineCount: lineCount,
-        firedAt: DateTime.now().toUtc().toIso8601String(),
+        firedAt: firedAt,
         state: 'fired',
       );
     }
@@ -1382,7 +1414,7 @@ final class CartController extends ChangeNotifier {
     try {
       final result = await _repository.fire(
         _merchantId!,
-        FireOrderRequest.fromJson(payload),
+        FireOrderRequest.fromJson(wireCommandPayload('pos.cart.fire', payload)),
       );
       final refreshed = await _readSelected();
       _set(CartState(phase: CartPhase.ready, cart: refreshed));
@@ -1434,7 +1466,7 @@ final class CartController extends ChangeNotifier {
       expectedVersion: cart.version,
       idempotencyKey: idempotencyKey,
     ).toJson();
-    if (_submitQueued(
+    if (await _submitQueued(
       idempotencyKey: idempotencyKey,
       commandType: 'pos.cart.fulfillment.set',
       payload: payload,
@@ -1663,14 +1695,22 @@ final class CartController extends ChangeNotifier {
   }
 
   Future<void> _persistCart(Cart cart) async {
+    final local = _workingCopy;
     try {
-      await _workingCopy?.writeCart(cart);
+      await local?.writeCart(cart);
+      final provenance =
+          _provenance ?? (local != null ? CartProvenanceStore(local) : null);
+      if (provenance != null) {
+        // Capture the source ages at the moment the cart contents change. A
+        // later catalogue refresh must not make this cart look younger.
+        unawaited(provenance.recordCart(cart).catchError((Object _) {}));
+      }
     } catch (_) {
       _event('local_store_write_failed');
     }
   }
 
-  bool _submitQueued({
+  Future<bool> _submitQueued({
     required String idempotencyKey,
     required String commandType,
     required Map<String, Object?> payload,
@@ -1678,11 +1718,11 @@ final class CartController extends ChangeNotifier {
     required CartPrediction predict,
     String? provisionalLineId,
     String? provisionalCartId,
-  }) {
+  }) async {
     final queue = _queue;
     if (queue == null) return false;
     final painted =
-        queue.submit(
+        await queue.submitDurable(
           QueuedCartCommand(
             commandId: cartCommandId(),
             commandType: commandType,
@@ -1701,36 +1741,72 @@ final class CartController extends ChangeNotifier {
     return painted;
   }
 
-  Future<bool> _submitQueuedPersisted({
+  Future<String?> _submitQueuedPersisted({
     required String idempotencyKey,
     required String commandType,
     required Map<String, Object?> payload,
     required String event,
     required CartPrediction predict,
+    Map<String, Object?>? operational,
     String? provisionalLineId,
     String? provisionalCartId,
   }) async {
     final queue = _queue;
-    if (queue == null) return false;
-    final painted = await queue.submitAndPersist(
-      QueuedCartCommand(
-        commandId: cartCommandId(),
-        commandType: commandType,
-        idempotencyKey: idempotencyKey,
-        payload: payload,
-        event: event,
-        predict: predict,
-        provisionalLineId: provisionalLineId,
-        provisionalCartId: provisionalCartId,
-      ),
+    if (queue == null) return null;
+    final command = QueuedCartCommand(
+      commandId: cartCommandId(),
+      commandType: commandType,
+      idempotencyKey: idempotencyKey,
+      payload: payload,
+      event: event,
+      predict: predict,
+      provisionalLineId: provisionalLineId,
+      provisionalCartId: provisionalCartId,
     );
+    final local = _workingCopy;
+    final merchantId = _merchantId;
+    final locationId = _locationId;
+    if (operational != null &&
+        local != null &&
+        merchantId != null &&
+        locationId != null) {
+      try {
+        await OperationalFireStore(local).record(
+          merchantId: merchantId,
+          locationId: locationId,
+          commandId: command.commandId,
+          operational: operational,
+        );
+      } catch (_) {
+        // The journal command would still be valid, but the local board could
+        // not draw the ticket until the cloud answered. Do not acknowledge a
+        // fire the kitchen cannot see.
+        return null;
+      }
+    }
+    final painted = await queue.submitAndPersist(command);
+    if (painted == null &&
+        operational != null &&
+        local != null &&
+        merchantId != null &&
+        locationId != null) {
+      unawaited(
+        OperationalFireStore(local)
+            .forget(
+              merchantId: merchantId,
+              locationId: locationId,
+              commandId: command.commandId,
+            )
+            .catchError((Object _) {}),
+      );
+    }
     if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
       debugPrint(
         '[umipos] cart queue submit-persisted=$commandType '
         'painted=${painted != null}',
       );
     }
-    return painted != null;
+    return painted == null ? null : command.commandId;
   }
 
   CartCommandScope? _queueScope() {

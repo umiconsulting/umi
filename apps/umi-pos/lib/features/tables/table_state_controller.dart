@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/errors/app_error.dart';
+import 'local_first_table_state_repository.dart';
 import 'table_state_repository.dart';
 
 /// The live state of the room, shared with the map surface (plan §8D steps 3–5).
@@ -47,6 +48,9 @@ final class TableStateController extends ChangeNotifier {
   TableStateMap? _map;
   Map<String, TableStateEntry> _entries = const {};
   DateTime? _receivedAtLocal;
+  DateTime? _sourceAt;
+  List<String> _pendingLocalCommands = const [];
+  String? _readFailureCode;
   bool _loading = false;
   bool _busy = false;
   bool _stale = false;
@@ -70,6 +74,16 @@ final class TableStateController extends ChangeNotifier {
 
   /// The last read failed, so what is drawn may be out of date.
   bool get stale => _stale;
+
+  /// When the server state behind this room was actually observed. A cached
+  /// room keeps its original time; a local projection does not renew it.
+  DateTime? get sourceAt => _sourceAt;
+
+  /// Commands this till accepted and journalled that the authoritative room
+  /// has not acknowledged yet. Their effect is drawn, but it is provisional.
+  List<String> get pendingLocalCommands => _pendingLocalCommands;
+
+  String? get readFailureCode => _readFailureCode;
 
   /// The last command's typed refusal, or null. Cleared when a new command
   /// starts and by [dismissError].
@@ -157,6 +171,9 @@ final class TableStateController extends ChangeNotifier {
     _loading = false;
     _busy = false;
     _stale = false;
+    _sourceAt = null;
+    _pendingLocalCommands = const [];
+    _readFailureCode = null;
     _errorCode = null;
     if (!_disposed) notifyListeners();
   }
@@ -193,7 +210,18 @@ final class TableStateController extends ChangeNotifier {
         throw const FormatException('Location mismatch');
       }
       _install(result);
-      _stale = false;
+      final repository = _repository;
+      final provenance = repository is TableStateProvenanceSource
+          ? (repository as TableStateProvenanceSource).lastProvenance(
+              merchantId,
+              locationId,
+            )
+          : null;
+      _stale = provenance?.stale ?? false;
+      _sourceAt = provenance?.sourceAt;
+      _pendingLocalCommands = provenance?.pendingCommandIds ?? const [];
+      _readFailureCode = provenance?.failureCode;
+      if (_stale) _receivedAtLocal = null;
     } catch (error) {
       if (_disposed || generation != _generation) return;
       _stale = true;

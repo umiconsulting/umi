@@ -19,6 +19,31 @@ final class TableDeviceIdentity {
   final int credentialVersion;
 }
 
+/// What the last successful room read actually rested on.
+///
+/// A cached room is useful, but it is not current truth. The controller and the
+/// floor plan need the difference, and a pending local command is not the same
+/// thing as an acknowledged server state.
+final class TableReadProvenance {
+  const TableReadProvenance({
+    required this.stale,
+    required this.sourceAt,
+    required this.projectedAt,
+    required this.pendingCommandIds,
+    this.failureCode,
+  });
+
+  final bool stale;
+  final DateTime? sourceAt;
+  final DateTime projectedAt;
+  final List<String> pendingCommandIds;
+  final String? failureCode;
+}
+
+abstract interface class TableStateProvenanceSource {
+  TableReadProvenance? lastProvenance(String merchantId, String locationId);
+}
+
 /// A floor plan that keeps working when the uplink does not.
 ///
 /// The cached room is painted first. Every table command is projected onto that
@@ -27,7 +52,10 @@ final class TableDeviceIdentity {
 /// table service as a live tap, under the live operator session and the original
 /// idempotency key.
 final class LocalFirstTableStateRepository
-    implements TableStateRepository, TableSeatProjectionRepository {
+    implements
+        TableStateRepository,
+        TableSeatProjectionRepository,
+        TableStateProvenanceSource {
   LocalFirstTableStateRepository({
     required TableStateRepository cloud,
     required LocalWorkingCopy local,
@@ -43,6 +71,7 @@ final class LocalFirstTableStateRepository
 
   static const namespace = 'table_state';
   static const _document = 'room';
+  static const _metaDocument = 'room_meta';
 
   final TableStateRepository _cloud;
   final LocalWorkingCopy _local;
@@ -50,6 +79,11 @@ final class LocalFirstTableStateRepository
   final TableDeviceIdentity? Function() _identity;
   final Future<void> Function(ReplayScope scope) _replay;
   final bool hubOwned;
+  final Map<String, TableReadProvenance> _provenance = {};
+
+  @override
+  TableReadProvenance? lastProvenance(String merchantId, String locationId) =>
+      _provenance[_scope(merchantId, locationId)];
 
   String _scope(String merchantId, String locationId) =>
       '$merchantId:$locationId';
@@ -63,13 +97,39 @@ final class LocalFirstTableStateRepository
     return payload == null ? null : TableStateMap.fromJson(payload);
   }
 
-  Future<void> _cache(String merchantId, TableStateMap map) =>
-      _local.writeDocument(
-        namespace: namespace,
-        scopeKey: _scope(merchantId, map.locationId),
-        id: _document,
-        payload: map.toJson(),
-      );
+  Future<void> _cache(
+    String merchantId,
+    TableStateMap map, {
+    DateTime? cachedAt,
+  }) async {
+    // A local projection must not renew the age of the server base it was
+    // derived from. Only a successful cloud read passes a new timestamp.
+    final at =
+        cachedAt?.toUtc() ??
+        await _cachedAt(merchantId, map.locationId) ??
+        DateTime.now().toUtc();
+    await _local.writeDocument(
+      namespace: namespace,
+      scopeKey: _scope(merchantId, map.locationId),
+      id: _document,
+      payload: map.toJson(),
+    );
+    await _local.writeDocument(
+      namespace: namespace,
+      scopeKey: _scope(merchantId, map.locationId),
+      id: _metaDocument,
+      payload: {'cachedAt': at.toIso8601String()},
+    );
+  }
+
+  Future<DateTime?> _cachedAt(String merchantId, String locationId) async {
+    final meta = await _local.readDocument(
+      namespace,
+      _scope(merchantId, locationId),
+      _metaDocument,
+    );
+    return DateTime.tryParse(meta?['cachedAt'] as String? ?? '')?.toUtc();
+  }
 
   @override
   Future<TableStateMap> read(
@@ -77,15 +137,91 @@ final class LocalFirstTableStateRepository
     PosTableStateQuery query,
   ) async {
     final cached = await _cached(merchantId, query.locationId);
-    final TableStateMap server;
+    late final TableStateMap base;
+    late final bool stale;
+    DateTime? sourceAt;
+    String? failureCode;
     try {
-      server = await _cloud.read(merchantId, query);
-    } catch (_) {
-      if (cached != null) return cached;
-      rethrow;
+      base = await _cloud.read(merchantId, query);
+      sourceAt = DateTime.now().toUtc();
+      stale = false;
+      await _cache(merchantId, base, cachedAt: sourceAt);
+    } catch (error) {
+      if (cached == null) rethrow;
+      base = cached;
+      sourceAt = await _cachedAt(merchantId, query.locationId);
+      stale = true;
+      failureCode = error is AppException ? error.code : 'TABLE_READ_FAILED';
     }
-    await _cache(merchantId, server);
-    return server;
+    // Pending commands are overlaid on every read. A readable old cloud room
+    // therefore cannot erase a seat this till already accepted and journalled;
+    // the journal, not the last response, decides what the operator sees until
+    // the authoritative room acknowledges it.
+    final overlaid = await _applyPending(merchantId, query.locationId, base);
+    _provenance[_scope(merchantId, query.locationId)] = TableReadProvenance(
+      stale: stale,
+      sourceAt: sourceAt,
+      projectedAt: DateTime.now().toUtc(),
+      pendingCommandIds: overlaid.pendingCommandIds,
+      failureCode: failureCode,
+    );
+    return overlaid.map;
+  }
+
+  Future<({TableStateMap map, List<String> pendingCommandIds})> _applyPending(
+    String merchantId,
+    String locationId,
+    TableStateMap base,
+  ) async {
+    final OfflineJournalSnapshot snapshot;
+    try {
+      snapshot = await _journal.load();
+    } on OfflineJournalException {
+      return (map: base, pendingCommandIds: const <String>[]);
+    }
+    final entries =
+        snapshot.entries
+            .where(
+              (entry) =>
+                  entry.command.commandType == 'pos.table.command' &&
+                  entry.command.merchantId == merchantId &&
+                  entry.command.locationId == locationId &&
+                  (entry.status == JournalStatus.pending ||
+                      entry.status == JournalStatus.replaying ||
+                      entry.status == JournalStatus.unknown),
+            )
+            .toList()
+          ..sort(
+            (left, right) => left.command.deviceSequence.compareTo(
+              right.command.deviceSequence,
+            ),
+          );
+    var map = base;
+    final applied = <String>[];
+    for (final entry in entries) {
+      final payload = entry.command.payload;
+      final action = payload['action'];
+      final rawRequest = payload['request'];
+      if (action is! String || rawRequest is! Map) continue;
+      final request = Map<String, Object?>.from(rawRequest);
+      try {
+        final projection = _project(
+          action: action,
+          request: request,
+          current: map,
+          commandId: entry.command.commandId,
+          at: DateTime.tryParse(entry.command.createdAt)?.toUtc(),
+        );
+        map = projection.map;
+        applied.add(entry.command.commandId);
+      } on AppException {
+        // The authoritative base may already contain this transition (a lost
+        // response), or refuse it as a real conflict. In either case the base
+        // wins; replay still owns the final verdict and the command stays
+        // visible in the recovery centre.
+      }
+    }
+    return (map: map, pendingCommandIds: applied);
   }
 
   @override
@@ -328,21 +464,21 @@ final class LocalFirstTableStateRepository
     final locationId = request['locationId'] as String;
     final operatorSessionId = request['operatorSessionId'] as String;
     final idempotencyKey = request['idempotencyKey'] as String;
-    final current = await _cached(merchantId, locationId);
-    if (current == null) {
+    final cached = await _cached(merchantId, locationId);
+    if (cached == null) {
       throw const AppException(
         category: AppErrorCategory.configuration,
         code: 'TABLE_STATE_NOT_CACHED',
         recoverable: true,
       );
     }
+    final current = (await _applyPending(merchantId, locationId, cached)).map;
     final result = _project(
       action: action,
       request: request,
       current: current,
       commandId: idempotencyKey,
     );
-    await _cache(merchantId, result.map);
     try {
       final accepted = await online();
       final entries = {
@@ -358,19 +494,21 @@ final class LocalFirstTableStateRepository
           serverTime: accepted.serverTime,
           states: entries.values.toList(growable: false),
         ),
+        cachedAt: DateTime.now().toUtc(),
       );
       return accepted;
     } on AppException catch (error) {
       if (error.category != AppErrorCategory.transport &&
           error.category != AppErrorCategory.timeout &&
           error.category != AppErrorCategory.server) {
-        await _cache(merchantId, current);
         rethrow;
       }
     } catch (_) {
       // A platform or LAN transport can surface outside AppException. The
       // durable journal below is the fallback for that offline outcome.
     }
+    // Journal first, cache second: never leave an unjournaled table mutation in
+    // the local room cache if the journal append fails or crashes.
     await _journal.append(
       commandId: idempotencyKey,
       deviceId: identity.deviceId,
@@ -383,6 +521,7 @@ final class LocalFirstTableStateRepository
       hubOwned: hubOwned,
       payload: {'action': action, 'request': request},
     );
+    await _cache(merchantId, result.map);
     unawaited(
       _replay(
         ReplayScope(
@@ -402,8 +541,9 @@ final class LocalFirstTableStateRepository
     required Map<String, Object?> request,
     required TableStateMap current,
     required String commandId,
+    DateTime? at,
   }) {
-    final now = DateTime.now().toUtc().toIso8601String();
+    final now = (at ?? DateTime.now()).toUtc().toIso8601String();
     final entries = <String, Map<String, Object?>>{
       for (final raw in current.states)
         if (raw['tableId'] case final String id)

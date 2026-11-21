@@ -3,6 +3,7 @@ import 'package:umi_contract/umi_contract.dart';
 import '../../core/storage/local_working_copy.dart';
 import '../../shared/business_day.dart';
 import '../offline/offline_journal.dart';
+import '../offline/operational_fire.dart';
 
 /// The kitchen work a LAN peer can read while the uplink is down.
 ///
@@ -86,7 +87,12 @@ final class LanKdsStore {
         .toList(growable: false);
   }
 
-  Future<Map<String, Object?>> applyCommand(
+  /// Validate and compute one kitchen transition without writing anything.
+  ///
+  /// The caller appends the command to the journal first and commits this
+  /// prepared transition second. A failure between the two leaves a replayable
+  /// command, never a board state that no durable command can explain.
+  Future<PreparedKitchenCommand> prepareCommand(
     String merchantId,
     String locationId,
     KitchenCommandRequest request,
@@ -200,19 +206,46 @@ final class LanKdsStore {
     };
     final overlay = [...state.orders];
     overlay[index] = current;
-    await _saveOverlay(merchantId, locationId, overlay);
-    await _saveEvents(merchantId, locationId, [
-      ...state.events,
-      event,
-    ], sequence + 1);
-    return {
-      'kitchenOrderId': current['id'],
-      'status': nextStatus,
-      'version': version,
-      'sequence': sequence,
-      'updatedAt': now,
-    };
+    return PreparedKitchenCommand(
+      overlay: overlay,
+      events: [...state.events, event],
+      nextSequence: sequence + 1,
+      result: {
+        'kitchenOrderId': current['id'],
+        'status': nextStatus,
+        'version': version,
+        'sequence': sequence,
+        'updatedAt': now,
+      },
+    );
   }
+
+  /// Apply one prepared transition. Idempotent: a retried command rewrites the
+  /// same order version and event list instead of advancing twice.
+  Future<Map<String, Object?>> commitCommand(
+    String merchantId,
+    String locationId,
+    PreparedKitchenCommand prepared,
+  ) async {
+    await _saveOverlay(merchantId, locationId, prepared.overlay);
+    await _saveEvents(
+      merchantId,
+      locationId,
+      prepared.events,
+      prepared.nextSequence,
+    );
+    return prepared.result;
+  }
+
+  Future<Map<String, Object?>> applyCommand(
+    String merchantId,
+    String locationId,
+    KitchenCommandRequest request,
+  ) async => commitCommand(
+    merchantId,
+    locationId,
+    await prepareCommand(merchantId, locationId, request),
+  );
 
   Future<Map<String, Object?>?> commandResult(
     String merchantId,
@@ -237,6 +270,10 @@ final class LanKdsStore {
 
   /// The server-side order reference for a locally fired cart. The main
   /// station writes the order with `pos-cart:<cartId>` as its external ref.
+  ///
+  /// A fire that only exists in the journal has no SQLite cart row yet. Its
+  /// stable cart identity is still on the operational snapshot, so the bump can
+  /// be routed to the order the replay will create.
   Future<String?> sourceReferenceFor(
     String merchantId,
     String locationId,
@@ -246,6 +283,17 @@ final class LanKdsStore {
       if ((cart.firedOrderId ?? cart.id) == kitchenOrderId) {
         return 'pos-cart:${cart.id}';
       }
+    }
+    final snapshot = await _operationalJournal();
+    final snapshots = await _operationalSnapshots(merchantId, locationId);
+    for (final entry in snapshot?.entries ?? const <JournalEntry>[]) {
+      if (entry.command.commandType != 'pos.cart.fire') continue;
+      final operational = snapshots[entry.command.commandId];
+      if (operational is! Map<String, Object?>) continue;
+      final cartId = operational['cartId'];
+      if (cartId is! String) continue;
+      if ((entry.officialId ?? cartId) != kitchenOrderId) continue;
+      return 'pos-cart:$cartId';
     }
     return null;
   }
@@ -311,6 +359,24 @@ final class LanKdsStore {
         .whereType<Map<String, Object?>>()
         .map((order) => Map<String, Object?>.from(order))
         .toList(growable: true);
+    // The cloud board is the official view. A durable fire whose order has not
+    // reached that board yet is still real kitchen work: derive its ticket from
+    // the journal, which is the only write that was acknowledged. This replaces
+    // the older dependency on a predicted cart being written to SQLite.
+    final officialPublicReferences = {
+      for (final order in base)
+        if (order['publicReference'] case final String reference) reference,
+    };
+    final journalTickets = await _journalTickets(
+      merchantId,
+      locationId,
+      stations.isEmpty ? null : stations.first,
+      officialPublicReferences,
+    );
+    final operationalCartIds = {
+      for (final ticket in journalTickets)
+        if (ticket['localCartId'] case final String cartId) cartId,
+    };
     final overlay =
         (documents['overlay']?['orders'] as List<Object?>? ?? const [])
             .whereType<Map<String, Object?>>()
@@ -320,9 +386,18 @@ final class LanKdsStore {
     final officialSourceByLocal = {
       for (final cart in carts)
         if (cart.firedOrderId != null) cart.id: cart.firedOrderId!,
+      // A journal-only ticket has no cart row. Its overlay is keyed by the
+      // local cart id, so match the official order through the external
+      // reference the fire writer used.
+      for (final order in base)
+        if (order['publicReference'] case final String reference)
+          if (reference.startsWith('pos-cart:'))
+            if (order['sourceOrderId'] case final String source)
+              reference.substring('pos-cart:'.length): source,
     };
     final localSources = {
       for (final cart in carts) cart.firedOrderId ?? cart.id,
+      ...operationalCartIds,
     };
     final officialTypes = <String, Object?>{
       for (final order in base)
@@ -365,6 +440,9 @@ final class LanKdsStore {
         }
         continue;
       }
+      // The journal ticket is the same work with a durable command identity.
+      // Do not draw it twice just because a later server read wrote the cart.
+      if (operationalCartIds.contains(cart.id)) continue;
       localOnly.add(
         _ticketFromCart(
           merchantId,
@@ -374,7 +452,11 @@ final class LanKdsStore {
         ),
       );
     }
-    final orders = [...localOnly, ...merged.values];
+    final journalOnly = [
+      for (final ticket in journalTickets)
+        if (!merged.containsKey(ticket['sourceOrderId'])) ticket,
+    ];
+    final orders = [...journalOnly, ...localOnly, ...merged.values];
     await _applyPendingFulfillment(merchantId, locationId, carts, orders);
     final events =
         (documents['events']?['events'] as List<Object?>? ?? const [])
@@ -487,6 +569,188 @@ final class LanKdsStore {
     },
   );
 
+  /// The journal write is the acknowledgement. Read it with the same
+  /// degradation rule as the rest of the board: a journal that cannot be read
+  /// must not erase the cached cloud board.
+  Future<OfflineJournalSnapshot?> _operationalJournal() async {
+    final journal = _journal;
+    if (journal == null || !journal.supportsSecureOffline) return null;
+    try {
+      return await journal.load();
+    } on OfflineJournalException {
+      return null;
+    }
+  }
+
+  /// Operational snapshots keyed by the command that justifies them. An entry
+  /// without a matching journal command is a crash orphan and is not a ticket.
+  Future<Map<String, Map<String, Object?>>> _operationalSnapshots(
+    String merchantId,
+    String locationId,
+  ) async {
+    final documents = await OperationalFireStore(
+      _local,
+    ).read(merchantId, locationId);
+    return {
+      for (final document in documents)
+        if (document['commandId'] case final String commandId)
+          if (document['operational'] case final Map<String, Object?> value)
+            commandId: value,
+    };
+  }
+
+  Future<List<Map<String, Object?>>> _journalTickets(
+    String merchantId,
+    String locationId,
+    KitchenStation? station,
+    Set<String> officialPublicReferences,
+  ) async {
+    final snapshot = await _operationalJournal();
+    if (snapshot == null) return const [];
+    final snapshots = await _operationalSnapshots(merchantId, locationId);
+    final latest = <String, JournalEntry>{};
+    for (final entry in snapshot.entries) {
+      final command = entry.command;
+      if (command.commandType != 'pos.cart.fire' ||
+          command.merchantId != merchantId ||
+          command.locationId != locationId) {
+        continue;
+      }
+      if (entry.status == JournalStatus.conflict ||
+          entry.status == JournalStatus.archived) {
+        // A refused fire has no kitchen work. Drop the snapshot instead of
+        // loading it on every board refresh for the rest of the install.
+        await OperationalFireStore(_local).forget(
+          merchantId: merchantId,
+          locationId: locationId,
+          commandId: command.commandId,
+        );
+        continue;
+      }
+      final operational = snapshots[command.commandId];
+      if (operational is! Map<String, Object?>) continue;
+      final cartId = operational['cartId'];
+      if (cartId is! String) continue;
+      final previous = latest[cartId];
+      if (previous == null ||
+          command.deviceSequence > previous.command.deviceSequence) {
+        latest[cartId] = entry;
+      }
+    }
+    final tickets = <Map<String, Object?>>[];
+    for (final entry in latest.values) {
+      final operational = snapshots[entry.command.commandId]!;
+      final cartId = operational['cartId']! as String;
+      if (officialPublicReferences.contains('pos-cart:$cartId')) {
+        // The official order is already on the cloud board; the local ticket
+        // has been reconciled and must not appear beside it. Its snapshot has
+        // served its purpose.
+        await OperationalFireStore(_local).forget(
+          merchantId: merchantId,
+          locationId: locationId,
+          commandId: entry.command.commandId,
+        );
+        continue;
+      }
+      tickets.add(
+        _ticketFromOperational(
+          merchantId: merchantId,
+          locationId: locationId,
+          operational: operational,
+          entry: entry,
+          station: station,
+        ),
+      );
+    }
+    tickets.sort((left, right) {
+      final leftSequence =
+          ((left['delivery'] as Map?)?['deviceSequence'] as num?)?.toInt() ?? 0;
+      final rightSequence =
+          ((right['delivery'] as Map?)?['deviceSequence'] as num?)?.toInt() ??
+          0;
+      return leftSequence.compareTo(rightSequence);
+    });
+    return tickets;
+  }
+
+  Map<String, Object?> _ticketFromOperational({
+    required String merchantId,
+    required String locationId,
+    required Map<String, Object?> operational,
+    required JournalEntry entry,
+    required KitchenStation? station,
+  }) {
+    final cartId = operational['cartId']! as String;
+    final sourceOrderId = entry.officialId ?? cartId;
+    final times = [
+      for (final item in (operational['items'] as List<Object?>? ?? const []))
+        if (item is Map<String, Object?>) item,
+    ];
+    return {
+      'id': sourceOrderId,
+      'sourceOrderId': sourceOrderId,
+      'localCartId': cartId,
+      'publicReference': operational['publicReference'] ?? cartId,
+      'merchantId': merchantId,
+      'locationId': locationId,
+      'stationId': station?.id ?? _placeholderStation,
+      if (station != null) 'stationName': station.name,
+      'source': 'pos',
+      'fulfillmentType': operational['fulfillmentType'] ?? 'dine_in',
+      'status': 'queued',
+      'priority': 'normal',
+      'businessDate': operational['businessDate'],
+      'queuedAt': operational['firedAt'] ?? entry.command.createdAt,
+      'preparationStartedAt': null,
+      'updatedAt': operational['firedAt'] ?? entry.command.createdAt,
+      'version': 1,
+      'lastEventSequence': 0,
+      'firedThroughCourse': operational['firedThroughCourse'] ?? 1,
+      'delivery': {
+        // Command, request, attempt, cart, official order and projection in
+        // one bounded record. No customer, tender or payment payload.
+        'commandId': entry.command.commandId,
+        'requestId': entry.command.idempotencyKey,
+        'attempts': entry.attempts,
+        'deviceSequence': entry.command.deviceSequence,
+        'projectionRevision': entry.command.deviceSequence,
+        'cartId': cartId,
+        'officialOrderId': entry.officialId,
+        'originDeviceId': entry.command.originDeviceId,
+        'originOperatorSessionId': entry.command.originOperatorSessionId,
+        'hubReceivedAt': entry.command.hubReceivedAt,
+        'lastReplayAt': entry.lastReplayAt?.toUtc().toIso8601String(),
+        'state': entry.command.originDeviceId != null
+            ? 'host_queued'
+            : 'local_durable',
+        'journalStatus': entry.status.name,
+      },
+      'items': [
+        for (var index = 0; index < times.length; index++)
+          _itemFromOperational(times[index], index),
+      ],
+    };
+  }
+
+  Map<String, Object?> _itemFromOperational(
+    Map<String, Object?> item,
+    int index,
+  ) => {
+    'id': item['id'],
+    'status': 'queued',
+    'productName': item['productName'],
+    'variantName': item['variantName'],
+    'allergens': const <Object?>[],
+    'modifiers': item['modifiers'] ?? const <Object?>[],
+    'quantity': item['quantity'],
+    'preparationNote': item['preparationNote'],
+    'displayOrder': item['displayOrder'] ?? index,
+    'targetSeconds': null,
+    'courseNumber': item['courseNumber'] ?? 1,
+    'fired': true,
+    'version': 1,
+  };
+
   Map<String, Object?> _ticketFromCart(
     String merchantId,
     String locationId,
@@ -575,6 +839,22 @@ final class LanKdsRefusal implements Exception {
   const LanKdsRefusal(this.code, this.status);
   final String code;
   final int status;
+}
+
+/// A kitchen transition computed from the current board but not yet durably
+/// owned by a command. Only [LanKdsStore.commitCommand] writes it.
+final class PreparedKitchenCommand {
+  const PreparedKitchenCommand({
+    required this.overlay,
+    required this.events,
+    required this.nextSequence,
+    required this.result,
+  });
+
+  final List<Map<String, Object?>> overlay;
+  final List<Map<String, Object?>> events;
+  final int nextSequence;
+  final Map<String, Object?> result;
 }
 
 final class _KdsState {

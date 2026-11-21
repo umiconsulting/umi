@@ -1089,7 +1089,7 @@ void main() {
   });
 
   test(
-    'accepts cached trust before 300 seconds and refuses at the boundary',
+    'survives a WAN outage past 300 seconds and refuses at the 12-hour lease boundary',
     () async {
       final clock = _FakeClock();
       final cloud = _Cloud(_Cloud.valid);
@@ -1099,53 +1099,71 @@ void main() {
       );
       expect(await _board(harness), 200);
 
-      // The cloud is now absent. A local request at 299 seconds must not renew
-      // the trust, and the request itself must still be served.
+      // The cloud is now absent. A local peer stays admitted past the old 300 s
+      // window through an offline shift, without renewing its lease while offline.
       cloud.respond = _Cloud.unavailable;
-      clock.advance(const Duration(seconds: 299));
+      clock.advance(const Duration(seconds: 300));
       expect(await _board(harness), 200);
 
-      // At 300 seconds the record is no longer valid. The cloud is still absent,
-      // so the node refuses instead of trusting the stored hash.
+      clock.advance(const Duration(hours: 11, minutes: 54, seconds: 59));
+      expect(await _board(harness), 200);
+
+      // At 12 hours the persisted lease expires. The cloud is still absent,
+      // so the node refuses instead of trusting indefinitely.
       clock.advance(const Duration(seconds: 1));
       expect(await _board(harness), 403);
     },
   );
 
-  test('refuses at 300 seconds when the cloud times out', () async {
-    final clock = _FakeClock();
-    final cloud = _Cloud(_Cloud.valid);
-    final harness = await _startControlled(clock: clock, client: cloud.client);
-    expect(await _board(harness), 200);
+  test(
+    'survives cloud timeout past 300 seconds and refuses once the 12-hour lease expires',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(_Cloud.valid);
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+      );
+      expect(await _board(harness), 200);
 
-    cloud.respond = () async => throw TimeoutException('cloud timeout');
-    clock.advance(const Duration(seconds: 300));
-    expect(await _board(harness), 403);
-  });
+      cloud.respond = () async => throw TimeoutException('cloud timeout');
+      clock.advance(const Duration(seconds: 300));
+      expect(await _board(harness), 200);
 
-  test('requires a new cloud validation after a restart', () async {
-    final clock = _FakeClock();
-    final cloud = _Cloud(_Cloud.valid);
-    final local = _MemoryLocal();
-    final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
-    final first = await _startControlled(
-      clock: clock,
-      client: cloud.client,
-      local: local,
-      journal: journal,
-    );
-    expect(await _board(first), 200);
+      clock.advance(const Duration(hours: 12));
+      expect(await _board(harness), 403);
+    },
+  );
 
-    cloud.respond = _Cloud.unavailable;
-    clock.advance(const Duration(seconds: 1));
-    final restarted = await _startControlled(
-      clock: clock,
-      client: cloud.client,
-      local: local,
-      journal: journal,
-    );
-    expect(await _board(restarted), 403);
-  });
+  test(
+    'preserves persisted peer lease across hub restart during WAN outage and refuses after expiry',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(_Cloud.valid);
+      final local = _MemoryLocal();
+      final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+      final first = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        local: local,
+        journal: journal,
+      );
+      expect(await _board(first), 200);
+
+      cloud.respond = _Cloud.unavailable;
+      clock.advance(const Duration(seconds: 1));
+      final restarted = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        local: local,
+        journal: journal,
+      );
+      expect(await _board(restarted), 200);
+
+      clock.advance(const Duration(hours: 12));
+      expect(await _board(restarted), 403);
+    },
+  );
 
   test('rejects a merchant or location scope change', () async {
     final clock = _FakeClock();

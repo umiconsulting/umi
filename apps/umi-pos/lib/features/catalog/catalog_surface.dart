@@ -5904,6 +5904,35 @@ final class _CartPanelState extends State<_CartPanel> {
         ],
       ),
       const PosDivider(),
+      if (controller.hasUnconfirmedChanges) ...[
+        const SizedBox(height: 4),
+        PosNoticeBanner(
+          content: Text(
+            spanish
+                ? 'Cambios sin guardar. Espera un momento antes de cerrar la cuenta.'
+                : 'Changes are not saved yet. Wait before closing the account.',
+          ),
+          actions: [
+            PosTextButton(
+              onPressed: controller.preservePendingCommands,
+              child: Text(spanish ? 'Guardar ahora' : 'Save now'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+      ],
+      if (cart.firedOrderId == null && items.any((item) => item.fired)) ...[
+        const SizedBox(height: 4),
+        PosNoticeBanner(
+          content: Text(
+            spanish
+                ? 'Guardado en este equipo. La comanda ya está en el tablero local; la nube todavía no confirma la orden.'
+                : 'Saved on this device. The ticket is on the local board; the cloud has not confirmed the order yet.',
+          ),
+          actions: const [],
+        ),
+        const SizedBox(height: 4),
+      ],
     ];
     final lines = <Widget>[
       Padding(

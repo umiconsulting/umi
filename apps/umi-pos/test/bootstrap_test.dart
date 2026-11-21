@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,22 @@ import 'package:umi_pos/core/release/release_compatibility.dart';
 import 'package:umi_pos/core/security/credential_vault.dart';
 
 import 'support/fakes.dart';
+
+final class _HangingReleaseCompatibility implements ReleaseCompatibilityGateway {
+  final Completer<ReleaseCompatibility> _never =
+      Completer<ReleaseCompatibility>();
+
+  @override
+  Future<ReleaseCompatibility> check() => _never.future;
+}
+
+final class _DeferredReleaseCompatibility implements ReleaseCompatibilityGateway {
+  final Completer<ReleaseCompatibility> completer =
+      Completer<ReleaseCompatibility>();
+
+  @override
+  Future<ReleaseCompatibility> check() => completer.future;
+}
 
 void main() {
   test(
@@ -21,6 +38,60 @@ void main() {
       root.dispose();
     },
   );
+
+  test('a proven release does not wait on a hung compatibility probe', () async {
+    final preferences = TestPreferences();
+    final online = testRoot(preferences: preferences);
+    await online.controller.initialize();
+    expect(
+      online.controller.state.phase,
+      BootstrapPhase.readyForAuthentication,
+    );
+    online.dispose();
+
+    final stopwatch = Stopwatch()..start();
+    final offline = testRoot(
+      preferences: preferences,
+      releaseCompatibility: _HangingReleaseCompatibility(),
+    );
+    await offline.controller.initialize();
+    stopwatch.stop();
+
+    expect(
+      offline.controller.state.phase,
+      BootstrapPhase.readyForAuthentication,
+    );
+    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 9)));
+    offline.dispose();
+  });
+
+  test('a background incompatible answer revokes a locally admitted start', () async {
+    final preferences = TestPreferences();
+    final online = testRoot(preferences: preferences);
+    await online.controller.initialize();
+    online.dispose();
+
+    final deferred = _DeferredReleaseCompatibility();
+    final offline = testRoot(
+      preferences: preferences,
+      releaseCompatibility: deferred,
+    );
+    await offline.controller.initialize();
+    expect(
+      offline.controller.state.phase,
+      BootstrapPhase.readyForAuthentication,
+    );
+
+    deferred.completer.complete(ReleaseCompatibility.upgradeRequired);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(offline.controller.state.phase, BootstrapPhase.unrecoverableFailure);
+    expect(
+      offline.controller.state.diagnosticCategory,
+      'upgradeRequired',
+    );
+    offline.dispose();
+  });
 
   test('pilot bootstrap fails safely when the API is unreachable', () async {
     final root = testRoot(

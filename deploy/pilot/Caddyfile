@@ -1,6 +1,15 @@
 {$PILOT_DOMAIN} {
   encode zstd gzip
 
+  log {
+    output file /data/access.log {
+      roll_size 50mb
+      roll_keep 10
+      roll_keep_for 168h
+    }
+    format json
+  }
+
   request_body {
     max_size 1MB
   }
