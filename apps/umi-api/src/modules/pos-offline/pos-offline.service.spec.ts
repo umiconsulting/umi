@@ -861,12 +861,13 @@ describe('PosOfflineService', () => {
       serverConflictReference: null,
       failure: null,
     }));
+    const readAccount = vi.fn(async () => ({
+      id: uid(40),
+      version: 8,
+      tableId: uid(42),
+    }));
     const orderCart = {
-      readAccount: vi.fn(async () => ({
-        id: uid(40),
-        version: 8,
-        tableId: uid(42),
-      })),
+      readAccount,
       assignAccountTable: vi.fn(async () => {
         throw new ConflictException({ code: 'CART_ALREADY_ASSIGNED' });
       }),
@@ -883,13 +884,26 @@ describe('PosOfflineService', () => {
       replay,
     } as unknown as PosOfflineRepository;
 
-    const result = await new PosOfflineService(repo, checkout, orderCart, kds).batch(user, uid(4), {
-      replaySessionId: uid(9),
-      commands: [tableSetCommand(1)],
-    });
+    // Written under uid(6), replayed after lock/restart under live session uid(77).
+    const result = await new PosOfflineService(repo, checkout, orderCart, kds).batch(
+      user,
+      uid(4),
+      {
+        replaySessionId: uid(9),
+        commands: [tableSetCommand(1)],
+      },
+      {
+        locationId: uid(5),
+        operatorSessionId: uid(77),
+        credentialVersion: 1,
+      },
+    );
 
     expect(result.results[0].status).toBe('accepted');
     expect(result.stopped).toBe(false);
+    expect(readAccount).toHaveBeenCalledTimes(2);
+    expect(readAccount).toHaveBeenNthCalledWith(1, user, uid(4), uid(40), uid(5), uid(77));
+    expect(readAccount).toHaveBeenNthCalledWith(2, user, uid(4), uid(40), uid(5), uid(77));
   });
 
   it('assigns the table the till chose while it had no uplink', async () => {

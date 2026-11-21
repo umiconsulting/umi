@@ -12,6 +12,7 @@ import { validateConfig } from './config.schema';
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
+      ignoreEnvFile: process.env.NODE_ENV === 'test',
       validate: validateConfig,
     }),
   ],

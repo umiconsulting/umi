@@ -217,7 +217,11 @@ final class OfflineJournalSnapshot {
         continue;
       }
       final command = entry.command;
-      if (command.commandType == 'pos.table.command') continue;
+      if (command.commandType == 'pos.table.command' ||
+          command.commandType == 'pos.kds.command' ||
+          command.commandType == 'operational.ack') {
+        continue;
+      }
       final snapshot = command.payload['snapshot'];
       final checkout = snapshot is Map ? snapshot['checkoutCommand'] : null;
       final rawId =

@@ -6,8 +6,8 @@ unset UMI_PG_CONTAINER UMI_MIGRATE_ALLOW_DRIFT
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 export GATE_DB="${GATE_DB:-umi_ci_$$}"
-[[ "$GATE_DB" =~ ^umi_ci(_[a-zA-Z0-9_]+)?$ ]] || {
-  echo 'Use a disposable database name with the umi_ci prefix.' >&2
+[[ "$GATE_DB" =~ ^umi_(ci|p0)(_[a-zA-Z0-9_]+)?$ ]] || {
+  echo 'Use a disposable database name with the umi_ci or umi_p0 prefix.' >&2
   exit 1
 }
 createdb "$GATE_DB"
@@ -20,8 +20,10 @@ psql -X -v ON_ERROR_STOP=1 -d "$GATE_DB" -f apps/umi-api/test/integration/harnes
 psql -X -v ON_ERROR_STOP=1 -d "$GATE_DB" -f apps/umi-api/db/roles/004_login_roles.sql
 bash db/migrate.sh "$GATE_DB"
 
-export DATABASE_URL_APP="postgresql://api_login:harness_api@${PGHOST:-localhost}:${PGPORT:-5432}/$GATE_DB"
-export DATABASE_URL_WORKER="postgresql://worker_login:harness_worker@${PGHOST:-localhost}:${PGPORT:-5432}/$GATE_DB"
+API_LOGIN_PASSWORD="${API_LOGIN_PASSWORD:-harness_api}"
+WORKER_LOGIN_PASSWORD="${WORKER_LOGIN_PASSWORD:-harness_worker}"
+export DATABASE_URL_APP="${DATABASE_URL_APP:-postgresql://api_login:${API_LOGIN_PASSWORD}@${PGHOST:-localhost}:${PGPORT:-5432}/$GATE_DB}"
+export DATABASE_URL_WORKER="${DATABASE_URL_WORKER:-postgresql://worker_login:${WORKER_LOGIN_PASSWORD}@${PGHOST:-localhost}:${PGPORT:-5432}/$GATE_DB}"
 export DATABASE_URL_ADMIN="postgresql://${PGUSER:-postgres}:${PGPASSWORD:?Set the disposable server password}@${PGHOST:-localhost}:${PGPORT:-5432}/$GATE_DB"
 export REDIS_URL="${REDIS_URL:-redis://localhost:6379}"
 JWT_SECRET="$(openssl rand -hex 24)"
@@ -60,3 +62,10 @@ bash db/test/migrate.sh
 # disposable database and harness roles above.
 pnpm --filter @umi/api test:integration:checkout
 pnpm --filter @umi/api test:acceptance:checkout
+pnpm --filter @umi/api test:integration:kitchen
+pnpm --filter @umi/api test:integration:tables
+pnpm --filter @umi/api test:acceptance:bound-settlement
+# Note: test:integration:migration's pristine-safe suites (pooler-isolation and
+# identity-normalization) run inside test:integration:schema above. The remaining
+# two files (rls.integration.ts, smoke.integration.ts) require a backfilled
+# production snapshot (umi_backfill_v3) and APP_QR_SECRET.

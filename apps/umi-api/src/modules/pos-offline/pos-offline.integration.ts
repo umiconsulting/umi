@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { ConfigService } from '@nestjs/config';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Cart, OfflineCommand } from '@umi/contract';
+import { ReplayResult, type Cart, type OfflineCommand } from '@umi/contract';
 import type { AppConfig } from '../../shared/config/config.schema';
 import { PgService } from '../../shared/database/pg.service';
 import { runWithRequestContext } from '../../shared/database/request-context';
@@ -260,8 +260,31 @@ const TILL_BOUNDARY = tillSpec('Caja limite', 0x1400);
 const TILL_STREAM = tillSpec('Caja flujos', 0x1500);
 /** The till at the ONCA-shaped branch. No policy row exists for this location. */
 const TILL_ONCA_DISABLED = tillSpec('Caja ONCA sin politica', 0x1600);
+/** The till that replays a cash sale whose cart was cancelled/abandoned. */
+const TILL_CANCELLED_CASH = tillSpec('Caja cancelada', 0x1700);
+/** The till that replays orphaned cart/cash commands while Cart B is active. */
+const TILL_ORPHAN_CART = tillSpec('Caja huerfana', 0x1800);
+/** The till that replays a duplicate table assignment under a new session after lock. */
+const TILL_TABLE_LOCK = tillSpec('Caja mesa bloqueada', 0x1900);
+/** The till that resolves a refused KDS command conflict and reads its terminal outcome. */
+const TILL_KDS_CONFLICT = tillSpec('Caja kds conflicto', 0x1a00);
 
-const TILLS = [TILL_MAIN, TILL_REFUSED, TILL_BATCH, TILL_OUT_OF_ORDER, TILL_BOUNDARY, TILL_STREAM];
+const FLOOR_AREA = fixtureId(0x1940);
+const TABLE_ONE = fixtureId(0x1950);
+const TABLE_TWO = fixtureId(0x1951);
+
+const TILLS = [
+  TILL_MAIN,
+  TILL_REFUSED,
+  TILL_BATCH,
+  TILL_OUT_OF_ORDER,
+  TILL_BOUNDARY,
+  TILL_STREAM,
+  TILL_CANCELLED_CASH,
+  TILL_ORPHAN_CART,
+  TILL_TABLE_LOCK,
+  TILL_KDS_CONFLICT,
+];
 
 /**
  * The merchant's own trading day, read from the same expression the trigger uses
@@ -274,6 +297,7 @@ let BUSINESS_DATE = '1970-01-01';
 
 describe('offline cash replay · §8K, "a cash sale made offline lands once"', () => {
   let pg: PgService;
+  let offlineRepo: PosOfflineRepository;
   let offline: PosOfflineService;
   let checkout: PosCheckoutService;
   let carts: PosCartService;
@@ -444,7 +468,8 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
     // preview this file runs and the preview the replay runs are the same object.
     checkout = new PosCheckoutService(new PosCheckoutRepository(pg), cartRepository, integrity);
     carts = new PosCartService(cartRepository, integrity);
-    offline = new PosOfflineService(new PosOfflineRepository(pg), checkout, carts, {
+    offlineRepo = new PosOfflineRepository(pg);
+    offline = new PosOfflineService(offlineRepo, checkout, carts, {
       commandForReplay: async () => undefined,
     } as unknown as KdsService);
     const cash = new PosCashService(new PosCashRepository(pg), integrity);
@@ -467,6 +492,50 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
       `INSERT INTO merchant.location (id,merchant_id,name)
        VALUES ($1::uuid,$2::uuid,'ONCA') ON CONFLICT (id) DO NOTHING`,
       [ONCA_LOCATION, MERCHANT],
+    );
+    const floorPlan = {
+      schemaVersion: 1,
+      areas: [
+        {
+          id: FLOOR_AREA,
+          name: 'Salon',
+          width: 720,
+          height: 480,
+          elements: [
+            {
+              id: TABLE_ONE,
+              label: 'Mesa 1',
+              kind: 'table',
+              shape: 'square',
+              capacity: 4,
+              x: 80,
+              y: 80,
+              width: 100,
+              height: 100,
+              rotation: 0,
+            },
+            {
+              id: TABLE_TWO,
+              label: 'Mesa 2',
+              kind: 'table',
+              shape: 'square',
+              capacity: 4,
+              x: 240,
+              y: 80,
+              width: 100,
+              height: 100,
+              rotation: 0,
+            },
+          ],
+        },
+      ],
+    };
+    await pg.query(
+      `INSERT INTO merchant.floor_plan
+         (merchant_id,location_id,version,draft,published_version,published,published_at)
+       VALUES ($1::uuid,$2::uuid,1,$3::jsonb,1,$3::jsonb,now())
+       ON CONFLICT (merchant_id,location_id) DO NOTHING`,
+      [MERCHANT, LOCATION, JSON.stringify(floorPlan)],
     );
     BUSINESS_DATE = (
       await pg.query<{ value: string }>(
@@ -1515,5 +1584,506 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
         [MERCHANT, till.shiftId],
       ),
     ).toBe(1);
+  });
+
+  // ── 7. P0 financial integrity, cart isolation, post-lock table recovery, KDS discard ──
+
+  it('records a manager-action financial conflict instead of silently accepting cash replay on a cancelled cart', async () => {
+    const till = tillOf(TILL_CANCELLED_CASH);
+    const { command, cart } = await queuedCashSale(TILL_CANCELLED_CASH, 1);
+    const ack = ackCommand(TILL_CANCELLED_CASH, 2);
+
+    // The account is cancelled/abandoned on the server before the till reconnects.
+    await pg.query(
+      `UPDATE merchant.pos_cart
+          SET status='abandoned', lifecycle_state='cancelled', updated_at=clock_timestamp()
+        WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [MERCHANT, cart.id],
+    );
+
+    const batch = await replay(TILL_CANCELLED_CASH, [command, ack]);
+    expect(batch.stopped).toBe(false);
+    expect(batch.results).toHaveLength(2);
+
+    const cashResult = ReplayResult.parse(batch.results[0]);
+    expect(cashResult.status).toBe('conflict');
+    expect(cashResult.officialCommit).toBeNull();
+    expect(cashResult.serverConflictReference).toBeTruthy();
+    expect(cashResult.failure).toMatchObject({
+      classification: 'reconciliation_required',
+      retryable: false,
+      blocksFollowing: false,
+      operatorActionRequired: true,
+      managerActionRequired: true,
+      guidanceCode: 'cart_cancelled_after_cash_taken',
+    });
+    // Unrelated stream in the same batch must keep flowing.
+    expect(batch.results[1].status).toBe('accepted');
+
+    // Persisted conflict row in PostgreSQL with manager_action_required = true.
+    expect(
+      await readOn(
+        till,
+        `SELECT classification||':'||guidance_code||':'||
+                operator_action_required::text||':'||manager_action_required::text||':'||
+                blocks_following::text||':'||resolution_state AS value
+           FROM merchant.offline_replay_conflict
+          WHERE merchant_id=$1::uuid AND device_id=$2::uuid AND command_id=$3::uuid`,
+        [MERCHANT, till.deviceId, command.commandId],
+      ),
+    ).toBe('reconciliation_required:cart_cancelled_after_cash_taken:true:true:false:open');
+
+    // Zero silent no-op settlement: no journal command row, no sale, no order, no cash ledger row.
+    expect(
+      await countOn(
+        till,
+        `SELECT count(*)::text AS value FROM merchant.offline_replay_command
+          WHERE merchant_id=$1::uuid AND device_id=$2::uuid AND command_id=$3::uuid`,
+        [MERCHANT, till.deviceId, command.commandId],
+      ),
+    ).toBe(0);
+    expect(await ordersForCart(till, cart.id)).toBe(0);
+    expect(await salesForCart(till, cart.id)).toBe(0);
+    expect(await ledgerSumForShift(till, till.shiftId)).toBe(String(OPENING_FLOAT));
+
+    // A financial conflict must remain protected from operator discard.
+    await expect(
+      scoped(till, () =>
+        offline.resolveConflict(
+          till.user,
+          MERCHANT,
+          {
+            locationId: LOCATION,
+            operatorSessionId: till.operatorSessionId,
+            credentialVersion: CREDENTIAL_VERSION,
+          },
+          command.commandId,
+        ),
+      ),
+    ).rejects.toMatchObject({ response: { code: 'CONFLICT_NOT_RESOLVABLE' } });
+  });
+
+  it('records conflicts for orphaned cart/cash commands and leaves unrelated active Cart B untouched', async () => {
+    const till = tillOf(TILL_ORPHAN_CART);
+    // Build a valid cash sale command first, then retarget it to an unknown ghost cart id.
+    const template = await queuedCashSale(TILL_ORPHAN_CART, 2);
+    // Park/abandon the template cart so Cart B is the operator's sole active cart.
+    await pg.query(
+      `UPDATE merchant.pos_cart
+          SET status='abandoned', lifecycle_state='cancelled', updated_at=clock_timestamp()
+        WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [MERCHANT, template.cart.id],
+    );
+
+    // Operator opens Cart B online and adds one coffee.
+    const cartBCreated = await scoped(till, () =>
+      carts.create(till.user, MERCHANT, {
+        locationId: LOCATION,
+        operatorSessionId: till.operatorSessionId,
+        idempotencyKey: randomUUID(),
+      }),
+    );
+    const cartB = await scoped(till, () =>
+      carts.add(till.user, MERCHANT, {
+        cartId: cartBCreated.id,
+        locationId: LOCATION,
+        operatorSessionId: till.operatorSessionId,
+        productId: PRODUCT,
+        variantId: null,
+        modifierSelections: [],
+        quantity: 1,
+        courseNumber: 1,
+        note: null,
+        expectedVersion: cartBCreated.version,
+        idempotencyKey: randomUUID(),
+      }),
+    );
+    const cartBVersionBefore = await readOn(
+      till,
+      `SELECT version::text AS value FROM merchant.pos_cart
+        WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [MERCHANT, cartB.id],
+    );
+    const cartBItemsBefore = await countOn(
+      till,
+      `SELECT COALESCE(sum(quantity),0)::text AS value FROM merchant.pos_cart_line
+        WHERE cart_id=$1::uuid`,
+      [cartB.id],
+    );
+    expect(cartBItemsBefore).toBe(1);
+
+    const ghostCartForLine = randomUUID();
+    const ghostCartForCash = randomUUID();
+    const orphanLineUnsigned = {
+      commandId: randomUUID(),
+      provisionalId: null,
+      deviceId: till.deviceId,
+      deviceCredentialVersion: CREDENTIAL_VERSION,
+      deviceSequence: 1,
+      merchantId: MERCHANT,
+      locationId: LOCATION,
+      operatorSessionId: till.operatorSessionId,
+      commandType: 'pos.cart.line.add' as const,
+      idempotencyKey: randomUUID(),
+      contractVersion: CONTRACT_VERSION,
+      schemaVersion: SCHEMA_VERSION,
+      createdAt: new Date().toISOString(),
+      payload: {
+        cartId: ghostCartForLine,
+        locationId: LOCATION,
+        operatorSessionId: till.operatorSessionId,
+        productId: PRODUCT,
+        variantId: null,
+        modifierSelections: [],
+        quantity: 3,
+        courseNumber: 1,
+        note: 'orphan-line',
+        expectedVersion: 1,
+        idempotencyKey: randomUUID(),
+      },
+    };
+    const orphanLineAdd: OfflineCommand = {
+      ...orphanLineUnsigned,
+      fingerprint: fingerprintOf(orphanLineUnsigned),
+    };
+
+    const rawTemplatePayload = template.command.payload as {
+      policyVersion: string;
+      policyFingerprint: string;
+      checkoutIdentity: string;
+      snapshot: {
+        checkoutCommand: Record<string, unknown>;
+        cartSnapshot: Record<string, unknown>;
+        [key: string]: unknown;
+      };
+    };
+    const orphanCashUnsigned = {
+      commandId: randomUUID(),
+      provisionalId: randomUUID(),
+      deviceId: till.deviceId,
+      deviceCredentialVersion: CREDENTIAL_VERSION,
+      deviceSequence: 2,
+      merchantId: MERCHANT,
+      locationId: LOCATION,
+      operatorSessionId: till.operatorSessionId,
+      commandType: 'pos.checkout.cash' as const,
+      idempotencyKey: randomUUID(),
+      contractVersion: CONTRACT_VERSION,
+      schemaVersion: SCHEMA_VERSION,
+      createdAt: template.command.createdAt,
+      payload: {
+        ...rawTemplatePayload,
+        snapshot: {
+          ...rawTemplatePayload.snapshot,
+          checkoutCommand: {
+            ...rawTemplatePayload.snapshot.checkoutCommand,
+            cartId: ghostCartForCash,
+          },
+          cartSnapshot: {
+            ...rawTemplatePayload.snapshot.cartSnapshot,
+            id: ghostCartForCash,
+          },
+        },
+      },
+    };
+    const orphanCash: OfflineCommand = {
+      ...orphanCashUnsigned,
+      fingerprint: fingerprintOf(orphanCashUnsigned),
+    };
+
+    const result = await replay(TILL_ORPHAN_CART, [orphanLineAdd, orphanCash]);
+    expect(result.stopped).toBe(false);
+    expect(result.results).toHaveLength(2);
+
+    const lineResult = ReplayResult.parse(result.results[0]);
+    expect(lineResult.status).toBe('conflict');
+    expect(lineResult.failure).toMatchObject({
+      classification: 'cart_mismatch',
+      guidanceCode: 'cart_not_found',
+      blocksFollowing: false,
+    });
+
+    const cashResult = ReplayResult.parse(result.results[1]);
+    expect(cashResult.status).toBe('conflict');
+    expect(cashResult.failure).toMatchObject({
+      classification: 'cart_mismatch',
+      guidanceCode: 'cart_not_found',
+      blocksFollowing: false,
+      managerActionRequired: true,
+    });
+
+    // Both orphaned commands recorded conflicts and zero accepted journal rows.
+    expect(
+      await countOn(
+        till,
+        `SELECT count(*)::text AS value FROM merchant.offline_replay_conflict
+          WHERE merchant_id=$1::uuid AND device_id=$2::uuid
+            AND classification='cart_mismatch' AND guidance_code='cart_not_found'
+            AND resolution_state='open'`,
+        [MERCHANT, till.deviceId],
+      ),
+    ).toBe(2);
+    expect(await journalRowsForDevice(till, till.deviceId)).toBe(0);
+
+    // Cart B is completely untouched in PostgreSQL (same version, same item count, 0 sales).
+    expect(
+      await readOn(
+        till,
+        `SELECT version::text AS value FROM merchant.pos_cart
+          WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+        [MERCHANT, cartB.id],
+      ),
+    ).toBe(cartBVersionBefore);
+    expect(
+      await countOn(
+        till,
+        `SELECT COALESCE(sum(quantity),0)::text AS value FROM merchant.pos_cart_line
+          WHERE cart_id=$1::uuid`,
+        [cartB.id],
+      ),
+    ).toBe(cartBItemsBefore);
+    expect(await salesForCart(till, cartB.id)).toBe(0);
+    expect(await ledgerSumForShift(till, till.shiftId)).toBe(String(OPENING_FLOAT));
+  });
+
+  it('replays duplicate pos.cart.table.set under a new operatorSessionId after lock without 401/403', async () => {
+    const till = tillOf(TILL_TABLE_LOCK);
+    // Open a cart and assign TABLE_ONE under the original session.
+    const cart = await scoped(till, () =>
+      carts.create(till.user, MERCHANT, {
+        locationId: LOCATION,
+        operatorSessionId: till.operatorSessionId,
+        idempotencyKey: randomUUID(),
+      }),
+    );
+    const assigned = await scoped(till, () =>
+      carts.assignAccountTable(till.user, MERCHANT, cart.id, {
+        locationId: LOCATION,
+        operatorSessionId: till.operatorSessionId,
+        tableId: TABLE_ONE,
+        expectedVersion: cart.version,
+        idempotencyKey: randomUUID(),
+      }),
+    );
+    expect(assigned.tableId).toBe(TABLE_ONE);
+
+    // Simulate terminal lock + restart: end the original operator session and open a fresh one.
+    const oldSessionId = till.operatorSessionId;
+    const newSessionId = randomUUID();
+    await pg.query(
+      `UPDATE runtime.operator_session
+          SET state='ended', ended_at=now(), last_activity_at=now()
+        WHERE id=$1::uuid`,
+      [oldSessionId],
+    );
+    await pg.query(
+      `INSERT INTO runtime.operator_session
+         (id,durable_session_id,user_id,staff_id,device_id,merchant_id,location_id,
+          permissions,entitlements,expires_at)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,
+               $8::text[],$9::jsonb,now()+interval '2 hours')`,
+      [
+        newSessionId,
+        till.durableSessionId,
+        till.userId,
+        till.staffId,
+        till.deviceId,
+        MERCHANT,
+        LOCATION,
+        PERMISSIONS,
+        ENTITLEMENTS,
+      ],
+    );
+    await pg.query(
+      `UPDATE merchant.pos_cart
+          SET operator_session_id=$2::uuid, updated_at=clock_timestamp()
+        WHERE merchant_id=$1::uuid AND id=$3::uuid`,
+      [MERCHANT, newSessionId, cart.id],
+    );
+
+    // 1) Duplicate table assignment for TABLE_ONE (written under oldSessionId, replayed under newSessionId).
+    const dupTableSetUnsigned = {
+      commandId: randomUUID(),
+      provisionalId: null,
+      deviceId: till.deviceId,
+      deviceCredentialVersion: CREDENTIAL_VERSION,
+      deviceSequence: 1,
+      merchantId: MERCHANT,
+      locationId: LOCATION,
+      operatorSessionId: oldSessionId,
+      commandType: 'pos.cart.table.set' as const,
+      idempotencyKey: randomUUID(),
+      contractVersion: CONTRACT_VERSION,
+      schemaVersion: SCHEMA_VERSION,
+      createdAt: new Date().toISOString(),
+      payload: {
+        cartId: cart.id,
+        locationId: LOCATION,
+        operatorSessionId: oldSessionId,
+        tableId: TABLE_ONE,
+        expectedVersion: cart.version,
+        idempotencyKey: randomUUID(),
+      },
+    };
+    const dupTableSet: OfflineCommand = {
+      ...dupTableSetUnsigned,
+      fingerprint: fingerprintOf(dupTableSetUnsigned),
+    };
+
+    // 2) Conflicting table assignment for TABLE_TWO while cart already holds TABLE_ONE:
+    // exercises `CART_ALREADY_ASSIGNED -> this.cart.readAccount(..., scope.operatorSessionId)`
+    // against PostgreSQL. Previously this threw 403 OPERATOR_SESSION_INVALID on the ended oldSessionId.
+    const conflictTableSetUnsigned = {
+      commandId: randomUUID(),
+      provisionalId: null,
+      deviceId: till.deviceId,
+      deviceCredentialVersion: CREDENTIAL_VERSION,
+      deviceSequence: 2,
+      merchantId: MERCHANT,
+      locationId: LOCATION,
+      operatorSessionId: oldSessionId,
+      commandType: 'pos.cart.table.set' as const,
+      idempotencyKey: randomUUID(),
+      contractVersion: CONTRACT_VERSION,
+      schemaVersion: SCHEMA_VERSION,
+      createdAt: new Date().toISOString(),
+      payload: {
+        cartId: cart.id,
+        locationId: LOCATION,
+        operatorSessionId: oldSessionId,
+        tableId: TABLE_TWO,
+        expectedVersion: assigned.version,
+        idempotencyKey: randomUUID(),
+      },
+    };
+    const conflictTableSet: OfflineCommand = {
+      ...conflictTableSetUnsigned,
+      fingerprint: fingerprintOf(conflictTableSetUnsigned),
+    };
+
+    const replayed = await scoped(till, () =>
+      offline.batch(
+        till.user,
+        MERCHANT,
+        { replaySessionId: randomUUID(), commands: [dupTableSet, conflictTableSet] },
+        {
+          locationId: LOCATION,
+          operatorSessionId: newSessionId,
+          credentialVersion: CREDENTIAL_VERSION,
+        },
+      ),
+    );
+    expect(replayed.stopped).toBe(false);
+    expect(replayed.results).toHaveLength(2);
+    expect(replayed.results[0].status).toBe('accepted');
+    // Second command did not crash with 401/403 on stale oldSessionId and kept TABLE_ONE intact.
+    expect(replayed.results[1].status).toBe('accepted');
+    expect(
+      await readOn(
+        till,
+        `SELECT table_id::text AS value FROM merchant.pos_cart
+          WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+        [MERCHANT, cart.id],
+      ),
+    ).toBe(TABLE_ONE);
+  });
+
+  it('resolves a non-retryable pos.kds.command kitchen_refusal conflict and returns explicit conflict_discarded', async () => {
+    const till = tillOf(TILL_KDS_CONFLICT);
+    const makeKdsCommand = (sequence: number, kitchenOrderId: string): OfflineCommand => {
+      const unsigned = {
+        commandId: randomUUID(),
+        provisionalId: null,
+        deviceId: till.deviceId,
+        deviceCredentialVersion: CREDENTIAL_VERSION,
+        deviceSequence: sequence,
+        merchantId: MERCHANT,
+        locationId: LOCATION,
+        operatorSessionId: till.operatorSessionId,
+        commandType: 'pos.kds.command' as const,
+        idempotencyKey: randomUUID(),
+        contractVersion: CONTRACT_VERSION,
+        schemaVersion: SCHEMA_VERSION,
+        createdAt: new Date().toISOString(),
+        payload: {
+          action: 'command',
+          commandId: randomUUID(),
+          idempotencyKey: randomUUID(),
+          correlationId: randomUUID(),
+          expectedVersion: 1,
+          kitchenOrderId,
+          commandType: 'mark_item_ready',
+          itemIds: [randomUUID()],
+          reasonCode: null,
+          reasonNote: null,
+          priority: null,
+          courseNumber: null,
+          locationId: LOCATION,
+          operatorSessionId: till.operatorSessionId,
+          actorDeviceId: till.deviceId,
+        },
+      };
+      return { ...unsigned, fingerprint: fingerprintOf(unsigned) };
+    };
+
+    const resolvableKds = makeKdsCommand(1, randomUUID());
+    const unresolvableKds = makeKdsCommand(2, randomUUID());
+
+    await scoped(till, async () => {
+      await offlineRepo.recordStreamConflict(
+        resolvableKds,
+        'server_validation_failed',
+        `kitchen:${String(resolvableKds.payload.kitchenOrderId)}`,
+        'kitchen_refusal:KITCHEN_INVALID_TRANSITION',
+        false,
+      );
+      await offlineRepo.recordStreamConflict(
+        unresolvableKds,
+        'fingerprint_mismatch',
+        `kitchen:${String(unresolvableKds.payload.kitchenOrderId)}`,
+        'fingerprint_mismatch',
+        false,
+      );
+    });
+
+    const query = {
+      locationId: LOCATION,
+      operatorSessionId: till.operatorSessionId,
+      credentialVersion: CREDENTIAL_VERSION,
+    };
+
+    // Guarded non-retryable kitchen_refusal:* KDS conflict resolves cleanly.
+    const resolved = await scoped(till, () =>
+      offline.resolveConflict(till.user, MERCHANT, query, resolvableKds.commandId),
+    );
+    expect(resolved).toMatchObject({
+      resolved: true,
+      commandId: resolvableKds.commandId,
+      deviceSequence: 1,
+    });
+
+    // resultFor / commandResult returns explicit rejected + conflict_discarded.
+    const terminalOutcome = ReplayResult.parse(
+      await scoped(till, () =>
+        offline.commandResult(till.user, MERCHANT, query, resolvableKds.commandId),
+      ),
+    );
+    expect(terminalOutcome.status).toBe('rejected');
+    expect(terminalOutcome.failure?.guidanceCode).toBe('conflict_discarded');
+
+    // Non-guarded KDS conflict (fingerprint_mismatch) remains protected from discard.
+    await expect(
+      scoped(till, () =>
+        offline.resolveConflict(till.user, MERCHANT, query, unresolvableKds.commandId),
+      ),
+    ).rejects.toMatchObject({ response: { code: 'CONFLICT_NOT_RESOLVABLE' } });
+
+    const openOutcome = ReplayResult.parse(
+      await scoped(till, () =>
+        offline.commandResult(till.user, MERCHANT, query, unresolvableKds.commandId),
+      ),
+    );
+    expect(openOutcome.status).toBe('conflict');
+    expect(openOutcome.failure?.guidanceCode).toBe('fingerprint_mismatch');
   });
 });

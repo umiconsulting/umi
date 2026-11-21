@@ -22,9 +22,17 @@ void main() {
     expect(await gateway.check(), ReleaseCompatibility.unsupported);
   });
 
-  test('rejects a release identity with no HTTP major', () async {
+  test('accepts legacy 2.x identity without the HTTP-major field', () async {
     final gateway = ApiReleaseCompatibilityGateway(
-      api: _ReleaseApi(apiMajorVersion: null),
+      api: _ReleaseApi(apiMajorVersion: null, contractVersion: '2.49.0'),
+      config: pilotTestConfig,
+    );
+    expect(await gateway.check(), ReleaseCompatibility.compatible);
+  });
+
+  test('refuses a 3.x identity without the HTTP-major field', () async {
+    final gateway = ApiReleaseCompatibilityGateway(
+      api: _ReleaseApi(apiMajorVersion: null, contractVersion: '3.0.0'),
       config: pilotTestConfig,
     );
     expect(await gateway.check(), ReleaseCompatibility.unsupported);

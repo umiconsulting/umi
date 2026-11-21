@@ -57,7 +57,7 @@ describe('same device operator recovery preserves account authority', () => {
     if (
       !process.env.DATABASE_URL_APP ||
       !process.env.DATABASE_URL_WORKER ||
-      !new URL(process.env.DATABASE_URL_WORKER).pathname.includes('verify')
+      !/verify|umi_ci|umi_p0/i.test(new URL(process.env.DATABASE_URL_WORKER).pathname)
     )
       throw new Error('Set both database URLs to a disposable verification database.');
     const values = { ...process.env };
@@ -173,7 +173,8 @@ describe('same device operator recovery preserves account authority', () => {
     const before = await read();
     const operator = await repo.startOperator(input());
     expect(operator?.id).toBe(oldOperator);
-    expect(operator?.permissions).toEqual(['cart.write']);
+    expect(operator?.permissions).toContain('cart.write');
+    expect(operator?.permissions).not.toContain('revoked.permission');
     expect(operator?.entitlements).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ featureKey: 'pos', enabled: true }),
@@ -512,5 +513,100 @@ describe('same device operator recovery preserves account authority', () => {
       [merchant, concurrentUser],
     );
     expect((await repo.startOperator(loser))?.deviceId).toBe(loser.deviceId);
+  });
+
+  it('picks up a newly granted role permission (order.fire) when resuming an operator session via PIN (bug-008)', async () => {
+    const cashierUser = randomUUID();
+    const cashierStaff = randomUUID();
+    const cashierDevice = randomUUID();
+    const customRoleId = randomUUID();
+    const firstDurable = randomUUID();
+    const resumedDurable = randomUUID();
+
+    await pg.query(`INSERT INTO umi."user"(id,full_name) VALUES ($1,'Cashier bug-008')`, [
+      cashierUser,
+    ]);
+    await pg.query(
+      `INSERT INTO merchant.device(id,merchant_id,name,kind) VALUES ($1,$2,'POS bug-008','pos_terminal')`,
+      [cashierDevice, merchant],
+    );
+    await pg.query(
+      `INSERT INTO umi.role(id,key,name,description,is_platform)
+       VALUES ($1,$2,'Cashier bug-008','Isolated role for bug-008',false)`,
+      [customRoleId, `cashier_bug008_${customRoleId.slice(0, 8)}`],
+    );
+    await pg.query(
+      `INSERT INTO umi.role_permission(role_id,permission_id)
+       SELECT $1, id FROM umi.permission WHERE key IN ('catalog.read','cart.write')`,
+      [customRoleId],
+    );
+    await pg.query(
+      `INSERT INTO merchant.staff(id,merchant_id,user_id,role_id,name)
+       VALUES ($1,$2,$3,$4,'Cashier bug-008')`,
+      [cashierStaff, merchant, cashierUser, customRoleId],
+    );
+    await pg.query(
+      `INSERT INTO runtime.session(id,merchant_id,principal_type,principal_id,token_hash,metadata,expires_at)
+       VALUES ($1,$2,'device',$3,$4,jsonb_build_object('app','pos','operatorUserId',$5::text,'locationId',$6::text),now()+interval '1 day')`,
+      [firstDurable, merchant, cashierDevice, randomUUID(), cashierUser, location],
+    );
+
+    const started = await repo.startOperator({
+      durableSessionId: firstDurable,
+      userId: cashierUser,
+      deviceId: cashierDevice,
+      merchantId: merchant,
+      locationId: location,
+      expiresAt: new Date(Date.now() + 60 * 60_000),
+    });
+    expect(started).not.toBeNull();
+    expect(started!.permissions).toContain('cart.write');
+    expect(started!.permissions).not.toContain('order.fire');
+
+    // Open an active cart under the started session so PIN unlock resumes the
+    // exact same operator_session row even after the RBAC trigger invalidates it.
+    const cashierCart = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.pos_cart
+         (id,merchant_id,location_id,operator_session_id,
+          original_operator_session_id,original_operator_user_id,operator_user_id)
+       VALUES ($1,$2,$3,$4,$4,$5,$5)`,
+      [cashierCart, merchant, location, started!.id, cashierUser],
+    );
+
+    // Lock the terminal and grant `order.fire` to the role while locked.
+    expect(await repo.transition(started!.id, firstDurable, 'locked')).toBe(true);
+    await pg.query(
+      `INSERT INTO umi.role_permission(role_id,permission_id)
+       SELECT $1, id FROM umi.permission WHERE key='order.fire'`,
+      [customRoleId],
+    );
+
+    // Operator unlocks with PIN (new durable session resuming the same operator session).
+    await pg.query(
+      `INSERT INTO runtime.session(id,merchant_id,principal_type,principal_id,token_hash,metadata,expires_at)
+       VALUES ($1,$2,'device',$3,$4,jsonb_build_object('app','pos','operatorUserId',$5::text,'locationId',$6::text),now()+interval '1 day')`,
+      [resumedDurable, merchant, cashierDevice, randomUUID(), cashierUser, location],
+    );
+    const resumed = await repo.startOperator({
+      durableSessionId: resumedDurable,
+      userId: cashierUser,
+      deviceId: cashierDevice,
+      merchantId: merchant,
+      locationId: location,
+      expiresAt: new Date(Date.now() + 60 * 60_000),
+    });
+    expect(resumed).not.toBeNull();
+    expect(resumed!.id).toBe(started!.id);
+    expect(resumed!.permissions).toContain('order.fire');
+    expect(resumed!.permissions).toContain('cart.write');
+
+    const stored = (
+      await pg.query<{ permissions: string[] }>(
+        `SELECT permissions FROM runtime.operator_session WHERE id=$1::uuid`,
+        [resumed!.id],
+      )
+    ).rows[0];
+    expect(stored.permissions).toContain('order.fire');
   });
 });
