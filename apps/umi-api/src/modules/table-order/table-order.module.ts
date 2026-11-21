@@ -7,6 +7,7 @@ import { TableOrderCredentialController } from './table-order-credential.control
 import { TableOrderController } from './table-order.controller';
 import { TableOrderRepository } from './table-order.repository';
 import { TableOrderService } from './table-order.service';
+import { PublicMenuController } from './public-menu.controller';
 
 /**
  * Table-order intake (§8I step 2, ADR 2026-09-13 §9).
@@ -20,7 +21,7 @@ import { TableOrderService } from './table-order.service';
  */
 @Module({
   imports: [AuthModule, IntegrityModule, PosCartModule, PosCatalogModule],
-  controllers: [TableOrderController, TableOrderCredentialController],
+  controllers: [TableOrderController, TableOrderCredentialController, PublicMenuController],
   providers: [TableOrderRepository, TableOrderService],
   exports: [TableOrderService],
 })

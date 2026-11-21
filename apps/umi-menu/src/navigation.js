@@ -1,35 +1,31 @@
-const navigationToggle = document.querySelector('#navigation-toggle');
-const navigationPanel = document.querySelector('#navigation-panel');
+'use strict';
+const navigationToggle = $('#navigation-toggle');
+const navigationPanel = $('#navigation-panel');
 function closeNavigation(returnFocus = false) {
   navigationPanel.hidden = true;
   navigationToggle.setAttribute('aria-expanded', 'false');
   navigationToggle.setAttribute('aria-label', 'Abrir menú');
   if (returnFocus) navigationToggle.focus();
 }
-navigationToggle.addEventListener('click', () => {
+navigationToggle.onclick = () => {
   const opening = navigationPanel.hidden;
   navigationPanel.hidden = !opening;
   navigationToggle.setAttribute('aria-expanded', String(opening));
   navigationToggle.setAttribute('aria-label', opening ? 'Cerrar menú' : 'Abrir menú');
-  if (opening) navigationPanel.querySelector('button:not([hidden])').focus();
+  if (opening) navigationPanel.querySelector('button').focus();
+};
+navigationPanel.addEventListener('click', (event) => {
+  if (event.target.closest('button')) closeNavigation();
 });
-navigationPanel.addEventListener('click', (e) => {
-  if (e.target.closest('button')) closeNavigation(!!e.target.closest('[data-mode]'));
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.header-menu')) closeNavigation();
 });
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.header-menu')) closeNavigation();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !navigationPanel.hidden) {
-    e.preventDefault();
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !navigationPanel.hidden) {
+    event.preventDefault();
     closeNavigation(true);
   }
 });
-document.addEventListener('focusin', (e) => {
-  if (!e.target.closest('.header-menu')) closeNavigation();
+document.addEventListener('focusin', (event) => {
+  if (!event.target.closest('.header-menu')) closeNavigation();
 });
-if (tableLocked) {
-  const context = document.querySelector('#navigation-table');
-  context.hidden = false;
-  context.textContent = 'Mesa ' + tableNumber + ' · Identificada por QR';
-}

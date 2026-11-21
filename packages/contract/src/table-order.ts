@@ -57,6 +57,13 @@ export const TableOrderMenuItem = z
     productId: Uuid,
     name: z.string().min(1).max(240),
     description: z.string().max(2000).nullable(),
+    /** Optional public display fields. Older API deployments may omit these. */
+    category: z
+      .object({ id: Uuid, name: z.string().min(1).max(240) })
+      .strict()
+      .nullable()
+      .optional(),
+    imageUrl: z.string().url().startsWith('https://').nullable().optional(),
     price: CatalogMoney,
     /**
      * §8.5. The allergen labels this product carries, derived from its recipe when
@@ -99,6 +106,22 @@ export const TableOrderMenu = z
     /** The order is placed here and paid at the counter. Stated by the server, so no
      * client has to invent the sentence and none can leave it out. */
     paymentAtCounter: z.literal(true),
+    items: z.array(TableOrderMenuItem).max(500),
+  })
+  .strict();
+
+export const PublicMenuQuery = z.object({ locationId: Uuid.optional() }).strict();
+
+export const PublicMenuResponse = z
+  .object({
+    merchantHandle: z.string().min(2).max(63),
+    merchantName: z.string().min(1).max(240),
+    currency: Currency,
+    paymentAtCounter: z.literal(true),
+    locations: z.array(z.object({ id: Uuid, name: z.string().min(1).max(240) }).strict()).max(500),
+    /** Null means the visitor must choose a branch before reading its prices. */
+    locationId: Uuid.nullable(),
+    locationName: z.string().min(1).max(240).nullable(),
     items: z.array(TableOrderMenuItem).max(500),
   })
   .strict();
@@ -234,6 +257,8 @@ export const TableOrderCredentialList = z
   .strict();
 
 export type TableOrderMenu = z.infer<typeof TableOrderMenu>;
+export type PublicMenuQuery = z.infer<typeof PublicMenuQuery>;
+export type PublicMenuResponse = z.infer<typeof PublicMenuResponse>;
 export type TableOrderMenuItem = z.infer<typeof TableOrderMenuItem>;
 export type TableOrderOptionGroup = z.infer<typeof TableOrderOptionGroup>;
 export type TableOrderModifier = z.infer<typeof TableOrderModifier>;
@@ -251,6 +276,8 @@ export const tableOrderModels = {
   TableOrderOptionGroup,
   TableOrderMenuItem,
   TableOrderMenu,
+  PublicMenuQuery,
+  PublicMenuResponse,
   TableOrderModifierSelection,
   TableOrderLine,
   PlaceTableOrderRequest,
