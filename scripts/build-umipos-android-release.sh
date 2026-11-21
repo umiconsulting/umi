@@ -140,6 +140,7 @@ fi
   "--dart-define=UMIPOS_RELEASE_BUILD_TIMESTAMP=$release_timestamp" \
   --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1 \
   --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled \
+  --dart-define=UMIPOS_TELEMETRY_ENABLED=true \
   --dart-define=UMIPOS_LOCAL_FIRST_FAST_PATH=true \
   --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=false \
   --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=false
