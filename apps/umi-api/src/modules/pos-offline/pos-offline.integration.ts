@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { ConfigService } from '@nestjs/config';
+import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ReplayResult, type Cart, type OfflineCommand } from '@umi/contract';
 import type { AppConfig } from '../../shared/config/config.schema';
@@ -729,9 +730,37 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
   }, 120_000);
 
   afterAll(async () => {
-    // Nothing is deleted. `cash_ledger_entry` is append-only, `cash_shift` refuses
-    // deletion outright, and a committed sale is history — so the fixture is the run's
-    // own merchant and the run's own ids, and a second run simply has its own.
+    // Clean up post-043 command_type rows created by this fixture so CI's migration
+    // re-apply gate (which re-runs 043_local_first_order_replay.sql before 046) does
+    // not fail its temporary CHECK constraint check on leftover test rows.
+    if (process.env.DATABASE_URL_ADMIN) {
+      const admin = new Client({ connectionString: process.env.DATABASE_URL_ADMIN });
+      await admin.connect();
+      try {
+        await admin.query(
+          `SELECT merchant.with_append_only_writable(
+             'merchant.offline_replay_command',
+             format(
+               'DELETE FROM merchant.offline_replay_command WHERE merchant_id = %L::uuid AND command_type NOT IN (%L,%L,%L,%L,%L,%L,%L,%L,%L,%L)',
+               $1::text,
+               'operational.ack',
+               'pos.checkout.cash',
+               'pos.cart.open',
+               'pos.cart.line.add',
+               'pos.cart.line.update',
+               'pos.cart.line.remove',
+               'pos.cart.clear',
+               'pos.cart.prepare',
+               'pos.cart.fire',
+               'pos.cart.fulfillment.set'
+             )
+           )`,
+          [MERCHANT],
+        );
+      } finally {
+        await admin.end();
+      }
+    }
     if (pg) await pg.onModuleDestroy();
   }, 60_000);
 
