@@ -34,6 +34,7 @@ jobs:
       cash: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.cash == 'true' }}
       pos: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.pos == 'true' }}
       pos_ios: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.pos_ios == 'true' }}
+      offline_e2e: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.offline_e2e == 'true' || steps.paths.outputs.api == 'true' || steps.paths.outputs.pos == 'true' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -109,9 +110,14 @@ jobs:
     with:
       build_ios: ${{ needs.changes.outputs.pos_ios == 'true' }}
 
+  offline-e2e:
+    needs: [changes]
+    if: needs.changes.outputs.offline_e2e == 'true'
+    uses: ./.github/workflows/offline-e2e.yml
+
   ready:
     name: CI ready
-    needs: [changes, lint, packages, api, dashboard, landing, cash, pos]
+    needs: [changes, lint, packages, api, dashboard, landing, cash, pos, offline-e2e]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -132,7 +138,8 @@ jobs:
             selected("dashboard"; .changes.outputs.dashboard == "true" or $redeploy == "true") and
             selected("landing"; .changes.outputs.landing == "true" or $redeploy == "true") and
             selected("cash"; .changes.outputs.cash == "true") and
-            selected("pos"; .changes.outputs.pos == "true")
+            selected("pos"; .changes.outputs.pos == "true") and
+            selected("offline-e2e"; .changes.outputs.offline_e2e == "true")
           ' <<< "$RESULTS"
 
   # always() and !cancelled() suppress the default success() check. That check
