@@ -332,6 +332,89 @@ describe('PosCheckoutService', () => {
     });
   });
 
+  it('accepts trusted snapshot when offline split lines merge into one server row on replay', async () => {
+    const { service } = harness();
+    const m = (minorUnits: number) => ({ minorUnits, currency: 'MXN' });
+    const fingerprint = 'c'.repeat(64);
+    const trusted = {
+      cartVersion: 3,
+      fingerprint,
+      totals: {
+        subtotal: m(20_000),
+        tax: m(0),
+        discounts: { total: m(0), entries: [] },
+        grandTotal: m(20_000),
+        businessDate: '2026-07-28',
+      },
+      taxes: { total: m(0), entries: [] },
+      discounts: { total: m(0), entries: [] },
+      catalogVersion: 'catalog-1',
+      pricingVersion: 'pricing-1',
+      taxVersion: 'tax-1',
+      snapshotAt: '2026-07-28T18:55:00.000Z',
+      confirmedAt: null,
+    };
+    const command = {
+      ...base,
+      totalsFingerprint: fingerprint,
+      tenderDrafts: [
+        {
+          ...base.tenderDrafts[0],
+          amount: m(20_000),
+          amountReceived: m(20_000),
+          status: 'confirmed_success' as const,
+        },
+      ],
+    };
+
+    const result = await service.checkout(user, id(1), command, {
+      trustedConfirmation: trusted,
+      trustedLineSnapshot: [
+        {
+          id: id(81),
+          productId: id(9),
+          productName: 'Café',
+          saleAction: 'merchandise',
+          quantity: 1,
+          courseNumber: 1,
+          variant: null,
+          modifiers: [],
+          note: null,
+          fired: true,
+          price: {
+            unitPrice: m(10_000),
+            lineSubtotal: m(10_000),
+            tax: m(0),
+            lineTotal: m(10_000),
+            taxRateBasisPoints: 0,
+          },
+        },
+        {
+          id: id(82),
+          productId: id(9),
+          productName: 'Café',
+          saleAction: 'merchandise',
+          quantity: 1,
+          courseNumber: 1,
+          variant: null,
+          modifiers: [],
+          note: null,
+          fired: true,
+          price: {
+            unitPrice: m(10_000),
+            lineSubtotal: m(10_000),
+            tax: m(0),
+            lineTotal: m(10_000),
+            taxRateBasisPoints: 0,
+          },
+        },
+      ],
+    });
+
+    expect(result.status).toBe('completed');
+    expect(result.confirmation.totals.grandTotal.minorUnits).toBe(20_000);
+  });
+
   it('refuses a trusted price for different cart content', async () => {
     const { service } = harness();
     const fingerprint = 'b'.repeat(64);

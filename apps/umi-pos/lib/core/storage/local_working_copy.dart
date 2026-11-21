@@ -183,6 +183,7 @@ final class LocalCatalogSnapshot {
 /// The schema stores the contract JSON beside the indexes the till uses. A
 /// contract field therefore survives a local round trip without a second model.
 final class SqliteLocalDatabase implements LocalDatabase, LocalWorkingCopy {
+  static const _maxCatalogFilterPages = 20;
   SqliteLocalDatabase({DatabaseFactory? factory, String? path})
     : _factoryOverride = factory,
       _pathOverride = path;
@@ -696,6 +697,38 @@ final class SqliteLocalDatabase implements LocalDatabase, LocalWorkingCopy {
           where: 'partition_key = ?',
           whereArgs: [partition.key],
         );
+      }
+
+      // Derived filter pages are a cache, not the catalog. Keep the canonical
+      // root plus the newest bounded set of search/category/barcode pages; the
+      // shared product rows stay untouched.
+      final pages = await transaction.query(
+        'catalog_pages',
+        columns: ['filter_key'],
+        where: 'partition_key = ?',
+        orderBy: 'refreshed_at DESC, filter_key ASC',
+        whereArgs: [partition.key],
+      );
+      if (pages.length > _maxCatalogFilterPages) {
+        final keep = <String>{
+          _catalogPageRoot,
+          for (final row in pages.take(_maxCatalogFilterPages))
+            row['filter_key'] as String,
+        };
+        for (final row in pages) {
+          final filter = row['filter_key'] as String;
+          if (keep.contains(filter)) continue;
+          await transaction.delete(
+            'catalog_page_products',
+            where: 'partition_key = ? AND filter_key = ?',
+            whereArgs: [partition.key, filter],
+          );
+          await transaction.delete(
+            'catalog_pages',
+            where: 'partition_key = ? AND filter_key = ?',
+            whereArgs: [partition.key, filter],
+          );
+        }
       }
     });
   }

@@ -73,6 +73,7 @@ final class BoundedApiClient implements ApiClient {
         const NoDeviceCredentialProvider(),
     this.sessionRefresh,
     this.lanHubResolver,
+    this.monotonicElapsed,
     http.Client? client,
   }) : // ignore: prefer_initializing_formals
        _config = config,
@@ -97,14 +98,38 @@ final class BoundedApiClient implements ApiClient {
   /// a single renewal that they all await.
   Future<bool>? _refreshInFlight;
 
-  /// The moment the cloud will accept our traffic again after a 429.
+  /// When the cloud will accept traffic again after a 429.
   ///
-  /// A rate limit is a statement about the server's budget, not about the
-  /// wire. Without this gate every surface retries on its own cadence, the
-  /// retries keep the bucket empty, and the till shows "offline" while the API
-  /// is healthy. The gate is process-wide because the bucket belongs to the
-  /// device, not to one screen.
-  DateTime? _cloudRetryNotBefore;
+  /// Deadlines are monotonic elapsed milliseconds, not wall-clock instants, so
+  /// a device clock adjustment cannot extend or erase a refusal. A principal
+  /// bucket (`device`, `tenant`, `branch`, `user`, `global`, `ip`,
+  /// `ip_authenticated`) closes the cloud lane for every route, because that is
+  /// what the server counted. A route-specific 429 — an auth or PIN throttle, a
+  /// malformed or header-only response — closes only the route that produced
+  /// it: it must not masquerade as global capacity.
+  final Stopwatch _monotonic = Stopwatch()..start();
+
+  /// Test seam for the elapsed-time source. Production leaves it null and uses
+  /// the process stopwatch; no wall-clock read is involved in a deadline.
+  final Duration Function()? monotonicElapsed;
+
+  int get _nowMilliseconds =>
+      monotonicElapsed?.call().inMilliseconds ?? _monotonic.elapsedMilliseconds;
+  int _cloudRetryAtMilliseconds = 0;
+  final Map<String, int> _routeRetryAtMilliseconds = {};
+
+  static const _principalScopes = {
+    'device',
+    'tenant',
+    'branch',
+    'user',
+    // The ingress bucket is the address, not one route. A literal `global`
+    // (gateway/CDN) and the API's own `ip`/`ip_authenticated` names all close
+    // the cloud lane for the stated window.
+    'global',
+    'ip',
+    'ip_authenticated',
+  };
 
   static const requestTimeout = Duration(seconds: 15);
   static const maxResponseBytes = 2 * 1024 * 1024;
@@ -332,14 +357,23 @@ final class BoundedApiClient implements ApiClient {
       }
       // The probe is the one request that must pass the gate. It is how the
       // till learns that the API is healthy again, and it costs one row.
-      final gate = _cloudRetryNotBefore;
-      if (base == _config.apiBaseUri &&
-          path != '/health/live' &&
-          gate != null &&
-          DateTime.now().isBefore(gate)) {
-        throw _rateLimited(
-          gate.difference(DateTime.now()).inSeconds.clamp(1, 300).toInt(),
-        );
+      if (base == _config.apiBaseUri && path != '/health/live') {
+        final now = _nowMilliseconds;
+        final cloudWait = _cloudRetryAtMilliseconds - now;
+        if (cloudWait > 0) {
+          throw _rateLimited(
+            (cloudWait / 1000).ceil().clamp(1, 300),
+            scope: 'global',
+          );
+        }
+        final routeKey = _routeKey(method, path);
+        final routeWait = (_routeRetryAtMilliseconds[routeKey] ?? 0) - now;
+        if (routeWait > 0) {
+          throw _rateLimited(
+            (routeWait / 1000).ceil().clamp(1, 300),
+            scope: 'route',
+          );
+        }
       }
       final correlationId = _correlationId();
       try {
@@ -411,29 +445,62 @@ final class BoundedApiClient implements ApiClient {
           // The probe answers even while the window is closed. Only a normal
           // request proves that the window is open again.
           if (path != '/health/live' && path != '/health/ready') {
-            _cloudRetryNotBefore = null;
+            _cloudRetryAtMilliseconds = 0;
+            _routeRetryAtMilliseconds.remove(_routeKey(method, path));
           }
           return bytes.isEmpty ? <String, Object?>{} : _decode(bytes);
         }
         if (streamed.statusCode == 429) {
           final decoded = bytes.isEmpty ? <String, Object?>{} : _decode(bytes);
-          final refusal = _publicError(decoded, correlationId);
+          AppException refusal;
+          try {
+            refusal = _publicError(decoded, correlationId);
+          } catch (_) {
+            refusal = _rateLimited(
+              30,
+              scope: 'route',
+              correlationId: correlationId,
+            );
+          }
           final stated = int.tryParse(streamed.headers['retry-after'] ?? '');
-          final seconds = (stated ??
-                  (refusal.details?['retryAfterSeconds'] as num?)?.ceil() ??
-                  30)
-              .clamp(1, 300)
-              .toInt();
-          _cloudRetryNotBefore = DateTime.now().add(Duration(seconds: seconds));
+          final seconds =
+              (stated ??
+                      (refusal.details?['retryAfterSeconds'] as num?)?.ceil() ??
+                      30)
+                  .clamp(1, 300)
+                  .toInt();
+          final scope = _rateLimitScope(
+            streamed.headers['x-umi-ratelimit-scope'],
+            streamed.headers['x-ratelimit-remaining'],
+            decoded,
+            refusal,
+          );
+          final principal = _principalScopes.contains(scope);
+          final until = _nowMilliseconds + seconds * 1000;
+          if (principal) {
+            // Concurrent refusals may name different windows. The lane reopens
+            // at the latest one; a shorter answer cannot shorten a real hold.
+            if (until > _cloudRetryAtMilliseconds) {
+              _cloudRetryAtMilliseconds = until;
+            }
+          } else {
+            final key = _routeKey(method, path);
+            final previous = _routeRetryAtMilliseconds[key] ?? 0;
+            if (until > previous) _routeRetryAtMilliseconds[key] = until;
+          }
           _telemetry.event(
             ClientEvent(
               name: 'network.rate_limited',
-              values: {'waitSeconds': seconds},
+              values: {'waitSeconds': seconds, 'scope': scope},
             ),
           );
           // The refusal already names the wait. Retrying inside this call
           // would charge the same bucket again before its window closes.
-          throw refusal;
+          throw _rateLimited(
+            seconds,
+            scope: principal ? scope : 'route',
+            correlationId: refusal.correlationId,
+          );
         }
         if (streamed.statusCode == 502 ||
             streamed.statusCode == 503 ||
@@ -486,12 +553,55 @@ final class BoundedApiClient implements ApiClient {
     throw lastFailure!;
   }
 
-  AppException _rateLimited(int seconds) => AppException(
+  AppException _rateLimited(
+    int seconds, {
+    String? scope,
+    String? correlationId,
+  }) => AppException(
     category: AppErrorCategory.server,
     code: 'RATE_LIMITED',
     recoverable: true,
-    details: {'retryAfterSeconds': seconds},
+    correlationId: correlationId,
+    details: {'retryAfterSeconds': seconds, 'scope': ?scope, 'retryable': true},
   );
+
+  String _routeKey(ApiMethod method, String path) {
+    // Query parameters are not part of a route's bucket identity.
+    final route = path.split('?').first;
+    final segments = route.split('/').where((part) => part.isNotEmpty);
+    final template = segments
+        .map((part) {
+          // Ids are data; the route template is the stable key.
+          final uuid = RegExp(
+            r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
+            r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+          ).hasMatch(part);
+          return uuid ? ':id' : part;
+        })
+        .join('/');
+    return '${method.name}:/$template';
+  }
+
+  String _rateLimitScope(
+    String? header,
+    String? remaining,
+    Map<String, Object?> body,
+    AppException refusal,
+  ) {
+    final explicit = header ?? body['scope'];
+    if (explicit is String && explicit.isNotEmpty) return explicit;
+    final details = refusal.details;
+    final nested = details?['scope'];
+    if (nested is String && nested.isNotEmpty) return nested;
+    // Deployed API 2.49 names no scope. Its ingress guard is the only 429
+    // that writes `x-ratelimit-remaining` before refusing; the route
+    // throttles (PIN, table-order, pairing) write only Retry-After. Treat the
+    // address bucket as a global hold, not as a refusal of one route.
+    if (remaining != null) return 'global';
+    // Header-only or non-contract 429s are route refusals until the server
+    // says otherwise. They must not close unrelated work.
+    return 'route';
+  }
 
   Map<String, Object?> _decode(List<int> bytes) {
     final value = jsonDecode(utf8.decode(bytes));

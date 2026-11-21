@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -12,14 +13,77 @@ import '../../core/network/lan_discovery.dart';
 import '../../core/network/lan_node_identity.dart';
 import '../../core/storage/local_working_copy.dart';
 import '../offline/offline_journal.dart';
+import '../offline/operational_fire.dart';
 import 'hub_command_forwarder.dart';
 import 'lan_kds_store.dart';
+
+/// The process clock for LAN trust.
+///
+/// [monotonicNow] must not jump backwards while the process runs. [wallNow]
+/// detects a wall-clock rollback. Tests replace this clock with a controlled
+/// one to exercise the 300-second boundary.
+abstract interface class LanNodeClock {
+  DateTime wallNow();
+  Duration monotonicNow();
+}
+
+final class _SystemLanNodeClock implements LanNodeClock {
+  const _SystemLanNodeClock();
+  static final Stopwatch _process = Stopwatch()..start();
+
+  @override
+  DateTime wallNow() => DateTime.now();
+
+  @override
+  Duration monotonicNow() => _process.elapsed;
+}
+
+/// The last successful cloud validation of one peer and credential.
+final class _LanTrust {
+  const _LanTrust({
+    required this.credentialHash,
+    required this.merchantId,
+    required this.locationId,
+    required this.monotonicAt,
+    required this.wallAt,
+  });
+
+  final String credentialHash;
+  final String merchantId;
+  final String locationId;
+  final Duration monotonicAt;
+  final DateTime wallAt;
+}
+
+/// One admitted identity tuple. Membership survives for the node process.
+final class _LanAdmission {
+  _LanAdmission({
+    required this.key,
+    required this.headers,
+    required this.credentialHash,
+    required this.deviceId,
+    required this.merchantId,
+    required this.locationId,
+  });
+
+  final String key;
+  final Map<String, String> headers;
+  final String credentialHash;
+  final String deviceId;
+  final String? merchantId;
+  final String? locationId;
+  bool demand = false;
+  Duration? lastStart;
+}
 
 /// The local API of the main station.
 ///
 /// It serves the kitchen surface only. A peer is trusted by the hash of the
-/// device credential it presents. Cloud validation pairs a new peer. After that,
-/// the stored hash is enough while the cloud is unreachable.
+/// device credential it presents. Cloud validation pairs a new peer and writes
+/// a bounded persisted admission lease (12 hours) so already-admitted peers
+/// keep working across extended WAN outages (>300 s) and hub restarts. The hub
+/// still probes the cloud every 30 seconds while online so explicit revocations
+/// take effect promptly; a clock rollback or lease expiry fails closed.
 final class LanKdsNode {
   LanKdsNode({
     required LocalWorkingCopy local,
@@ -30,13 +94,15 @@ final class LanKdsNode {
     Future<int> Function(String commandId)? resolveConflict,
     this.port = lanNodePort,
     http.Client? client,
+    LanNodeClock? clock,
   }) : _local = local,
        _journal = journal,
        _store = store,
        _identity = identity,
        _cloudBase = cloudBase,
        _resolveConflict = resolveConflict,
-       _client = client ?? http.Client();
+       _client = client ?? http.Client(),
+       _clock = clock ?? const _SystemLanNodeClock();
 
   final LocalWorkingCopy _local;
   final EncryptedOfflineJournal _journal;
@@ -45,14 +111,280 @@ final class LanKdsNode {
   final Uri _cloudBase;
   final Future<int> Function(String commandId)? _resolveConflict;
   final http.Client _client;
+  final LanNodeClock _clock;
   final int port;
+
+  static const Duration _trustPeriod = Duration(hours: 12);
+  static const Duration _probePeriod = Duration(seconds: 30);
+  static const String _leaseNamespace = 'lan_peer_lease';
 
   HttpServer? _server;
   StreamSubscription<HttpRequest>? _requests;
   final StreamController<void> _changed = StreamController<void>.broadcast();
-  final Map<String, DateTime> _validatedAt = {};
+  final Map<String, _LanTrust> _trusted = {};
   final HubAccountSequencer _accountSequencer = HubAccountSequencer();
-  DateTime? _cloudProbeAfter;
+  static const int _maxAdmissions = 257;
+  static const int _maxSnapshotBytes = 4096;
+  static const int _maxResponseBytes = 65536;
+  static const Duration _minStartSpacing = Duration(seconds: 2);
+
+  final Map<String, _LanAdmission> _admissions = {};
+  final List<String> _ring = [];
+  int _cursor = 0;
+  bool _probeActive = false;
+  Duration? _nextStartNotBefore;
+  Timer? _probeTimer;
+  int _generation = 0;
+
+  _LanAdmission _admit({
+    required String key,
+    required Map<String, String> headers,
+    required String credentialHash,
+    required String deviceId,
+    required String? merchantId,
+    required String? locationId,
+    required int snapshotBytes,
+  }) {
+    final existing = _admissions[key];
+    if (existing != null) {
+      existing.demand = true;
+      return existing;
+    }
+    if (snapshotBytes > _maxSnapshotBytes) {
+      throw const _LanRefusal(
+        'PAYLOAD_TOO_LARGE',
+        HttpStatus.requestEntityTooLarge,
+      );
+    }
+    if (_admissions.length >= _maxAdmissions) {
+      // Exact admission is full. No record, no cloud request, no turn change.
+      throw const _LanRefusal(
+        'LAN_PROBE_CAPACITY_EXCEEDED',
+        HttpStatus.serviceUnavailable,
+      );
+    }
+    final admission = _LanAdmission(
+      key: key,
+      headers: headers,
+      credentialHash: credentialHash,
+      deviceId: deviceId,
+      merchantId: merchantId,
+      locationId: locationId,
+    )..demand = true;
+    _admissions[key] = admission;
+    _ring.add(key);
+    return admission;
+  }
+
+  _LanAdmission? _selectNext(Duration now) {
+    if (_ring.isEmpty) return null;
+    for (var offset = 0; offset < _ring.length; offset += 1) {
+      final index = (_cursor + offset) % _ring.length;
+      final admission = _admissions[_ring[index]];
+      if (admission == null || !admission.demand) continue;
+      final last = admission.lastStart;
+      if (last != null && now - last < _probePeriod) continue;
+      _cursor = (index + 1) % _ring.length;
+      admission
+        ..demand = false
+        ..lastStart = now;
+      return admission;
+    }
+    return null;
+  }
+
+  void _scheduleProbe() {
+    if (_probeActive || _probeTimer?.isActive == true) return;
+    final now = _clock.monotonicNow();
+    final next = _nextStartNotBefore;
+    final delay = next != null && next > now ? next - now : Duration.zero;
+    _probeTimer = Timer(delay, () {
+      _probeTimer = null;
+      final at = _clock.monotonicNow();
+      final earliest = _nextStartNotBefore;
+      if (earliest != null && at < earliest) {
+        _scheduleProbe();
+        return;
+      }
+      final admission = _selectNext(at);
+      if (admission == null) return;
+      _probeActive = true;
+      _nextStartNotBefore = at + _minStartSpacing;
+      unawaited(
+        _runProbe(admission).whenComplete(() {
+          _probeActive = false;
+          _scheduleProbe();
+        }),
+      );
+    });
+  }
+
+  Future<bool> _tryProbeTurn(String requesterKey) async {
+    final now = _clock.monotonicNow();
+    final earliest = _nextStartNotBefore;
+    if (_probeActive || (earliest != null && now < earliest)) {
+      _scheduleProbe();
+      return false;
+    }
+    final admission = _selectNext(now);
+    if (admission == null) return false;
+    _probeActive = true;
+    _nextStartNotBefore = now + _minStartSpacing;
+    if (admission.key == requesterKey) {
+      try {
+        await _runProbe(admission);
+      } finally {
+        _probeActive = false;
+        _scheduleProbe();
+      }
+      return true;
+    }
+    unawaited(
+      _runProbe(admission).whenComplete(() {
+        _probeActive = false;
+        _scheduleProbe();
+      }),
+    );
+    return false;
+  }
+
+  Future<void> _runProbe(_LanAdmission admission) async {
+    final generation = _generation;
+    final abort = Completer<void>();
+    final deadline = Timer(const Duration(seconds: 2), abort.complete);
+    try {
+      final request = http.AbortableRequest(
+        'GET',
+        _cloudBase.resolve('/api/v1/devices/status'),
+        abortTrigger: abort.future,
+      );
+      request.headers.addAll(admission.headers);
+      final response = await _client
+          .send(request)
+          .timeout(const Duration(seconds: 2));
+      final body = BytesBuilder(copy: false);
+      await for (final chunk in response.stream.timeout(
+        const Duration(seconds: 2),
+      )) {
+        body.add(chunk);
+        if (body.length > _maxResponseBytes) {
+          throw StateError('response_too_large');
+        }
+      }
+      if (generation != _generation) return;
+      final status = response.statusCode;
+      if (status >= 200 && status < 300) {
+        final device = DeviceSummary.fromJson(
+          jsonDecode(utf8.decode(body.takeBytes())) as Map<String, Object?>,
+        );
+        final mismatch =
+            device.state != 'active' ||
+            device.locationId == null ||
+            (admission.merchantId != null &&
+                admission.merchantId != device.merchantId) ||
+            (admission.locationId != null &&
+                admission.locationId != device.locationId);
+        if (mismatch) {
+          _trusted.remove(admission.deviceId);
+          await _deletePeerLease(
+            admission.merchantId,
+            admission.locationId,
+            admission.deviceId,
+          );
+          final known =
+              admission.merchantId == null || admission.locationId == null
+              ? null
+              : await _local.readNetworkDevice(
+                  admission.merchantId!,
+                  admission.locationId!,
+                  admission.deviceId,
+                );
+          if (known != null) {
+            await _local.deleteNetworkDevice(
+              known.merchantId,
+              known.locationId,
+              known.deviceId,
+            );
+          }
+          _generation += 1;
+          return;
+        }
+        final seenAt = _now();
+        final wallNow = _clock.wallNow().toUtc();
+        final known =
+            admission.merchantId == null || admission.locationId == null
+            ? null
+            : await _local.readNetworkDevice(
+                admission.merchantId!,
+                admission.locationId!,
+                admission.deviceId,
+              );
+        await _local.writeNetworkDevice(
+          LocalNetworkDevice(
+            merchantId: device.merchantId,
+            locationId: device.locationId!,
+            deviceId: device.id,
+            role: device.type,
+            stationId: null,
+            address: null,
+            port: null,
+            credentialHash: admission.credentialHash,
+            pairedAt: known?.pairedAt ?? seenAt,
+            lastSeenAt: seenAt,
+            status: 'active',
+          ),
+        );
+        await _writePeerLease(
+          merchantId: device.merchantId,
+          locationId: device.locationId!,
+          deviceId: device.id,
+          credentialHash: admission.credentialHash,
+          validatedAt: wallNow,
+        );
+        _trusted[admission.deviceId] = _LanTrust(
+          credentialHash: admission.credentialHash,
+          merchantId: device.merchantId,
+          locationId: device.locationId!,
+          monotonicAt: _clock.monotonicNow(),
+          wallAt: wallNow,
+        );
+        return;
+      }
+      if (status >= 400 && status < 500) {
+        _trusted.remove(admission.deviceId);
+        await _deletePeerLease(
+          admission.merchantId,
+          admission.locationId,
+          admission.deviceId,
+        );
+        if (admission.merchantId != null && admission.locationId != null) {
+          final known = await _local.readNetworkDevice(
+            admission.merchantId!,
+            admission.locationId!,
+            admission.deviceId,
+          );
+          if (known != null) {
+            await _local.deleteNetworkDevice(
+              known.merchantId,
+              known.locationId,
+              known.deviceId,
+            );
+          }
+          _generation += 1;
+        }
+      }
+    } on _LanRefusal {
+      rethrow;
+    } catch (error) {
+      debugPrint(
+        '[umipos] lan_peer_validation_unavailable '
+        'type=${error.runtimeType}',
+      );
+    } finally {
+      deadline.cancel();
+    }
+  }
+
   bool _stopped = false;
 
   Uri? get boundUri {
@@ -561,21 +893,57 @@ final class LanKdsNode {
     final commandId = _uuidFrom(
       'hub-command:${peer.deviceId}:$clientCommandId',
     );
+    final operational = rawPayload[operationalFireKey];
+    final cleanPayload = Map<String, Object?>.from(rawPayload)
+      ..remove(operationalFireKey);
     final journal = await _journal.load();
     final existing = journal.entries.where(
       (entry) => entry.command.commandId == commandId,
     );
     if (existing.isNotEmpty) {
+      final current = existing.single;
+      final projected =
+          operational is Map<String, Object?> && commandType == 'pos.cart.fire';
+      if (projected) {
+        // A retried forward may have lost the host projection in a crash. The
+        // command already exists; restoring the ticket is idempotent.
+        await OperationalFireStore(_local).record(
+          merchantId: peer.merchantId,
+          locationId: peer.locationId,
+          commandId: commandId,
+          operational: operational,
+        );
+      }
       await _json(request, HttpStatus.ok, {
         'ok': true,
         'data': {
           'queued': true,
           'duplicate': true,
           'commandId': commandId,
-          'deviceSequence': existing.single.command.deviceSequence,
+          'deviceSequence': current.command.deviceSequence,
+          // A duplicate forward does not append or project again. The revision
+          // still names the durable work the peer's ticket is derived from.
+          'projectionRevision': current.command.deviceSequence,
+          'requestId': current.command.idempotencyKey,
+          'originRequestId': clientIdempotencyKey,
+          'attempts': current.attempts,
+          'projected': projected,
         },
       });
       return;
+    }
+    final projected =
+        operational is Map<String, Object?> && commandType == 'pos.cart.fire';
+    if (projected) {
+      // The ticket is durable before the command that justifies it. A crash
+      // between the two leaves an orphan the board ignores; a crash after the
+      // append leaves a recoverable ticket.
+      await OperationalFireStore(_local).record(
+        merchantId: peer.merchantId,
+        locationId: peer.locationId,
+        commandId: commandId,
+        operational: operational,
+      );
     }
     final command = await _journal.append(
       commandId: commandId,
@@ -592,7 +960,7 @@ final class LanKdsNode {
       originOperatorSessionId: originOperatorSessionId,
       hubReceivedAt: _now(),
       payload: {
-        ...rawPayload,
+        ...cleanPayload,
         'operatorSessionId': host.operatorSessionId,
         'locationId': peer.locationId,
       },
@@ -604,6 +972,13 @@ final class LanKdsNode {
         'duplicate': false,
         'commandId': command.commandId,
         'deviceSequence': command.deviceSequence,
+        // The receipt means "host journal + projection input accepted", never
+        // "the cook saw it". The board derives the ticket from this revision.
+        'projectionRevision': command.deviceSequence,
+        'requestId': command.idempotencyKey,
+        'originRequestId': clientIdempotencyKey,
+        'attempts': 0,
+        'projected': projected,
       },
     });
   }
@@ -954,11 +1329,34 @@ final class LanKdsNode {
       (entry) => entry.command.commandId == command.commandId,
     );
     if (existing.isNotEmpty) {
-      final current = await _store.commandResult(
+      var current = await _store.commandResult(
         peer.merchantId,
         peer.locationId,
         command.kitchenOrderId,
       );
+      if (current == null) {
+        throw const _LanRefusal('RESOURCE_NOT_FOUND', HttpStatus.notFound);
+      }
+      // A previous attempt could have appended the command and died before the
+      // board write. The command is the durable fact; re-apply its transition
+      // instead of returning an older board version and leaving the bump lost.
+      final version = (current['version'] as num? ?? 0).toInt();
+      if (version <= command.expectedVersion) {
+        try {
+          final prepared = await _store.prepareCommand(
+            peer.merchantId,
+            peer.locationId,
+            command,
+          );
+          current = await _store.commitCommand(
+            peer.merchantId,
+            peer.locationId,
+            prepared,
+          );
+        } on LanKdsRefusal catch (error) {
+          if (error.code != 'KITCHEN_VERSION_CONFLICT') rethrow;
+        }
+      }
       if (current == null) {
         throw const _LanRefusal('RESOURCE_NOT_FOUND', HttpStatus.notFound);
       }
@@ -996,7 +1394,9 @@ final class LanKdsNode {
           locationId: peer.locationId,
           operatorSessionId: sessionId,
         );
-    final result = await _store.applyCommand(
+    // Compute first, journal second, board third. The board must never show a
+    // transition that has no replayable command behind it.
+    final prepared = await _store.prepareCommand(
       peer.merchantId,
       peer.locationId,
       command,
@@ -1022,6 +1422,11 @@ final class LanKdsNode {
       ),
       payload: payload,
       commandType: 'pos.kds.command',
+    );
+    final result = await _store.commitCommand(
+      peer.merchantId,
+      peer.locationId,
+      prepared,
     );
     if (!_changed.isClosed) _changed.add(null);
     return result;
@@ -1057,115 +1462,185 @@ final class LanKdsNode {
             scopeLocation,
             deviceId,
           );
-    final lastValidated = _validatedAt[deviceId];
-    final validateNow =
-        lastValidated == null ||
-        DateTime.now().difference(lastValidated) > const Duration(seconds: 30);
-    final cloudProbeAfter = _cloudProbeAfter;
-    if (validateNow &&
-        (cloudProbeAfter == null || DateTime.now().isAfter(cloudProbeAfter))) {
-      try {
-        final response = await _client
-            .get(
-              _cloudBase.resolve('/api/v1/devices/status'),
-              headers: {
-                'accept': 'application/json',
-                'x-umi-device-id': deviceId,
-                'x-umi-device-public-id': publicId,
-                'x-umi-installation-id': installationId,
-                'x-umi-device-credential': credential,
-                'x-umi-merchant-id': ?headerMerchant,
-                'x-umi-location-id': ?headerLocation,
-              },
-            )
-            .timeout(const Duration(seconds: 2));
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          final device = DeviceSummary.fromJson(
-            jsonDecode(response.body) as Map<String, Object?>,
-          );
-          if (device.state != 'active' ||
-              device.locationId == null ||
-              (merchantId != null && merchantId != device.merchantId) ||
-              (locationId != null && locationId != device.locationId) ||
-              (headerMerchant != null && headerMerchant != device.merchantId) ||
-              (headerLocation != null && headerLocation != device.locationId)) {
-            debugPrint(
-              '[umipos] lan_peer_validation_mismatch '
-              'state=${device.state} '
-              'hasLocation=${device.locationId != null} '
-              'merchantMismatch=${merchantId != null && merchantId != device.merchantId} '
-              'locationMismatch=${locationId != null && locationId != device.locationId}',
-            );
-            if (known != null) {
-              await _local.deleteNetworkDevice(
-                known.merchantId,
-                known.locationId,
-                known.deviceId,
-              );
-            }
-            throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
-          }
-          final now = _now();
-          final peer = LocalNetworkDevice(
-            merchantId: device.merchantId,
-            locationId: device.locationId!,
-            deviceId: device.id,
-            role: device.type,
-            stationId: null,
-            address: request.connectionInfo?.remoteAddress.address,
-            port: request.connectionInfo?.remotePort,
-            credentialHash: hash,
-            pairedAt: known?.pairedAt ?? now,
-            lastSeenAt: now,
-            status: 'active',
-          );
-          await _local.writeNetworkDevice(peer);
-          _validatedAt[deviceId] = DateTime.now();
-          _cloudProbeAfter = null;
-          return _LanPeer(peer);
-        }
-        if (response.statusCode < 500) {
-          debugPrint(
-            '[umipos] lan_peer_validation_refused '
-            'status=${response.statusCode}',
-          );
-          if (known != null) {
-            await _local.deleteNetworkDevice(
-              known.merchantId,
-              known.locationId,
-              known.deviceId,
-            );
-          }
-          throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
-        }
-      } on _LanRefusal {
-        rethrow;
-      } catch (error) {
-        debugPrint(
-          '[umipos] lan_peer_validation_unavailable '
-          'type=${error.runtimeType}',
-        );
-        // No cloud answer. A stored credential hash is the only offline trust.
-        _cloudProbeAfter = DateTime.now().add(const Duration(seconds: 30));
-      }
-    }
-    if (known == null ||
-        known.credentialHash != hash ||
-        known.status != 'active') {
-      debugPrint(
-        '[umipos] lan_peer_trust_missing '
-        'known=${known != null} '
-        'hashMatch=${known?.credentialHash == hash} '
-        'status=${known?.status}',
-      );
-      throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
-    }
-    final seen = known.seen(
-      address: request.connectionInfo?.remoteAddress.address,
-      port: request.connectionInfo?.remotePort,
+    final headers = <String, String>{
+      'accept': 'application/json',
+      'x-umi-device-id': deviceId,
+      'x-umi-device-public-id': publicId,
+      'x-umi-installation-id': installationId,
+      'x-umi-device-credential': credential,
+      'x-umi-merchant-id': ?headerMerchant,
+      'x-umi-location-id': ?headerLocation,
+    };
+    final key = [
+      hash,
+      deviceId,
+      publicId,
+      installationId,
+      headerMerchant ?? '',
+      headerLocation ?? '',
+      scopeMerchant ?? '',
+      scopeLocation ?? '',
+    ].join('\u0000');
+    final admission = _admit(
+      key: key,
+      headers: headers,
+      credentialHash: hash,
+      deviceId: deviceId,
+      merchantId: scopeMerchant,
+      locationId: scopeLocation,
+      snapshotBytes: utf8.encode(key).length + utf8.encode(credential).length,
     );
-    await _local.writeNetworkDevice(seen);
-    return _LanPeer(seen);
+    final trust = _freshTrust(
+      deviceId: deviceId,
+      credentialHash: hash,
+      merchantId: scopeMerchant,
+      locationId: scopeLocation,
+    );
+    final trustAgeOk =
+        admission.lastStart != null &&
+        _clock.monotonicNow() - admission.lastStart! < _probePeriod;
+    if (trust != null &&
+        trustAgeOk &&
+        known != null &&
+        known.credentialHash == hash &&
+        known.status == 'active') {
+      final seen = known.seen(
+        address: request.connectionInfo?.remoteAddress.address,
+        port: request.connectionInfo?.remotePort,
+      );
+      await _local.writeNetworkDevice(seen);
+      return _LanPeer(seen);
+    }
+    admission.demand = true;
+    await _tryProbeTurn(key);
+    final validated =
+        _freshTrust(
+          deviceId: deviceId,
+          credentialHash: hash,
+          merchantId: scopeMerchant,
+          locationId: scopeLocation,
+        ) !=
+        null;
+    final leased =
+        validated ||
+        await _hasValidPersistedLease(
+          deviceId: deviceId,
+          credentialHash: hash,
+          merchantId: scopeMerchant,
+          locationId: scopeLocation,
+        );
+    final refreshed = scopeMerchant == null || scopeLocation == null
+        ? null
+        : await _local.readNetworkDevice(
+            scopeMerchant,
+            scopeLocation,
+            deviceId,
+          );
+    if (leased &&
+        refreshed != null &&
+        refreshed.credentialHash == hash &&
+        refreshed.status == 'active') {
+      final seen = refreshed.seen(
+        address: request.connectionInfo?.remoteAddress.address,
+        port: request.connectionInfo?.remotePort,
+      );
+      await _local.writeNetworkDevice(seen);
+      return _LanPeer(seen);
+    }
+    throw const _LanRefusal('DEVICE_REVOKED', HttpStatus.forbidden);
+  }
+
+  Future<void> _writePeerLease({
+    required String merchantId,
+    required String locationId,
+    required String deviceId,
+    required String credentialHash,
+    required DateTime validatedAt,
+  }) => _local.writeDocument(
+    namespace: _leaseNamespace,
+    scopeKey: '$merchantId:$locationId',
+    id: deviceId,
+    payload: {
+      'merchantId': merchantId,
+      'locationId': locationId,
+      'deviceId': deviceId,
+      'credentialHash': credentialHash,
+      'validatedAt': validatedAt.toUtc().toIso8601String(),
+      'expiresAt': validatedAt.toUtc().add(_trustPeriod).toIso8601String(),
+    },
+  );
+
+  Future<void> _deletePeerLease(
+    String? merchantId,
+    String? locationId,
+    String deviceId,
+  ) async {
+    if (merchantId == null || locationId == null) return;
+    await _local.deleteDocument(
+      _leaseNamespace,
+      '$merchantId:$locationId',
+      deviceId,
+    );
+  }
+
+  Future<bool> _hasValidPersistedLease({
+    required String deviceId,
+    required String credentialHash,
+    required String? merchantId,
+    required String? locationId,
+  }) async {
+    if (merchantId == null || locationId == null) return false;
+    final lease = await _local.readDocument(
+      _leaseNamespace,
+      '$merchantId:$locationId',
+      deviceId,
+    );
+    if (lease == null) return false;
+    if (lease['credentialHash'] != credentialHash ||
+        lease['merchantId'] != merchantId ||
+        lease['locationId'] != locationId) {
+      return false;
+    }
+    final validatedAt = DateTime.tryParse(
+      lease['validatedAt'] as String? ?? '',
+    )?.toUtc();
+    final expiresAt = DateTime.tryParse(
+      lease['expiresAt'] as String? ?? '',
+    )?.toUtc();
+    if (validatedAt == null || expiresAt == null) return false;
+    final wall = _clock.wallNow().toUtc();
+    if (wall.isBefore(validatedAt) || !wall.isBefore(expiresAt)) {
+      return false;
+    }
+    return true;
+  }
+
+  _LanTrust? _freshTrust({
+    required String deviceId,
+    required String credentialHash,
+    required String? merchantId,
+    required String? locationId,
+  }) {
+    final trust = _trusted[deviceId];
+    if (trust == null || merchantId == null || locationId == null) {
+      return null;
+    }
+    if (trust.credentialHash != credentialHash ||
+        trust.merchantId != merchantId ||
+        trust.locationId != locationId) {
+      return null;
+    }
+    final wall = _clock.wallNow().toUtc();
+    final monotonic = _clock.monotonicNow();
+    if (wall.isBefore(trust.wallAt) || monotonic < trust.monotonicAt) {
+      _trusted.remove(deviceId);
+      return null;
+    }
+    if (monotonic - trust.monotonicAt >= _trustPeriod) {
+      _trusted.remove(deviceId);
+      return null;
+    }
+    return trust;
   }
 
   void _recordClock(HttpRequest request) {

@@ -62,11 +62,13 @@ import '../features/kitchen/lan_kds_node.dart';
 import '../features/kitchen/lan_kds_store.dart';
 import '../features/kitchen/lan_mdns_advertiser.dart';
 import '../features/kitchen/lan_peer_registration.dart';
+import '../features/offline/cart_provenance.dart';
 import '../features/offline/connectivity_controller.dart';
 import '../features/offline/offline_checkout_service.dart';
 import '../features/offline/offline_journal.dart';
 import '../features/offline/offline_policy.dart';
 import '../features/offline/replay_engine.dart';
+import '../features/offline/sqlite_journal_store.dart';
 import '../features/sale/sale_lifecycle_controller.dart';
 import '../features/sale/sale_repository.dart';
 import '../features/tables/floor_plan_controller.dart';
@@ -98,6 +100,7 @@ final class AppCompositionRoot {
     required this.config,
     required this.controller,
     required this.telemetry,
+    this.telemetryExporter,
     required this.secureStorage,
     required this.preferences,
     required this.localDatabase,
@@ -153,10 +156,26 @@ final class AppCompositionRoot {
 
   factory AppCompositionRoot.production() {
     final config = AppConfig.fromEnvironment();
+    const rawTelemetryEndpoint = String.fromEnvironment(
+      'UMIPOS_TELEMETRY_ENDPOINT',
+      defaultValue: '',
+    );
+    final parsedTelemetryEndpoint = rawTelemetryEndpoint.isEmpty
+        ? null
+        : Uri.tryParse(rawTelemetryEndpoint);
+    final telemetryExporter = BufferedTelemetryExporter(
+      buildVersionProvider: () => config.release.version,
+      endpoint:
+          parsedTelemetryEndpoint != null &&
+              parsedTelemetryEndpoint.hasScheme &&
+              parsedTelemetryEndpoint.hasAuthority
+          ? parsedTelemetryEndpoint
+          : null,
+    );
     final telemetry = SafeTelemetry(
       enabled: config.telemetryEnabled,
       context: TelemetryContext.current(config),
-      exporter: const NoopTelemetryExporter(),
+      exporter: telemetryExporter,
     );
     // The vault backend. Default is the platform credential service. The
     // opt-in `UMIPOS_SECURE_STORAGE=tpm` build seals the vault to the TPM 2.0,
@@ -238,12 +257,15 @@ final class AppCompositionRoot {
     );
     final offlineJournal = EncryptedOfflineJournal(
       PlatformJournalCipherStore(preferences, secureStorage),
+      sqliteStore: kIsWeb ? null : SqliteJournalStore.openDefault(),
+      telemetry: telemetry,
     );
     final policyCache = OfflinePolicyCache(offlineJournal);
     final offlineCheckout = OfflineCheckoutService(
       journal: offlineJournal,
       policyCache: policyCache,
       eligibility: const OfflineCheckoutEligibilityEngine(),
+      telemetry: telemetry,
     );
     final hubGateway = !config.lanNodeEnabled && config.lanHubUri != null
         ? ApiHubCommandGateway(apiClient)
@@ -259,6 +281,7 @@ final class AppCompositionRoot {
       journal: offlineJournal,
       gateway: replayGateway,
       connectivity: connectivity,
+      telemetry: telemetry,
     );
     final hubCommandForwarder = hubGateway == null
         ? null
@@ -303,6 +326,12 @@ final class AppCompositionRoot {
       vault: credentials,
       telemetry: telemetry,
       idleTimeout: const Duration(minutes: 30),
+      offlineRecovery: offlineRecovery,
+    );
+    telemetryExporter.bindRuntimeContext(
+      deviceIdProvider: () => entry.state.device?.id,
+      connectivityStateProvider: () => connectivity.state.name,
+      pendingJournalCountProvider: () => offlineJournal.pendingCount.value,
     );
     Future<LanNodeIdentity?> lanIdentity() async {
       final state = entry.state;
@@ -436,6 +465,7 @@ final class AppCompositionRoot {
       config: config,
       controller: controller,
       telemetry: telemetry,
+      telemetryExporter: telemetryExporter,
       secureStorage: secureStorage,
       preferences: preferences,
       localDatabase: localDatabase,
@@ -536,6 +566,9 @@ final class AppCompositionRoot {
         localFirstFastPathEnabled: config.localFirstFastPathEnabled,
         pendingLocalCommands: () => cart.hasPendingForCurrentCart,
         preserveLocalCommands: cart.preservePendingCommands,
+        loadProvenance: (cart) => CartProvenanceStore(
+          localDatabase,
+        ).cart(cart.merchantId, cart.locationId, cart.id),
         refreshOfflinePolicy: () async {
           final state = entry.state;
           final tenant = state.selectedTenant;
@@ -638,6 +671,7 @@ final class AppCompositionRoot {
   final AppConfig config;
   final BootstrapController controller;
   final Telemetry telemetry;
+  final BufferedTelemetryExporter? telemetryExporter;
   final SecureKeyValueStorage secureStorage;
   final PreferencesStore preferences;
   final LocalDatabase localDatabase;
@@ -793,9 +827,13 @@ final class AppCompositionRoot {
   static const connectivityHeartbeatInterval = Duration(seconds: 10);
   static const connectivityHeartbeatDeadline = Duration(seconds: 4);
 
+  @visibleForTesting
+  Future<void> runConnectivityHeartbeatOnce() => _beat();
+
   Future<void> _beat() async {
     if (_disposed || _heartbeatInFlight) return;
     _heartbeatInFlight = true;
+    var triggerReplay = false;
     try {
       final answer = await apiClient
           .request(
@@ -810,9 +848,7 @@ final class AppCompositionRoot {
         return;
       }
       connectivity.apiReachable(authorityValid: true);
-      // Level-triggered: even without a connectivity edge, a sale waiting in the
-      // journal drains as soon as the API is proven reachable.
-      await offlineRecovery?.replayIfPending();
+      triggerReplay = true;
     } on AppException catch (error) {
       // The server answered. It refused because its budget is full, which is
       // the opposite of an unreachable API: marking it offline would hide the
@@ -826,6 +862,16 @@ final class AppCompositionRoot {
       connectivity.apiFailure();
     } finally {
       _heartbeatInFlight = false;
+    }
+    if (triggerReplay && !_disposed) {
+      // Level-triggered: even without a connectivity edge, a sale waiting in the
+      // journal drains as soon as the API is proven reachable. Run outside
+      // `_heartbeatInFlight` behind `OfflineRecoveryController`'s own guard so
+      // a slow replay never starves `/health/live` reachability detection.
+      final recovery = offlineRecovery;
+      if (recovery != null) {
+        unawaited(recovery.replayIfPending());
+      }
     }
   }
 
@@ -931,6 +977,8 @@ final class AppCompositionRoot {
     if (deviceChannelClose != null) unawaited(deviceChannelClose);
     connectivity.dispose();
     offlineRecovery?.dispose();
+    unawaited(offlineJournal.close());
+    telemetryExporter?.dispose();
     inventory?.dispose();
     final hardwareDispose = hardware?.dispose();
     if (hardwareDispose != null) unawaited(hardwareDispose);

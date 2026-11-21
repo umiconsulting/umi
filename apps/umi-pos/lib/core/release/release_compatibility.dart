@@ -54,6 +54,15 @@ final class ApiReleaseCompatibilityGateway
     }
     final serverContract = _version(server['contractVersion']);
     final clientContract = _version(_config.release.contractVersion);
+    var serverApiMajor = server['apiMajorVersion'];
+    if (serverApiMajor == null &&
+        serverContract != null &&
+        serverContract[0] == 2) {
+      serverApiMajor = 1;
+    }
+    if (serverApiMajor is! int || serverApiMajor != 1) {
+      return ReleaseCompatibility.unsupported;
+    }
     final minimumPos = _version(server['minimumPosVersion']);
     final clientVersion = _version(_config.release.version);
     if ([

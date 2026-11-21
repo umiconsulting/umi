@@ -406,6 +406,7 @@ export class PosOfflineRepository {
       officialId: string | null;
       retryable: boolean;
       id: string;
+      resolutionState: 'open' | 'acknowledged' | 'resolved';
     }>(
       merchantId,
       locationId,
@@ -417,7 +418,7 @@ export class PosOfflineRepository {
               guidance_code AS "guidanceCode",
               correlation_id AS "correlationId",
               official_id::text AS "officialId",
-              retryable,id::text
+              retryable,id::text,resolution_state AS "resolutionState"
        FROM merchant.offline_replay_conflict
        WHERE merchant_id=$1::uuid AND location_id=$2::uuid
          AND device_id=$3::uuid AND credential_version=$4
@@ -427,10 +428,11 @@ export class PosOfflineRepository {
     );
     const row = conflict.rows[0];
     if (!row) return null;
+    const discarded = row.resolutionState === 'resolved';
     return {
       commandId: row.commandId,
       deviceSequence: Number(row.deviceSequence),
-      status: 'conflict' as const,
+      status: discarded ? ('rejected' as const) : ('conflict' as const),
       officialId: row.officialId,
       officialCommit: null,
       serverConflictReference: row.id,
@@ -440,7 +442,7 @@ export class PosOfflineRepository {
         blocksFollowing: row.blocksFollowing,
         operatorActionRequired: row.operatorActionRequired,
         managerActionRequired: row.managerActionRequired,
-        guidanceCode: row.guidanceCode,
+        guidanceCode: discarded ? 'conflict_discarded' : row.guidanceCode,
         correlationId: row.correlationId,
       },
     };
@@ -626,7 +628,8 @@ export class PosOfflineRepository {
          RETURNING device_id
        ),
        conflict_row AS (
-         SELECT id,device_sequence,resolution_state,command_type,stream_key,classification
+         SELECT id,device_sequence,resolution_state,command_type,stream_key,classification,
+                retryable,guidance_code
          FROM merchant.offline_replay_conflict
          WHERE merchant_id=$1::uuid AND location_id=$2::uuid
            AND device_id=$3::uuid AND command_id=$4::uuid
@@ -667,7 +670,22 @@ export class PosOfflineRepository {
              'pos.cart.clear',
              'pos.cart.prepare',
              'pos.cart.fire',
-             'pos.cart.fulfillment.set'
+             'pos.cart.fulfillment.set',
+             -- A KDS transition the kitchen refused is already superseded by the
+             -- server's authoritative ticket state. Leaving it un-discardable
+             -- blocked every following command on the till's stream forever.
+             'pos.kds.command'
+           )
+           -- The KDS type alone is not a verdict. Only the kitchen's own
+           -- non-retryable refusal may be discarded; an integrity, sequence or
+           -- unsupported-command conflict stays for review.
+           AND (
+             c.command_type <> 'pos.kds.command'
+             OR (
+               c.classification='server_validation_failed'
+               AND c.retryable=false
+               AND c.guidance_code LIKE 'kitchen_refusal:%'
+             )
            )
          )
        ),
@@ -839,6 +857,7 @@ export class PosOfflineRepository {
     blocksFollowing: boolean,
     guidanceCode: string = classification,
     retryable = false,
+    managerActionRequired = false,
   ): ReplayResult {
     return {
       commandId: command.commandId,
@@ -852,11 +871,78 @@ export class PosOfflineRepository {
         retryable,
         blocksFollowing,
         operatorActionRequired: true,
-        managerActionRequired: false,
+        managerActionRequired,
         guidanceCode,
         correlationId: command.commandId,
       },
     };
+  }
+
+  private async insertManagerConflictRow(
+    command: OfflineCommand,
+    classification: ConflictClassification,
+    blocksFollowing: boolean,
+    guidanceCode: string,
+    streamKey: string | null,
+    retryable: boolean,
+    advanceProcessed: boolean,
+  ): Promise<string> {
+    return this.pg.runWithMerchant(
+      command.merchantId,
+      getRequestContext()?.userId ?? null,
+      async (client) => {
+        const { rows } = await client.query<{ id: string }>(
+          `INSERT INTO merchant.offline_replay_conflict
+             (merchant_id,location_id,device_id,credential_version,command_id,
+              device_sequence,classification,blocks_following,
+              operator_action_required,manager_action_required,guidance_code,
+              correlation_id,provisional_id,command_type,stream_key,retryable)
+           VALUES
+             ($1::uuid,$2::uuid,$3::uuid,$4,$5::uuid,$6,$7::text,$8,
+              true,true,$9::text,$5::text,$10::uuid,$11::text,$12::text,$13)
+           ON CONFLICT (merchant_id,device_id,command_id) DO UPDATE
+             SET last_observed_at=clock_timestamp()
+           RETURNING id::text AS id`,
+          [
+            command.merchantId,
+            command.locationId,
+            command.deviceId,
+            command.deviceCredentialVersion,
+            command.commandId,
+            command.deviceSequence,
+            classification,
+            blocksFollowing,
+            guidanceCode,
+            normalizeProvisionalId(command.provisionalId),
+            command.commandType,
+            streamKey,
+            retryable,
+          ],
+        );
+        if (advanceProcessed) {
+          await client.query(
+            `INSERT INTO merchant.device_replay_cursor
+               (merchant_id,location_id,device_id,credential_version,last_processed_sequence)
+             VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5)
+             ON CONFLICT (device_id,credential_version) DO UPDATE
+               SET last_processed_sequence=GREATEST(
+                     merchant.device_replay_cursor.last_processed_sequence,
+                     excluded.last_processed_sequence
+                   ),
+                   updated_at=clock_timestamp()`,
+            [
+              command.merchantId,
+              command.locationId,
+              command.deviceId,
+              command.deviceCredentialVersion,
+              command.deviceSequence,
+            ],
+          );
+        }
+        return rows[0].id;
+      },
+      command.locationId,
+    );
   }
 
   async recordConflict(
@@ -864,8 +950,28 @@ export class PosOfflineRepository {
     classification: ConflictClassification,
     blocksFollowing: boolean,
     guidanceCode: string = classification,
+    managerActionRequired = false,
   ): Promise<ReplayResult> {
-    const result = this.conflict(command, classification, blocksFollowing, guidanceCode);
+    const result = this.conflict(
+      command,
+      classification,
+      blocksFollowing,
+      guidanceCode,
+      false,
+      managerActionRequired,
+    );
+    if (managerActionRequired) {
+      const id = await this.insertManagerConflictRow(
+        command,
+        classification,
+        blocksFollowing,
+        guidanceCode,
+        null,
+        false,
+        !blocksFollowing,
+      );
+      return { ...result, serverConflictReference: id };
+    }
     const { rows } = await this.scopedQuery<{ id: string }>(
       command.merchantId,
       command.locationId,
@@ -903,8 +1009,28 @@ export class PosOfflineRepository {
     streamKey: string,
     guidanceCode: string = classification,
     retryable = false,
+    managerActionRequired = false,
   ): Promise<ReplayResult> {
-    const result = this.conflict(command, classification, false, guidanceCode, retryable);
+    const result = this.conflict(
+      command,
+      classification,
+      false,
+      guidanceCode,
+      retryable,
+      managerActionRequired,
+    );
+    if (managerActionRequired) {
+      const id = await this.insertManagerConflictRow(
+        command,
+        classification,
+        false,
+        guidanceCode,
+        streamKey,
+        retryable,
+        true,
+      );
+      return { ...result, serverConflictReference: id };
+    }
     const { rows } = await this.scopedQuery<{ id: string }>(
       command.merchantId,
       command.locationId,

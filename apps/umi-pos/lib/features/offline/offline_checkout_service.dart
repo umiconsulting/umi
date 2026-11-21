@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:umi_contract/umi_contract.dart';
 
+import '../../core/observability/telemetry.dart';
 import 'offline_journal.dart';
 import 'offline_policy.dart';
 
@@ -56,22 +57,36 @@ final class OfflineCheckoutService {
     required EncryptedOfflineJournal journal,
     required OfflinePolicyCache policyCache,
     required OfflineCheckoutEligibilityEngine eligibility,
+    Telemetry? telemetry,
   }) : _journal = journal,
        _policyCache = policyCache,
-       _eligibility = eligibility;
+       _eligibility = eligibility,
+       _telemetry = telemetry;
   final EncryptedOfflineJournal _journal;
   final OfflinePolicyCache _policyCache;
   final OfflineCheckoutEligibilityEngine _eligibility;
+  final Telemetry? _telemetry;
 
   Future<OfflineCashCommit> checkout(
     OfflineCheckoutRequest request, {
     required OfflineCheckoutFacts facts,
     required DateTime now,
   }) async {
-    final policy = await _policyCache.validated(
-      authority: request.authority,
-      now: now,
-    );
+    final ValidatedOfflinePolicy policy;
+    try {
+      policy = await _policyCache.validated(
+        authority: request.authority,
+        now: now,
+      );
+    } on OfflineJournalException catch (error) {
+      _telemetry?.event(
+        ClientEvent(
+          name: 'offline.checkout.blocked',
+          values: {'reason': error.category},
+        ),
+      );
+      rethrow;
+    }
     final journal = await _journal.load();
     final result = _eligibility.evaluate(
       authority: request.authority,
@@ -81,14 +96,25 @@ final class OfflineCheckoutService {
       trustedNow: now,
     );
     if (result.status != 'eligible') {
-      throw OfflineJournalException(
-        result.reason ?? 'offline_checkout_blocked',
+      final reason = result.reason ?? 'offline_checkout_blocked';
+      _telemetry?.event(
+        ClientEvent(
+          name: 'offline.checkout.blocked',
+          values: {'reason': reason},
+        ),
       );
+      throw OfflineJournalException(reason);
     }
     final amountDue =
         request.totals.totals['grandTotal']! as Map<String, Object?>;
     final due = (amountDue['minorUnits']! as num).toInt();
     if (request.amountReceivedMinorUnits < due) {
+      _telemetry?.event(
+        const ClientEvent(
+          name: 'offline.checkout.blocked',
+          values: {'reason': 'cash_received_insufficient'},
+        ),
+      );
       throw const OfflineJournalException('cash_received_insufficient');
     }
     final snapshot = OfflineCheckoutSnapshot(
@@ -128,6 +154,16 @@ final class OfflineCheckoutService {
       maxPendingCashCount: policy.limits.maxOfflineSaleCount,
       maxPendingCashMinorUnits: policy.limits.maxAccumulatedMinorUnits,
       cashAmountMinorUnits: due,
+    );
+    _telemetry?.event(
+      ClientEvent(
+        name: 'offline.checkout.committed',
+        values: {
+          'policyVersion': policy.cash.version,
+          'currency': policy.cash.currency,
+          'deviceSequence': persisted.deviceSequence,
+        },
+      ),
     );
     return OfflineCashCommit(localCommitId: persisted.provisionalId!);
   }

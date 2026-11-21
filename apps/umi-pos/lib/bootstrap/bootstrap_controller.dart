@@ -40,12 +40,45 @@ final class BootstrapController extends ChangeNotifier {
   final Telemetry _telemetry;
   BootstrapState _state = const BootstrapState.initializing();
   bool _running = false;
-  bool _provenCompatibility = false;
+  bool _admissionRevoked = false;
 
   static const _compatibilityKey = 'bootstrap.compatibility_proof.v1';
   static const _compatibilityPreferenceKey = 'bootstrap.compatibility_proof.v1';
   static const _lastFailureKey = 'bootstrap.last_failure';
   static const _proofValidity = Duration(days: 7);
+
+  /// The release probe must not spend the transport's full retry budget before
+  /// a till with a valid cached start can open. A fast incompatible answer is
+  /// still obeyed; only a probe that does not answer within the bound falls back.
+  static const _releaseProbeTimeout = Duration(seconds: 10);
+
+  /// Re-check a locally admitted build without taking the till offline first.
+  ///
+  /// A compatible answer refreshes the proof; an unavailable/transport answer
+  /// leaves the lease in force; an authoritative incompatible answer revokes
+  /// admission so checkout cannot continue under a build the server refuses.
+  Future<void> _refreshCompatibility() async {
+    try {
+      final result = await _releaseCompatibility.check().timeout(
+        _releaseProbeTimeout,
+      );
+      if (result == ReleaseCompatibility.compatible) {
+        await _rememberCompatibility();
+        return;
+      }
+      if (result == ReleaseCompatibility.apiUnavailable) return;
+      _admissionRevoked = true;
+      _setState(
+        BootstrapState(
+          BootstrapPhase.unrecoverableFailure,
+          diagnosticCategory: result.name,
+          diagnosticCode: result.name,
+        ),
+      );
+    } catch (_) {
+      // The lease remains in force when the freshness check cannot complete.
+    }
+  }
 
   /// Records that this build's contract was verified against a live API.
   Future<void> _rememberCompatibility() async {
@@ -127,7 +160,6 @@ final class BootstrapController extends ChangeNotifier {
   Future<void> initialize() async {
     if (_running) return;
     _running = true;
-    _provenCompatibility = false;
     final stopwatch = Stopwatch()..start();
     _setState(const BootstrapState.initializing());
     try {
@@ -146,21 +178,29 @@ final class BootstrapController extends ChangeNotifier {
         _setState(const BootstrapState(BootstrapPhase.sdkUnavailable));
         return;
       }
-      final releaseCompatibility = await _releaseCompatibility.check();
-      if (releaseCompatibility == ReleaseCompatibility.apiUnavailable) {
-        // A till that has already proven this exact build against the API keeps
-        // that proof. Refusing to start because the uplink is down turns a
-        // network outage into "the POS does not open", which is the one outcome
-        // local-first exists to prevent. Anything that is not this build's own
-        // recorded proof — a different contract, a different release, or a
-        // marker older than the serving window — still fails as before.
-        if (await _lastCompatibilityProven() ||
-            await _lastEnrolledStateProven()) {
-          _provenCompatibility = true;
-          _telemetry.event(
-            const ClientEvent(name: 'bootstrap.offline_compatible'),
+      final cachedOfflineStart =
+          await _lastCompatibilityProven() || await _lastEnrolledStateProven();
+      if (cachedOfflineStart) {
+        // The persisted proof is the admission lease. Enter the local-first
+        // state now; the network is a background freshness/revocation signal,
+        // not a gate in front of a till that already proved this build.
+        _telemetry.event(
+          const ClientEvent(name: 'bootstrap.offline_compatible'),
+        );
+        unawaited(_refreshCompatibility());
+      } else {
+        // No lease: this is a first start (or an expired/different build), so
+        // there is nothing safe to admit locally. A bounded online check either
+        // proves compatibility or refuses clearly.
+        late ReleaseCompatibility releaseCompatibility;
+        try {
+          releaseCompatibility = await _releaseCompatibility.check().timeout(
+            _releaseProbeTimeout,
           );
-        } else {
+        } on TimeoutException {
+          releaseCompatibility = ReleaseCompatibility.apiUnavailable;
+        }
+        if (releaseCompatibility == ReleaseCompatibility.apiUnavailable) {
           _setState(
             const BootstrapState(
               BootstrapPhase.recoverableFailure,
@@ -170,20 +210,16 @@ final class BootstrapController extends ChangeNotifier {
           );
           return;
         }
-      }
-      if (releaseCompatibility != ReleaseCompatibility.compatible &&
-          !(releaseCompatibility == ReleaseCompatibility.apiUnavailable &&
-              _provenCompatibility)) {
-        _setState(
-          BootstrapState(
-            BootstrapPhase.unrecoverableFailure,
-            diagnosticCategory: releaseCompatibility.name,
-            diagnosticCode: releaseCompatibility.name,
-          ),
-        );
-        return;
-      }
-      if (releaseCompatibility == ReleaseCompatibility.compatible) {
+        if (releaseCompatibility != ReleaseCompatibility.compatible) {
+          _setState(
+            BootstrapState(
+              BootstrapPhase.unrecoverableFailure,
+              diagnosticCategory: releaseCompatibility.name,
+              diagnosticCode: releaseCompatibility.name,
+            ),
+          );
+          return;
+        }
         await _rememberCompatibility();
       }
       final storage = await _secureStorage.healthCheck();
@@ -197,6 +233,7 @@ final class BootstrapController extends ChangeNotifier {
         );
         return;
       }
+      if (_admissionRevoked) return;
       _setState(const BootstrapState(BootstrapPhase.readyForAuthentication));
     } on AppException catch (error) {
       _setState(
