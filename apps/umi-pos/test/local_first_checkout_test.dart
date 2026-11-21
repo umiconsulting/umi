@@ -10,6 +10,7 @@ import 'package:umi_pos/features/cart/cart_command_queue.dart';
 import 'package:umi_pos/features/cart/cart_repository.dart';
 import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
+import 'package:umi_pos/features/offline/cart_provenance.dart';
 import 'package:umi_pos/features/offline/connectivity_controller.dart';
 import 'package:umi_pos/features/offline/offline_checkout_service.dart';
 import 'package:umi_pos/features/offline/offline_journal.dart';
@@ -242,6 +243,145 @@ void main() {
       expect((totals['grandTotal']! as Map)['minorUnits'], 10000);
     },
   );
+
+  test(
+    'a local confirmation keeps catalogue, price and tax ages apart',
+    () async {
+      final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+      final policyCache = OfflinePolicyCache(journal, web: false);
+      final now = DateTime.now().toUtc();
+      await policyCache.save(_policy(now), now);
+      final connectivity = ConnectivityController()..networkDown();
+      final provenance = CartSourceProvenance(
+        catalogAt: now.subtract(const Duration(minutes: 5)),
+        pricingAt: now.subtract(const Duration(hours: 2)),
+        taxAt: now.subtract(const Duration(minutes: 30)),
+        catalogVersion: 'catalog-7',
+        pricingVersion: 'pricing-3',
+        taxVersion: 'tax-2',
+      );
+      final checkout = CheckoutController(
+        repository: _NeverCheckout(),
+        connectivity: connectivity,
+        offlineCheckout: OfflineCheckoutService(
+          journal: journal,
+          policyCache: policyCache,
+          eligibility: const OfflineCheckoutEligibilityEngine(),
+        ),
+        loadProvenance: (_) async => provenance,
+        preserveLocalCommands: () async => true,
+        telemetry: const SafeTelemetry(
+          enabled: false,
+          context: TelemetryContext(
+            appVersion: 'test',
+            environment: 'test',
+            platform: 'test',
+          ),
+          exporter: NoopTelemetryExporter(),
+        ),
+        localFirstFastPathEnabled: true,
+      );
+      final cart = _cart(now);
+
+      await checkout.preview(
+        merchantId: _merchant,
+        locationId: _location,
+        operatorSessionId: _operator,
+        cartId: _cartId,
+        cartVersion: cart.version,
+        paymentMethod: 'cash',
+        cashShiftId: _shift,
+        cart: cart,
+        authority: _authority(),
+        locationName: 'ONCA',
+        operatorName: 'Ana',
+        cashReceivedMinorUnits: 5000,
+        tenderDrafts: const [
+          {
+            'id': '00000000-0000-4000-8000-000000000007',
+            'type': 'cash',
+            'amount': {'minorUnits': 5000, 'currency': 'MXN'},
+            'amountReceived': {'minorUnits': 5000, 'currency': 'MXN'},
+          },
+        ],
+      );
+
+      final confirmation = checkout.state.result!.confirmation;
+      expect(
+        DateTime.parse(confirmation['snapshotAt']! as String),
+        provenance.pricingAt,
+        reason: 'the confirmation keeps the oldest real source age',
+      );
+      expect(confirmation['catalogVersion'], 'catalog-7');
+      expect(confirmation['pricingVersion'], 'pricing-3');
+      expect(confirmation['taxVersion'], 'tax-2');
+
+      await checkout.confirm();
+      expect(checkout.state.phase, CheckoutPhase.failure);
+      expect(checkout.state.errorCode, 'pricing_stale');
+      expect((await journal.load()).pendingCashCount, 0);
+    },
+  );
+
+  test('fresh recorded sources still allow the local sale', () async {
+    final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+    final policyCache = OfflinePolicyCache(journal, web: false);
+    final now = DateTime.now().toUtc();
+    await policyCache.save(_policy(now), now);
+    final connectivity = ConnectivityController()..networkDown();
+    final provenance = CartSourceProvenance(
+      catalogAt: now.subtract(const Duration(minutes: 2)),
+      pricingAt: now.subtract(const Duration(minutes: 2)),
+      taxAt: now.subtract(const Duration(minutes: 2)),
+    );
+    final checkout = CheckoutController(
+      repository: _NeverCheckout(),
+      connectivity: connectivity,
+      offlineCheckout: OfflineCheckoutService(
+        journal: journal,
+        policyCache: policyCache,
+        eligibility: const OfflineCheckoutEligibilityEngine(),
+      ),
+      loadProvenance: (_) async => provenance,
+      preserveLocalCommands: () async => true,
+      telemetry: const SafeTelemetry(
+        enabled: false,
+        context: TelemetryContext(
+          appVersion: 'test',
+          environment: 'test',
+          platform: 'test',
+        ),
+        exporter: NoopTelemetryExporter(),
+      ),
+      localFirstFastPathEnabled: true,
+    );
+    final cart = _cart(now);
+    await checkout.preview(
+      merchantId: _merchant,
+      locationId: _location,
+      operatorSessionId: _operator,
+      cartId: _cartId,
+      cartVersion: cart.version,
+      paymentMethod: 'cash',
+      cashShiftId: _shift,
+      cart: cart,
+      authority: _authority(),
+      locationName: 'ONCA',
+      operatorName: 'Ana',
+      cashReceivedMinorUnits: 5000,
+      tenderDrafts: const [
+        {
+          'id': '00000000-0000-4000-8000-000000000007',
+          'type': 'cash',
+          'amount': {'minorUnits': 5000, 'currency': 'MXN'},
+          'amountReceived': {'minorUnits': 5000, 'currency': 'MXN'},
+        },
+      ],
+    );
+    await checkout.confirm();
+    expect(checkout.state.phase, CheckoutPhase.completed);
+    expect((await journal.load()).pendingCashCount, 1);
+  });
 
   test('an offline cash sale shows paid totals without a receipt', () async {
     final store = _MemoryCipherStore();

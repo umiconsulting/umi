@@ -33,7 +33,10 @@ final class AppConfig {
       defaultValue: '',
     );
     const apiValue = String.fromEnvironment('UMIPOS_API_BASE_URL');
-    const telemetry = bool.fromEnvironment('UMIPOS_TELEMETRY_ENABLED');
+    const telemetry = bool.fromEnvironment(
+      'UMIPOS_TELEMETRY_ENABLED',
+      defaultValue: true,
+    );
     const diagnostics = bool.fromEnvironment(
       'UMIPOS_DEVELOPMENT_DIAGNOSTICS',
       defaultValue: false,

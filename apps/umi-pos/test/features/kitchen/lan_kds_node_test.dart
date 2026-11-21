@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -22,6 +23,8 @@ const _command = '00000000-0000-4000-8000-000000000008';
 const _idempotency = '00000000-0000-4000-8000-000000000009';
 const _correlation = '00000000-0000-4000-8000-000000000010';
 const _credential = 'paired-device-credential-value';
+const _otherMerchant = '00000000-0000-4000-8000-000000000012';
+const _otherLocation = '00000000-0000-4000-8000-000000000013';
 
 void main() {
   test(
@@ -59,9 +62,7 @@ void main() {
         ),
         cloudBase: Uri.parse('https://cloud.example.test'),
         port: 0,
-        client: MockClient(
-          (_) async => http.Response('{"error":"unavailable"}', 503),
-        ),
+        client: _offlineAfterValidationClient(),
       );
       final bound = await node.start();
       final base = Uri.parse('http://127.0.0.1:${bound.port}');
@@ -555,7 +556,7 @@ void main() {
       ),
       cloudBase: Uri.parse('https://cloud.example.test'),
       port: 0,
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: _offlineAfterValidationClient(),
     );
     final bound = await node.start();
     addTearDown(node.stop);
@@ -619,7 +620,7 @@ void main() {
       ),
       cloudBase: Uri.parse('https://cloud.example.test'),
       port: 0,
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: _offlineAfterValidationClient(),
     );
     final bound = await node.start();
     addTearDown(node.stop);
@@ -721,7 +722,7 @@ void main() {
       ),
       cloudBase: Uri.parse('https://cloud.example.test'),
       port: 0,
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: _offlineAfterValidationClient(),
     );
     final bound = await node.start();
     addTearDown(node.stop);
@@ -839,7 +840,7 @@ void main() {
       ),
       cloudBase: Uri.parse('https://cloud.example.test'),
       port: 0,
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: _offlineAfterValidationClient(),
     );
     final bound = await node.start();
     addTearDown(node.stop);
@@ -909,7 +910,7 @@ void main() {
       ),
       cloudBase: Uri.parse('https://cloud.example.test'),
       port: 0,
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: _offlineAfterValidationClient(),
     );
     final bound = await node.start();
     addTearDown(node.stop);
@@ -986,7 +987,7 @@ void main() {
         return journal.resolveConflictAndRetryFollowing(commandId);
       },
       port: 0,
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: _offlineAfterValidationClient(),
     );
     final bound = await node.start();
     addTearDown(node.stop);
@@ -1086,18 +1087,618 @@ void main() {
     );
     expect(retained.entries.last.status, JournalStatus.pending);
   });
+
+  test(
+    'survives a WAN outage past 300 seconds and refuses at the 12-hour lease boundary',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(_Cloud.valid);
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+      );
+      expect(await _board(harness), 200);
+
+      // The cloud is now absent. A local peer stays admitted past the old 300 s
+      // window through an offline shift, without renewing its lease while offline.
+      cloud.respond = _Cloud.unavailable;
+      clock.advance(const Duration(seconds: 300));
+      expect(await _board(harness), 200);
+
+      clock.advance(const Duration(hours: 11, minutes: 54, seconds: 59));
+      expect(await _board(harness), 200);
+
+      // At 12 hours the persisted lease expires. The cloud is still absent,
+      // so the node refuses instead of trusting indefinitely.
+      clock.advance(const Duration(seconds: 1));
+      expect(await _board(harness), 403);
+    },
+  );
+
+  test(
+    'survives cloud timeout past 300 seconds and refuses once the 12-hour lease expires',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(_Cloud.valid);
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+      );
+      expect(await _board(harness), 200);
+
+      cloud.respond = () async => throw TimeoutException('cloud timeout');
+      clock.advance(const Duration(seconds: 300));
+      expect(await _board(harness), 200);
+
+      clock.advance(const Duration(hours: 12));
+      expect(await _board(harness), 403);
+    },
+  );
+
+  test(
+    'preserves persisted peer lease across hub restart during WAN outage and refuses after expiry',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(_Cloud.valid);
+      final local = _MemoryLocal();
+      final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+      final first = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        local: local,
+        journal: journal,
+      );
+      expect(await _board(first), 200);
+
+      cloud.respond = _Cloud.unavailable;
+      clock.advance(const Duration(seconds: 1));
+      final restarted = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        local: local,
+        journal: journal,
+      );
+      expect(await _board(restarted), 200);
+
+      clock.advance(const Duration(hours: 12));
+      expect(await _board(restarted), 403);
+    },
+  );
+
+  test('rejects a merchant or location scope change', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.valid);
+    final harness = await _startControlled(clock: clock, client: cloud.client);
+    expect(await _board(harness), 200);
+
+    cloud.respond = _Cloud.unavailable;
+    final changed = _headers(
+      merchant: _otherMerchant,
+      location: _otherLocation,
+    );
+    expect(await _board(harness, headers: changed), 403);
+  });
+
+  test('rejects a credential change while the cloud is absent', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.valid);
+    final harness = await _startControlled(clock: clock, client: cloud.client);
+    expect(await _board(harness), 200);
+
+    cloud.respond = _Cloud.unavailable;
+    expect(
+      await _board(harness, headers: _headers(credential: 'rotated')),
+      403,
+    );
+  });
+
+  test('rejects a wall-clock rollback', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.valid);
+    final harness = await _startControlled(clock: clock, client: cloud.client);
+    expect(await _board(harness), 200);
+
+    clock.advance(const Duration(seconds: 10));
+    clock.moveWallBack(const Duration(seconds: 20));
+    cloud.respond = _Cloud.unavailable;
+    expect(await _board(harness), 403);
+  });
+
+  test(
+    'five 403 refusals within 30 seconds start exactly one cloud probe',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(() async => http.Response('{}', 403));
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        seedDevice: false,
+      );
+
+      for (var request = 0; request < 5; request += 1) {
+        clock.advance(const Duration(seconds: 1));
+        expect(await _board(harness), 403);
+      }
+      expect(cloud.calls, 1);
+      expect(
+        await harness.local.readNetworkDevice(_merchant, _location, _peer),
+        isNull,
+      );
+    },
+  );
+
+  test('alternating refused credentials cannot bypass the backoff', () async {
+    final clock = _FakeClock();
+    final credentials = <String>[];
+    final client = MockClient((request) async {
+      credentials.add(request.headers['x-umi-device-credential'] ?? '');
+      return http.Response('{}', 403);
+    });
+    final harness = await _startControlled(
+      clock: clock,
+      client: client,
+      seedDevice: false,
+    );
+
+    for (var request = 0; request < 5; request += 1) {
+      clock.advance(const Duration(seconds: 1));
+      final credential = request.isEven ? 'refused-a' : 'refused-b';
+      expect(
+        await _board(harness, headers: _headers(credential: credential)),
+        403,
+      );
+    }
+    expect(credentials, hasLength(2));
+    expect(credentials.toSet(), {'refused-a', 'refused-b'});
+  });
+
+  for (final refusedCount in [2, 8]) {
+    for (final order in ['refused-first', 'genuine-first']) {
+      test('genuine probes within the fairness bound with '
+          '$refusedCount refused, $order', () async {
+        final clock = _FakeClock();
+        final credentials = <String>[];
+        var firstGenuineSecond = -1;
+        final client = MockClient((request) async {
+          final credential = request.headers['x-umi-device-credential'] ?? '';
+          credentials.add(credential);
+          if (credential == 'genuine' && firstGenuineSecond < 0) {
+            firstGenuineSecond = clock.monotonicNow().inSeconds;
+          }
+          return http.Response('{}', 403);
+        });
+        final harness = await _startControlled(
+          clock: clock,
+          client: client,
+          seedDevice: false,
+        );
+
+        for (var second = 0; second < 45; second += 1) {
+          clock.advance(const Duration(seconds: 1));
+          final refused = List.generate(
+            refusedCount,
+            (index) => 'refused-${index + 1}',
+          );
+          final batch = order == 'genuine-first'
+              ? ['genuine', ...refused]
+              : [...refused, 'genuine'];
+          for (final credential in batch) {
+            expect(
+              await _board(harness, headers: _headers(credential: credential)),
+              403,
+            );
+          }
+        }
+
+        final genuineProbes = credentials
+            .where((credential) => credential == 'genuine')
+            .length;
+        expect(firstGenuineSecond, greaterThanOrEqualTo(0));
+        expect(genuineProbes, greaterThanOrEqualTo(1));
+        expect(firstGenuineSecond, lessThanOrEqualTo(45));
+        expect(credentials, hasLength(lessThanOrEqualTo(25)));
+      });
+    }
+  }
+
+  test(
+    'a genuine credential probes within three windows of sustained rotation',
+    () async {
+      final clock = _FakeClock();
+      final credentials = <String>[];
+      var firstGenuineSecond = -1;
+      final client = MockClient((request) async {
+        final credential = request.headers['x-umi-device-credential'] ?? '';
+        credentials.add(credential);
+        if (credential == 'genuine' && firstGenuineSecond < 0) {
+          firstGenuineSecond = clock.monotonicNow().inSeconds;
+        }
+        return http.Response('{}', 403);
+      });
+      final harness = await _startControlled(
+        clock: clock,
+        client: client,
+        seedDevice: false,
+      );
+
+      // Three 30s windows. Each second, in order: refused-a, refused-b,
+      // genuine. The same two attackers repeat in every window.
+      for (var second = 0; second < 90; second += 1) {
+        clock.advance(const Duration(seconds: 1));
+        for (final credential in ['refused-a', 'refused-b', 'genuine']) {
+          expect(
+            await _board(harness, headers: _headers(credential: credential)),
+            403,
+          );
+        }
+      }
+
+      final genuineProbes = credentials
+          .where((credential) => credential == 'genuine')
+          .length;
+      expect(genuineProbes, greaterThan(0));
+      expect(genuineProbes, lessThanOrEqualTo(3));
+      // Rate is burst 2, then one probe per 2s after 5s.
+      expect(credentials, hasLength(lessThanOrEqualTo(46)));
+      expect(firstGenuineSecond, lessThanOrEqualTo(45));
+    },
+  );
+
+  test(
+    'five distinct refused credentials stay within the strict pacing bound',
+    () async {
+      final clock = _FakeClock();
+      final credentials = <String>[];
+      final starts = <Duration>[];
+      final client = MockClient((request) async {
+        credentials.add(request.headers['x-umi-device-credential'] ?? '');
+        starts.add(clock.monotonicNow());
+        return http.Response('{}', 403);
+      });
+      final harness = await _startControlled(
+        clock: clock,
+        client: client,
+        seedDevice: false,
+      );
+
+      for (final credential in [
+        'refused-a',
+        'refused-b',
+        'refused-c',
+        'refused-d',
+        'refused-e',
+        'refused-a',
+      ]) {
+        clock.advance(const Duration(seconds: 1));
+        expect(
+          await _board(harness, headers: _headers(credential: credential)),
+          403,
+        );
+      }
+      // Strict pacing: at most one start every 2s. Six seconds allow at most
+      // four starts; each consecutive start is at least 2s apart.
+      expect(credentials, hasLength(lessThanOrEqualTo(4)));
+      for (var index = 1; index < starts.length; index += 1) {
+        expect(
+          starts[index] - starts[index - 1] >= const Duration(seconds: 2),
+          isTrue,
+        );
+      }
+    },
+  );
+
+  test('a 2xx identity mismatch arms the backoff and probes once', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(
+      () async => http.Response(
+        jsonEncode({
+          ..._deviceJson(),
+          'locationId': '00000000-0000-4000-8000-000000000099',
+        }),
+        200,
+        headers: {'content-type': 'application/json'},
+      ),
+    );
+    final harness = await _startControlled(
+      clock: clock,
+      client: cloud.client,
+      seedDevice: false,
+    );
+
+    for (var request = 0; request < 5; request += 1) {
+      clock.advance(const Duration(seconds: 1));
+      expect(await _board(harness), 403);
+    }
+    expect(cloud.calls, 1);
+    expect(
+      await harness.local.readNetworkDevice(_merchant, _location, _peer),
+      isNull,
+    );
+  });
+
+  test(
+    'a refused device probes again only after the 30 second backoff',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(() async => http.Response('{}', 403));
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        seedDevice: false,
+      );
+
+      expect(await _board(harness), 403);
+      expect(cloud.calls, 1);
+      clock.advance(const Duration(seconds: 30));
+      expect(await _board(harness), 403);
+      expect(cloud.calls, 2);
+    },
+  );
+
+  test(
+    'an unknown device starts at most one cloud probe in 30 seconds',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(_Cloud.unavailable);
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        seedDevice: false,
+      );
+
+      for (var request = 0; request < 5; request += 1) {
+        expect(await _board(harness), 403);
+      }
+      expect(cloud.calls, 1);
+    },
+  );
+
+  test('a failed probe holds the backoff for the next request', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.unavailable);
+    final harness = await _startControlled(
+      clock: clock,
+      client: cloud.client,
+      seedDevice: false,
+    );
+
+    expect(await _board(harness), 403);
+    expect(await _board(harness), 403);
+    expect(cloud.calls, 1);
+  });
+
+  test('the next cloud probe occurs after 30 seconds', () async {
+    final clock = _FakeClock();
+    final cloud = _Cloud(_Cloud.unavailable);
+    final harness = await _startControlled(
+      clock: clock,
+      client: cloud.client,
+      seedDevice: false,
+    );
+
+    expect(await _board(harness), 403);
+    clock.advance(const Duration(seconds: 30));
+    expect(await _board(harness), 403);
+    expect(cloud.calls, 2);
+  });
+
+  test(
+    'an explicit cloud rejection removes trust and keeps the node',
+    () async {
+      final clock = _FakeClock();
+      final cloud = _Cloud(_Cloud.valid);
+      final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+      final harness = await _startControlled(
+        clock: clock,
+        client: cloud.client,
+        journal: journal,
+      );
+      expect(await _board(harness), 200);
+
+      await journal.append(
+        commandId: _command,
+        deviceId: _host,
+        credentialVersion: 1,
+        merchantId: _merchant,
+        locationId: _location,
+        operatorSessionId: _session,
+        idempotencyKey: _idempotency,
+        payload: {'acknowledgement': 'safe'},
+      );
+
+      cloud.respond = () async => http.Response('{}', 403);
+      clock.advance(const Duration(seconds: 31));
+      expect(await _board(harness), 403);
+      expect(
+        await harness.local.readNetworkDevice(_merchant, _location, _peer),
+        isNull,
+      );
+      expect((await journal.load()).entries, hasLength(1));
+      expect(
+        (await journal.load()).entries.single.status,
+        JournalStatus.pending,
+      );
+
+      // The refusal removed trust; it did not stop the existing KDS node.
+      final health = await http.get(harness.base.resolve('/health/live'));
+      expect(health.statusCode, 200);
+    },
+  );
 }
 
-Map<String, String> _headers({String credential = _credential}) => {
+Map<String, String> _headers({
+  String credential = _credential,
+  String merchant = _merchant,
+  String location = _location,
+}) => {
   'content-type': 'application/json',
   'x-umi-device-id': _peer,
   'x-umi-device-public-id': _peer,
   'x-umi-installation-id': '00000000-0000-4000-8000-000000000011',
   'x-umi-device-credential': credential,
-  'x-umi-merchant-id': _merchant,
-  'x-umi-location-id': _location,
+  'x-umi-merchant-id': merchant,
+  'x-umi-location-id': location,
   'x-umi-client-time': DateTime.now().toUtc().toIso8601String(),
 };
+
+Map<String, Object?> _deviceJson() => {
+  'id': _peer,
+  'publicId': _peer,
+  'merchantId': _merchant,
+  'locationId': _location,
+  'displayName': 'KDS Cocina',
+  'type': 'kds',
+  'platform': 'android',
+  'mobility': 'static',
+  'state': 'active',
+  'credentialVersion': 1,
+  'lastSeenAt': null,
+  'rotationRequired': false,
+  'revokedAt': null,
+  'replacementDeviceId': null,
+};
+
+/// The cloud validates once, then stops answering. A wrong credential is
+/// refused, so a stranger cannot use the same helper to pair.
+http.Client _offlineAfterValidationClient() => MockClient((request) async {
+  if (request.url.path == '/api/v1/devices/status') {
+    if (request.headers['x-umi-device-credential'] == _credential) {
+      return http.Response(
+        jsonEncode(_deviceJson()),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    }
+    return http.Response('{}', 403);
+  }
+  return http.Response('{}', 503);
+});
+
+final class _FakeClock implements LanNodeClock {
+  _FakeClock() : _wall = DateTime.utc(2026, 11, 15, 0, 0, 0);
+
+  DateTime _wall;
+  Duration _monotonic = Duration.zero;
+
+  @override
+  DateTime wallNow() => _wall;
+
+  @override
+  Duration monotonicNow() => _monotonic;
+
+  void advance(Duration delta) {
+    _wall = _wall.add(delta);
+    _monotonic += delta;
+  }
+
+  void moveWallBack(Duration delta) {
+    _wall = _wall.subtract(delta);
+  }
+}
+
+final class _Cloud {
+  _Cloud(this.respond);
+
+  Future<http.Response> Function() respond;
+  int calls = 0;
+  late final http.Client client = MockClient((_) {
+    calls += 1;
+    return respond();
+  });
+
+  static Future<http.Response> valid() async => http.Response(
+    jsonEncode(_deviceJson()),
+    200,
+    headers: {'content-type': 'application/json'},
+  );
+
+  static Future<http.Response> unavailable() async => http.Response('{}', 503);
+}
+
+final class _ControlledHarness {
+  const _ControlledHarness({
+    required this.local,
+    required this.journal,
+    required this.base,
+    required this.client,
+  });
+
+  final _MemoryLocal local;
+  final EncryptedOfflineJournal journal;
+  final Uri base;
+  final http.Client client;
+}
+
+Future<_ControlledHarness> _startControlled({
+  required _FakeClock clock,
+  required http.Client client,
+  _MemoryLocal? local,
+  EncryptedOfflineJournal? journal,
+  bool seedDevice = true,
+}) async {
+  final resolvedLocal = local ?? _MemoryLocal();
+  final resolvedJournal =
+      journal ?? EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+  final store = LanKdsStore(resolvedLocal);
+  await store.saveCloudBoard(_merchant, _location, [_ticketMap()]);
+  if (seedDevice) {
+    await resolvedLocal.writeNetworkDevice(
+      LocalNetworkDevice(
+        merchantId: _merchant,
+        locationId: _location,
+        deviceId: _peer,
+        role: 'kds',
+        stationId: null,
+        address: null,
+        port: null,
+        credentialHash: sha256.convert(utf8.encode(_credential)).toString(),
+        pairedAt: DateTime.now().toUtc().toIso8601String(),
+        lastSeenAt: DateTime.now().toUtc().toIso8601String(),
+        status: 'active',
+      ),
+    );
+  }
+  final node = LanKdsNode(
+    local: resolvedLocal,
+    journal: resolvedJournal,
+    store: store,
+    identity: () async => const LanNodeIdentity(
+      merchantId: _merchant,
+      locationId: _location,
+      operatorSessionId: _session,
+      deviceId: _host,
+      credentialVersion: 1,
+    ),
+    cloudBase: Uri.parse('https://cloud.example.test'),
+    port: 0,
+    client: client,
+    clock: clock,
+  );
+  final bound = await node.start();
+  addTearDown(node.stop);
+  // One client keeps one connection. A new client per request exhausts the
+  // ephemeral ports on the macOS runner after a few thousand requests.
+  final httpClient = http.Client();
+  addTearDown(httpClient.close);
+  return _ControlledHarness(
+    local: resolvedLocal,
+    journal: resolvedJournal,
+    base: Uri.parse('http://127.0.0.1:${bound.port}'),
+    client: httpClient,
+  );
+}
+
+Future<int> _board(
+  _ControlledHarness harness, {
+  Map<String, String>? headers,
+}) async {
+  final response = await harness.client.post(
+    harness.base.resolve('/api/kds/board'),
+    headers: headers ?? _headers(),
+    body: jsonEncode({'action': 'snapshot'}),
+  );
+  return response.statusCode;
+}
 
 Cart _cartForTicket(String fulfillmentType) => Cart(
   id: '00000000-0000-4000-8000-000000000060',

@@ -86,6 +86,7 @@ final class CartCommandQueue {
     required void Function(String event) onEvent,
     required void Function(bool busy) onBusy,
     void Function()? onSettled,
+    void Function()? onDurabilityChanged,
     ConnectivityController? connectivity,
     OfflineRecoveryController? recovery,
     HubCommandForwarder? hub,
@@ -97,6 +98,7 @@ final class CartCommandQueue {
        _onEvent = onEvent,
        _onBusy = onBusy,
        _onSettled = onSettled,
+       _onDurabilityChanged = onDurabilityChanged,
        _connectivity = connectivity,
        _recovery = recovery,
        _hub = hub {
@@ -114,6 +116,7 @@ final class CartCommandQueue {
   final void Function(String event) _onEvent;
   final void Function(bool busy) _onBusy;
   final void Function()? _onSettled;
+  final void Function()? _onDurabilityChanged;
   final ConnectivityController? _connectivity;
   final OfflineRecoveryController? _recovery;
   final HubCommandForwarder? _hub;
@@ -122,6 +125,7 @@ final class CartCommandQueue {
   final Map<String, String> _cartAliases = {};
   final Map<String, String> _lineAliases = {};
   final Set<String> _journaledCommands = {};
+  final Set<String> _unconfirmed = {};
   Cart? _serverCart;
   Future<void> _journalTail = Future<void>.value();
   Future<void>? _journalInspection;
@@ -137,11 +141,22 @@ final class CartCommandQueue {
   int get pendingCount => _commands.length;
   bool get awaitsSynchronization => _journalBacked && _commands.isNotEmpty;
 
+  /// Commands painted on the cart whose append has not completed yet.
+  ///
+  /// Until the encrypted journal owns a command it is a prediction, not saved
+  /// work. The cart shows this so a blocked or failed write is visible to the
+  /// operator instead of looking like a completed edit.
+  bool get hasUnconfirmedChanges => _unconfirmed.isNotEmpty;
+  int get unconfirmedCount => _unconfirmed.length;
+  List<String> get unconfirmedCommandIds =>
+      List<String>.unmodifiable(_unconfirmed);
+
   void clearLocal() {
     _selectionGeneration += 1;
     _commands.clear();
     _cartAliases.clear();
     _lineAliases.clear();
+    _unconfirmed.clear();
     _serverCart = null;
   }
 
@@ -155,6 +170,7 @@ final class CartCommandQueue {
     _cartAliases.clear();
     _lineAliases.clear();
     _journaledCommands.clear();
+    _unconfirmed.clear();
     _journalBacked = false;
   }
 
@@ -199,9 +215,22 @@ final class CartCommandQueue {
     final painted = command.predict(current, _lineAliases);
     if (painted == null) return null;
     _commands.add(command);
+    _unconfirmed.add(command.commandId);
     _emitPrediction();
     unawaited(_start());
     return _compose();
+  }
+
+  /// Submit with the durability the current lane actually requires.
+  ///
+  /// Online, the command can still go straight to the API. On the journal lane
+  /// (offline, hub, or a lane already backed by durable commands) the caller
+  /// must not receive a successful paint before the append completes.
+  Future<Cart?> submitDurable(QueuedCartCommand command) {
+    if (_journalBacked || _knownOffline || _hub != null) {
+      return submitAndPersist(command);
+    }
+    return Future<Cart?>.value(submit(command));
   }
 
   /// Submit a command that must reach the journal before the UI paints it.
@@ -216,11 +245,18 @@ final class CartCommandQueue {
     final painted = command.predict(current, _lineAliases);
     if (painted == null) return null;
     _commands.add(command);
+    _unconfirmed.add(command.commandId);
     _journalBacked = true;
     await _persistPending();
     if (_disposed || !_journaledCommands.contains(command.commandId)) {
+      // The append failed. Do not leave a fire prediction painted as if the
+      // order had been accepted by the journal or by the kitchen.
+      _commands.remove(command);
+      _unconfirmed.remove(command.commandId);
+      _emitPrediction();
       return null;
     }
+    _unconfirmed.remove(command.commandId);
     _emitPrediction();
     unawaited(_start());
     return _compose();
@@ -293,6 +329,8 @@ final class CartCommandQueue {
         try {
           final result = await _execute(command);
           _commands.removeAt(0);
+          _unconfirmed.remove(command.commandId);
+          _onDurabilityChanged?.call();
           if (command.commandType == 'pos.cart.line.add') {
             _rememberAddedLine(command, result.cart);
           }
@@ -308,6 +346,8 @@ final class CartCommandQueue {
             break;
           }
           _commands.removeAt(0);
+          _unconfirmed.remove(command.commandId);
+          _onDurabilityChanged?.call();
           _emitPrediction();
           _onError(error);
         } catch (_) {
@@ -589,13 +629,87 @@ final class CartCommandQueue {
     if (provisionalLineId == null) return;
     final productId = command.payload['productId'];
     if (productId is! String) return;
+
+    // 1. Prefer an exact clientLineId echo when the server preserves it.
     for (final raw in serverCart.items) {
       final line = CartItem.fromJson(raw);
-      if (line.productId == productId) {
+      if (line.id == provisionalLineId) {
         _lineAliases[provisionalLineId] = line.id;
         return;
       }
     }
+
+    // 2. Match by the full line identity tuple:
+    // (productId, variantId, modifiers signature, courseNumber, note).
+    // Matching on productId alone aliases two distinct lines of the same
+    // product (e.g. Chai Oat Milk vs Chai Almond Milk) onto the first line.
+    final targetVariantId = command.payload['variantId'] as String?;
+    final targetModifiers = _modifiersSignature(
+      command.payload['modifierSelections'],
+    );
+    final targetCourse =
+        (command.payload['courseNumber'] as num?)?.toInt() ?? 1;
+    final targetNote = _normalizeLineNote(command.payload['note'] as String?);
+
+    final priorIds = <String>{
+      for (final raw in _serverCart?.items ?? const <Map<String, Object?>>[])
+        if (raw['id'] case final String id) id,
+    };
+    final claimedIds = _lineAliases.values.toSet();
+
+    final matches = <CartItem>[];
+    for (final raw in serverCart.items) {
+      final line = CartItem.fromJson(raw);
+      if (line.productId != productId) continue;
+      if (_lineVariantId(line) != targetVariantId) continue;
+      if (_modifiersSignature(line.modifiers) != targetModifiers) continue;
+      if (line.courseNumber != targetCourse) continue;
+      if (_normalizeLineNote(line.note) != targetNote) continue;
+      matches.add(line);
+    }
+    if (matches.isEmpty) return;
+
+    for (final line in matches) {
+      if (!priorIds.contains(line.id) && !claimedIds.contains(line.id)) {
+        _lineAliases[provisionalLineId] = line.id;
+        return;
+      }
+    }
+    for (final line in matches) {
+      if (!claimedIds.contains(line.id)) {
+        _lineAliases[provisionalLineId] = line.id;
+        return;
+      }
+    }
+    _lineAliases[provisionalLineId] = matches.last.id;
+  }
+
+  String? _lineVariantId(CartItem line) {
+    final variant = line.variant;
+    if (variant == null) return null;
+    final variantId = variant['variantId'] ?? variant['id'];
+    return variantId is String && variantId.isNotEmpty ? variantId : null;
+  }
+
+  String _modifiersSignature(Object? raw) {
+    if (raw is! List) return '';
+    final parts = <String>[];
+    for (final entry in raw) {
+      if (entry is! Map) continue;
+      final modifierId = entry['modifierId'] ?? entry['id'];
+      if (modifierId is! String || modifierId.isEmpty) continue;
+      final quantity = (entry['quantity'] as num?)?.toInt() ?? 1;
+      if (quantity <= 0) continue;
+      parts.add('$modifierId:$quantity');
+    }
+    parts.sort();
+    return parts.join(',');
+  }
+
+  String? _normalizeLineNote(String? note) {
+    if (note == null) return null;
+    final trimmed = note.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   String _aliasedLine(String lineId) => _lineAliases[lineId] ?? lineId;
@@ -652,10 +766,13 @@ final class CartCommandQueue {
           hubOwned: _hub != null,
         );
         _journaledCommands.add(command.commandId);
+        _unconfirmed.remove(command.commandId);
+        _onDurabilityChanged?.call();
       }
     });
     _journalTail = operation.then<void>((_) {}, onError: (_, _) {});
     return operation.catchError((Object error) {
+      _onDurabilityChanged?.call();
       _onError(
         AppException(
           category: AppErrorCategory.storage,
@@ -718,7 +835,14 @@ final class CartCommandQueue {
     unawaited(
       _journalTail
           .then((_) async {
-            await recovery.recover(scope.replayScope);
+            if (recovery.status.phase == RecoveryPhase.blockedByConflict) {
+              // Respect the recovery controller's conflict watermark so every
+              // 10s connectivity heartbeat does not hammer /offline/replay/begin
+              // and /offline/reconcile when zero new unblocked work exists.
+              await recovery.replayIfPending();
+            } else {
+              await recovery.recover(scope.replayScope);
+            }
             _replayScheduled = false;
           })
           .catchError((_) {
@@ -730,6 +854,7 @@ final class CartCommandQueue {
   bool _recoveryNeedsOperator(RecoveryPhase phase) =>
       phase == RecoveryPhase.blockedByConflict ||
       phase == RecoveryPhase.blockedByDevice ||
+      phase == RecoveryPhase.blockedByAuth ||
       phase == RecoveryPhase.blockedByStorage ||
       phase == RecoveryPhase.waitingForCapacity;
 
@@ -819,6 +944,24 @@ final class CartCommandQueue {
     } finally {
       _reconciling = false;
     }
+  }
+
+  /// Drop a refused command and every later command for the same cart. The
+  /// server cart is the only base after a financial hold.
+  void dropRefused(String commandId) {
+    final index = _commands.indexWhere(
+      (command) => command.commandId == commandId,
+    );
+    if (index < 0) return;
+    final cartId = _commands[index].payload['cartId'];
+    final removed = _commands.sublist(index);
+    _commands.removeAt(index);
+    _commands.removeWhere((command) => command.payload['cartId'] == cartId);
+    for (final command in removed) {
+      _unconfirmed.remove(command.commandId);
+    }
+    _onDurabilityChanged?.call();
+    _emitPrediction();
   }
 
   Future<void> _settleAfterReplay() async {

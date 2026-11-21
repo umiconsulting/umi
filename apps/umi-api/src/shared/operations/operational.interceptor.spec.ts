@@ -51,6 +51,56 @@ describe('OperationalInterceptor', () => {
     ]);
   });
 
+  it('names the exhausted scope in the refusal and its headers', async () => {
+    const hit = vi.fn().mockImplementation((key: string) => ({
+      allowed: !key.startsWith('http:device:'),
+      remaining: key.startsWith('http:device:') ? 0 : 10,
+      resetAt: Date.now() + 12_000,
+    }));
+    const request = {
+      method: 'GET',
+      ip: '127.0.0.1',
+      headers: { 'x-umi-device-id': 'device-1' },
+      routeOptions: { url: '/api/v1/kitchen/board' },
+      authUser: { id: 'user-1' },
+    } as unknown as FastifyRequest;
+    const header = vi.fn();
+    const reply = { statusCode: 200, header } as unknown as FastifyReply;
+    const context = {
+      getType: () => 'http',
+      switchToHttp: () => ({ getRequest: () => request, getResponse: () => reply }),
+    } as unknown as ExecutionContext;
+    const interceptor = new OperationalInterceptor(
+      { hit } as unknown as RateLimitService,
+      new MetricsService(),
+    );
+    const next: CallHandler = { handle: () => of('ok') };
+
+    let failure: { getResponse(): unknown } | null = null;
+    try {
+      await runWithRequestContext(
+        {
+          requestId: 'request-1',
+          correlationId: 'correlation-1',
+          userId: 'user-1',
+          merchantId: 'tenant-1',
+          locationId: 'branch-1',
+        },
+        () => lastValueFrom(interceptor.intercept(context, next)),
+      );
+    } catch (error) {
+      failure = error as { getResponse(): unknown };
+    }
+
+    expect(failure).not.toBeNull();
+    expect(failure!.getResponse()).toMatchObject({
+      code: 'RATE_LIMITED',
+      scope: 'device',
+    });
+    expect(header).toHaveBeenCalledWith('x-umi-ratelimit-scope', 'device');
+    expect(header).toHaveBeenCalledWith('retry-after', expect.any(String));
+  });
+
   it('never refuses a liveness probe, whose job is to report the process', async () => {
     const hit = vi.fn();
     const request = {

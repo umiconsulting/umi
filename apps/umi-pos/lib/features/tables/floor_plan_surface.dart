@@ -310,6 +310,20 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                   ),
                 ],
               ),
+            if (room != null && room.pendingLocalCommands.isNotEmpty)
+              PosNoticeBanner(
+                content: Text(
+                  es
+                      ? 'Hay cambios locales pendientes de confirmar. Se muestran en el plano y se reintentarán solos.'
+                      : 'Local changes are waiting for confirmation. They are shown here and will retry automatically.',
+                ),
+                actions: [
+                  PosTextButton(
+                    onPressed: _load,
+                    child: Text(es ? 'Actualizar' : 'Refresh'),
+                  ),
+                ],
+              ),
             if (room?.errorCode != null) _failureBanner(room!, l10n),
             if (_notice != null)
               PosNoticeBanner(

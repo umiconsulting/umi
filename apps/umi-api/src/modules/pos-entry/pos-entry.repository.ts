@@ -229,12 +229,10 @@ export class PosEntryRepository {
       }
       const prior = candidates.rows[0];
       const resumed = prior != null && prior.durableSessionId !== input.durableSessionId;
-      const permissions =
-        !prior || authorized.permissions.includes('*')
-          ? (prior?.permissions ?? authorized.permissions)
-          : prior.permissions.includes('*')
-            ? authorized.permissions
-            : prior.permissions.filter((permission) => authorized.permissions.includes(permission));
+      // Always reflect the staff member's live authorization when starting or
+      // resuming a session so newly granted permissions (e.g. `order.fire`) are
+      // picked up on PIN unlock while revoked permissions are still removed.
+      const permissions = authorized.permissions;
       if (prior) {
         await client.query(
           `UPDATE runtime.operator_session SET state='ended',ended_at=now(),last_activity_at=now()
