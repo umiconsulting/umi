@@ -7,6 +7,7 @@ import '../../core/errors/app_error.dart';
 import '../../core/navigation/app_navigation.dart';
 import '../../core/observability/telemetry.dart';
 import '../../core/security/credential_vault.dart';
+import '../offline/replay_engine.dart';
 import 'entry_gateway.dart';
 
 enum EntryPhase {
@@ -54,14 +55,17 @@ final class EntryController extends ChangeNotifier {
     required CredentialVault vault,
     required Telemetry telemetry,
     Duration? idleTimeout,
+    OfflineRecoveryController? offlineRecovery,
   }) : _gateway = gateway,
        _vault = vault,
        _telemetry = telemetry,
-       _idleTimeout = idleTimeout;
+       _idleTimeout = idleTimeout,
+       _offlineRecovery = offlineRecovery;
 
   final EntryGateway _gateway;
   final CredentialVault _vault;
   final Telemetry _telemetry;
+  final OfflineRecoveryController? _offlineRecovery;
 
   /// Retira el destino de avisos antes de cerrar una sesión de forma explícita.
   /// Un fallo de red no impide el cierre; el servidor también revoca la sesión.
@@ -206,6 +210,7 @@ final class EntryController extends ChangeNotifier {
         return;
       }
       _set(EntryState(EntryPhase.pinRequired, device: device));
+      _offlineRecovery?.clearScope();
       await _vault.clearSession();
     } on TimeoutException {
       // A stalled secure-storage read must not leave the terminal on a spinner.
@@ -574,6 +579,7 @@ final class EntryController extends ChangeNotifier {
       // knows its tenant and branch, mirroring loginWithPin.
       await _resolveContext();
     } catch (_) {
+      _offlineRecovery?.clearScope();
       await _vault.clearSession();
       _set(EntryState(EntryPhase.pinRequired, device: _state.device));
     }
@@ -785,6 +791,7 @@ final class EntryController extends ChangeNotifier {
   Future<void> lock() async {
     final operator = _state.operator;
     if (operator == null) return;
+    _offlineRecovery?.clearScope();
     try {
       await _gateway.lockOperator(operator.id);
     } on AppException catch (error) {
@@ -798,14 +805,24 @@ final class EntryController extends ChangeNotifier {
       // The local lock remains authoritative for the presentation state.
       // Server session expiry and the next PIN authentication fail closed.
     }
+    _offlineRecovery?.clearScope();
     await _vault.clearSession();
     await _vault.clearEntrySnapshot();
     _event('operator.locked');
     _set(EntryState(EntryPhase.pinRequired, device: _state.device));
   }
 
+  Future<void> clearSession() async {
+    _offlineRecovery?.clearScope();
+    await _vault.clearSession();
+    await _vault.clearEntrySnapshot();
+    _operatorName = null;
+    _set(EntryState(EntryPhase.pinRequired, device: _state.device));
+  }
+
   Future<void> reselectBranch() async {
     await _notifyBeforeLogout();
+    _offlineRecovery?.clearScope();
     final operator = _state.operator;
     if (operator != null) await _gateway.endOperator(operator.id);
     final tenant = _state.selectedTenant;
@@ -875,6 +892,7 @@ final class EntryController extends ChangeNotifier {
 
   Future<void> logout() async {
     await _notifyBeforeLogout();
+    _offlineRecovery?.clearScope();
     final operator = _state.operator;
     // Best-effort server teardown. The session may already be ended server-side
     // (a role/permission change ends active operator sessions), so these calls
@@ -888,6 +906,7 @@ final class EntryController extends ChangeNotifier {
     try {
       await _gateway.logout();
     } catch (_) {}
+    _offlineRecovery?.clearScope();
     await _vault.clearSession();
     _operatorName = null;
     _event('session.ended');
@@ -896,6 +915,7 @@ final class EntryController extends ChangeNotifier {
 
   Future<void> globalLogout() async {
     await _notifyBeforeLogout();
+    _offlineRecovery?.clearScope();
     await _gateway.globalLogout();
     await _vault.clearSession();
     _operatorName = null;

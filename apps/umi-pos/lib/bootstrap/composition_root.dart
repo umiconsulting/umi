@@ -303,6 +303,7 @@ final class AppCompositionRoot {
       vault: credentials,
       telemetry: telemetry,
       idleTimeout: const Duration(minutes: 30),
+      offlineRecovery: offlineRecovery,
     );
     Future<LanNodeIdentity?> lanIdentity() async {
       final state = entry.state;
@@ -793,9 +794,13 @@ final class AppCompositionRoot {
   static const connectivityHeartbeatInterval = Duration(seconds: 10);
   static const connectivityHeartbeatDeadline = Duration(seconds: 4);
 
+  @visibleForTesting
+  Future<void> runConnectivityHeartbeatOnce() => _beat();
+
   Future<void> _beat() async {
     if (_disposed || _heartbeatInFlight) return;
     _heartbeatInFlight = true;
+    var triggerReplay = false;
     try {
       final answer = await apiClient
           .request(
@@ -810,9 +815,7 @@ final class AppCompositionRoot {
         return;
       }
       connectivity.apiReachable(authorityValid: true);
-      // Level-triggered: even without a connectivity edge, a sale waiting in the
-      // journal drains as soon as the API is proven reachable.
-      await offlineRecovery?.replayIfPending();
+      triggerReplay = true;
     } on AppException catch (error) {
       // The server answered. It refused because its budget is full, which is
       // the opposite of an unreachable API: marking it offline would hide the
@@ -826,6 +829,16 @@ final class AppCompositionRoot {
       connectivity.apiFailure();
     } finally {
       _heartbeatInFlight = false;
+    }
+    if (triggerReplay && !_disposed) {
+      // Level-triggered: even without a connectivity edge, a sale waiting in the
+      // journal drains as soon as the API is proven reachable. Run outside
+      // `_heartbeatInFlight` behind `OfflineRecoveryController`'s own guard so
+      // a slow replay never starves `/health/live` reachability detection.
+      final recovery = offlineRecovery;
+      if (recovery != null) {
+        unawaited(recovery.replayIfPending());
+      }
     }
   }
 

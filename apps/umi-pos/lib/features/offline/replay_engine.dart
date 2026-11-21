@@ -259,6 +259,7 @@ enum RecoveryPhase {
   waitingForCapacity,
   waitingForConnectivity,
   blockedByDevice,
+  blockedByAuth,
   blockedByConflict,
   blockedByStorage,
   completed,
@@ -310,10 +311,29 @@ final class OfflineRecoveryController extends ChangeNotifier {
   ReplayScope? _scope;
   RecoveryStatus _status = const RecoveryStatus();
   bool _running = false;
+  bool _checkingPending = false;
   String? _reconciliationId;
   Timer? _retryTimer;
+  final Stopwatch _clock = Stopwatch()..start();
+  Duration? _retryNotBefore;
+  int? _blockedAtNextSequence;
   RecoveryStatus get status => _status;
   String? get reconciliationId => _reconciliationId;
+
+  /// Drop the active operator scope on lock/logout/session clear so background
+  /// heartbeats never replay without a Bearer token. Also cancels any pending
+  /// retry timer.
+  void clearScope() {
+    _scope = null;
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _retryNotBefore = null;
+    _blockedAtNextSequence = null;
+    if (_status.phase != RecoveryPhase.blockedByDevice &&
+        _status.phase != RecoveryPhase.blockedByStorage) {
+      _set(const RecoveryStatus(phase: RecoveryPhase.blockedByAuth));
+    }
+  }
 
   /// Replay by itself when the connection comes back.
   ///
@@ -357,39 +377,55 @@ final class OfflineRecoveryController extends ChangeNotifier {
         _connectivity.state != PosConnectivity.reconciliationRequired) {
       return;
     }
-    if (_running) return;
+    if (_running || _checkingPending) return;
     if (_status.phase == RecoveryPhase.blockedByDevice ||
-        _status.phase == RecoveryPhase.blockedByStorage ||
-        _status.phase == RecoveryPhase.waitingForCapacity) {
+        _status.phase == RecoveryPhase.blockedByAuth ||
+        _status.phase == RecoveryPhase.blockedByStorage) {
       return;
     }
+    if (_status.phase == RecoveryPhase.waitingForCapacity) {
+      final notBefore = _retryNotBefore;
+      if (notBefore != null && _clock.elapsed < notBefore) {
+        return;
+      }
+      _retryTimer?.cancel();
+      _retryTimer = null;
+      _retryNotBefore = null;
+    }
+    _checkingPending = true;
+    var shouldRecover = false;
     try {
       final snapshot = await _journal.load();
       if (snapshot.pendingCount == 0) return;
-      if (_status.phase == RecoveryPhase.blockedByConflict &&
-          !snapshot.entries.any(
-            (e) =>
-                e.status == JournalStatus.pending ||
-                e.status == JournalStatus.unknown ||
-                (e.status == JournalStatus.conflict &&
-                    (e.lastSafeErrorCategory == 'offline_limit_exceeded' ||
-                        e.lastSafeErrorCategory == 'stream_blocked' ||
-                        e.lastSafeErrorCategory == 'command_expired')),
-          )) {
-        return;
+      if (_status.phase == RecoveryPhase.blockedByConflict) {
+        if (_blockedAtNextSequence != null &&
+            snapshot.nextSequence == _blockedAtNextSequence) {
+          return;
+        }
+        if (!_hasUnblockedWork(snapshot)) {
+          return;
+        }
       }
+      shouldRecover = true;
     } on OfflineJournalException {
       // Unreadable storage is `recover`'s to report, not a connectivity event's:
       // it sets `blockedByStorage` with the category, which is the state an
       // operator can act on. Swallowing it here keeps a listener from throwing.
       return;
+    } finally {
+      _checkingPending = false;
     }
-    await recover(scope);
+    final activeScope = _scope;
+    if (shouldRecover && activeScope != null && !_running) {
+      await recover(activeScope);
+    }
   }
 
   @override
   void dispose() {
     _retryTimer?.cancel();
+    _retryTimer = null;
+    _retryNotBefore = null;
     _connectivity.removeListener(_onConnectivityChanged);
     super.dispose();
   }
@@ -397,6 +433,9 @@ final class OfflineRecoveryController extends ChangeNotifier {
   Future<void> recover(ReplayScope scope) async {
     if (_running) return;
     _retryTimer?.cancel();
+    _retryTimer = null;
+    _retryNotBefore = null;
+    _blockedAtNextSequence = null;
     _scope = scope;
     _running = true;
     try {
@@ -503,9 +542,13 @@ final class OfflineRecoveryController extends ChangeNotifier {
           'pending=${afterRecovery.pendingCount}',
         );
       }
+      final serverProcessed =
+          reconciliation.serverLastProcessedSequence ??
+          reconciliation.serverLastAcceptedSequence;
       if (reconciliation.reconciliationRequired &&
-          reconciliation.serverLastAcceptedSequence >
-              afterRecovery.lastAcknowledgedSequence) {
+          (reconciliation.serverLastAcceptedSequence >
+                  afterRecovery.lastAcknowledgedSequence ||
+              serverProcessed > afterRecovery.lastAcknowledgedSequence)) {
         final recovered = await _recoverBehind(
           scope,
           afterRecovery,
@@ -513,6 +556,7 @@ final class OfflineRecoveryController extends ChangeNotifier {
         );
         if (!recovered) return;
       }
+      await _consumeServerResolvedConflicts(scope, reconciliation);
       final ready = await _journal.load();
       if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
         debugPrint(
@@ -562,12 +606,33 @@ final class OfflineRecoveryController extends ChangeNotifier {
         _scheduleRetry(scope, error.retryAfter ?? const Duration(seconds: 30));
         return;
       }
-      final phase =
-          error.code == 'DEVICE_REVOKED' ||
-              error.code == 'DEVICE_CREDENTIAL_ROTATED'
-          ? RecoveryPhase.blockedByDevice
-          : RecoveryPhase.failedSafely;
-      _set(RecoveryStatus(phase: phase, errorCode: error.code));
+      if (error.code == 'DEVICE_REVOKED' ||
+          error.code == 'DEVICE_CREDENTIAL_ROTATED') {
+        _set(
+          RecoveryStatus(
+            phase: RecoveryPhase.blockedByDevice,
+            errorCode: error.code,
+          ),
+        );
+        return;
+      }
+      if (error.code == 'AUTHENTICATION_REQUIRED' ||
+          error.category == AppErrorCategory.authentication) {
+        _scope = null;
+        _retryTimer?.cancel();
+        _retryTimer = null;
+        _retryNotBefore = null;
+        _set(
+          RecoveryStatus(
+            phase: RecoveryPhase.blockedByAuth,
+            errorCode: error.code,
+          ),
+        );
+        return;
+      }
+      _set(
+        RecoveryStatus(phase: RecoveryPhase.failedSafely, errorCode: error.code),
+      );
     } finally {
       _running = false;
     }
@@ -601,6 +666,7 @@ final class OfflineRecoveryController extends ChangeNotifier {
         commandId,
       );
       _reconciliationId = null;
+      _blockedAtNextSequence = null;
       // The refused step is no longer open, so the controller is not blocked.
       // Without this reset the heartbeat keeps skipping automatic replay after
       // a successful resolution.
@@ -615,6 +681,22 @@ final class OfflineRecoveryController extends ChangeNotifier {
           ),
         );
         _scheduleRetry(scope, error.retryAfter ?? const Duration(seconds: 30));
+        return 0;
+      }
+      if (error.code == 'AUTHENTICATION_REQUIRED' ||
+          (error.category == AppErrorCategory.authentication &&
+              error.code != 'DEVICE_REVOKED' &&
+              error.code != 'DEVICE_CREDENTIAL_ROTATED')) {
+        _scope = null;
+        _retryTimer?.cancel();
+        _retryTimer = null;
+        _retryNotBefore = null;
+        _set(
+          RecoveryStatus(
+            phase: RecoveryPhase.blockedByAuth,
+            errorCode: error.code,
+          ),
+        );
         return 0;
       }
       _set(
@@ -673,6 +755,95 @@ final class OfflineRecoveryController extends ChangeNotifier {
     }
   }
 
+  /// Consume server-resolved conflicts strictly AFTER [_recoverBehind] has
+  /// restored any lost accepted results.
+  ///
+  /// Money-moving commands are never auto-resolved here. A conflict is
+  /// discarded ONLY when the server returns an explicit terminal
+  /// `status == 'rejected'` with `failure['guidanceCode'] == 'conflict_discarded'`
+  /// AND the local failure is an eligible non-retryable kitchen refusal. A null
+  /// result, absence from `reconciliation.conflicts`, or any other status leaves
+  /// the conflict visible for operator review.
+  Future<void> _consumeServerResolvedConflicts(
+    ReplayScope scope,
+    ReconciliationSummary reconciliation,
+  ) async {
+    if (reconciliation.conflicts.length >= 100) return;
+    final open = <String>{};
+    for (final item in reconciliation.conflicts) {
+      final commandId = item['commandId'];
+      if (commandId is String) open.add(commandId);
+    }
+    final processed =
+        reconciliation.serverLastProcessedSequence ??
+        reconciliation.serverLastAcceptedSequence;
+    final handled = <String>{};
+    for (var resolved = 0; resolved < 50; resolved++) {
+      final snapshot = await _journal.load();
+      final entry = snapshot.entries
+          .where(
+            (value) =>
+                value.status == JournalStatus.conflict &&
+                !open.contains(value.command.commandId) &&
+                value.command.deviceSequence <= processed &&
+                !handled.contains(value.command.commandId),
+          )
+          .firstOrNull;
+      if (entry == null) return;
+      handled.add(entry.command.commandId);
+
+      // The server's result is the first authority. If the command was actually
+      // accepted, apply that result so the official sale/receipt identity is
+      // preserved instead of being turned into a bare "resolved" step.
+      final result = await _gateway.resultFor(scope, entry.command.commandId);
+      if (result != null &&
+          (result.status == 'accepted' || result.status == 'duplicate')) {
+        await _journal.apply(result);
+        continue;
+      }
+
+      // A closed KDS conflict is only discardable when the server returns an
+      // explicit terminal `rejected/conflict_discarded` outcome AND the local
+      // failure is the kitchen's own non-retryable refusal. A null result, an
+      // open conflict, or any other status leaves it visible for review.
+      final discarded =
+          result != null &&
+          result.status == 'rejected' &&
+          result.failure?['guidanceCode'] == 'conflict_discarded';
+      if (!discarded || !_isEligibleKitchenRefusal(entry)) continue;
+      await _journal.resolveConflictAndRetryFollowing(entry.command.commandId);
+    }
+    throw const AppException(
+      category: AppErrorCategory.conflict,
+      code: 'CONFLICT_CHAIN_TOO_LONG',
+      recoverable: false,
+    );
+  }
+
+  bool _isEligibleKitchenRefusal(JournalEntry entry) {
+    final failure = entry.failure;
+    if (entry.command.commandType != 'pos.kds.command') return false;
+    if (failure?['classification'] != 'server_validation_failed') return false;
+    if (failure?['retryable'] != false) return false;
+    final guidance = failure?['guidanceCode'];
+    return guidance is String && guidance.startsWith('kitchen_refusal:');
+  }
+
+  bool _isDiscardableServerConflict(
+    String commandType,
+    Map<String, Object?>? failure,
+  ) {
+    if (commandType == 'pos.kds.command') {
+      return failure?['classification'] == 'server_validation_failed' &&
+          failure?['retryable'] == false;
+    }
+    return _isDefiniteNonFinancialCartRefusalGuidance(
+      failure?['retryable'],
+      commandType,
+      failure?['classification'],
+    );
+  }
+
   Future<bool> _recoverBehind(
     ReplayScope scope,
     OfflineJournalSnapshot local,
@@ -687,10 +858,13 @@ final class OfflineRecoveryController extends ChangeNotifier {
           value.status != JournalStatus.accepted &&
           value.status != JournalStatus.duplicate &&
           value.status != JournalStatus.resolved &&
-          value.status != JournalStatus.archived,
+          value.status != JournalStatus.archived &&
+          value.status != JournalStatus.conflict,
     )) {
       final result = await _gateway.resultFor(scope, entry.command.commandId);
       if (result == null) {
+        _blockedAtNextSequence = local.nextSequence;
+        _connectivity.reconciliationNeeded();
         _set(
           RecoveryStatus(
             phase: RecoveryPhase.blockedByConflict,
@@ -700,8 +874,54 @@ final class OfflineRecoveryController extends ChangeNotifier {
         return false;
       }
       await _journal.apply(result);
+      final discarded =
+          result.status == 'rejected' &&
+          result.failure?['guidanceCode'] == 'conflict_discarded';
+      if (discarded &&
+          _isDiscardableServerConflict(
+            entry.command.commandType,
+            result.failure,
+          )) {
+        await _journal.resolveConflictAndRetryFollowing(
+          entry.command.commandId,
+        );
+      }
     }
     return true;
+  }
+
+  bool _isTransientCashConflict(JournalEntry entry) =>
+      entry.status == JournalStatus.conflict &&
+      entry.command.commandType == 'pos.checkout.cash' &&
+      (entry.lastSafeErrorCategory == 'offline_limit_exceeded' ||
+          entry.lastSafeErrorCategory == 'stream_blocked' ||
+          entry.lastSafeErrorCategory == 'command_expired');
+
+  bool _hasUnblockedWork(OfflineJournalSnapshot snapshot) {
+    final ordered = [...snapshot.entries]
+      ..sort(
+        (a, b) =>
+            a.command.deviceSequence.compareTo(b.command.deviceSequence),
+      );
+    for (final entry in ordered) {
+      if (entry.status == JournalStatus.accepted ||
+          entry.status == JournalStatus.duplicate ||
+          entry.status == JournalStatus.resolved ||
+          entry.status == JournalStatus.archived) {
+        continue;
+      }
+      if (entry.status == JournalStatus.conflict) {
+        if (_isTransientCashConflict(entry)) return true;
+        if (entry.failure?['blocksFollowing'] != false) return false;
+        continue;
+      }
+      if (entry.status == JournalStatus.pending ||
+          entry.status == JournalStatus.unknown) {
+        if (entry.command.hubOwned == true) continue;
+        return true;
+      }
+    }
+    return false;
   }
 
   Future<void> _replay(
@@ -713,6 +933,7 @@ final class OfflineRecoveryController extends ChangeNotifier {
     var accepted = 0;
     var duplicates = 0;
     var processed = 0;
+    var hadUnresolvedConflict = false;
     final snapshot = await _journal.load();
     final pending =
         snapshot.entries
@@ -772,6 +993,22 @@ final class OfflineRecoveryController extends ChangeNotifier {
           );
           return;
         }
+        if (error.code == 'AUTHENTICATION_REQUIRED' ||
+            error.category == AppErrorCategory.authentication) {
+          _scope = null;
+          _retryTimer?.cancel();
+          _retryTimer = null;
+          _retryNotBefore = null;
+          _set(
+            RecoveryStatus(
+              phase: RecoveryPhase.blockedByAuth,
+              total: pending.length,
+              processed: processed,
+              errorCode: error.code,
+            ),
+          );
+          return;
+        }
         if (error.category != AppErrorCategory.transport &&
             error.category != AppErrorCategory.timeout) {
           // Only a refusal that needs a person blocks the queue. A server
@@ -779,8 +1016,11 @@ final class OfflineRecoveryController extends ChangeNotifier {
           // again, or one bad minute would stop the till for the shift.
           final blocking =
               error.category == AppErrorCategory.conflict ||
-              error.category == AppErrorCategory.permission ||
-              error.category == AppErrorCategory.authentication;
+              error.category == AppErrorCategory.permission;
+          if (blocking) {
+            _blockedAtNextSequence = snapshot.nextSequence;
+            _connectivity.reconciliationNeeded();
+          }
           _set(
             RecoveryStatus(
               phase: blocking
@@ -829,6 +1069,8 @@ final class OfflineRecoveryController extends ChangeNotifier {
                 result.commandId,
               );
               if (!resolution.resolved) {
+                _blockedAtNextSequence = (await _journal.load()).nextSequence;
+                _connectivity.reconciliationNeeded();
                 _set(
                   RecoveryStatus(
                     phase: RecoveryPhase.blockedByConflict,
@@ -850,6 +1092,8 @@ final class OfflineRecoveryController extends ChangeNotifier {
               // next pass ask the server about them in order.
               break;
             } on AppException catch (error) {
+              _blockedAtNextSequence = (await _journal.load()).nextSequence;
+              _connectivity.reconciliationNeeded();
               _set(
                 RecoveryStatus(
                   phase: RecoveryPhase.blockedByConflict,
@@ -878,6 +1122,7 @@ final class OfflineRecoveryController extends ChangeNotifier {
           ),
         );
         if (result.failure?['blocksFollowing'] == true) {
+          _blockedAtNextSequence = (await _journal.load()).nextSequence;
           _connectivity.reconciliationNeeded();
           _set(
             RecoveryStatus(
@@ -894,6 +1139,9 @@ final class OfflineRecoveryController extends ChangeNotifier {
         }
       }
       if (unresolvedConflict) {
+        hadUnresolvedConflict = true;
+        _blockedAtNextSequence = (await _journal.load()).nextSequence;
+        _connectivity.reconciliationNeeded();
         _set(
           RecoveryStatus(
             phase: RecoveryPhase.blockedByConflict,
@@ -913,6 +1161,8 @@ final class OfflineRecoveryController extends ChangeNotifier {
         // has a handful of lines, not an endless stream.
         final nextAutoResolved = autoResolved + resolvedInBatch;
         if (nextAutoResolved > 50) {
+          _blockedAtNextSequence = (await _journal.load()).nextSequence;
+          _connectivity.reconciliationNeeded();
           _set(
             RecoveryStatus(
               phase: RecoveryPhase.blockedByConflict,
@@ -931,11 +1181,39 @@ final class OfflineRecoveryController extends ChangeNotifier {
       }
       if (batch.stopped) return;
     }
-    _connectivity.apiReachable(authorityValid: true);
-    _retryTimer?.cancel();
-    if (_status.phase == RecoveryPhase.blockedByConflict) {
+    final afterBatch = await _journal.load();
+    final hasOpenConflict = afterBatch.entries.any(
+      (entry) => entry.status == JournalStatus.conflict,
+    );
+    if (hadUnresolvedConflict ||
+        hasOpenConflict ||
+        _status.phase == RecoveryPhase.blockedByConflict) {
+      _blockedAtNextSequence = afterBatch.nextSequence;
+      _connectivity.reconciliationNeeded();
+      _retryTimer?.cancel();
+      _retryTimer = null;
+      _retryNotBefore = null;
+      if (_status.phase != RecoveryPhase.blockedByConflict) {
+        _set(
+          RecoveryStatus(
+            phase: RecoveryPhase.blockedByConflict,
+            total: pending.length,
+            processed: processed,
+            accepted: accepted,
+            duplicates: duplicates,
+            conflicts: afterBatch.entries
+                .where((entry) => entry.status == JournalStatus.conflict)
+                .length,
+          ),
+        );
+      }
       return;
     }
+    _connectivity.apiReachable(authorityValid: true);
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _retryNotBefore = null;
+    _blockedAtNextSequence = null;
     _set(
       RecoveryStatus(
         phase: RecoveryPhase.completed,
@@ -1068,10 +1346,27 @@ final class OfflineRecoveryController extends ChangeNotifier {
   /// a second replay.
   void _scheduleRetry(ReplayScope scope, Duration wait) {
     _retryTimer?.cancel();
+    _retryNotBefore = _clock.elapsed + wait;
     _retryTimer = Timer(wait, () {
+      _retryTimer = null;
+      _retryNotBefore = null;
+      if (_scope == null) return;
       if (_connectivity.state == PosConnectivity.online ||
-          _connectivity.state == PosConnectivity.recovering) {
+          _connectivity.state == PosConnectivity.recovering ||
+          _connectivity.state == PosConnectivity.reconciliationRequired) {
         unawaited(recover(scope));
+        return;
+      }
+      if (_status.phase == RecoveryPhase.waitingForCapacity) {
+        _set(
+          RecoveryStatus(
+            phase: RecoveryPhase.waitingForConnectivity,
+            total: _status.total,
+            processed: _status.processed,
+            accepted: _status.accepted,
+            duplicates: _status.duplicates,
+          ),
+        );
       }
     });
   }

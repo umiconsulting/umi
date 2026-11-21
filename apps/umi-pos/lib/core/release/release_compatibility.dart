@@ -55,12 +55,21 @@ final class ApiReleaseCompatibilityGateway
     }
     // The URL major is the compatibility axis. The artifact major below is a
     // separate identity: it can move without a change to the HTTP contract.
-    final serverApiMajor = server['apiMajorVersion'];
+    final serverContract = _version(server['contractVersion']);
+    final clientContract = _version(_config.release.contractVersion);
+    var serverApiMajor = server['apiMajorVersion'];
+    if (serverApiMajor == null &&
+        serverContract != null &&
+        serverContract[0] == 2) {
+      // Deployed API 2.49 predates the explicit HTTP-major field. Its public
+      // contract is 2.x and its routes are the same HTTP/1 contract the 2.58
+      // server declares as `apiMajorVersion: 1`. This shim is deliberately
+      // narrow: a missing field with a 3.x (or unparseable) contract is refused.
+      serverApiMajor = 1;
+    }
     if (serverApiMajor is! int || serverApiMajor != apiMajorVersion) {
       return ReleaseCompatibility.unsupported;
     }
-    final serverContract = _version(server['contractVersion']);
-    final clientContract = _version(_config.release.contractVersion);
     final minimumPos = _version(server['minimumPosVersion']);
     final clientVersion = _version(_config.release.version);
     if ([

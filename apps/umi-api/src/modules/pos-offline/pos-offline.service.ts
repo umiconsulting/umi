@@ -584,6 +584,17 @@ export class PosOfflineService {
               scope,
             );
             if (!applied.applied) {
+              if (applied.missingCart) {
+                const conflict = await refuse(command, 'cart_mismatch', 'cart_not_found');
+                results.push(conflict);
+                if (conflict.failure?.blocksFollowing) {
+                  stopped = true;
+                  break;
+                }
+                expectedSequence = Math.max(expectedSequence, command.deviceSequence + 1);
+                lastProcessed = Math.max(lastProcessed, command.deviceSequence);
+                continue;
+              }
               if (!(await refuseAndContinue(command, 'server_validation_failed'))) break;
               continue;
             }
@@ -628,6 +639,7 @@ export class PosOfflineService {
           const trustedCart = Cart.safeParse(this.normalizeSnapshotCart(snapshot.cartSnapshot));
           const targetCartId =
             appliedCartId ??
+            cartAliases.get(snapshot.checkoutCommand.cartId) ??
             (await this.repo.provisionalCartId?.(
               merchantId,
               command.locationId,
@@ -677,9 +689,29 @@ export class PosOfflineService {
               (cartState.status === 'abandoned' || cartState.lifecycleState === 'cancelled')
             ) {
               this.logger.warn(
-                `offline_checkout_cancelled_cart_settled commandId=${command.commandId} cartId=${targetCartId}`,
+                `offline_checkout_cancelled_cart_conflict commandId=${command.commandId} cartId=${targetCartId}`,
               );
-              appliedCartId = targetCartId;
+              const conflict =
+                streamKey && this.repo.recordStreamConflict
+                  ? await this.repo.recordStreamConflict(
+                      command,
+                      'reconciliation_required',
+                      streamKey,
+                      'cart_cancelled_after_cash_taken',
+                      false,
+                      true,
+                    )
+                  : await this.repo.recordConflict(
+                      command,
+                      'reconciliation_required',
+                      false,
+                      'cart_cancelled_after_cash_taken',
+                      true,
+                    );
+              results.push(conflict);
+              expectedSequence = Math.max(expectedSequence, command.deviceSequence + 1);
+              lastProcessed = Math.max(lastProcessed, command.deviceSequence);
+              continue;
             } else {
               const shouldResumeSuspended =
                 retryResolved ||
@@ -698,17 +730,6 @@ export class PosOfflineService {
                   shouldResumeSuspended,
                 );
               }
-              /*
-               * A cart opened offline has a till-side id; the server mints its own and
-               * the alias only lives for the batch that created it. A checkout that
-               * arrives in a later batch — the ordinary case when a sale is larger
-               * than one batch, or when the first batch was retried — used to die here
-               * as `CART_NOT_FOUND` and never reach the operator. Same fallback the
-               * cart commands beside it already use: the session's active cart is the
-               * cart. The preview below re-prices it and refuses on any difference, so
-               * attaching to the wrong cart is a conflict to report, never a wrong
-               * charge.
-               */
               let currentCart;
               try {
                 currentCart = await this.cart.readAccount(
@@ -720,12 +741,30 @@ export class PosOfflineService {
                 );
               } catch (error) {
                 if (!(error instanceof NotFoundException)) throw error;
-                currentCart = await this.cart.read(
-                  user,
-                  merchantId,
-                  command.locationId,
-                  scope.operatorSessionId,
+                this.logger.warn(
+                  `offline_checkout_missing_cart_conflict commandId=${command.commandId} cartId=${targetCartId}`,
                 );
+                const conflict =
+                  streamKey && this.repo.recordStreamConflict
+                    ? await this.repo.recordStreamConflict(
+                        command,
+                        'cart_mismatch',
+                        streamKey,
+                        'cart_not_found',
+                        false,
+                        true,
+                      )
+                    : await this.repo.recordConflict(
+                        command,
+                        'cart_mismatch',
+                        false,
+                        'cart_not_found',
+                        true,
+                      );
+                results.push(conflict);
+                expectedSequence = Math.max(expectedSequence, command.deviceSequence + 1);
+                lastProcessed = Math.max(lastProcessed, command.deviceSequence);
+                continue;
               }
               let checkoutCommand = {
                 ...snapshot.checkoutCommand,
@@ -1355,7 +1394,7 @@ export class PosOfflineService {
     command: OfflineCommand,
     cartAliases: Map<string, string>,
     scope: ReplayScope,
-  ): Promise<{ applied: boolean; cartId?: string }> {
+  ): Promise<{ applied: boolean; cartId?: string; missingCart?: boolean }> {
     const raw: Record<string, unknown> = command.payload;
     const provisionalCartId = raw.cartId;
     const locationId = raw.locationId;
@@ -1413,7 +1452,7 @@ export class PosOfflineService {
       cartAliases.set(provisionalCartId, cart.id);
       return { applied: true, cartId: cart.id };
     }
-    let cartId =
+    const cartId =
       cartAliases.get(provisionalCartId) ??
       (await this.repo.provisionalCartId?.(merchantId, locationId, provisionalCartId)) ??
       provisionalCartId;
@@ -1428,11 +1467,10 @@ export class PosOfflineService {
       );
     } catch (error) {
       if (!(error instanceof NotFoundException)) throw error;
-      // A later replay batch has no in-memory alias map. The cart this
-      // operator session opened is still the one active cart on the server.
-      current = await this.cart.read(user, merchantId, locationId, operatorSessionId);
-      cartId = current.id;
-      cartAliases.set(provisionalCartId, cartId);
+      this.logger.warn(
+        `offline_order_missing_cart_conflict commandId=${command.commandId} type=${command.commandType} cartId=${cartId}`,
+      );
+      return { applied: false, missingCart: true };
     }
     const withCurrentVersion = {
       ...raw,
@@ -1521,7 +1559,7 @@ export class PosOfflineService {
                 merchantId,
                 cartId,
                 command.locationId,
-                command.operatorSessionId,
+                scope.operatorSessionId,
               );
               if (current.tableId === parsed.data.tableId) {
                 return { applied: true, cartId };
