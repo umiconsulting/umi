@@ -252,6 +252,35 @@ void main() {
     },
   );
 
+  test('derived search pages are bounded while the canonical catalog stays', () async {
+    await database.writeCategories(_scope, _categories());
+    await database.writeCatalogPage(
+      _scope,
+      _page([_product('root', name: 'Root')]),
+    );
+    for (var index = 0; index < 30; index++) {
+      await database.writeCatalogPage(
+        _scope,
+        _page([_product('search-$index', name: 'Search $index')]),
+        search: 'term$index',
+      );
+    }
+
+    await database.close();
+    final raw = await databaseFactoryFfi.openDatabase(databasePath);
+    final countRow = await raw.rawQuery('SELECT COUNT(*) AS n FROM catalog_pages');
+    final count = countRow.first['n'] as int;
+    await raw.close();
+    database = SqliteLocalDatabase(
+      factory: databaseFactoryFfi,
+      path: databasePath,
+    );
+    await database.initialize();
+
+    expect(count, lessThanOrEqualTo(21));
+    expect((await database.readCatalog(_scope))!.products, isNotEmpty);
+  });
+
   test(
     'a replacement page updates rows without blanking the last answer',
     () async {

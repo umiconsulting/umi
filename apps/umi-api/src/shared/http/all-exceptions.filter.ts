@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
-import { getRequestContext } from '../database/request-context';
+import { getRequestContext, type RequestContext } from '../database/request-context';
 import { API_ERROR_CODES, type ApiError } from '@umi/contract';
 
 // `HttpException.getStatus()` returns a plain `number`, so comparing it against a
@@ -41,9 +41,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // does not must still get its error reported.
     const request =
       typeof http.getRequest === 'function'
-        ? http.getRequest<{ method?: string; url?: string }>()
+        ? http.getRequest<{
+            method?: string;
+            url?: string;
+            ip?: string;
+            headers?: Record<string, string | string[] | undefined>;
+            user?: { deviceId?: string | null; device_id?: string | null };
+          }>()
         : undefined;
-    const route = `${request?.method ?? '?'} ${(request?.url ?? '?').split('?')[0]}`;
+    const method = request?.method ?? '?';
+    const path = (request?.url ?? '?').split('?')[0];
+    const route = `${method} ${path}`;
 
     const status =
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
@@ -51,8 +59,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const payload =
       exception instanceof HttpException ? exception.getResponse() : 'Internal server error';
 
+    const scope = getRequestContext();
+    const correlationId = scope?.correlationId ?? 'unavailable';
+    const error = publicError(
+      status,
+      payload,
+      scope?.correlationId ?? scope?.requestId ?? 'unavailable',
+    );
+    const opsContext = describeOperationalContext(request, scope);
+
     if (status >= SERVER_ERROR_MIN) {
-      const correlationId = getRequestContext()?.correlationId ?? 'unavailable';
       const errorType = exception instanceof Error ? exception.constructor.name : 'UnknownError';
       // The message and stack stay OUT of the response — `publicError` below is the
       // only thing the caller sees — but they have to reach the log. A 500 that
@@ -61,7 +77,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // the caller already knew.
       const detail = exception instanceof Error ? exception.message : String(exception);
       this.logger.error(
-        `${status} request_failed ${route} correlationId=${correlationId} type=${errorType} detail=${detail}`,
+        `${status} request_failed ${route} statusCode=${status} method=${method} path=${path} correlationId=${correlationId} ${opsContext} code=${error.code} type=${errorType} detail=${detail}`,
         exception instanceof Error ? exception.stack : undefined,
       );
     } else {
@@ -69,20 +85,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // only 2xx, so a client that kept being told "no" left no trace, and the only
       // way to find out why was to guess. The till's inventory surface failed this
       // way for a whole afternoon on a missing policy lease, and the log said
-      // nothing at all. The code and the route are enough to find the caller.
-      const correlationId = getRequestContext()?.correlationId ?? 'unavailable';
-      const scope = getRequestContext();
+      // nothing at all. The code, route, deviceId, posBuild, and ip identify the caller
+      // without ever recording credentials, PINs, or PII.
       const requestScope = scope
         ? `merchant=${scope.merchantId ?? 'none'} location=${scope.locationId ?? 'none'}`
         : 'unknown_scope';
       this.logger.warn(
-        `${status} request_refused ${route} correlationId=${correlationId} ${requestScope} code=${publicError(status, payload, correlationId).code} detail=${describeRefusal(payload)}`,
+        `${status} request_refused ${route} statusCode=${status} method=${method} path=${path} correlationId=${correlationId} ${requestScope} ${opsContext} code=${error.code} detail=${describeRefusal(payload)}`,
       );
     }
 
-    const context = getRequestContext();
-    const requestId = context?.requestId ?? 'unavailable';
-    const error = publicError(status, payload, context?.correlationId ?? requestId);
+    const requestId = scope?.requestId ?? 'unavailable';
     // The client needs the wait it must observe before it sends again. Without
     // this header a refusal of type 429 is only a status, and every surface
     // retries at its own cadence against a bucket that is still empty.
@@ -197,4 +210,59 @@ function describeRefusal(payload: string | object): string {
     parts.push(`fields=${JSON.stringify(source.fieldErrors).slice(0, 500)}`);
   }
   return parts.join(' ') || 'no_detail';
+}
+
+interface RefusalRequestLike {
+  ip?: string;
+  headers?: Record<string, string | string[] | undefined>;
+  user?: { deviceId?: string | null; device_id?: string | null };
+}
+
+function describeOperationalContext(
+  request: RefusalRequestLike | undefined,
+  scope: RequestContext | undefined,
+): string {
+  const deviceId =
+    safeToken(scope?.deviceId, SAFE_ID_PATTERN) ??
+    safeToken(request?.user?.deviceId, SAFE_ID_PATTERN) ??
+    safeToken(request?.user?.device_id, SAFE_ID_PATTERN) ??
+    safeHeader(request?.headers, 'x-umi-device-id', SAFE_ID_PATTERN) ??
+    safeHeader(request?.headers, 'x-device-id', SAFE_ID_PATTERN) ??
+    'none';
+  const posBuild = safeHeader(request?.headers, 'x-umi-pos-build', SAFE_BUILD_PATTERN) ?? 'unknown';
+  const ip =
+    safeToken(request?.ip, SAFE_IP_PATTERN) ?? safeForwardedIp(request?.headers) ?? 'unknown';
+  return `deviceId=${deviceId} posBuild=${posBuild} ip=${ip}`;
+}
+
+const SAFE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const SAFE_BUILD_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
+const SAFE_IP_PATTERN = /^[0-9A-Fa-f:.]{1,64}$/;
+
+function safeToken(value: unknown, pattern: RegExp): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return pattern.test(trimmed) ? trimmed : null;
+}
+
+function safeHeader(
+  headers: Record<string, string | string[] | undefined> | undefined,
+  name: string,
+  pattern: RegExp,
+): string | null {
+  if (!headers) return null;
+  const raw = headers[name] ?? headers[name.toLowerCase()];
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  return safeToken(candidate, pattern);
+}
+
+function safeForwardedIp(
+  headers: Record<string, string | string[] | undefined> | undefined,
+): string | null {
+  if (!headers) return null;
+  const raw = headers['x-forwarded-for'];
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof candidate !== 'string') return null;
+  const first = candidate.split(',')[0];
+  return safeToken(first, SAFE_IP_PATTERN);
 }

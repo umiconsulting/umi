@@ -543,6 +543,100 @@ void main() {
       expect(cached.states.single['seatedAt'], '2026-10-18T09:00:00.000Z');
     },
   );
+
+  test('a readable old cloud room cannot erase a pending seat', () async {
+    final local = _MemoryLocal();
+    final cloud = _Cloud(_room('open'));
+    final journal = EncryptedOfflineJournal(_MemoryCipher(), web: false);
+    final repository = _repository(local, cloud, journal: journal);
+    await repository.read(_merchant, _query());
+
+    cloud.fail = true;
+    await repository.seat(
+      _merchant,
+      SeatTableRequest(
+        locationId: _location,
+        operatorSessionId: _operator,
+        idempotencyKey: _uuid(21),
+        tableId: _table,
+        partySize: 2,
+      ),
+    );
+
+    // The cloud is reachable again but has not applied the seat yet.
+    cloud
+      ..fail = false
+      ..map = _room('open');
+    final room = await repository.read(_merchant, _query());
+    expect(_stateOf(room, _table), 'seated');
+
+    final provenance = repository.lastProvenance(_merchant, _location)!;
+    expect(provenance.stale, isFalse);
+    expect(provenance.pendingCommandIds, hasLength(1));
+
+    final controller = TableStateController(repository);
+    addTearDown(controller.dispose);
+    await controller.load(_merchant, _location, _operator);
+    expect(controller.stateOf(_table).state, 'seated');
+    expect(controller.pendingLocalCommands, hasLength(1));
+    expect(controller.stale, isFalse);
+  });
+
+  test('a cached room fallback is stale and keeps its source age', () async {
+    final local = _MemoryLocal();
+    final cloud = _Cloud(_room('open'));
+    final repository = _repository(local, cloud);
+    await repository.read(_merchant, _query());
+    final first = repository.lastProvenance(_merchant, _location)!;
+    expect(first.stale, isFalse);
+    expect(first.sourceAt, isNotNull);
+
+    cloud.fail = true;
+    final cached = await repository.read(_merchant, _query());
+    expect(_stateOf(cached, _table), 'open');
+    final fallback = repository.lastProvenance(_merchant, _location)!;
+    expect(fallback.stale, isTrue);
+    expect(fallback.failureCode, isNotNull);
+    expect(fallback.sourceAt, first.sourceAt);
+
+    final controller = TableStateController(repository);
+    addTearDown(controller.dispose);
+    await controller.load(_merchant, _location, _operator);
+    expect(controller.stale, isTrue);
+  });
+
+  test(
+    'a pending seat survives a fresh repository over the same journal',
+    () async {
+      final local = _MemoryLocal();
+      final cloud = _Cloud(_room('open'));
+      final journal = EncryptedOfflineJournal(_MemoryCipher(), web: false);
+      final first = _repository(local, cloud, journal: journal);
+      await first.read(_merchant, _query());
+      cloud.fail = true;
+      await first.seat(
+        _merchant,
+        SeatTableRequest(
+          locationId: _location,
+          operatorSessionId: _operator,
+          idempotencyKey: _uuid(22),
+          tableId: _table,
+          partySize: 2,
+        ),
+      );
+
+      cloud
+        ..fail = false
+        ..map = _room('open');
+      final restarted = _repository(local, cloud, journal: journal);
+      final room = await restarted.read(_merchant, _query());
+      expect(_stateOf(room, _table), 'seated');
+      expect(
+        restarted.lastProvenance(_merchant, _location)!.pendingCommandIds,
+        hasLength(1),
+      );
+    },
+  );
 }
 
 String _stateOf(TableStateMap map, String tableId) =>

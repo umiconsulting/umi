@@ -40,11 +40,18 @@ export class OperationalInterceptor implements NestInterceptor {
       resetAt = Math.max(resetAt, result.resetAt);
       if (!result.allowed) {
         this.metrics.increment('http.rate_limit.rejected', { scope });
+        // `scope` is part of the refusal. A per-route login throttle and a
+        // tenant-wide capacity ceiling are not the same instruction to the
+        // client: only the principal buckets may close the whole cloud lane.
+        const retryAfterSeconds = Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1_000));
+        void reply.header('retry-after', String(retryAfterSeconds));
+        void reply.header('x-umi-ratelimit-scope', scope);
         throw new HttpException(
           {
             code: 'RATE_LIMITED',
             message: 'Request rate limit exceeded.',
-            retryAfterSeconds: Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1_000)),
+            scope,
+            retryAfterSeconds,
           },
           429,
         );

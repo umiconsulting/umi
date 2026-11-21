@@ -93,6 +93,7 @@ final class EntryController extends ChangeNotifier {
   static const _localEntryTimeout = Duration(seconds: 10);
 
   int _pairingGeneration = 0;
+  int _admissionGeneration = 0;
 
   /// The realtime nudge subscription for the current pairing attempt. It is
   /// keyed to `_pairingGeneration`, exactly like the poll loop, so one counter
@@ -133,6 +134,8 @@ final class EntryController extends ChangeNotifier {
   };
 
   Future<void> initialize() async {
+    _admissionGeneration += 1;
+    final admissionGeneration = _admissionGeneration;
     _set(const EntryState(EntryPhase.checkingDevice));
     try {
       final identity = await _vault.deviceIdentity().timeout(
@@ -164,6 +167,24 @@ final class EntryController extends ChangeNotifier {
         } catch (_) {
           // Device authentication remains safe. The next bootstrap retries this
           // acknowledgement with the same persisted pairing session.
+        }
+      }
+      // The persisted entry snapshot is the admission lease. If it is valid
+      // for this device and session, admit locally now and let the status call
+      // run as a background revocation/freshness check. A revocation returned
+      // by the server clears trust and replaces the till state; an unreachable
+      // server leaves the bounded offline lease in force.
+      if (await _canRestoreOfflineSession()) {
+        final restored = await _restoreOffline(
+          const AppException(
+            category: AppErrorCategory.timeout,
+            code: 'LOCAL_ADMISSION_LEASE',
+            recoverable: true,
+          ),
+        );
+        if (restored) {
+          unawaited(_refreshAdmission(admissionGeneration));
+          return;
         }
       }
       final DeviceSummary device;
@@ -552,6 +573,36 @@ final class EntryController extends ChangeNotifier {
     if (lastActive == null) return false;
     return DateTime.now().toUtc().difference(lastActive.toUtc()) <=
         _offlineRestoreWindow;
+  }
+
+  /// Freshness/revocation check for a locally admitted till.
+  ///
+  /// It never restores or mints trust. A revocation or rotation answer replaces
+  /// the ready state; every other failure leaves the existing lease in force.
+  Future<void> _refreshAdmission(int generation) async {
+    try {
+      final device = await _gateway.deviceStatus().timeout(_localEntryTimeout);
+      if (generation != _admissionGeneration) return;
+      if (device.state == 'revoked' || device.state == 'replaced') {
+        _offlineRecovery?.clearScope();
+        await _vault.clearDeviceTrust();
+        _set(EntryState(EntryPhase.deviceRevoked, device: device));
+        return;
+      }
+      if (device.rotationRequired) {
+        _set(EntryState(EntryPhase.rotationRequired, device: device));
+      }
+    } on AppException catch (error) {
+      if (generation != _admissionGeneration) return;
+      if (error.code == 'DEVICE_REVOKED' ||
+          error.code == 'DEVICE_CREDENTIAL_INVALID') {
+        _offlineRecovery?.clearScope();
+        await _vault.clearDeviceTrust();
+        _set(EntryState(EntryPhase.deviceRevoked, errorCode: error.code));
+      }
+    } catch (_) {
+      // The bounded local lease remains the authority while the API is absent.
+    }
   }
 
   /// Renews and persists the access token without changing the entry phase.

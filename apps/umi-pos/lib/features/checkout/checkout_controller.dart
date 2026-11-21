@@ -8,6 +8,7 @@ import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/errors/app_error.dart';
 import '../../core/observability/telemetry.dart';
+import '../offline/cart_provenance.dart';
 import '../offline/connectivity_controller.dart';
 import '../offline/offline_checkout_service.dart';
 import '../offline/offline_journal.dart';
@@ -112,6 +113,8 @@ final class CheckoutController extends ChangeNotifier {
     bool Function()? pendingLocalCommands,
     Future<bool> Function()? preserveLocalCommands,
     Future<void> Function()? refreshOfflinePolicy,
+    Future<CartSourceProvenance?> Function(Cart cart)? loadProvenance,
+    CartProvenanceStore? provenance,
     required Telemetry telemetry,
     Future<String?> Function(CheckoutResult result)? afterCommit,
     Future<void> Function(OfflineCashCommit commit)? afterOfflineCommit,
@@ -123,6 +126,8 @@ final class CheckoutController extends ChangeNotifier {
        _pendingLocalCommands = pendingLocalCommands,
        _preserveLocalCommands = preserveLocalCommands,
        _refreshOfflinePolicy = refreshOfflinePolicy,
+       _loadProvenance = loadProvenance,
+       _provenance = provenance,
        _telemetry = telemetry,
        _afterCommit = afterCommit,
        _afterOfflineCommit = afterOfflineCommit;
@@ -134,7 +139,19 @@ final class CheckoutController extends ChangeNotifier {
   final bool Function()? _pendingLocalCommands;
   final Future<bool> Function()? _preserveLocalCommands;
   final Future<void> Function()? _refreshOfflinePolicy;
+  final Future<CartSourceProvenance?> Function(Cart cart)? _loadProvenance;
+  final CartProvenanceStore? _provenance;
   final Telemetry _telemetry;
+
+  Future<CartSourceProvenance?> _readProvenance(Cart cart) {
+    final loader = _loadProvenance;
+    if (loader != null) return loader(cart);
+    final store = _provenance;
+    if (store != null) {
+      return store.cart(cart.merchantId, cart.locationId, cart.id);
+    }
+    return Future<CartSourceProvenance?>.value(null);
+  }
   final Future<String?> Function(CheckoutResult result)? _afterCommit;
   final Future<void> Function(OfflineCashCommit commit)? _afterOfflineCommit;
   final bool localFirstFastPathEnabled;
@@ -251,6 +268,7 @@ final class CheckoutController extends ChangeNotifier {
   Map<String, Object?>? _recoveredPaymentOutcome;
   String? _commitCommandId;
   String? _commitIdempotencyKey;
+  String? _localCommitId;
   String? _customerValueFingerprintCommandId;
   final Map<String, CheckoutResult> _confirmationCache = {};
 
@@ -296,6 +314,7 @@ final class CheckoutController extends ChangeNotifier {
     _receiptDelivery = Map.unmodifiable(receiptDelivery);
     _commitCommandId = _uuid();
     _commitIdempotencyKey = _uuid();
+    _localCommitId = _uuid();
     _customerValueFingerprintCommandId ??= _uuid();
     if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
       debugPrint(
@@ -317,7 +336,7 @@ final class CheckoutController extends ChangeNotifier {
         return;
       }
       final cached = _confirmationCache[_confirmationCacheKey(cart)];
-      final confirmation = cached ?? _localConfirmation(cart);
+      final confirmation = cached ?? await _localConfirmation(cart);
       _confirmationCache[_confirmationCacheKey(cart)] = confirmation;
       _set(
         CheckoutState(
@@ -592,12 +611,14 @@ final class CheckoutController extends ChangeNotifier {
     _approvalIds = List.unmodifiable({..._approvalIds, approvalId});
     _commitCommandId = _uuid();
     _commitIdempotencyKey = _uuid();
+    _localCommitId = _uuid();
   }
 
   void applyCustomerValue(CustomerValueSelection? selection) {
     _customerValueSelection = selection;
     _commitCommandId = _uuid();
     _commitIdempotencyKey = _uuid();
+    _localCommitId = _uuid();
     notifyListeners();
   }
 
@@ -934,7 +955,7 @@ final class CheckoutController extends ChangeNotifier {
     // is entitled to see the totals before the sale is written.
     if (_shouldCommitLocally()) {
       if (fingerprint == null && _cart != null) {
-        final confirmation = _localConfirmation(_cart!);
+        final confirmation = await _localConfirmation(_cart!);
         _confirmationCache[_confirmationCacheKey(_cart!)] = confirmation;
         _event('totals_confirmed_offline');
         _set(
@@ -1069,7 +1090,7 @@ final class CheckoutController extends ChangeNotifier {
       if (_canFallbackOffline(error)) {
         _connectivity?.networkDown();
         if (fingerprint == null && _cart != null) {
-          final confirmation = _localConfirmation(_cart!);
+          final confirmation = await _localConfirmation(_cart!);
           _confirmationCache[_confirmationCacheKey(_cart!)] = confirmation;
           _set(
             CheckoutState(
@@ -1105,7 +1126,7 @@ final class CheckoutController extends ChangeNotifier {
     return fingerprint.toString();
   }
 
-  CheckoutResult _localConfirmation(Cart cart) {
+  Future<CheckoutResult> _localConfirmation(Cart cart) async {
     final taxes = <String, Object?>{
       'total': cart.totals['tax'],
       'entries': const <Map<String, Object?>>[],
@@ -1122,7 +1143,18 @@ final class CheckoutController extends ChangeNotifier {
           ),
         )
         .toString();
-    final now = DateTime.now().toUtc().toIso8601String();
+    // Never stamp the confirmation with "now": that would claim cached
+    // catalogue, price and tax data was observed now. Preserve the recorded
+    // source ages, and fall back to the cart's own age when none were captured.
+    final provenance = await _readProvenance(cart);
+    final fallback =
+        DateTime.tryParse(cart.updatedAt)?.toUtc() ?? DateTime.now().toUtc();
+    final catalogAt = provenance?.catalogAt ?? fallback;
+    final pricingAt = provenance?.pricingAt ?? fallback;
+    final taxAt = provenance?.taxAt ?? fallback;
+    final snapshotAt = [catalogAt, pricingAt, taxAt]
+        .reduce((left, right) => left.isBefore(right) ? left : right)
+        .toIso8601String();
     return CheckoutResult(
       status: 'confirmation_required',
       confirmation: TotalsConfirmation(
@@ -1133,11 +1165,11 @@ final class CheckoutController extends ChangeNotifier {
         discounts:
             cart.totals['discounts'] as Map<String, Object?>? ??
             const {'total': {}, 'entries': <Map<String, Object?>>[]},
-        catalogVersion: fingerprint,
-        pricingVersion: fingerprint,
-        taxVersion: fingerprint,
-        snapshotAt: now,
-        confirmedAt: now,
+        catalogVersion: provenance?.catalogVersion ?? fingerprint,
+        pricingVersion: provenance?.pricingVersion ?? fingerprint,
+        taxVersion: provenance?.taxVersion ?? fingerprint,
+        snapshotAt: snapshotAt,
+        confirmedAt: DateTime.now().toUtc().toIso8601String(),
       ).toJson(),
       payment: null,
       reservation: null,
@@ -1271,9 +1303,13 @@ final class CheckoutController extends ChangeNotifier {
     final totals = TotalsConfirmation.fromJson(raw);
     final grandTotal = totals.totals['grandTotal']! as Map<String, Object?>;
     final amount = (grandTotal['minorUnits']! as num).toInt();
-    final snapshotAt = DateTime.parse(
-      totals.confirmedAt ?? cart.updatedAt,
-    ).toUtc();
+    final recorded = await _readProvenance(cart);
+    final fallbackSnapshot =
+        DateTime.tryParse(totals.snapshotAt)?.toUtc() ??
+        DateTime.parse(totals.confirmedAt ?? cart.updatedAt).toUtc();
+    final catalogAt = recorded?.catalogAt ?? fallbackSnapshot;
+    final pricingAt = recorded?.pricingAt ?? fallbackSnapshot;
+    final taxAt = recorded?.taxAt ?? fallbackSnapshot;
     final preserved = await _preserveLocalCommands?.call() ?? true;
     if (!preserved) {
       _set(
@@ -1287,12 +1323,14 @@ final class CheckoutController extends ChangeNotifier {
     }
     _set(CheckoutState(phase: CheckoutPhase.processing, result: _state.result));
     try {
-      final commandId = _uuid();
+      final commandId = _commitCommandId ??= _uuid();
+      final idempotencyKey = _commitIdempotencyKey ??= _uuid();
+      final localCommitId = _localCommitId ??= _uuid();
       final commit = await offlineCheckout.checkout(
         OfflineCheckoutRequest(
           commandId: commandId,
-          idempotencyKey: _uuid(),
-          localCommitId: _uuid(),
+          idempotencyKey: idempotencyKey,
+          localCommitId: localCommitId,
           authority: authority,
           checkoutCommand: CheckoutCommand(
             commandId: commandId,
@@ -1302,7 +1340,7 @@ final class CheckoutController extends ChangeNotifier {
             expectedCartVersion: cart.version,
             paymentMethod: 'cash',
             totalsFingerprint: fingerprint,
-            idempotencyKey: _uuid(),
+            idempotencyKey: idempotencyKey,
             // The contract types this as a UUID, and the online path always
             // sends one even when no customer value is being redeemed. Leaving
             // it null here made every offline cash sale fail contract
@@ -1323,17 +1361,17 @@ final class CheckoutController extends ChangeNotifier {
           catalogVersion: totals.catalogVersion,
           pricingVersion: totals.pricingVersion,
           taxVersion: totals.taxVersion,
-          catalogSnapshotAt: snapshotAt,
-          pricingSnapshotAt: snapshotAt,
-          taxSnapshotAt: snapshotAt,
+          catalogSnapshotAt: catalogAt,
+          pricingSnapshotAt: pricingAt,
+          taxSnapshotAt: taxAt,
           amountReceivedMinorUnits: _cashReceivedMinorUnits ?? amount,
           businessDate: TotalsPreview.fromJson(totals.totals).businessDate,
         ),
         facts: OfflineCheckoutFacts(
           amountMinorUnits: amount,
-          catalogSnapshotAt: snapshotAt,
-          pricingSnapshotAt: snapshotAt,
-          taxSnapshotAt: snapshotAt,
+          catalogSnapshotAt: catalogAt,
+          pricingSnapshotAt: pricingAt,
+          taxSnapshotAt: taxAt,
           connectivity: _connectivity?.state ?? PosConnectivity.unknown,
           paymentMethod: _paymentMethod,
           // Pending cart commands select this ordered journal path while the

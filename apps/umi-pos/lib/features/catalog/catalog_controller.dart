@@ -7,6 +7,7 @@ import '../../core/errors/app_error.dart';
 import '../../core/network/api_client.dart';
 import '../../core/observability/telemetry.dart';
 import '../../core/storage/local_working_copy.dart';
+import '../offline/cart_provenance.dart';
 import 'catalog_repository.dart';
 
 enum CatalogPhase {
@@ -47,14 +48,17 @@ final class CatalogController extends ChangeNotifier {
     required CatalogCache cache,
     required Telemetry telemetry,
     LocalWorkingCopy? workingCopy,
+    CartProvenanceStore? provenance,
   }) : _repository = repository,
        _cache = cache,
        _telemetry = telemetry,
-       _workingCopy = workingCopy;
+       _workingCopy = workingCopy,
+       _provenance = provenance;
   final CatalogRepository _repository;
   final CatalogCache _cache;
   final Telemetry _telemetry;
   final LocalWorkingCopy? _workingCopy;
+  final CartProvenanceStore? _provenance;
   CatalogPartition? _partition;
   CancellationToken? _request;
   CancellationToken? _warmRequest;
@@ -566,8 +570,9 @@ final class CatalogController extends ChangeNotifier {
     String? barcode,
     bool append = false,
   }) async {
+    final local = _workingCopy;
     try {
-      await _workingCopy?.writeCatalogPage(
+      await local?.writeCatalogPage(
         _scopeOf(partition),
         page,
         categoryId: categoryId,
@@ -575,6 +580,25 @@ final class CatalogController extends ChangeNotifier {
         barcode: barcode,
         append: append,
       );
+      final provenance =
+          _provenance ?? (local != null ? CartProvenanceStore(local) : null);
+      if (provenance != null) {
+        final scope = _scopeOf(partition);
+        // A successful catalogue read is the only thing that renews the
+        // catalogue, price and tax source ages.
+        unawaited(
+          provenance
+              .recordSources(
+                scope.merchantId,
+                scope.locationId,
+                catalogAt: DateTime.now().toUtc(),
+                catalogVersion: page.catalogVersion,
+                pricingVersion: page.catalogVersion,
+                taxVersion: page.catalogVersion,
+              )
+              .catchError((Object _) {}),
+        );
+      }
     } catch (_) {
       _event('local_store_write_failed');
     }
@@ -584,8 +608,29 @@ final class CatalogController extends ChangeNotifier {
     CatalogPartition partition,
     CatalogProductDetail detail,
   ) async {
+    final local = _workingCopy;
     try {
-      await _workingCopy?.writeProductDetail(_scopeOf(partition), detail);
+      await local?.writeProductDetail(_scopeOf(partition), detail);
+      final provenance =
+          _provenance ?? (local != null ? CartProvenanceStore(local) : null);
+      if (provenance != null) {
+        final scope = _scopeOf(partition);
+        final at = DateTime.now().toUtc();
+        unawaited(
+          provenance
+              .recordSources(
+                scope.merchantId,
+                scope.locationId,
+                catalogAt: at,
+                pricingAt: at,
+                taxAt: at,
+                catalogVersion: detail.updatedAt,
+                pricingVersion: detail.updatedAt,
+                taxVersion: detail.updatedAt,
+              )
+              .catchError((Object _) {}),
+        );
+      }
     } catch (_) {
       _event('local_store_write_failed');
     }
