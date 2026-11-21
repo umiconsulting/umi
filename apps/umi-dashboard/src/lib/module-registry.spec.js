@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { getModuleAvailability, getVisibleModules, missingLocationFor } from './module-registry.js';
+import {
+  getAdaptiveNavItems,
+  getModuleAvailability,
+  getSoftLockedProductGroups,
+  getVisibleModules,
+  isCashOnlyMerchant,
+  missingLocationFor,
+} from './module-registry.js';
 import { i18n, activateTestLocale } from '@/test/i18n.jsx';
 
 const capabilities = (permissions) => ({
@@ -85,5 +92,83 @@ describe('a café with no locations', () => {
     // No capabilities at all is "no café selected", not "no locations".
     expect(missingLocationFor('floor-plan', undefined)).toBe(false);
     expect(missingLocationFor('floor-plan', {})).toBe(false);
+  });
+});
+
+describe('Cash-only adaptive navigation and soft-locked product discovery', () => {
+  const cashOnlyOwner = {
+    products: {
+      cash: { status: 'active' },
+    },
+    membership: {
+      role: 'owner',
+      permissions: [
+        'loyalty.read',
+        'loyalty.reward.redeem',
+        'gift_card.read',
+        'wallet.read',
+        'merchant.manage',
+      ],
+    },
+  };
+
+  const cashOnlyCashier = {
+    products: {
+      cash: { status: 'active' },
+    },
+    membership: {
+      role: 'cashier',
+      permissions: ['loyalty.read', 'loyalty.reward.redeem', 'gift_card.read', 'wallet.read'],
+    },
+  };
+
+  it('detects a Cash-only café and promotes Cash rooms to top-level sidebar items', () => {
+    expect(isCashOnlyMerchant(cashOnlyOwner)).toBe(true);
+    expect(isCashOnlyMerchant(capabilities(['loyalty.read', 'merchant.manage']))).toBe(false);
+
+    const navIds = getAdaptiveNavItems(cashOnlyOwner).map((item) => item.id);
+    expect(navIds).toEqual([
+      'loyalty-value/home',
+      'loyalty-value/scan',
+      'loyalty-value/members',
+      'loyalty-value/rewards',
+      'loyalty-value/gift-cards',
+      'loyalty-value/wallet',
+      'loyalty-value/settings',
+    ]);
+  });
+
+  it('shows the 3 soft-locked product doors to a Cash-only owner/admin and never to staff/cashier', () => {
+    expect(getSoftLockedProductGroups(cashOnlyOwner).map((g) => g.key)).toEqual([
+      'pos',
+      'inventory',
+      'conversaflow',
+    ]);
+    expect(getSoftLockedProductGroups(cashOnlyCashier)).toEqual([]);
+  });
+
+  it('nests Cash tabs as children of loyalty-value when the café has the Full Suite', () => {
+    const fullSuiteOwner = {
+      ...capabilities([
+        'loyalty.read',
+        'loyalty.reward.redeem',
+        'gift_card.read',
+        'wallet.read',
+        'merchant.manage',
+      ]),
+      membership: {
+        role: 'owner',
+        permissions: [
+          'loyalty.read',
+          'loyalty.reward.redeem',
+          'gift_card.read',
+          'wallet.read',
+          'merchant.manage',
+        ],
+      },
+    };
+    const cashMod = getAdaptiveNavItems(fullSuiteOwner).find((m) => m.id === 'loyalty-value');
+    expect(cashMod?.children?.map((c) => c.id)).toContain('loyalty-value/scan');
+    expect(getSoftLockedProductGroups(fullSuiteOwner)).toEqual([]);
   });
 });

@@ -23,6 +23,8 @@ vi.mock('@/data.jsx', () => ({
   }),
 }));
 
+vi.mock('./cash-home.jsx', () => ({ default: () => 'Cash home body' }));
+vi.mock('./cash-scan.jsx', () => ({ default: () => 'Cash scan body' }));
 vi.mock('./members.jsx', () => ({ default: () => 'Members body' }));
 vi.mock('./gift-cards.jsx', () => ({ default: () => 'Gift body' }));
 vi.mock('./cash-settings.jsx', () => ({ default: () => 'Cash settings body' }));
@@ -104,6 +106,22 @@ describe('LoyaltyValueScreen routed tabs', () => {
     expect(markup).toContain('data-permission-unavailable');
     expect(markup).toContain('No tienes acceso a');
     expect(markup).not.toContain('Cash settings body');
+  });
+
+  it('renders the Cash home cockpit and QR scanner for allowed memberships', () => {
+    const homeMarkup = renderAt('/loyalty-value/home');
+    expect(homeMarkup).toContain('Cash home body');
+
+    state.capabilities = capabilitiesFor('cashier');
+    const scanMarkup = renderAt('/loyalty-value/scan');
+    expect(scanMarkup).toContain('Cash scan body');
+  });
+
+  it('refuses the QR scanner tab before mount for a read-only viewer', () => {
+    state.capabilities = capabilitiesFor('viewer');
+    const markup = renderAt('/loyalty-value/scan');
+    expect(markup).toContain('data-permission-unavailable');
+    expect(markup).not.toContain('Cash scan body');
   });
 
   it('shows only the summary its permissions support', () => {

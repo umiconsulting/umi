@@ -279,9 +279,26 @@ test('shared brand hues resolve from core in BOTH apps (single source, no drift)
 });
 
 test('no unresolved DTCG references leak into any generated artifact', () => {
-  for (const f of ['dashboard.css', 'landing.cjs', 'landing.mjs', 'tokens.json']) {
+  for (const f of [
+    'dashboard.css',
+    'cash-naive.css',
+    'landing.cjs',
+    'landing.mjs',
+    'tokens.json',
+  ]) {
     assert.doesNotMatch(distText(f), /\{[a-z]+(\.[a-z]+)+\}/i, `unresolved {ref} in dist/${f}`);
   }
+});
+
+test('cash-naive.css emits scoped Naive surface tokens without touching :root', () => {
+  const css = distText('cash-naive.css');
+  assert.ok(!css.includes(':root'), 'cash-naive.css must stay scoped and never target :root');
+  const vars = parseCssVars(block(css, '[data-surface="cash-naive"],'));
+  assert.equal(vars['naive-canvas'], '#F8F3E9');
+  assert.equal(vars['naive-navy'], '#132642');
+  assert.equal(vars['naive-coral'], '#E66025');
+  assert.equal(vars['naive-sh-card'], '1.9px 1.9px 0 #132642');
+  assert.equal(vars['naive-sh-btn'], '3.3px 3.3px 0 #132642');
 });
 
 // A typed declaration must have a literal initial value and preserve inheritance.

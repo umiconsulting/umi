@@ -73,10 +73,10 @@ El comando ejecuta los mismos comandos de lint y formato que usa CI. También co
 - cambios staged;
 - rango desde el merge base del PR hasta `HEAD`.
 
-El valor predeterminado es `origin/main`. Use `PR_BASE_REF` cuando el PR tenga otra base. PR #72 usa:
+El valor predeterminado es `origin/dev` (los PRs apuntan a la rama `dev` con `gh pr create --base dev`). Use `PR_BASE_REF` cuando el PR tenga otra base:
 
 ```sh
-PR_BASE_REF=origin/build-v3 pnpm check:pr
+PR_BASE_REF=origin/dev pnpm check:pr
 ```
 
 El rango actual contiene dos saltos de línea Markdown deliberados. `config/git-whitespace-baseline.json` registra solo esas dos líneas. El gate rechaza cualquier hallazgo nuevo.

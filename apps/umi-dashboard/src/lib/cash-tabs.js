@@ -21,8 +21,25 @@ import { msg } from '@lingui/core/macro';
 
 export const CASH_TABS = [
   {
+    id: 'home',
+    label: msg`Inicio`,
+    icon: 'Home',
+    permissions: ['loyalty.read'],
+  },
+  {
+    id: 'scan',
+    label: msg`Escanear`,
+    icon: 'QrScan',
+    permissions: ['loyalty.reward.redeem'],
+    actions: {
+      scan: ['loyalty.reward.redeem'],
+      seals: ['loyalty.adjust'],
+    },
+  },
+  {
     id: 'members',
     label: msg`Lealtad`,
+    icon: 'Users2',
     // The member list and member detail read under `loyalty.read`.
     permissions: ['loyalty.read'],
     actions: {
@@ -37,6 +54,7 @@ export const CASH_TABS = [
   {
     id: 'rewards',
     label: msg`Recompensas`,
+    icon: 'Stamp',
     // The reward configuration read is `loyalty.read`; its write is
     // `merchant.manage`. The tab is a read surface with a write action.
     permissions: ['loyalty.read'],
@@ -47,6 +65,7 @@ export const CASH_TABS = [
   {
     id: 'gift-cards',
     label: msg`Tarjetas de regalo`,
+    icon: 'Gift',
     permissions: ['gift_card.read'],
     actions: {
       issue: ['gift_card.issue'],
@@ -56,6 +75,7 @@ export const CASH_TABS = [
   {
     id: 'wallet',
     label: msg`Monedero`,
+    icon: 'Wallet',
     permissions: ['wallet.read'],
     actions: {
       topup: ['wallet.authorize'],
@@ -65,6 +85,7 @@ export const CASH_TABS = [
   {
     id: 'settings',
     label: msg`Ajustes`,
+    icon: 'Settings',
     // Cash settings live under the loyalty-value module, not the dashboard
     // settings module. The API contract gates both halves on `merchant.manage`.
     permissions: ['merchant.manage'],
@@ -72,20 +93,33 @@ export const CASH_TABS = [
 ];
 
 /**
- * Route aliases. The old screens lived at `/members` and `/gift-cards`; their
- * bookmarks still arrive with those names. The hub itself uses the tab id.
+ * Route aliases. The old screens lived at `/members`, `/gift-cards`, and
+ * `/[slug]/admin/*` in `umi-cash`; their bookmarks still arrive with those
+ * names. The hub itself uses the tab id.
  */
 const ROUTE_ALIASES = {
+  home: 'home',
+  inicio: 'home',
+  admin: 'home',
+  scan: 'scan',
+  escanear: 'scan',
   members: 'members',
+  customers: 'members',
+  clientes: 'members',
   loyalty: 'members',
   rewards: 'rewards',
+  recompensas: 'rewards',
   'gift-cards': 'gift-cards',
   giftcards: 'gift-cards',
   gift_cards: 'gift-cards',
   wallet: 'wallet',
+  topup: 'wallet',
+  monedero: 'wallet',
   settings: 'settings',
   ajustes: 'settings',
 };
+
+const BARISTA_ROLES = new Set(['cashier', 'staff', 'barista']);
 
 export function cashTabForRoute(route) {
   const key = String(route || '')
@@ -120,6 +154,24 @@ export function allowedCashTabs(capabilities) {
 /** The tab the hub opens when the URL names no tab. */
 export function firstAllowedCashTab(capabilities) {
   return allowedCashTabs(capabilities)[0]?.id || null;
+}
+
+/**
+ * Role-aware Cash landing tab.
+ *
+ * On mobile (<768px), a shop-floor barista/cashier/staff member with scan
+ * authority lands directly on the QR scanner (`scan`) for one-thumb operation;
+ * owners/managers and desktop sessions open the first allowed tab (`home`).
+ */
+export function preferredCashLandingTab(capabilities, { isMobile = false } = {}) {
+  const role = String(capabilities?.membership?.role || '')
+    .trim()
+    .toLowerCase();
+  const isBaristaRole = BARISTA_ROLES.has(role) || role.startsWith('barista');
+  if (isMobile && isBaristaRole && canShowCashTab('scan', capabilities)) {
+    return 'scan';
+  }
+  return firstAllowedCashTab(capabilities);
 }
 
 /** An action gate. The action name is unique across the hub. */

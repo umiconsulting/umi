@@ -7,16 +7,16 @@ description: The validation gates that run every time a pull request is publishe
 
 A pull request is not publishable until the **Before** gates pass, not mergeable until the **During** gate is green, and not done until the **After** gate confirms it. Gates are ordered; a failing gate stops the flow — fix on the branch, never wave it through.
 
-Fixed point for every diff and affected filter: the merge-base with the PR base. `origin/main`
-is the default when the PR base is not supplied.
+Fixed point for every diff and affected filter: the merge-base with the PR base. All feature, fix, and agent PRs target `dev` (`gh pr create --base dev`), so `origin/dev` is the default when `PR_BASE_REF` is not supplied (`dev` -> `staging` -> `main`).
 
 ```
-BASE_REF=${PR_BASE_REF:-origin/main}
+BASE_REF=${PR_BASE_REF:-origin/dev}
 BASE=$(git merge-base "$BASE_REF" HEAD)
 ```
 
 ## Branch names and PR descriptions
 
+- Branch from `origin/dev` and always open feature, fix, and agent PRs against `dev` (`gh pr create --base dev`).
 - Use `<type>/<short-description>` for feature and fix branches.
 - Select a conventional prefix that matches the change: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `build`, `ci`, or `chore`.
 - Write the description in English, with lowercase words separated by hyphens. Keep it short and specific, such as `feat/sales-analysis` or `fix/refund-totals`.

@@ -47,7 +47,7 @@ const upstreamRef = () => {
   });
   return result.status === 0 && result.stdout.trim().length > 0 ? result.stdout.trim() : null;
 };
-const baseRef = process.env.PR_BASE_REF ?? upstreamRef() ?? 'origin/main';
+const baseRef = process.env.PR_BASE_REF ?? upstreamRef() ?? 'origin/dev';
 const mergeBase = runGit(['merge-base', baseRef, 'HEAD']);
 runGit(['diff', '--check']);
 runGit(['diff', '--cached', '--check']);
