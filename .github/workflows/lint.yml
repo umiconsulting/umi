@@ -24,7 +24,7 @@ jobs:
           echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -shellcheck=''
-          shellcheck db/check.sh db/test/migrate.sh apps/umi-api/deploy/deploy.sh apps/umi-dashboard/scripts/build-ci.sh
+          shellcheck db/check.sh db/test/migrate.sh apps/umi-api/deploy/deploy.sh apps/umi-dashboard/scripts/build-ci.sh scripts/ci-pos-api-offline-smoke.sh
 
       - name: Scan commits for secrets
         env:

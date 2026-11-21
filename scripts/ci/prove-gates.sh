@@ -18,13 +18,16 @@ open(f'{w}/release.jq', 'w').write(rel + '\n')
 PY
 
 cat > "$W/ready-docs-only.json" <<'JSON'
-{"changes":{"result":"success","outputs":{"packages":"false","api":"false","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"lint":{"result":"success"},"packages":{"result":"skipped"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
+{"changes":{"result":"success","outputs":{"packages":"false","api":"false","dashboard":"false","landing":"false","cash":"false","pos":"false","offline_e2e":"false"}},"lint":{"result":"success"},"packages":{"result":"skipped"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"},"offline-e2e":{"result":"skipped"}}
 JSON
 cat > "$W/ready-failing.json" <<'JSON'
-{"changes":{"result":"success","outputs":{"packages":"false","api":"false","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"lint":{"result":"failure"},"packages":{"result":"skipped"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
+{"changes":{"result":"success","outputs":{"packages":"false","api":"false","dashboard":"false","landing":"false","cash":"false","pos":"false","offline_e2e":"false"}},"lint":{"result":"failure"},"packages":{"result":"skipped"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"},"offline-e2e":{"result":"skipped"}}
 JSON
 cat > "$W/ready-cancelled.json" <<'JSON'
-{"changes":{"result":"success","outputs":{"packages":"false","api":"true","dashboard":"false","landing":"false","cash":"false","pos":"false"}},"lint":{"result":"success"},"packages":{"result":"skipped"},"api":{"result":"cancelled"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"}}
+{"changes":{"result":"success","outputs":{"packages":"false","api":"true","dashboard":"false","landing":"false","cash":"false","pos":"false","offline_e2e":"true"}},"lint":{"result":"success"},"packages":{"result":"skipped"},"api":{"result":"cancelled"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"skipped"},"offline-e2e":{"result":"success"}}
+JSON
+cat > "$W/ready-offline-e2e-fail.json" <<'JSON'
+{"changes":{"result":"success","outputs":{"packages":"false","api":"false","dashboard":"false","landing":"false","cash":"false","pos":"true","offline_e2e":"true"}},"lint":{"result":"success"},"packages":{"result":"skipped"},"api":{"result":"skipped"},"dashboard":{"result":"skipped"},"landing":{"result":"skipped"},"cash":{"result":"skipped"},"pos":{"result":"success"},"offline-e2e":{"result":"failure"}}
 JSON
 cat > "$W/release-complete.json" <<'JSON'
 {"ready":{"result":"success"},"changes":{"result":"success","outputs":{"api":"true","dashboard":"true","landing":"true"}},"deploy-api-staging":{"result":"success"},"deploy-api-production":{"result":"skipped"},"deploy-dashboard":{"result":"success"},"deploy-landing":{"result":"skipped"}}
@@ -52,6 +55,7 @@ run() {
 
 run "failing-job-blocks-ready" ready ready-failing.json fail false
 run "cancelled-job-blocks-ready" ready ready-cancelled.json fail false
+run "offline-e2e-failure-blocks-ready" ready ready-offline-e2e-fail.json fail false
 run "docs-only-change-passes-ready" ready ready-docs-only.json pass false
 run "incomplete-release-not-recorded" release release-incomplete.json fail staging
 run "complete-release-recorded" release release-complete.json pass staging

@@ -48,3 +48,7 @@ pos:
   - '.github/workflows/umi-pos-ios.yml'
 pos_ios:
   - 'apps/umi-pos/ios/**'
+offline_e2e:
+  - 'scripts/ci-pos-api-offline-smoke.sh'
+  - 'scripts/seed-offline-e2e-fixture.mjs'
+  - '.github/workflows/offline-e2e.yml'
