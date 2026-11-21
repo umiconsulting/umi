@@ -6,6 +6,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:umi_contract/umi_contract.dart';
 
+import '../../core/observability/telemetry.dart';
 import '../../core/storage/storage.dart';
 import 'sqlite_journal_store.dart';
 
@@ -303,8 +304,10 @@ final class EncryptedOfflineJournal {
   EncryptedOfflineJournal(
     this._store, {
     SqliteJournalStore? sqliteStore,
+    Telemetry? telemetry,
     bool? web,
   }) : _sqliteStore = sqliteStore,
+       _telemetry = telemetry,
        _web = web ?? kIsWeb,
        _mutationQueue = _queues[sqliteStore ?? _store] ??=
            _JournalMutationQueue();
@@ -322,6 +325,7 @@ final class EncryptedOfflineJournal {
 
   final JournalCipherStore _store;
   final SqliteJournalStore? _sqliteStore;
+  final Telemetry? _telemetry;
   final _JournalMutationQueue _mutationQueue;
   final bool _web;
   final _cipher = AesGcm.with256bits();
@@ -401,6 +405,7 @@ final class EncryptedOfflineJournal {
       if (legacyEncoded != null) {
         final migrated = await _decryptLegacyBlob(legacyEncoded);
         if (migrated != null) {
+          final watch = Stopwatch()..start();
           final key = await _key(create: true);
           _syncDeviceScopeFromSnapshot(migrated);
           _legacyMigrated = true;
@@ -417,6 +422,17 @@ final class EncryptedOfflineJournal {
             meta: meta,
             entries: entryRows,
             replaceExisting: true,
+          );
+          watch.stop();
+          _telemetry?.event(
+            ClientEvent(
+              name: 'offline.journal.sqlite_migrated',
+              values: {
+                'entryCount': migrated.entries.length,
+                'pendingCount': migrated.pendingCount,
+                'durationMs': watch.elapsedMilliseconds,
+              },
+            ),
           );
           // Mark legacy blob migrated so SharedPreferences XML shrinks and
           // never re-imports. Best-effort because SQLite already committed.
@@ -472,10 +488,9 @@ final class EncryptedOfflineJournal {
         cachedPolicy: metaData['cachedPolicy'] as Map<String, Object?>?,
         lastTrustedServerTime: _date(metaData['lastTrustedServerTime']),
         lastTrustedLocalTime: _date(metaData['lastTrustedLocalTime']),
-        recoveryAudit:
-            (metaData['recoveryAudit'] as List<Object?>? ?? const [])
-                .map((item) => item! as Map<String, Object?>)
-                .toList(growable: false),
+        recoveryAudit: (metaData['recoveryAudit'] as List<Object?>? ?? const [])
+            .map((item) => item! as Map<String, Object?>)
+            .toList(growable: false),
       );
       _lastDeviceId = metaRow.deviceId;
       _lastMerchantId = metaRow.merchantId;
@@ -1275,6 +1290,7 @@ final class EncryptedOfflineJournal {
       _lastLocationId = latest.locationId;
     }
     try {
+      final watch = Stopwatch()..start();
       final meta = await _encodeSqliteMeta(
         snapshot,
         key,
@@ -1293,6 +1309,17 @@ final class EncryptedOfflineJournal {
             entries: encodedRows,
             deleteSequences: delta.deleteSequences,
           );
+          if (delta.deleteSequences.isNotEmpty) {
+            _telemetry?.event(
+              ClientEvent(
+                name: 'offline.journal.pruned',
+                values: {
+                  'removedCount': delta.deleteSequences.length,
+                  'remainingCount': snapshot.entries.length,
+                },
+              ),
+            );
+          }
         case _DeltaKind.metaOnly:
           await sqlite.writeMeta(meta);
         case _DeltaKind.prune:
@@ -1301,14 +1328,38 @@ final class EncryptedOfflineJournal {
           final cutoffMs = now
               .subtract(const Duration(days: 30))
               .millisecondsSinceEpoch;
-          await sqlite.pruneExpired(
+          final removed = await sqlite.pruneExpired(
             nowMs: nowMs,
             settledCutoffMs: cutoffMs,
             mappedProvisionalIds: snapshot.mappings.keys.toSet(),
             meta: meta,
           );
+          if (removed > 0) {
+            _telemetry?.event(
+              ClientEvent(
+                name: 'offline.journal.pruned',
+                values: {
+                  'removedCount': removed,
+                  'remainingCount': snapshot.entries.length,
+                },
+              ),
+            );
+          }
         case _DeltaKind.resetAll:
           await sqlite.deleteAllAndResetMeta(meta);
+      }
+      watch.stop();
+      if (watch.elapsedMilliseconds > 50) {
+        _telemetry?.event(
+          ClientEvent(
+            name: 'offline.journal.slow_write',
+            values: {
+              'op': delta.kind.name,
+              'durationMs': watch.elapsedMilliseconds,
+              'entryCount': snapshot.entries.length,
+            },
+          ),
+        );
       }
       _sqliteInitialized = true;
       _loadedSqliteGeneration = sqlite.writeGeneration;

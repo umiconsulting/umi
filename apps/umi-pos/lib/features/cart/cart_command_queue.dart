@@ -650,7 +650,8 @@ final class CartCommandQueue {
     final targetModifiers = _modifiersSignature(
       command.payload['modifierSelections'],
     );
-    final targetCourse = (command.payload['courseNumber'] as num?)?.toInt() ?? 1;
+    final targetCourse =
+        (command.payload['courseNumber'] as num?)?.toInt() ?? 1;
     final targetNote = _normalizeLineNote(command.payload['note'] as String?);
 
     final priorIds = <String>{
@@ -837,7 +838,14 @@ final class CartCommandQueue {
     unawaited(
       _journalTail
           .then((_) async {
-            await recovery.recover(scope.replayScope);
+            if (recovery.status.phase == RecoveryPhase.blockedByConflict) {
+              // Respect the recovery controller's conflict watermark so every
+              // 10s connectivity heartbeat does not hammer /offline/replay/begin
+              // and /offline/reconcile when zero new unblocked work exists.
+              await recovery.replayIfPending();
+            } else {
+              await recovery.recover(scope.replayScope);
+            }
             _replayScheduled = false;
           })
           .catchError((_) {

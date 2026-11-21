@@ -240,10 +240,14 @@ void main() {
         ),
       );
 
+      final telemetryExporter = BufferedTelemetryExporter(
+        deviceIdProvider: () => deviceId,
+        buildVersionProvider: () => config.release.version,
+      );
       final telemetry = SafeTelemetry(
         enabled: true,
         context: TelemetryContext.current(config),
-        exporter: BufferedTelemetryExporter(),
+        exporter: telemetryExporter,
       );
 
       final apiClient = BoundedApiClient(
@@ -452,6 +456,7 @@ void main() {
         journal: journal,
         policyCache: policyCache,
         eligibility: const OfflineCheckoutEligibilityEngine(),
+        telemetry: telemetry,
       );
       await offlineCheckout.checkout(
         OfflineCheckoutRequest(
@@ -551,6 +556,7 @@ void main() {
         cipherStore,
         web: false,
         sqliteStore: sqliteJournalStore,
+        telemetry: telemetry,
       );
       final reopenedSnapshot = await journal.load();
       expect(
@@ -571,6 +577,7 @@ void main() {
         journal: journal,
         gateway: replayGateway,
         connectivity: connectivity,
+        telemetry: telemetry,
       );
       addTearDown(recovery.dispose);
       // Seed an active scope (as an unlocked terminal would have), then lock.
@@ -648,6 +655,20 @@ void main() {
             'Every queued command (table, cart, lines, fire, cash checkout) must land cleanly on real NestJS + Postgres; conflicts=${conflictEntries.map((c) => '${c.command.commandType}:${c.failure?['guidanceCode'] ?? c.lastSafeErrorCategory}').toList()}',
       );
       expect(conflictEntries, isEmpty);
+      final recordedTelemetryNames = telemetryExporter.events
+          .map((e) => e.name)
+          .toSet();
+      expect(
+        recordedTelemetryNames,
+        containsAll([
+          'offline.checkout.committed',
+          'offline.replay.auth_blocked',
+          'offline.replay.started',
+          'offline.replay.completed',
+        ]),
+        reason:
+            'Real offline telemetry must emit checkout, auth-block, replay start, and replay completion events; got=$recordedTelemetryNames',
+      );
 
       // Real wire idempotency: re-submit the exact accepted cash checkout command
       // to real /offline/replay/submit and verify duplicate acceptance (still 1 sale).
