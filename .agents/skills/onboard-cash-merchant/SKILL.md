@@ -32,12 +32,14 @@ python3 .agents/skills/onboard-cash-merchant/scripts/onboard_merchant.py fetch \
   --workdir "$WORKDIR"
 ```
 
-If Instagram blocks anonymous metadata fetch, pass `--logo-file /path/to/avatar.jpg --name "<Merchant Name>"`.
+Under the hood, `fetch` calls sibling `scripts/profile_build.sh` (which uses a bot User-Agent + `chromium --headless --dump-dom` fallback to pull public name, bio, stats, and avatar in ~0.7s without login; do not replace its curl UA with a Chrome UA).
+You can also run `profile_build.sh <user1> <user2> -o "$WORKDIR" --json` directly for batch lookups.
+If a profile is private or blocked, pass `--logo-file /path/to/avatar.jpg --name "<Merchant Name>"`.
 This downloads `raw-logo.*`, extracts dominant `#rrggbb` brand colors via ImageMagick, derives `cardPrefix` + generic admin email/password, and writes `$WORKDIR/draft.json`.
 
 ### 2. Upscale & clean the logo (model step)
 
-Use the image generator / Gemini editor on `$WORKDIR/raw-logo.*` to produce a crisp, high-resolution, square logo (`$WORKDIR/upscaled-logo.png`) suitable for receipts and Apple/Google Wallet passes. Keep the brand's real typography and emblem faithful — do not invent a different mark.
+Because public Instagram avatars are 150x150, use the harness image editor/generator (`image-generator` in Antigravity, or Gemini) on `$WORKDIR/raw-logo.*` to produce a crisp, high-resolution, square logo (`$WORKDIR/upscaled-logo.png`) suitable for receipts and Apple/Google Wallet passes. Keep the brand's real typography and emblem faithful — do not invent a different mark.
 
 ### 3. Normalize logo for `umi-api` limits (deterministic script)
 
