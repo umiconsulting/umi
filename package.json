@@ -75,7 +75,10 @@
     "pilot:bootstrap": "bash scripts/umipos-pilot-bootstrap.sh",
     "ci:db": "bash db/check.sh",
     "ci:migrations": "bash db/test/migrate.sh",
-    "ci:release": "node --test scripts/deploy-release.spec.mjs"
+    "ci:release": "node --test scripts/deploy-release.spec.mjs",
+    "smoke:staging": "node scripts/staging-smoke.mjs",
+    "smoke:staging:test": "node --test scripts/staging-smoke.spec.mjs",
+    "pos:release-smoke": "bash scripts/pos-release-smoke.sh"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
