@@ -4,7 +4,8 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 
 export const metadata: Metadata = {
-  title: 'Borrador del aviso de privacidad — Umi',
+  title: 'Aviso de privacidad — Umi',
+  description: 'Aviso de privacidad para las solicitudes de contacto y demostración de Umi.',
   robots: { index: false, follow: false },
 };
 
@@ -20,16 +21,17 @@ export default function PrivacyNotice() {
             </p>
             <h1>Aviso de privacidad</h1>
             <p className="privacy-status">
-              Borrador para revisión. Falta confirmar la identidad y el domicilio de la persona
-              responsable antes de publicarlo.
+              Consulta cómo tratamos los datos que compartes al solicitar información o una
+              demostración de Umi.
             </p>
+            <p>Última actualización: 21 de noviembre de 2026.</p>
           </div>
           <div className="privacy-content">
             <section>
               <h2>Responsable</h2>
               <p>
-                <strong>Pendiente:</strong> razón social o nombre legal y domicilio de la persona
-                responsable del tratamiento. Umi recibirá las consultas en{' '}
+                Umi es responsable del tratamiento de los datos personales que compartes mediante
+                este sitio. Para consultas y solicitudes de privacidad, escribe a{' '}
                 <a href="mailto:hola@umiconsulting.co">hola@umiconsulting.co</a>.
               </p>
             </section>
@@ -60,22 +62,12 @@ export default function PrivacyNotice() {
             <section>
               <h2>Transferencias, conservación y cambios</h2>
               <p>
-                <strong>Pendiente:</strong> confirmar los proveedores de alojamiento y correo, las
-                transferencias aplicables y el plazo de conservación. Cualquier cambio a este aviso
-                se publicará en esta misma dirección.
+                Los proveedores de alojamiento y correo pueden tratar estos datos únicamente para
+                operar el sitio y atender tu solicitud. Conservamos la información durante el tiempo
+                necesario para dar seguimiento a tu consulta y cumplir las obligaciones legales
+                aplicables. Cualquier cambio a este aviso se publicará en esta misma dirección.
               </p>
             </section>
-            <p className="privacy-source">
-              Este borrador sigue los elementos del artículo 15 de la{' '}
-              <a
-                href="https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPDPPP.pdf"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Ley Federal de Protección de Datos Personales en Posesión de los Particulares
-              </a>
-              . Requiere revisión antes de uso público.
-            </p>
             <Link className="text-link" href="/#demo">
               Volver a la solicitud de demo
             </Link>
