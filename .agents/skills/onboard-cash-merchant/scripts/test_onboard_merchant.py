@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import struct
+import subprocess
 import tempfile
 import unittest
+from unittest import mock
 import zlib
 
 import onboard_merchant as om
@@ -96,6 +99,45 @@ class OnboardMerchantTests(unittest.TestCase):
             rc = om.main(["cleanup", "--workdir", str(workdir)])
             self.assertEqual(rc, 0)
             self.assertFalse(workdir.exists())
+
+    def test_fetch_instagram_profile_integration(self) -> None:
+        self.assertTrue(om.INSTAGRAM_FETCH_SCRIPT.exists())
+        syntax = subprocess.run(["bash", "-n", str(om.INSTAGRAM_FETCH_SCRIPT)], capture_output=True, text=True, check=False)
+        self.assertEqual(syntax.returncode, 0, syntax.stderr)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            avatar = root / "shimona.png"
+            make_tiny_png(avatar, width=24, height=24)
+            fake_script = root / "fake_fetch_instagram_profile.sh"
+            fake_script.write_text(
+                "#!/usr/bin/env bash\n"
+                f'cp "{avatar}" "$3/$1.png"\n'
+                'printf \'{"username":"%s","full_name":"Shimonagi Coffee","bio":"Specialty coffee in Culiacan","followers":1738,"following":42,"posts":120,"profile_url":"https://www.instagram.com/%s/","avatar_url":"https://example.test/a.jpg","avatar_file":"%s/%s.png","source":"og:meta (bot UA)"}\\n\' "$1" "$1" "$3" "$1"\n',
+                encoding="utf-8",
+            )
+            os.chmod(fake_script, 0o755)
+            workdir = root / "job-ig"
+
+            with mock.patch.object(om, "INSTAGRAM_FETCH_SCRIPT", fake_script):
+                rc = om.main(
+                    [
+                        "fetch",
+                        "--instagram",
+                        "https://www.instagram.com/shimonagimx/",
+                        "--plan",
+                        "growth",
+                        "--workdir",
+                        str(workdir),
+                    ]
+                )
+            self.assertEqual(rc, 0)
+            draft = json.loads((workdir / "draft.json").read_text(encoding="utf-8"))
+            self.assertEqual(draft["source"]["handle"], "shimonagimx")
+            self.assertEqual(draft["source"]["followers"], 1738)
+            self.assertEqual(draft["provisionPayload"]["name"], "Shimonagi Coffee")
+            self.assertEqual(draft["provisionPayload"]["adminEmail"], "admin+shimonagimx@umiconsulting.co")
+            self.assertTrue(Path(draft["rawLogoPath"]).exists())
 
 
 if __name__ == "__main__":

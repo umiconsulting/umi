@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import base64
-import html
 import http.cookiejar
 import json
 import os
@@ -86,65 +85,60 @@ def generate_initial_password(length: int = 16) -> str:
             return pwd
 
 
-def fetch_instagram_public(handle: str, timeout: int = 15) -> dict[str, Any]:
-    """Best-effort public Instagram metadata fetch (returns partial dict if blocked)."""
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/json;q=0.9,*/*;q=0.8",
-        "Accept-Language": "es-MX,es;q=0.9,en;q=0.8",
-        "X-IG-App-ID": "936619743392459",
-    }
+INSTAGRAM_FETCH_SCRIPT = Path(__file__).resolve().parent / "fetch_instagram_profile.sh"
 
-    # Try web_profile_info JSON first (fast and structured when allowed).
-    api_url = f"https://i.instagram.com/api/v1/users/web_profile_info/?username={urllib.parse.quote(handle)}"
-    try:
-        req = urllib.request.Request(api_url, headers=headers)
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            payload = json.loads(resp.read().decode("utf-8", errors="replace"))
-        user = ((payload.get("data") or {}).get("user")) or {}
-        if user:
-            return {
-                "source": "instagram_api",
-                "handle": handle,
-                "name": (user.get("full_name") or handle).strip(),
-                "bio": (user.get("biography") or "").strip(),
-                "avatarUrl": user.get("profile_pic_url_hd") or user.get("profile_pic_url"),
-                "externalUrl": user.get("external_url"),
-            }
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
-        pass
 
-    # Fallback: OpenGraph tags on public profile HTML.
-    page_url = f"https://www.instagram.com/{urllib.parse.quote(handle)}/"
-    try:
-        req = urllib.request.Request(page_url, headers={"User-Agent": headers["User-Agent"]})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8", errors="replace")
-        og_title = re.search(r'<meta\s+property="og:title"\s+content="([^"]+)"', body)
-        og_image = re.search(r'<meta\s+property="og:image"\s+content="([^"]+)"', body)
-        og_desc = re.search(r'<meta\s+property="og:description"\s+content="([^"]+)"', body)
-        raw_title = html.unescape(og_title.group(1)) if og_title else handle
-        clean_name = raw_title.split("(@")[0].split("•")[0].strip() or handle
+def fetch_instagram_public(handle: str, workdir: Path, timeout: int = 75) -> dict[str, Any]:
+    """Extract public Instagram metadata and avatar via sibling fetch_instagram_profile.sh."""
+    script = INSTAGRAM_FETCH_SCRIPT
+    if not script.exists():
         return {
-            "source": "instagram_og",
-            "handle": handle,
-            "name": clean_name,
-            "bio": html.unescape(og_desc.group(1)) if og_desc else "",
-            "avatarUrl": html.unescape(og_image.group(1)) if og_image else None,
-            "externalUrl": None,
-        }
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        return {
-            "source": "blocked",
+            "source": "missing_script",
             "handle": handle,
             "name": handle.replace(".", " ").replace("_", " ").title(),
             "bio": "",
             "avatarUrl": None,
-            "warning": f"Instagram blocked anonymous fetch ({exc}). Provide --logo-file and --name.",
+            "avatarFile": None,
+            "warning": f"Extractor script not found: {script}",
         }
+
+    res = subprocess.run(
+        [str(script), handle, "-o", str(workdir), "--json"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=timeout,
+    )
+    json_line = next((ln.strip() for ln in reversed(res.stdout.splitlines()) if ln.strip().startswith("{")), None)
+    if res.returncode == 0 and json_line:
+        try:
+            data = json.loads(json_line)
+            return {
+                "source": data.get("source") or "fetch_instagram_profile.sh",
+                "handle": data.get("username") or handle,
+                "name": (data.get("full_name") or handle).strip(),
+                "bio": (data.get("bio") or "").strip(),
+                "followers": data.get("followers"),
+                "following": data.get("following"),
+                "posts": data.get("posts"),
+                "profileUrl": data.get("profile_url"),
+                "avatarUrl": data.get("avatar_url"),
+                "avatarFile": data.get("avatar_file"),
+                **({"avatarError": data["avatar_error"]} if data.get("avatar_error") else {}),
+            }
+        except json.JSONDecodeError:
+            pass
+
+    err_detail = (res.stderr or res.stdout).strip() or f"exit {res.returncode}"
+    return {
+        "source": "blocked",
+        "handle": handle,
+        "name": handle.replace(".", " ").replace("_", " ").title(),
+        "bio": "",
+        "avatarUrl": None,
+        "avatarFile": None,
+        "warning": f"fetch_instagram_profile.sh could not extract @{handle} ({err_detail}). Provide --logo-file and --name.",
+    }
 
 
 def find_magick() -> list[str] | None:
@@ -206,10 +200,10 @@ def cmd_fetch(args: argparse.Namespace) -> int:
     workdir = Path(args.workdir).expanduser().resolve()
     workdir.mkdir(parents=True, exist_ok=True)
 
-    meta: dict[str, Any] = {"source": "manual", "handle": None, "bio": "", "avatarUrl": None}
+    meta: dict[str, Any] = {"source": "manual", "handle": None, "bio": "", "avatarUrl": None, "avatarFile": None}
     if args.instagram:
         handle = normalize_instagram_handle(args.instagram)
-        meta = fetch_instagram_public(handle)
+        meta = fetch_instagram_public(handle, workdir)
 
     merchant_name = (args.name or meta.get("name") or "Nuevo Comercio").strip()
     handle_slug = slugify_identifier(meta.get("handle") or merchant_name)
@@ -222,6 +216,12 @@ def cmd_fetch(args: argparse.Namespace) -> int:
         ext = src.suffix.lower() or ".png"
         raw_logo_path = workdir / f"raw-logo{ext}"
         shutil.copy2(src, raw_logo_path)
+    elif meta.get("avatarFile") and Path(meta["avatarFile"]).exists():
+        src = Path(meta["avatarFile"]).resolve()
+        ext = src.suffix.lower() or ".jpg"
+        raw_logo_path = workdir / f"raw-logo{ext}"
+        if src != raw_logo_path:
+            shutil.copy2(src, raw_logo_path)
     elif meta.get("avatarUrl"):
         try:
             req = urllib.request.Request(
