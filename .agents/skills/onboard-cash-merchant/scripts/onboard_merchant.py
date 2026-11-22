@@ -85,12 +85,12 @@ def generate_initial_password(length: int = 16) -> str:
             return pwd
 
 
-PROFILE_BUILD_SCRIPT = Path(__file__).resolve().parent / "profile_build.sh"
+INSTAGRAM_FETCH_SCRIPT = Path(__file__).resolve().parent / "fetch_instagram_profile.sh"
 
 
 def fetch_instagram_public(handle: str, workdir: Path, timeout: int = 75) -> dict[str, Any]:
-    """Extract public Instagram metadata and avatar via sibling profile_build.sh."""
-    script = PROFILE_BUILD_SCRIPT
+    """Extract public Instagram metadata and avatar via sibling fetch_instagram_profile.sh."""
+    script = INSTAGRAM_FETCH_SCRIPT
     if not script.exists():
         return {
             "source": "missing_script",
@@ -114,7 +114,7 @@ def fetch_instagram_public(handle: str, workdir: Path, timeout: int = 75) -> dic
         try:
             data = json.loads(json_line)
             return {
-                "source": data.get("source") or "profile_build.sh",
+                "source": data.get("source") or "fetch_instagram_profile.sh",
                 "handle": data.get("username") or handle,
                 "name": (data.get("full_name") or handle).strip(),
                 "bio": (data.get("bio") or "").strip(),
@@ -137,7 +137,7 @@ def fetch_instagram_public(handle: str, workdir: Path, timeout: int = 75) -> dic
         "bio": "",
         "avatarUrl": None,
         "avatarFile": None,
-        "warning": f"profile_build.sh could not extract @{handle} ({err_detail}). Provide --logo-file and --name.",
+        "warning": f"fetch_instagram_profile.sh could not extract @{handle} ({err_detail}). Provide --logo-file and --name.",
     }
 
 

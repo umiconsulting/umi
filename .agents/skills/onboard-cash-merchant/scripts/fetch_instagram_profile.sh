@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# profile_build.sh - saca avatar + info publica de cualquier cuenta de Instagram.
+# fetch_instagram_profile.sh - saca avatar + info publica de cualquier cuenta de Instagram.
 # Rapido (~0.7s por cuenta), sin login, sin dependencias mas alla de curl+python3.
 #
 # Uso:
-#   ./profile_build.sh <usuario|url>... [-o DIR] [--json]
+#   ./fetch_instagram_profile.sh <usuario|url>... [-o DIR] [--json]
 #
 #   <usuario|url>   shimonagimx | @shimonagimx | https://www.instagram.com/shimonagimx/
 #                   acepta varias cuentas en la misma llamada

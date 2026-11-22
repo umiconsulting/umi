@@ -100,16 +100,16 @@ class OnboardMerchantTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertFalse(workdir.exists())
 
-    def test_profile_build_sh_integration(self) -> None:
-        self.assertTrue(om.PROFILE_BUILD_SCRIPT.exists())
-        syntax = subprocess.run(["bash", "-n", str(om.PROFILE_BUILD_SCRIPT)], capture_output=True, text=True, check=False)
+    def test_fetch_instagram_profile_integration(self) -> None:
+        self.assertTrue(om.INSTAGRAM_FETCH_SCRIPT.exists())
+        syntax = subprocess.run(["bash", "-n", str(om.INSTAGRAM_FETCH_SCRIPT)], capture_output=True, text=True, check=False)
         self.assertEqual(syntax.returncode, 0, syntax.stderr)
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             avatar = root / "shimona.png"
             make_tiny_png(avatar, width=24, height=24)
-            fake_script = root / "fake_profile_build.sh"
+            fake_script = root / "fake_fetch_instagram_profile.sh"
             fake_script.write_text(
                 "#!/usr/bin/env bash\n"
                 f'cp "{avatar}" "$3/$1.png"\n'
@@ -119,7 +119,7 @@ class OnboardMerchantTests(unittest.TestCase):
             os.chmod(fake_script, 0o755)
             workdir = root / "job-ig"
 
-            with mock.patch.object(om, "PROFILE_BUILD_SCRIPT", fake_script):
+            with mock.patch.object(om, "INSTAGRAM_FETCH_SCRIPT", fake_script):
                 rc = om.main(
                     [
                         "fetch",

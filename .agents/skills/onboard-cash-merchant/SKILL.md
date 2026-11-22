@@ -32,8 +32,8 @@ python3 .agents/skills/onboard-cash-merchant/scripts/onboard_merchant.py fetch \
   --workdir "$WORKDIR"
 ```
 
-Under the hood, `fetch` calls sibling `scripts/profile_build.sh` (which uses a bot User-Agent + `chromium --headless --dump-dom` fallback to pull public name, bio, stats, and avatar in ~0.7s without login; do not replace its curl UA with a Chrome UA).
-You can also run `profile_build.sh <user1> <user2> -o "$WORKDIR" --json` directly for batch lookups.
+Under the hood, `fetch` calls sibling `scripts/fetch_instagram_profile.sh` (which uses a bot User-Agent + `chromium --headless --dump-dom` fallback to pull public name, bio, stats, and avatar in ~0.7s without login; do not replace its curl UA with a Chrome UA).
+You can also run `fetch_instagram_profile.sh <user1> <user2> -o "$WORKDIR" --json` directly for batch lookups.
 If a profile is private or blocked, pass `--logo-file /path/to/avatar.jpg --name "<Merchant Name>"`.
 This downloads `raw-logo.*`, extracts dominant `#rrggbb` brand colors via ImageMagick, derives `cardPrefix` + generic admin email/password, and writes `$WORKDIR/draft.json`.
 
