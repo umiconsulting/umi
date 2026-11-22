@@ -14,24 +14,24 @@ msgstr ""
 "Plural-Forms: \n"
 
 #: src/app.jsx
+#~ msgid "Módulo"
+#~ msgstr "Module"
+
+#: src/app.jsx
+#~ msgid "producto"
+#~ msgstr "product"
+
+#: src/app.jsx
+#~ msgid "{name} no está activo en este café"
+#~ msgstr "{name} is not active for this café"
+
+#: src/app.jsx
+#~ msgid "Esta sección necesita {productName}. El super admin lo puede revisar en Productos y facturación; no hay controles hasta activar el producto."
+#~ msgstr "This section needs {productName}. The super admin can review it under Products and billing; there are no controls until the product is active."
+
+#: src/app.jsx
 msgid "Cerrar el menú"
 msgstr "Close the menu"
-
-#: src/app.jsx
-msgid "Módulo"
-msgstr "Module"
-
-#: src/app.jsx
-msgid "producto"
-msgstr "product"
-
-#: src/app.jsx
-msgid "{name} no está activo en este café"
-msgstr "{name} is not active for this café"
-
-#: src/app.jsx
-msgid "Esta sección necesita {productName}. El super admin lo puede revisar en Productos y facturación; no hay controles hasta activar el producto."
-msgstr "This section needs {productName}. The super admin can review it under Products and billing; there are no controls until the product is active."
 
 #: src/app.jsx
 msgid "Esta pantalla"
@@ -79,6 +79,7 @@ msgid "Elige un negocio en la barra lateral."
 msgstr "Choose a business in the sidebar."
 
 #: src/app.jsx
+#: src/screens/cash-scan.jsx
 #: src/screens/customers.jsx
 #: src/screens/floor-plan.jsx
 #: src/screens/recipe-workspace.jsx
@@ -258,6 +259,17 @@ msgid "Código incorrecto o vencido."
 msgstr "Incorrect or expired code."
 
 #: src/lib/cash-tabs.js
+#: src/screens/cash-scan.jsx
+msgid "Inicio"
+msgstr "Home"
+
+#: src/lib/cash-tabs.js
+#: src/screens/cash-scan.jsx
+#: src/shell.jsx
+msgid "Escanear"
+msgstr "Scan"
+
+#: src/lib/cash-tabs.js
 #: src/screens/customers.jsx
 #: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
@@ -267,6 +279,7 @@ msgid "Lealtad"
 msgstr "Loyalty"
 
 #: src/lib/cash-tabs.js
+#: src/screens/cash-scan.jsx
 #: src/screens/operations-workspace.jsx
 msgid "Recompensas"
 msgstr "Rewards"
@@ -886,6 +899,21 @@ msgstr "Loyalty and value"
 msgid "Cocina"
 msgstr "Kitchen"
 
+#: src/lib/module-registry.js
+#: src/shell.jsx
+msgid "Punto de venta"
+msgstr "Point of sale"
+
+#: src/lib/module-registry.js
+#: src/shell.jsx
+msgid "Inventario y costos"
+msgstr "Inventory & costing"
+
+#: src/lib/module-registry.js
+#: src/shell.jsx
+msgid "WhatsApp IA"
+msgstr "WhatsApp AI"
+
 #: src/screens/cafes.jsx
 msgid "Starter · solo lealtad"
 msgstr "Starter · loyalty only"
@@ -1362,6 +1390,7 @@ msgid "Fecha comercial"
 msgstr "Business date"
 
 #: src/screens/caja-turnos.jsx
+#: src/screens/cash-home.jsx
 #: src/screens/gift-cards.jsx
 #: src/screens/inventory-costing.jsx
 #: src/screens/inventory-import-table.jsx
@@ -1553,6 +1582,479 @@ msgstr "Loading shifts…"
 #: src/screens/caja-turnos.jsx
 msgid "No hay turnos de caja en esta vista."
 msgstr "No cash shifts in this view."
+
+#: src/screens/cash-home.jsx
+msgid "Tu cafetería"
+msgstr "Your café"
+
+#: src/screens/cash-home.jsx
+msgid "Bebida de cortesía"
+msgstr "Complimentary drink"
+
+#: src/screens/cash-home.jsx
+#: src/screens/members.jsx
+msgid "Nunca"
+msgstr "Never"
+
+#. placeholder {0}: Math.floor(ms / 60000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_MINUTE)
+#. placeholder {0}: Math.max(1, Math.floor(ms / 60000))
+#: src/screens/cash-home.jsx
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+#: src/screens/members.jsx
+msgid "hace {0} min"
+msgstr "{0} min ago"
+
+#. placeholder {0}: Math.floor(ms / 3600000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_HOUR)
+#: src/screens/cash-home.jsx
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+#: src/screens/members.jsx
+msgid "hace {0} h"
+msgstr "{0} h ago"
+
+#. placeholder {0}: Math.floor(ms / 86400000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_DAY)
+#. placeholder {0}: Math.round(hours / 24)
+#: src/screens/cash-home.jsx
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+#: src/screens/members.jsx
+msgid "hace {0} d"
+msgstr "{0} d ago"
+
+#. placeholder {0}: member.name || member.cardNumber
+#: src/screens/cash-home.jsx
+msgid "+1 sello registrado para {0}"
+msgstr "+1 stamp recorded for {0}"
+
+#: src/screens/cash-home.jsx
+msgid "No se pudo registrar la visita."
+msgstr "Could not record the visit."
+
+#: src/screens/cash-home.jsx
+msgid "Panel de"
+msgstr "Loyalty"
+
+#: src/screens/cash-home.jsx
+#: src/screens/customers.jsx
+msgid "lealtad"
+msgstr "loyalty"
+
+#. placeholder {0}: formatNumber(totalMembers)
+#: src/screens/cash-home.jsx
+msgid "{0} clientes activos"
+msgstr "{0} active customers"
+
+#: src/screens/cash-home.jsx
+msgid "Acción principal · Barra"
+msgstr "Primary action · Counter"
+
+#: src/screens/cash-home.jsx
+msgid "Escanear cliente"
+msgstr "Scan customer"
+
+#: src/screens/cash-home.jsx
+msgid "Sumar sello, canjear o recargar saldo"
+msgstr "Add stamp, redeem reward, or top up balance"
+
+#: src/screens/cash-home.jsx
+msgid "Visitas hoy"
+msgstr "Visits today"
+
+#: src/screens/cash-home.jsx
+msgid "En barra hoy"
+msgstr "At the counter today"
+
+#: src/screens/cash-home.jsx
+msgid "Recargado"
+msgstr "Topped up"
+
+#. placeholder {0}: stats?.topupsTodayCount ?? 0
+#: src/screens/cash-home.jsx
+msgid "{0} abonos"
+msgstr "{0} top-ups"
+
+#: src/screens/cash-home.jsx
+msgid "Por canjear"
+msgstr "Ready to redeem"
+
+#: src/screens/cash-home.jsx
+msgid "Listas hoy"
+msgstr "Ready today"
+
+#: src/screens/cash-home.jsx
+msgid "Recompensa activa"
+msgstr "Active reward"
+
+#: src/screens/cash-home.jsx
+msgid "A las <0>{visitsBase} visitas</0> · o sigue a {visitsTop} por <1>{rewardTop}</1>"
+msgstr "At <0>{visitsBase} visits</0> · or continue to {visitsTop} for <1>{rewardTop}</1>"
+
+#: src/screens/cash-home.jsx
+msgid "Cada <0>{visitsBase} visitas</0> acumuladas en su tarjeta"
+msgstr "Every <0>{visitsBase} visits</0> collected on their card"
+
+#: src/screens/cash-home.jsx
+msgid "Cambiar"
+msgstr "Change"
+
+#: src/screens/cash-home.jsx
+msgid "2 niveles"
+msgstr "2 tiers"
+
+#: src/screens/cash-home.jsx
+msgid "{visitsBase} sellos"
+msgstr "{visitsBase} stamps"
+
+#: src/screens/cash-home.jsx
+#: src/screens/customers.jsx
+msgid "Recargar saldo"
+msgstr "Top up balance"
+
+#: src/screens/cash-home.jsx
+msgid "Monedero y abonos"
+msgstr "Wallet & top-ups"
+
+#: src/screens/cash-home.jsx
+msgid "Tarjetas regalo"
+msgstr "Gift cards"
+
+#: src/screens/cash-home.jsx
+msgid "Emitir o canjear código"
+msgstr "Issue or redeem code"
+
+#: src/screens/cash-home.jsx
+msgid "Miembros recientes"
+msgstr "Recent members"
+
+#: src/screens/cash-home.jsx
+msgid "Programa de lealtad"
+msgstr "Loyalty program"
+
+#: src/screens/cash-home.jsx
+msgid "Ver todos"
+msgstr "View all"
+
+#: src/screens/cash-home.jsx
+#: src/screens/members.jsx
+msgid "Registrar"
+msgstr "Register"
+
+#: src/screens/cash-home.jsx
+#: src/screens/members.jsx
+msgid "Buscar por nombre, teléfono o tarjeta…"
+msgstr "Search by name, phone, or card…"
+
+#: src/screens/cash-home.jsx
+msgid "Buscar miembro"
+msgstr "Search member"
+
+#: src/screens/cash-home.jsx
+msgid "Recientes"
+msgstr "Recent"
+
+#: src/screens/cash-home.jsx
+#: src/screens/members.jsx
+msgid "Mayor saldo"
+msgstr "Highest balance"
+
+#: src/screens/cash-home.jsx
+#: src/screens/members.jsx
+msgid "Miembro"
+msgstr "Member"
+
+#: src/screens/cash-home.jsx
+msgid "Sellos"
+msgstr "Stamps"
+
+#: src/screens/cash-home.jsx
+#: src/screens/cash-scan.jsx
+#: src/screens/members.jsx
+#: src/screens/staff.jsx
+msgid "Saldo"
+msgstr "Balance"
+
+#: src/screens/cash-home.jsx
+#: src/screens/customers.jsx
+#: src/screens/members.jsx
+msgid "Última visita"
+msgstr "Last visit"
+
+#: src/screens/cash-home.jsx
+msgid "Sin miembros para mostrar en este filtro."
+msgstr "No members match this filter."
+
+#: src/screens/cash-home.jsx
+#: src/screens/members.jsx
+#: src/screens/orders.jsx
+#: src/screens/profile.jsx
+msgid "Sin nombre"
+msgstr "No name"
+
+#. placeholder {0}: m.pendingRewards
+#. placeholder {0}: preview.card.pendingRewards
+#: src/screens/cash-home.jsx
+#: src/screens/cash-scan.jsx
+msgid "{0} por canjear"
+msgstr "{0} to redeem"
+
+#: src/screens/cash-home.jsx
+#: src/screens/cash-scan.jsx
+msgid "Base listo"
+msgstr "Base ready"
+
+#. placeholder {0}: selectedMember.totalVisits || 0
+#. placeholder {1}: fmtBalance(selectedMember.balanceCentavos)
+#: src/screens/cash-home.jsx
+msgid "{0} visitas totales · Saldo {1}"
+msgstr "{0} total visits · Balance {1}"
+
+#: src/screens/cash-home.jsx
+msgid "Abrir en escáner"
+msgstr "Open in scanner"
+
+#: src/screens/cash-home.jsx
+msgid "+1 Visita"
+msgstr "+1 Visit"
+
+#: src/screens/cash-scan.jsx
+msgid "No se encontró una tarjeta con ese código."
+msgstr "No card found with that code."
+
+#: src/screens/cash-scan.jsx
+msgid "Tu navegador no permite acceso directo a cámara. Ingresa el código manual."
+msgstr "Your browser does not allow direct camera access. Enter the code manually."
+
+#: src/screens/cash-scan.jsx
+msgid "No se pudo abrir la cámara. Usa la búsqueda por código o nombre."
+msgstr "Could not open the camera. Search by code or name instead."
+
+#: src/screens/cash-scan.jsx
+msgid "Operación confirmada y pase actualizado."
+msgstr "Operation confirmed and pass updated."
+
+#: src/screens/cash-scan.jsx
+msgid "No se pudo confirmar la operación."
+msgstr "Could not confirm the operation."
+
+#: src/screens/cash-scan.jsx
+msgid "Saldo recargado correctamente."
+msgstr "Balance topped up."
+
+#: src/screens/cash-scan.jsx
+msgid "Cobro de saldo aplicado."
+msgstr "Balance charge applied."
+
+#: src/screens/cash-scan.jsx
+msgid "No se pudo procesar el movimiento de saldo."
+msgstr "Could not process the wallet transaction."
+
+#: src/screens/cash-scan.jsx
+msgid "Sellos acreditados correctamente."
+msgstr "Stamps credited."
+
+#: src/screens/cash-scan.jsx
+#: src/screens/customers.jsx
+msgid "No se pudieron acreditar los sellos."
+msgstr "The stamps could not be credited."
+
+#: src/screens/cash-scan.jsx
+msgid "Escanear QR · Barra"
+msgstr "Scan QR · Counter"
+
+#: src/screens/cash-scan.jsx
+msgid "Apunta al"
+msgstr "Point at the"
+
+#: src/screens/cash-scan.jsx
+msgid "QR del cliente"
+msgstr "customer QR"
+
+#: src/screens/cash-scan.jsx
+msgid "← Volver al panel"
+msgstr "← Back to hub"
+
+#: src/screens/cash-scan.jsx
+msgid "Lector QR"
+msgstr "QR scanner"
+
+#: src/screens/cash-scan.jsx
+msgid "Tarjeta o código ({cardPrefix}-…)"
+msgstr "Card or code ({cardPrefix}-…)"
+
+#: src/screens/cash-scan.jsx
+msgid "Código de tarjeta"
+msgstr "Card code"
+
+#: src/screens/cash-scan.jsx
+#: src/screens/settings.jsx
+msgid "Buscando…"
+msgstr "Searching…"
+
+#: src/screens/cash-scan.jsx
+#: src/screens/customers.jsx
+#: src/screens/settings.jsx
+msgid "Buscar"
+msgstr "Search"
+
+#: src/screens/cash-scan.jsx
+msgid "Detener cámara"
+msgstr "Stop camera"
+
+#: src/screens/cash-scan.jsx
+msgid "Activar cámara"
+msgstr "Start camera"
+
+#: src/screens/cash-scan.jsx
+msgid " Selección rápida en barra"
+msgstr "Quick counter pick"
+
+#: src/screens/cash-scan.jsx
+msgid "Acciones del cliente"
+msgstr "Customer actions"
+
+#: src/screens/cash-scan.jsx
+msgid "Escanea o selecciona un cliente"
+msgstr "Scan or pick a customer"
+
+#: src/screens/cash-scan.jsx
+msgid "Apunta la cámara al pase de Apple o Google Wallet del cliente, o escribe su número de tarjeta para sumar visita, canjear recompensa o abonar saldo."
+msgstr "Point the camera at the customer Apple or Google Wallet pass, or enter their card number to add a visit, redeem a reward, or top up balance."
+
+#: src/screens/cash-scan.jsx
+#: src/screens/orders.jsx
+msgid "Cliente"
+msgstr "Customer"
+
+#: src/screens/cash-scan.jsx
+msgid "Wallet activo"
+msgstr "Active Wallet"
+
+#: src/screens/cash-scan.jsx
+msgid "Visitas ciclo"
+msgstr "Cycle visits"
+
+#: src/screens/cash-scan.jsx
+#: src/screens/customers.jsx
+msgid "Registrar visita"
+msgstr "Record visit"
+
+#. placeholder {0}: preview.card?.rewardName || t`su recompensa`
+#: src/screens/cash-scan.jsx
+msgid "+1 sello hacia {0}"
+msgstr "+1 stamp toward {0}"
+
+#: src/screens/cash-scan.jsx
+msgid "su recompensa"
+msgstr "their reward"
+
+#: src/screens/cash-scan.jsx
+msgid "+1 sello"
+msgstr "+1 stamp"
+
+#. placeholder {0}: account.baseReward.rewardName
+#. placeholder {0}: account.rewardName
+#. placeholder {0}: preview.card?.pendingRewardName || preview.card?.baseReward?.rewardName || preview.card?.rewardName || t`recompensa`
+#: src/screens/cash-scan.jsx
+#: src/screens/customers.jsx
+msgid "Canjear {0}"
+msgstr "Redeem {0}"
+
+#: src/screens/cash-scan.jsx
+msgid "recompensa"
+msgstr "reward"
+
+#: src/screens/cash-scan.jsx
+msgid "Recompensa disponible para entregar ahora"
+msgstr "Reward ready to hand over now"
+
+#: src/screens/cash-scan.jsx
+msgid "Aún no junta las visitas necesarias"
+msgstr "Not enough visits yet"
+
+#: src/screens/cash-scan.jsx
+#: src/screens/gift-cards.jsx
+#: src/screens/members.jsx
+#: src/screens/overview.jsx
+msgid "Listo"
+msgstr "Done"
+
+#. placeholder {0}: preview.birthdayReward.rewardName
+#: src/screens/cash-scan.jsx
+msgid "Cumpleaños: {0}"
+msgstr "Birthday: {0}"
+
+#: src/screens/cash-scan.jsx
+msgid "Regalo de cumpleaños activo"
+msgstr "Active birthday gift"
+
+#: src/screens/cash-scan.jsx
+msgid "Folio o ticket opcional…"
+msgstr "Optional receipt or ticket…"
+
+#: src/screens/cash-scan.jsx
+msgid "Folio o ticket opcional"
+msgstr "Optional receipt or ticket"
+
+#: src/screens/cash-scan.jsx
+msgid "Cobrar saldo"
+msgstr "Charge balance"
+
+#: src/screens/cash-scan.jsx
+msgid "+ Sellos"
+msgstr "+ Stamps"
+
+#: src/screens/cash-scan.jsx
+msgid "Recargar monedero (MXN)"
+msgstr "Top up wallet (MXN)"
+
+#: src/screens/cash-scan.jsx
+msgid "Cobrar del monedero (MXN)"
+msgstr "Charge wallet (MXN)"
+
+#: src/screens/cash-scan.jsx
+msgid "Monto en pesos"
+msgstr "Amount in MXN"
+
+#: src/screens/cash-scan.jsx
+msgid "Nota opcional"
+msgstr "Optional note"
+
+#: src/screens/cash-scan.jsx
+msgid "Abonar saldo"
+msgstr "Add funds"
+
+#: src/screens/cash-scan.jsx
+msgid "Aplicar cobro"
+msgstr "Apply charge"
+
+#: src/screens/cash-scan.jsx
+msgid "Acreditar varios sellos"
+msgstr "Credit multiple stamps"
+
+#: src/screens/cash-scan.jsx
+msgid "Cantidad de sellos"
+msgstr "Number of stamps"
+
+#: src/screens/cash-scan.jsx
+msgid "Motivo o nota"
+msgstr "Reason or note"
+
+#: src/screens/cash-scan.jsx
+#: src/screens/customers.jsx
+msgid "Acreditar sellos"
+msgstr "Credit stamps"
+
+#: src/screens/cash-scan.jsx
+msgid "Confirmando…"
+msgstr "Confirming…"
+
+#: src/screens/cash-scan.jsx
+msgid "Confirmar operación ({selectedCount}) →"
+msgstr "Confirm operation ({selectedCount}) →"
 
 #: src/screens/cash-settings.jsx
 #: src/screens/hours.jsx
@@ -2416,11 +2918,6 @@ msgid "días distintos"
 msgstr "distinct days"
 
 #: src/screens/customers.jsx
-#: src/screens/members.jsx
-msgid "Última visita"
-msgstr "Last visit"
-
-#: src/screens/customers.jsx
 msgid "Visitas por mes"
 msgstr "Visits per month"
 
@@ -2528,10 +3025,6 @@ msgid "pedido"
 msgstr "order"
 
 #: src/screens/customers.jsx
-msgid "No se pudieron acreditar los sellos."
-msgstr "The stamps could not be credited."
-
-#: src/screens/customers.jsx
 msgid "Agregar sellos"
 msgstr "Add stamps"
 
@@ -2566,16 +3059,8 @@ msgid "{count, plural, one {Acreditar # sello} other {Acreditar # sellos}}"
 msgstr "{count, plural, one {Credit # stamp} other {Credit # stamps}}"
 
 #: src/screens/customers.jsx
-msgid "Acreditar sellos"
-msgstr "Credit stamps"
-
-#: src/screens/customers.jsx
 msgid "No se pudo recargar el saldo."
 msgstr "The balance could not be topped up."
-
-#: src/screens/customers.jsx
-msgid "Recargar saldo"
-msgstr "Top up balance"
 
 #. placeholder {0}: account.cardNumber || t`de lealtad`
 #: src/screens/customers.jsx
@@ -2680,28 +3165,14 @@ msgid "Recompensas pendientes"
 msgstr "Pending rewards"
 
 #: src/screens/customers.jsx
-msgid "lealtad"
-msgstr "loyalty"
-
-#: src/screens/customers.jsx
 #: src/screens/members.jsx
 msgid "Registrando…"
 msgstr "Recording…"
 
 #: src/screens/customers.jsx
-msgid "Registrar visita"
-msgstr "Record visit"
-
-#: src/screens/customers.jsx
 #: src/screens/gift-cards.jsx
 msgid "Canjeando…"
 msgstr "Redeeming…"
-
-#. placeholder {0}: account.baseReward.rewardName
-#. placeholder {0}: account.rewardName
-#: src/screens/customers.jsx
-msgid "Canjear {0}"
-msgstr "Redeem {0}"
 
 #: src/screens/customers.jsx
 msgid "Canjear recompensa"
@@ -2812,11 +3283,6 @@ msgid "Aquí verás su historial, sus conversaciones de WhatsApp, sus pedidos, s
 msgstr "Here you will see their history, WhatsApp conversations, orders, loyalty, and your notes, all in one place."
 
 #: src/screens/customers.jsx
-#: src/screens/settings.jsx
-msgid "Buscar"
-msgstr "Search"
-
-#: src/screens/customers.jsx
 msgid "Cargando cliente"
 msgstr "Loading customer"
 
@@ -2887,31 +3353,6 @@ msgstr "never"
 #: src/screens/devices.jsx
 msgid "hace un momento"
 msgstr "just now"
-
-#. placeholder {0}: Math.floor(ms / 60000)
-#. placeholder {0}: Math.floor(ms / LAST_SEEN_MINUTE)
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-#: src/screens/members.jsx
-msgid "hace {0} min"
-msgstr "{0} min ago"
-
-#. placeholder {0}: Math.floor(ms / 3600000)
-#. placeholder {0}: Math.floor(ms / LAST_SEEN_HOUR)
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-#: src/screens/members.jsx
-msgid "hace {0} h"
-msgstr "{0} h ago"
-
-#. placeholder {0}: Math.floor(ms / 86400000)
-#. placeholder {0}: Math.floor(ms / LAST_SEEN_DAY)
-#. placeholder {0}: Math.round(hours / 24)
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-#: src/screens/members.jsx
-msgid "hace {0} d"
-msgstr "{0} d ago"
 
 #: src/screens/device-utils.js
 msgid "Mercado Pago rechazó la dirección del negocio."
@@ -4242,12 +4683,6 @@ msgstr "The balance is credited to the customer's wallet."
 #: src/screens/gift-cards.jsx
 msgid "Canjeada por {0}. Nuevo saldo del cliente: {1}."
 msgstr "Redeemed for {0}. New customer balance: {1}."
-
-#: src/screens/gift-cards.jsx
-#: src/screens/members.jsx
-#: src/screens/overview.jsx
-msgid "Listo"
-msgstr "Done"
 
 #: src/screens/gift-cards.jsx
 #: src/screens/inventory-item-editor.jsx
@@ -7385,10 +7820,6 @@ msgid "Más visitas"
 msgstr "Most visits"
 
 #: src/screens/members.jsx
-msgid "Mayor saldo"
-msgstr "Highest balance"
-
-#: src/screens/members.jsx
 msgid "Mayor gasto"
 msgstr "Highest spend"
 
@@ -7430,10 +7861,6 @@ msgid "Fecha de nacimiento"
 msgstr "Date of birth"
 
 #: src/screens/members.jsx
-msgid "Registrar"
-msgstr "Register"
-
-#: src/screens/members.jsx
 msgid "Miembros activos"
 msgstr "Active members"
 
@@ -7448,10 +7875,6 @@ msgstr "members"
 #: src/screens/members.jsx
 msgid "Tu rol no incluye registrar miembros"
 msgstr "Your role does not include registering members"
-
-#: src/screens/members.jsx
-msgid "Buscar por nombre, teléfono o tarjeta…"
-msgstr "Search by name, phone, or card…"
 
 #: src/screens/members.jsx
 msgid "Ordenar clientes"
@@ -7472,19 +7895,10 @@ msgid "Miembros"
 msgstr "Members"
 
 #: src/screens/members.jsx
-msgid "Miembro"
-msgstr "Member"
-
-#: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/recibos.jsx
 msgid "Tarjeta"
 msgstr "Card"
-
-#: src/screens/members.jsx
-#: src/screens/staff.jsx
-msgid "Saldo"
-msgstr "Balance"
 
 #: src/screens/members.jsx
 msgid "Progreso"
@@ -7511,12 +7925,6 @@ msgid "{done} de {total} visitas para la recompensa"
 msgstr "{done} of {total} visits toward the reward"
 
 #: src/screens/members.jsx
-#: src/screens/orders.jsx
-#: src/screens/profile.jsx
-msgid "Sin nombre"
-msgstr "No name"
-
-#: src/screens/members.jsx
 msgid "Contacto restringido"
 msgstr "Contact restricted"
 
@@ -7527,10 +7935,6 @@ msgstr "visits"
 #: src/screens/members.jsx
 msgid "por canjear"
 msgstr "to redeem"
-
-#: src/screens/members.jsx
-msgid "Nunca"
-msgstr "Never"
 
 #: src/screens/members.jsx
 msgid "Miembro · Umi Cash"
@@ -8665,10 +9069,6 @@ msgstr "Order detail"
 msgid "Pedido · {channelLabel}"
 msgstr "Order · {channelLabel}"
 
-#: src/screens/orders.jsx
-msgid "Cliente"
-msgstr "Customer"
-
 #. placeholder {0}: order.pickup_person
 #: src/screens/orders.jsx
 msgid "Recoge: {0}"
@@ -8782,10 +9182,6 @@ msgstr "in progress · {0}"
 #: src/screens/overview.jsx
 #~ msgid "Pausado · aviso especial activo"
 #~ msgstr "Paused · special notice active"
-
-#: src/screens/overview.jsx
-#~ msgid "Visitas hoy"
-#~ msgstr "Visits today"
 
 #: src/screens/overview.jsx
 #~ msgid "Tarjetas de regalo abiertas"
@@ -11703,10 +12099,6 @@ msgid "Av. Chapultepec 1, Guadalajara"
 msgstr "Av. Chapultepec 1, Guadalajara"
 
 #: src/screens/settings.jsx
-msgid "Buscando…"
-msgstr "Searching…"
-
-#: src/screens/settings.jsx
 msgid "Pin"
 msgstr "Pin"
 
@@ -11761,6 +12153,155 @@ msgstr "Description (area / landmark)"
 #: src/screens/settings.jsx
 msgid "p. ej. la del centro, junto al parque"
 msgstr "e.g. the downtown one, next to the park"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "tu cafetería"
+msgstr "your café"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Punto de venta · Umi POS"
+msgstr "Point of sale · Umi POS"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Cobro en barra conectado a tus sellos"
+msgstr "Counter checkout connected to your stamps"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "sin doble escaneo"
+msgstr "with no double scanning"
+
+#. placeholder {0}: formatNumber(totalMembers)
+#: src/screens/soft-lock-preview.jsx
+msgid "Conecta tu caja con los {0} miembros que ya tienes en Umi Cash. Al cerrar una cuenta en el POS, los sellos y el saldo del monedero se aplican en un solo toque."
+msgstr "Connect your register to the {0} members you already have in Umi Cash. When closing a check on the POS, stamps and wallet balance apply in one tap."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Conecta tu caja con tu programa de lealtad Umi Cash. Al cerrar una cuenta en el POS, los sellos y el saldo del monedero se aplican en un solo toque."
+msgstr "Connect your register to your Umi Cash loyalty program. When closing a check on the POS, stamps and wallet balance apply in one tap."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Caja rápida y turnos"
+msgstr "Fast register & shifts"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Cobro en efectivo, tarjeta y monedero Umi con corte de caja por turno."
+msgstr "Cash, card, and Umi wallet checkout with per-shift drawer closeout."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Plano de mesas y salón"
+msgstr "Floor plan & dining room"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Mapa visual de mesas, cuentas abiertas y tiempos de servicio en vivo."
+msgstr "Visual table map, open checks, and live service times."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Pantalla de cocina (KDS)"
+msgstr "Kitchen display (KDS)"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Comandas digitales por estación sin papel perdido en barra."
+msgstr "Digital tickets per station with no lost paper at the counter."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Inventario y costos · Umi Stock"
+msgstr "Inventory & costing · Umi Stock"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Recetas, insumos y margen real"
+msgstr "Recipes, supplies, and real margin"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "por cada taza"
+msgstr "for every cup"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Calcula cuánto te cuesta realmente cada bebida y cada recompensa canjeada en {cafeName}, con descuento automático de leche, café e insumos por receta."
+msgstr "Calculate what every drink and redeemed reward really costs at {cafeName}, with automatic milk, coffee, and supply deduction per recipe."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Recetas y costo por bebida"
+msgstr "Recipes & cost per drink"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Conoce tu margen exacto por producto y el costo real de tus premios de lealtad."
+msgstr "Know your exact margin per product and the true cost of your loyalty rewards."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Conteos y alertas de stock"
+msgstr "Counts & low-stock alerts"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Avisos antes de quedarte sin grano, leche o vasos en hora pico."
+msgstr "Alerts before you run out of beans, milk, or cups during rush hour."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Compras y facturas"
+msgstr "Purchases & invoices"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Captura entradas de proveedor y actualiza costos promedio al instante."
+msgstr "Record supplier deliveries and update average costs automatically."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Atención inteligente · WhatsApp IA"
+msgstr "Smart service · WhatsApp AI"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Tu cafetería responde en WhatsApp"
+msgstr "Your café replies on WhatsApp"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "las 24 horas"
+msgstr "24 hours a day"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Atiende dudas de menú, horarios, sucursales y pedidos por WhatsApp reconociendo automáticamente a tus clientes frecuentes de Umi Cash."
+msgstr "Answer menu, hours, location, and order questions on WhatsApp while automatically recognizing your frequent Umi Cash customers."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Asistente con la voz de tu café"
+msgstr "Assistant with your café voice"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Responde preguntas de menú, leches vegetales y ubicación al instante."
+msgstr "Answers menu, plant-milk, and location questions right away."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Reconoce a tus miembros"
+msgstr "Recognizes your members"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Identifica quién escribe por su teléfono y muestra sus sellos y saldo."
+msgstr "Identifies who is messaging by phone and surfaces their stamps and balance."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Horarios y pausa de pedidos"
+msgstr "Hours & order pause"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Sincroniza tu disponibilidad real sin dejar mensajes sin contestar."
+msgstr "Syncs your live availability without leaving messages unanswered."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Hola equipo Umi, soy de {cafeName} y me gustaría activar {displayProduct} conectado a nuestro Umi Cash."
+msgstr "Hi Umi team, I am from {cafeName} and would like to activate {displayProduct} connected to our Umi Cash."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Todo dentro de este mismo panel"
+msgstr "Everything inside this same console"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Sin migrar cuentas ni cambiar de dirección web: al activarlo se desbloquea en tu menú lateral junto a Umi Cash."
+msgstr "No account migration or new URL: once activated, it unlocks right in your sidebar alongside Umi Cash."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Volver a mi panel"
+msgstr "Back to my hub"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Activar con Umi por WhatsApp"
+msgstr "Activate with Umi on WhatsApp"
 
 #: src/screens/staff.jsx
 #~ msgid "Roles y permisos"
@@ -12389,6 +12930,10 @@ msgid "CLIENTES"
 msgstr "CUSTOMERS"
 
 #: src/shell.jsx
+msgid "LEALTAD Y VALOR"
+msgstr "LOYALTY & VALUE"
+
+#: src/shell.jsx
 msgid "NEGOCIO"
 msgstr "BUSINESS"
 
@@ -12399,6 +12944,10 @@ msgstr "CONFIGURATION"
 #: src/shell.jsx
 msgid "PLATAFORMA"
 msgstr "PLATFORM"
+
+#: src/shell.jsx
+msgid "MÁS EN UMI"
+msgstr "MORE IN UMI"
 
 #: src/shell.jsx
 msgid "Panorama"
@@ -12453,5 +13002,13 @@ msgid "reintentar"
 msgstr "retry"
 
 #: src/shell.jsx
+msgid "Umi Cash"
+msgstr "Umi Cash"
+
+#: src/shell.jsx
 msgid "Secciones"
 msgstr "Sections"
+
+#: src/shell.jsx
+msgid "Navegación rápida de Cash"
+msgstr "Cash quick navigation"

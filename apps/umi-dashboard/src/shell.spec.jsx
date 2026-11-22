@@ -95,4 +95,42 @@ describe('Floor-plan location control', () => {
     expect(markup).toContain('Playa');
     expect(markup).not.toContain('disabled=""');
   });
+
+  it('renders the adaptive Cash-only brand lockup and soft-locked product doors', () => {
+    const markup = renderToStaticMarkup(
+      withI18n(
+        <Sidebar
+          active="loyalty-value"
+          activeFull="loyalty-value/home"
+          onChange={() => {}}
+          collapsed={false}
+          onToggleCollapse={() => {}}
+          isCashOnly
+          merchantName="Kalala Café"
+          merchantColor="#1E4D34"
+          navItems={[
+            {
+              id: 'loyalty-value/home',
+              label: msg`Inicio`,
+              icon: 'Home',
+              section: 'CASH',
+            },
+          ]}
+          softLockedItems={[
+            {
+              id: 'preview/pos',
+              label: msg`Punto de venta`,
+              icon: 'Monitor',
+              section: 'MORE_UMI',
+              locked: true,
+            },
+          ]}
+        />,
+      ),
+    );
+    expect(markup).toContain('naive-cash-tag');
+    expect(markup).toContain('Kalala Café');
+    expect(markup).toContain('Punto de venta');
+    expect(markup).toContain('soft-locked');
+  });
 });

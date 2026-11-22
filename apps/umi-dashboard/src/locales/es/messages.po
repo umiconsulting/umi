@@ -14,24 +14,24 @@ msgstr ""
 "Plural-Forms: \n"
 
 #: src/app.jsx
+#~ msgid "Módulo"
+#~ msgstr "Módulo"
+
+#: src/app.jsx
+#~ msgid "producto"
+#~ msgstr "producto"
+
+#: src/app.jsx
+#~ msgid "{name} no está activo en este café"
+#~ msgstr "{name} no está activo en este café"
+
+#: src/app.jsx
+#~ msgid "Esta sección necesita {productName}. El super admin lo puede revisar en Productos y facturación; no hay controles hasta activar el producto."
+#~ msgstr "Esta sección necesita {productName}. El super admin lo puede revisar en Productos y facturación; no hay controles hasta activar el producto."
+
+#: src/app.jsx
 msgid "Cerrar el menú"
 msgstr "Cerrar el menú"
-
-#: src/app.jsx
-msgid "Módulo"
-msgstr "Módulo"
-
-#: src/app.jsx
-msgid "producto"
-msgstr "producto"
-
-#: src/app.jsx
-msgid "{name} no está activo en este café"
-msgstr "{name} no está activo en este café"
-
-#: src/app.jsx
-msgid "Esta sección necesita {productName}. El super admin lo puede revisar en Productos y facturación; no hay controles hasta activar el producto."
-msgstr "Esta sección necesita {productName}. El super admin lo puede revisar en Productos y facturación; no hay controles hasta activar el producto."
 
 #: src/app.jsx
 msgid "Esta pantalla"
@@ -79,6 +79,7 @@ msgid "Elige un negocio en la barra lateral."
 msgstr "Elige un negocio en la barra lateral."
 
 #: src/app.jsx
+#: src/screens/cash-scan.jsx
 #: src/screens/customers.jsx
 #: src/screens/floor-plan.jsx
 #: src/screens/recipe-workspace.jsx
@@ -258,6 +259,17 @@ msgid "Código incorrecto o vencido."
 msgstr "Código incorrecto o vencido."
 
 #: src/lib/cash-tabs.js
+#: src/screens/cash-scan.jsx
+msgid "Inicio"
+msgstr "Inicio"
+
+#: src/lib/cash-tabs.js
+#: src/screens/cash-scan.jsx
+#: src/shell.jsx
+msgid "Escanear"
+msgstr "Escanear"
+
+#: src/lib/cash-tabs.js
 #: src/screens/customers.jsx
 #: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
@@ -267,6 +279,7 @@ msgid "Lealtad"
 msgstr "Lealtad"
 
 #: src/lib/cash-tabs.js
+#: src/screens/cash-scan.jsx
 #: src/screens/operations-workspace.jsx
 msgid "Recompensas"
 msgstr "Recompensas"
@@ -886,6 +899,21 @@ msgstr "Lealtad y valor"
 msgid "Cocina"
 msgstr "Cocina"
 
+#: src/lib/module-registry.js
+#: src/shell.jsx
+msgid "Punto de venta"
+msgstr "Punto de venta"
+
+#: src/lib/module-registry.js
+#: src/shell.jsx
+msgid "Inventario y costos"
+msgstr "Inventario y costos"
+
+#: src/lib/module-registry.js
+#: src/shell.jsx
+msgid "WhatsApp IA"
+msgstr "WhatsApp IA"
+
 #: src/screens/cafes.jsx
 msgid "Starter · solo lealtad"
 msgstr "Starter · solo lealtad"
@@ -1362,6 +1390,7 @@ msgid "Fecha comercial"
 msgstr "Fecha comercial"
 
 #: src/screens/caja-turnos.jsx
+#: src/screens/cash-home.jsx
 #: src/screens/gift-cards.jsx
 #: src/screens/inventory-costing.jsx
 #: src/screens/inventory-import-table.jsx
@@ -1553,6 +1582,479 @@ msgstr "Cargando turnos…"
 #: src/screens/caja-turnos.jsx
 msgid "No hay turnos de caja en esta vista."
 msgstr "No hay turnos de caja en esta vista."
+
+#: src/screens/cash-home.jsx
+msgid "Tu cafetería"
+msgstr "Tu cafetería"
+
+#: src/screens/cash-home.jsx
+msgid "Bebida de cortesía"
+msgstr "Bebida de cortesía"
+
+#: src/screens/cash-home.jsx
+#: src/screens/members.jsx
+msgid "Nunca"
+msgstr "Nunca"
+
+#. placeholder {0}: Math.floor(ms / 60000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_MINUTE)
+#. placeholder {0}: Math.max(1, Math.floor(ms / 60000))
+#: src/screens/cash-home.jsx
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+#: src/screens/members.jsx
+msgid "hace {0} min"
+msgstr "hace {0} min"
+
+#. placeholder {0}: Math.floor(ms / 3600000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_HOUR)
+#: src/screens/cash-home.jsx
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+#: src/screens/members.jsx
+msgid "hace {0} h"
+msgstr "hace {0} h"
+
+#. placeholder {0}: Math.floor(ms / 86400000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_DAY)
+#. placeholder {0}: Math.round(hours / 24)
+#: src/screens/cash-home.jsx
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+#: src/screens/members.jsx
+msgid "hace {0} d"
+msgstr "hace {0} d"
+
+#. placeholder {0}: member.name || member.cardNumber
+#: src/screens/cash-home.jsx
+msgid "+1 sello registrado para {0}"
+msgstr "+1 sello registrado para {0}"
+
+#: src/screens/cash-home.jsx
+msgid "No se pudo registrar la visita."
+msgstr "No se pudo registrar la visita."
+
+#: src/screens/cash-home.jsx
+msgid "Panel de"
+msgstr "Panel de"
+
+#: src/screens/cash-home.jsx
+#: src/screens/customers.jsx
+msgid "lealtad"
+msgstr "lealtad"
+
+#. placeholder {0}: formatNumber(totalMembers)
+#: src/screens/cash-home.jsx
+msgid "{0} clientes activos"
+msgstr "{0} clientes activos"
+
+#: src/screens/cash-home.jsx
+msgid "Acción principal · Barra"
+msgstr "Acción principal · Barra"
+
+#: src/screens/cash-home.jsx
+msgid "Escanear cliente"
+msgstr "Escanear cliente"
+
+#: src/screens/cash-home.jsx
+msgid "Sumar sello, canjear o recargar saldo"
+msgstr "Sumar sello, canjear o recargar saldo"
+
+#: src/screens/cash-home.jsx
+msgid "Visitas hoy"
+msgstr "Visitas hoy"
+
+#: src/screens/cash-home.jsx
+msgid "En barra hoy"
+msgstr "En barra hoy"
+
+#: src/screens/cash-home.jsx
+msgid "Recargado"
+msgstr "Recargado"
+
+#. placeholder {0}: stats?.topupsTodayCount ?? 0
+#: src/screens/cash-home.jsx
+msgid "{0} abonos"
+msgstr "{0} abonos"
+
+#: src/screens/cash-home.jsx
+msgid "Por canjear"
+msgstr "Por canjear"
+
+#: src/screens/cash-home.jsx
+msgid "Listas hoy"
+msgstr "Listas hoy"
+
+#: src/screens/cash-home.jsx
+msgid "Recompensa activa"
+msgstr "Recompensa activa"
+
+#: src/screens/cash-home.jsx
+msgid "A las <0>{visitsBase} visitas</0> · o sigue a {visitsTop} por <1>{rewardTop}</1>"
+msgstr "A las <0>{visitsBase} visitas</0> · o sigue a {visitsTop} por <1>{rewardTop}</1>"
+
+#: src/screens/cash-home.jsx
+msgid "Cada <0>{visitsBase} visitas</0> acumuladas en su tarjeta"
+msgstr "Cada <0>{visitsBase} visitas</0> acumuladas en su tarjeta"
+
+#: src/screens/cash-home.jsx
+msgid "Cambiar"
+msgstr "Cambiar"
+
+#: src/screens/cash-home.jsx
+msgid "2 niveles"
+msgstr "2 niveles"
+
+#: src/screens/cash-home.jsx
+msgid "{visitsBase} sellos"
+msgstr "{visitsBase} sellos"
+
+#: src/screens/cash-home.jsx
+#: src/screens/customers.jsx
+msgid "Recargar saldo"
+msgstr "Recargar saldo"
+
+#: src/screens/cash-home.jsx
+msgid "Monedero y abonos"
+msgstr "Monedero y abonos"
+
+#: src/screens/cash-home.jsx
+msgid "Tarjetas regalo"
+msgstr "Tarjetas regalo"
+
+#: src/screens/cash-home.jsx
+msgid "Emitir o canjear código"
+msgstr "Emitir o canjear código"
+
+#: src/screens/cash-home.jsx
+msgid "Miembros recientes"
+msgstr "Miembros recientes"
+
+#: src/screens/cash-home.jsx
+msgid "Programa de lealtad"
+msgstr "Programa de lealtad"
+
+#: src/screens/cash-home.jsx
+msgid "Ver todos"
+msgstr "Ver todos"
+
+#: src/screens/cash-home.jsx
+#: src/screens/members.jsx
+msgid "Registrar"
+msgstr "Registrar"
+
+#: src/screens/cash-home.jsx
+#: src/screens/members.jsx
+msgid "Buscar por nombre, teléfono o tarjeta…"
+msgstr "Buscar por nombre, teléfono o tarjeta…"
+
+#: src/screens/cash-home.jsx
+msgid "Buscar miembro"
+msgstr "Buscar miembro"
+
+#: src/screens/cash-home.jsx
+msgid "Recientes"
+msgstr "Recientes"
+
+#: src/screens/cash-home.jsx
+#: src/screens/members.jsx
+msgid "Mayor saldo"
+msgstr "Mayor saldo"
+
+#: src/screens/cash-home.jsx
+#: src/screens/members.jsx
+msgid "Miembro"
+msgstr "Miembro"
+
+#: src/screens/cash-home.jsx
+msgid "Sellos"
+msgstr "Sellos"
+
+#: src/screens/cash-home.jsx
+#: src/screens/cash-scan.jsx
+#: src/screens/members.jsx
+#: src/screens/staff.jsx
+msgid "Saldo"
+msgstr "Saldo"
+
+#: src/screens/cash-home.jsx
+#: src/screens/customers.jsx
+#: src/screens/members.jsx
+msgid "Última visita"
+msgstr "Última visita"
+
+#: src/screens/cash-home.jsx
+msgid "Sin miembros para mostrar en este filtro."
+msgstr "Sin miembros para mostrar en este filtro."
+
+#: src/screens/cash-home.jsx
+#: src/screens/members.jsx
+#: src/screens/orders.jsx
+#: src/screens/profile.jsx
+msgid "Sin nombre"
+msgstr "Sin nombre"
+
+#. placeholder {0}: m.pendingRewards
+#. placeholder {0}: preview.card.pendingRewards
+#: src/screens/cash-home.jsx
+#: src/screens/cash-scan.jsx
+msgid "{0} por canjear"
+msgstr "{0} por canjear"
+
+#: src/screens/cash-home.jsx
+#: src/screens/cash-scan.jsx
+msgid "Base listo"
+msgstr "Base listo"
+
+#. placeholder {0}: selectedMember.totalVisits || 0
+#. placeholder {1}: fmtBalance(selectedMember.balanceCentavos)
+#: src/screens/cash-home.jsx
+msgid "{0} visitas totales · Saldo {1}"
+msgstr "{0} visitas totales · Saldo {1}"
+
+#: src/screens/cash-home.jsx
+msgid "Abrir en escáner"
+msgstr "Abrir en escáner"
+
+#: src/screens/cash-home.jsx
+msgid "+1 Visita"
+msgstr "+1 Visita"
+
+#: src/screens/cash-scan.jsx
+msgid "No se encontró una tarjeta con ese código."
+msgstr "No se encontró una tarjeta con ese código."
+
+#: src/screens/cash-scan.jsx
+msgid "Tu navegador no permite acceso directo a cámara. Ingresa el código manual."
+msgstr "Tu navegador no permite acceso directo a cámara. Ingresa el código manual."
+
+#: src/screens/cash-scan.jsx
+msgid "No se pudo abrir la cámara. Usa la búsqueda por código o nombre."
+msgstr "No se pudo abrir la cámara. Usa la búsqueda por código o nombre."
+
+#: src/screens/cash-scan.jsx
+msgid "Operación confirmada y pase actualizado."
+msgstr "Operación confirmada y pase actualizado."
+
+#: src/screens/cash-scan.jsx
+msgid "No se pudo confirmar la operación."
+msgstr "No se pudo confirmar la operación."
+
+#: src/screens/cash-scan.jsx
+msgid "Saldo recargado correctamente."
+msgstr "Saldo recargado correctamente."
+
+#: src/screens/cash-scan.jsx
+msgid "Cobro de saldo aplicado."
+msgstr "Cobro de saldo aplicado."
+
+#: src/screens/cash-scan.jsx
+msgid "No se pudo procesar el movimiento de saldo."
+msgstr "No se pudo procesar el movimiento de saldo."
+
+#: src/screens/cash-scan.jsx
+msgid "Sellos acreditados correctamente."
+msgstr "Sellos acreditados correctamente."
+
+#: src/screens/cash-scan.jsx
+#: src/screens/customers.jsx
+msgid "No se pudieron acreditar los sellos."
+msgstr "No se pudieron acreditar los sellos."
+
+#: src/screens/cash-scan.jsx
+msgid "Escanear QR · Barra"
+msgstr "Escanear QR · Barra"
+
+#: src/screens/cash-scan.jsx
+msgid "Apunta al"
+msgstr "Apunta al"
+
+#: src/screens/cash-scan.jsx
+msgid "QR del cliente"
+msgstr "QR del cliente"
+
+#: src/screens/cash-scan.jsx
+msgid "← Volver al panel"
+msgstr "← Volver al panel"
+
+#: src/screens/cash-scan.jsx
+msgid "Lector QR"
+msgstr "Lector QR"
+
+#: src/screens/cash-scan.jsx
+msgid "Tarjeta o código ({cardPrefix}-…)"
+msgstr "Tarjeta o código ({cardPrefix}-…)"
+
+#: src/screens/cash-scan.jsx
+msgid "Código de tarjeta"
+msgstr "Código de tarjeta"
+
+#: src/screens/cash-scan.jsx
+#: src/screens/settings.jsx
+msgid "Buscando…"
+msgstr "Buscando…"
+
+#: src/screens/cash-scan.jsx
+#: src/screens/customers.jsx
+#: src/screens/settings.jsx
+msgid "Buscar"
+msgstr "Buscar"
+
+#: src/screens/cash-scan.jsx
+msgid "Detener cámara"
+msgstr "Detener cámara"
+
+#: src/screens/cash-scan.jsx
+msgid "Activar cámara"
+msgstr "Activar cámara"
+
+#: src/screens/cash-scan.jsx
+msgid " Selección rápida en barra"
+msgstr " Selección rápida en barra"
+
+#: src/screens/cash-scan.jsx
+msgid "Acciones del cliente"
+msgstr "Acciones del cliente"
+
+#: src/screens/cash-scan.jsx
+msgid "Escanea o selecciona un cliente"
+msgstr "Escanea o selecciona un cliente"
+
+#: src/screens/cash-scan.jsx
+msgid "Apunta la cámara al pase de Apple o Google Wallet del cliente, o escribe su número de tarjeta para sumar visita, canjear recompensa o abonar saldo."
+msgstr "Apunta la cámara al pase de Apple o Google Wallet del cliente, o escribe su número de tarjeta para sumar visita, canjear recompensa o abonar saldo."
+
+#: src/screens/cash-scan.jsx
+#: src/screens/orders.jsx
+msgid "Cliente"
+msgstr "Cliente"
+
+#: src/screens/cash-scan.jsx
+msgid "Wallet activo"
+msgstr "Wallet activo"
+
+#: src/screens/cash-scan.jsx
+msgid "Visitas ciclo"
+msgstr "Visitas ciclo"
+
+#: src/screens/cash-scan.jsx
+#: src/screens/customers.jsx
+msgid "Registrar visita"
+msgstr "Registrar visita"
+
+#. placeholder {0}: preview.card?.rewardName || t`su recompensa`
+#: src/screens/cash-scan.jsx
+msgid "+1 sello hacia {0}"
+msgstr "+1 sello hacia {0}"
+
+#: src/screens/cash-scan.jsx
+msgid "su recompensa"
+msgstr "su recompensa"
+
+#: src/screens/cash-scan.jsx
+msgid "+1 sello"
+msgstr "+1 sello"
+
+#. placeholder {0}: account.baseReward.rewardName
+#. placeholder {0}: account.rewardName
+#. placeholder {0}: preview.card?.pendingRewardName || preview.card?.baseReward?.rewardName || preview.card?.rewardName || t`recompensa`
+#: src/screens/cash-scan.jsx
+#: src/screens/customers.jsx
+msgid "Canjear {0}"
+msgstr "Canjear {0}"
+
+#: src/screens/cash-scan.jsx
+msgid "recompensa"
+msgstr "recompensa"
+
+#: src/screens/cash-scan.jsx
+msgid "Recompensa disponible para entregar ahora"
+msgstr "Recompensa disponible para entregar ahora"
+
+#: src/screens/cash-scan.jsx
+msgid "Aún no junta las visitas necesarias"
+msgstr "Aún no junta las visitas necesarias"
+
+#: src/screens/cash-scan.jsx
+#: src/screens/gift-cards.jsx
+#: src/screens/members.jsx
+#: src/screens/overview.jsx
+msgid "Listo"
+msgstr "Listo"
+
+#. placeholder {0}: preview.birthdayReward.rewardName
+#: src/screens/cash-scan.jsx
+msgid "Cumpleaños: {0}"
+msgstr "Cumpleaños: {0}"
+
+#: src/screens/cash-scan.jsx
+msgid "Regalo de cumpleaños activo"
+msgstr "Regalo de cumpleaños activo"
+
+#: src/screens/cash-scan.jsx
+msgid "Folio o ticket opcional…"
+msgstr "Folio o ticket opcional…"
+
+#: src/screens/cash-scan.jsx
+msgid "Folio o ticket opcional"
+msgstr "Folio o ticket opcional"
+
+#: src/screens/cash-scan.jsx
+msgid "Cobrar saldo"
+msgstr "Cobrar saldo"
+
+#: src/screens/cash-scan.jsx
+msgid "+ Sellos"
+msgstr "+ Sellos"
+
+#: src/screens/cash-scan.jsx
+msgid "Recargar monedero (MXN)"
+msgstr "Recargar monedero (MXN)"
+
+#: src/screens/cash-scan.jsx
+msgid "Cobrar del monedero (MXN)"
+msgstr "Cobrar del monedero (MXN)"
+
+#: src/screens/cash-scan.jsx
+msgid "Monto en pesos"
+msgstr "Monto en pesos"
+
+#: src/screens/cash-scan.jsx
+msgid "Nota opcional"
+msgstr "Nota opcional"
+
+#: src/screens/cash-scan.jsx
+msgid "Abonar saldo"
+msgstr "Abonar saldo"
+
+#: src/screens/cash-scan.jsx
+msgid "Aplicar cobro"
+msgstr "Aplicar cobro"
+
+#: src/screens/cash-scan.jsx
+msgid "Acreditar varios sellos"
+msgstr "Acreditar varios sellos"
+
+#: src/screens/cash-scan.jsx
+msgid "Cantidad de sellos"
+msgstr "Cantidad de sellos"
+
+#: src/screens/cash-scan.jsx
+msgid "Motivo o nota"
+msgstr "Motivo o nota"
+
+#: src/screens/cash-scan.jsx
+#: src/screens/customers.jsx
+msgid "Acreditar sellos"
+msgstr "Acreditar sellos"
+
+#: src/screens/cash-scan.jsx
+msgid "Confirmando…"
+msgstr "Confirmando…"
+
+#: src/screens/cash-scan.jsx
+msgid "Confirmar operación ({selectedCount}) →"
+msgstr "Confirmar operación ({selectedCount}) →"
 
 #: src/screens/cash-settings.jsx
 #: src/screens/hours.jsx
@@ -2416,11 +2918,6 @@ msgid "días distintos"
 msgstr "días distintos"
 
 #: src/screens/customers.jsx
-#: src/screens/members.jsx
-msgid "Última visita"
-msgstr "Última visita"
-
-#: src/screens/customers.jsx
 msgid "Visitas por mes"
 msgstr "Visitas por mes"
 
@@ -2528,10 +3025,6 @@ msgid "pedido"
 msgstr "pedido"
 
 #: src/screens/customers.jsx
-msgid "No se pudieron acreditar los sellos."
-msgstr "No se pudieron acreditar los sellos."
-
-#: src/screens/customers.jsx
 msgid "Agregar sellos"
 msgstr "Agregar sellos"
 
@@ -2566,16 +3059,8 @@ msgid "{count, plural, one {Acreditar # sello} other {Acreditar # sellos}}"
 msgstr "{count, plural, one {Acreditar # sello} other {Acreditar # sellos}}"
 
 #: src/screens/customers.jsx
-msgid "Acreditar sellos"
-msgstr "Acreditar sellos"
-
-#: src/screens/customers.jsx
 msgid "No se pudo recargar el saldo."
 msgstr "No se pudo recargar el saldo."
-
-#: src/screens/customers.jsx
-msgid "Recargar saldo"
-msgstr "Recargar saldo"
 
 #. placeholder {0}: account.cardNumber || t`de lealtad`
 #: src/screens/customers.jsx
@@ -2680,28 +3165,14 @@ msgid "Recompensas pendientes"
 msgstr "Recompensas pendientes"
 
 #: src/screens/customers.jsx
-msgid "lealtad"
-msgstr "lealtad"
-
-#: src/screens/customers.jsx
 #: src/screens/members.jsx
 msgid "Registrando…"
 msgstr "Registrando…"
 
 #: src/screens/customers.jsx
-msgid "Registrar visita"
-msgstr "Registrar visita"
-
-#: src/screens/customers.jsx
 #: src/screens/gift-cards.jsx
 msgid "Canjeando…"
 msgstr "Canjeando…"
-
-#. placeholder {0}: account.baseReward.rewardName
-#. placeholder {0}: account.rewardName
-#: src/screens/customers.jsx
-msgid "Canjear {0}"
-msgstr "Canjear {0}"
 
 #: src/screens/customers.jsx
 msgid "Canjear recompensa"
@@ -2812,11 +3283,6 @@ msgid "Aquí verás su historial, sus conversaciones de WhatsApp, sus pedidos, s
 msgstr "Aquí verás su historial, sus conversaciones de WhatsApp, sus pedidos, su lealtad y tus notas, todo junto."
 
 #: src/screens/customers.jsx
-#: src/screens/settings.jsx
-msgid "Buscar"
-msgstr "Buscar"
-
-#: src/screens/customers.jsx
 msgid "Cargando cliente"
 msgstr "Cargando cliente"
 
@@ -2887,31 +3353,6 @@ msgstr "nunca"
 #: src/screens/devices.jsx
 msgid "hace un momento"
 msgstr "hace un momento"
-
-#. placeholder {0}: Math.floor(ms / 60000)
-#. placeholder {0}: Math.floor(ms / LAST_SEEN_MINUTE)
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-#: src/screens/members.jsx
-msgid "hace {0} min"
-msgstr "hace {0} min"
-
-#. placeholder {0}: Math.floor(ms / 3600000)
-#. placeholder {0}: Math.floor(ms / LAST_SEEN_HOUR)
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-#: src/screens/members.jsx
-msgid "hace {0} h"
-msgstr "hace {0} h"
-
-#. placeholder {0}: Math.floor(ms / 86400000)
-#. placeholder {0}: Math.floor(ms / LAST_SEEN_DAY)
-#. placeholder {0}: Math.round(hours / 24)
-#: src/screens/device-utils.js
-#: src/screens/devices.jsx
-#: src/screens/members.jsx
-msgid "hace {0} d"
-msgstr "hace {0} d"
 
 #: src/screens/device-utils.js
 msgid "Mercado Pago rechazó la dirección del negocio."
@@ -4242,12 +4683,6 @@ msgstr "El saldo se abona al monedero del cliente."
 #: src/screens/gift-cards.jsx
 msgid "Canjeada por {0}. Nuevo saldo del cliente: {1}."
 msgstr "Canjeada por {0}. Nuevo saldo del cliente: {1}."
-
-#: src/screens/gift-cards.jsx
-#: src/screens/members.jsx
-#: src/screens/overview.jsx
-msgid "Listo"
-msgstr "Listo"
 
 #: src/screens/gift-cards.jsx
 #: src/screens/inventory-item-editor.jsx
@@ -7385,10 +7820,6 @@ msgid "Más visitas"
 msgstr "Más visitas"
 
 #: src/screens/members.jsx
-msgid "Mayor saldo"
-msgstr "Mayor saldo"
-
-#: src/screens/members.jsx
 msgid "Mayor gasto"
 msgstr "Mayor gasto"
 
@@ -7430,10 +7861,6 @@ msgid "Fecha de nacimiento"
 msgstr "Fecha de nacimiento"
 
 #: src/screens/members.jsx
-msgid "Registrar"
-msgstr "Registrar"
-
-#: src/screens/members.jsx
 msgid "Miembros activos"
 msgstr "Miembros activos"
 
@@ -7448,10 +7875,6 @@ msgstr "miembros"
 #: src/screens/members.jsx
 msgid "Tu rol no incluye registrar miembros"
 msgstr "Tu rol no incluye registrar miembros"
-
-#: src/screens/members.jsx
-msgid "Buscar por nombre, teléfono o tarjeta…"
-msgstr "Buscar por nombre, teléfono o tarjeta…"
 
 #: src/screens/members.jsx
 msgid "Ordenar clientes"
@@ -7472,19 +7895,10 @@ msgid "Miembros"
 msgstr "Miembros"
 
 #: src/screens/members.jsx
-msgid "Miembro"
-msgstr "Miembro"
-
-#: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/recibos.jsx
 msgid "Tarjeta"
 msgstr "Tarjeta"
-
-#: src/screens/members.jsx
-#: src/screens/staff.jsx
-msgid "Saldo"
-msgstr "Saldo"
 
 #: src/screens/members.jsx
 msgid "Progreso"
@@ -7511,12 +7925,6 @@ msgid "{done} de {total} visitas para la recompensa"
 msgstr "{done} de {total} visitas para la recompensa"
 
 #: src/screens/members.jsx
-#: src/screens/orders.jsx
-#: src/screens/profile.jsx
-msgid "Sin nombre"
-msgstr "Sin nombre"
-
-#: src/screens/members.jsx
 msgid "Contacto restringido"
 msgstr "Contacto restringido"
 
@@ -7527,10 +7935,6 @@ msgstr "visitas"
 #: src/screens/members.jsx
 msgid "por canjear"
 msgstr "por canjear"
-
-#: src/screens/members.jsx
-msgid "Nunca"
-msgstr "Nunca"
 
 #: src/screens/members.jsx
 msgid "Miembro · Umi Cash"
@@ -8665,10 +9069,6 @@ msgstr "Detalle del pedido"
 msgid "Pedido · {channelLabel}"
 msgstr "Pedido · {channelLabel}"
 
-#: src/screens/orders.jsx
-msgid "Cliente"
-msgstr "Cliente"
-
 #. placeholder {0}: order.pickup_person
 #: src/screens/orders.jsx
 msgid "Recoge: {0}"
@@ -8782,10 +9182,6 @@ msgstr "en curso · {0}"
 #: src/screens/overview.jsx
 #~ msgid "Pausado · aviso especial activo"
 #~ msgstr "Pausado · aviso especial activo"
-
-#: src/screens/overview.jsx
-#~ msgid "Visitas hoy"
-#~ msgstr "Visitas hoy"
 
 #: src/screens/overview.jsx
 #~ msgid "Tarjetas de regalo abiertas"
@@ -11703,10 +12099,6 @@ msgid "Av. Chapultepec 1, Guadalajara"
 msgstr "Av. Chapultepec 1, Guadalajara"
 
 #: src/screens/settings.jsx
-msgid "Buscando…"
-msgstr "Buscando…"
-
-#: src/screens/settings.jsx
 msgid "Pin"
 msgstr "Pin"
 
@@ -11761,6 +12153,155 @@ msgstr "Descripción (zona / referencia)"
 #: src/screens/settings.jsx
 msgid "p. ej. la del centro, junto al parque"
 msgstr "p. ej. la del centro, junto al parque"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "tu cafetería"
+msgstr "tu cafetería"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Punto de venta · Umi POS"
+msgstr "Punto de venta · Umi POS"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Cobro en barra conectado a tus sellos"
+msgstr "Cobro en barra conectado a tus sellos"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "sin doble escaneo"
+msgstr "sin doble escaneo"
+
+#. placeholder {0}: formatNumber(totalMembers)
+#: src/screens/soft-lock-preview.jsx
+msgid "Conecta tu caja con los {0} miembros que ya tienes en Umi Cash. Al cerrar una cuenta en el POS, los sellos y el saldo del monedero se aplican en un solo toque."
+msgstr "Conecta tu caja con los {0} miembros que ya tienes en Umi Cash. Al cerrar una cuenta en el POS, los sellos y el saldo del monedero se aplican en un solo toque."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Conecta tu caja con tu programa de lealtad Umi Cash. Al cerrar una cuenta en el POS, los sellos y el saldo del monedero se aplican en un solo toque."
+msgstr "Conecta tu caja con tu programa de lealtad Umi Cash. Al cerrar una cuenta en el POS, los sellos y el saldo del monedero se aplican en un solo toque."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Caja rápida y turnos"
+msgstr "Caja rápida y turnos"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Cobro en efectivo, tarjeta y monedero Umi con corte de caja por turno."
+msgstr "Cobro en efectivo, tarjeta y monedero Umi con corte de caja por turno."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Plano de mesas y salón"
+msgstr "Plano de mesas y salón"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Mapa visual de mesas, cuentas abiertas y tiempos de servicio en vivo."
+msgstr "Mapa visual de mesas, cuentas abiertas y tiempos de servicio en vivo."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Pantalla de cocina (KDS)"
+msgstr "Pantalla de cocina (KDS)"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Comandas digitales por estación sin papel perdido en barra."
+msgstr "Comandas digitales por estación sin papel perdido en barra."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Inventario y costos · Umi Stock"
+msgstr "Inventario y costos · Umi Stock"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Recetas, insumos y margen real"
+msgstr "Recetas, insumos y margen real"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "por cada taza"
+msgstr "por cada taza"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Calcula cuánto te cuesta realmente cada bebida y cada recompensa canjeada en {cafeName}, con descuento automático de leche, café e insumos por receta."
+msgstr "Calcula cuánto te cuesta realmente cada bebida y cada recompensa canjeada en {cafeName}, con descuento automático de leche, café e insumos por receta."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Recetas y costo por bebida"
+msgstr "Recetas y costo por bebida"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Conoce tu margen exacto por producto y el costo real de tus premios de lealtad."
+msgstr "Conoce tu margen exacto por producto y el costo real de tus premios de lealtad."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Conteos y alertas de stock"
+msgstr "Conteos y alertas de stock"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Avisos antes de quedarte sin grano, leche o vasos en hora pico."
+msgstr "Avisos antes de quedarte sin grano, leche o vasos en hora pico."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Compras y facturas"
+msgstr "Compras y facturas"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Captura entradas de proveedor y actualiza costos promedio al instante."
+msgstr "Captura entradas de proveedor y actualiza costos promedio al instante."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Atención inteligente · WhatsApp IA"
+msgstr "Atención inteligente · WhatsApp IA"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Tu cafetería responde en WhatsApp"
+msgstr "Tu cafetería responde en WhatsApp"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "las 24 horas"
+msgstr "las 24 horas"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Atiende dudas de menú, horarios, sucursales y pedidos por WhatsApp reconociendo automáticamente a tus clientes frecuentes de Umi Cash."
+msgstr "Atiende dudas de menú, horarios, sucursales y pedidos por WhatsApp reconociendo automáticamente a tus clientes frecuentes de Umi Cash."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Asistente con la voz de tu café"
+msgstr "Asistente con la voz de tu café"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Responde preguntas de menú, leches vegetales y ubicación al instante."
+msgstr "Responde preguntas de menú, leches vegetales y ubicación al instante."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Reconoce a tus miembros"
+msgstr "Reconoce a tus miembros"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Identifica quién escribe por su teléfono y muestra sus sellos y saldo."
+msgstr "Identifica quién escribe por su teléfono y muestra sus sellos y saldo."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Horarios y pausa de pedidos"
+msgstr "Horarios y pausa de pedidos"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Sincroniza tu disponibilidad real sin dejar mensajes sin contestar."
+msgstr "Sincroniza tu disponibilidad real sin dejar mensajes sin contestar."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Hola equipo Umi, soy de {cafeName} y me gustaría activar {displayProduct} conectado a nuestro Umi Cash."
+msgstr "Hola equipo Umi, soy de {cafeName} y me gustaría activar {displayProduct} conectado a nuestro Umi Cash."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Todo dentro de este mismo panel"
+msgstr "Todo dentro de este mismo panel"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Sin migrar cuentas ni cambiar de dirección web: al activarlo se desbloquea en tu menú lateral junto a Umi Cash."
+msgstr "Sin migrar cuentas ni cambiar de dirección web: al activarlo se desbloquea en tu menú lateral junto a Umi Cash."
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Volver a mi panel"
+msgstr "Volver a mi panel"
+
+#: src/screens/soft-lock-preview.jsx
+msgid "Activar con Umi por WhatsApp"
+msgstr "Activar con Umi por WhatsApp"
 
 #: src/screens/staff.jsx
 #~ msgid "Roles y permisos"
@@ -12389,6 +12930,10 @@ msgid "CLIENTES"
 msgstr "CLIENTES"
 
 #: src/shell.jsx
+msgid "LEALTAD Y VALOR"
+msgstr "LEALTAD Y VALOR"
+
+#: src/shell.jsx
 msgid "NEGOCIO"
 msgstr "NEGOCIO"
 
@@ -12399,6 +12944,10 @@ msgstr "CONFIGURACIÓN"
 #: src/shell.jsx
 msgid "PLATAFORMA"
 msgstr "PLATAFORMA"
+
+#: src/shell.jsx
+msgid "MÁS EN UMI"
+msgstr "MÁS EN UMI"
 
 #: src/shell.jsx
 msgid "Panorama"
@@ -12453,5 +13002,13 @@ msgid "reintentar"
 msgstr "reintentar"
 
 #: src/shell.jsx
+msgid "Umi Cash"
+msgstr "Umi Cash"
+
+#: src/shell.jsx
 msgid "Secciones"
 msgstr "Secciones"
+
+#: src/shell.jsx
+msgid "Navegación rápida de Cash"
+msgstr "Navegación rápida de Cash"

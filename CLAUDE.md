@@ -10,6 +10,7 @@ Read first:
 ## Claude adapter rules
 
 - Use `AGENTS.md` as the neutral source of workspace-wide rules.
+- Always target `dev` for pull requests (`dev` -> `staging` -> `main`): branch from `origin/dev`, validate with `PR_BASE_REF=origin/dev pnpm check:pr`, and open PRs with `gh pr create --base dev`.
 - Always follow the [Writing standard](/Users/juanlopez1/Documents/Repositories/Umi/AGENTS.md:61)
   section of `AGENTS.md`. Answer in the language that the user writes:
   - English → ASD-STE100 Simplified Technical English.

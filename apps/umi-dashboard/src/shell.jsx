@@ -1,7 +1,7 @@
 import React from 'react';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { I } from './icons.jsx';
+import { I, UmiFish, UmiWordmark } from './icons.jsx';
 import { Select } from '@/components/select.jsx';
 import { Menu } from '@/components/menu.jsx';
 import { LOCALES, activateLocale } from '@/lib/i18n.js';
@@ -167,9 +167,11 @@ const SECTION_LABELS = {
   HOME: msg`HOY`,
   OPERATIONS: msg`OPERACIÓN`,
   CUSTOMERS: msg`CLIENTES`,
+  CASH: msg`LEALTAD Y VALOR`,
   BUSINESS: msg`NEGOCIO`,
   CONFIGURATION: msg`CONFIGURACIÓN`,
   PLATFORM: msg`PLATAFORMA`,
+  MORE_UMI: msg`MÁS EN UMI`,
 };
 
 /** Screen titles for the masthead. Resolved at render, so they follow the locale. */
@@ -182,6 +184,9 @@ const SCREEN_TITLES = {
   products: msg`Productos`,
   inventory: msg`Inventario`,
   'loyalty-value': msg`Lealtad y valor`,
+  'preview/pos': msg`Punto de venta`,
+  'preview/inventory': msg`Inventario y costos`,
+  'preview/conversaflow': msg`WhatsApp IA`,
   kitchen: msg`Cocina`,
   orders: msg`Pedidos`,
   devices: msg`Dispositivos`,
@@ -267,6 +272,10 @@ const Sidebar = ({
   collapsed,
   onToggleCollapse,
   navItems,
+  softLockedItems = [],
+  isCashOnly = false,
+  merchantName,
+  merchantColor,
   merchants,
   selectedMerchantId,
   onMerchantChange,
@@ -279,7 +288,7 @@ const Sidebar = ({
   const [openGroups, setOpenGroups] = React.useState({});
   const sections = [];
   let current = null;
-  const items = navItems || [];
+  const items = [...(navItems || []), ...(softLockedItems || [])];
   items.forEach((item) => {
     if (item.section !== current) {
       current = item.section;
@@ -289,7 +298,7 @@ const Sidebar = ({
   });
 
   return (
-    <aside className="side">
+    <aside className="side" data-cash-only-side={isCashOnly ? 'true' : undefined}>
       <button
         className="collapse-btn focusable"
         onClick={onToggleCollapse}
@@ -299,11 +308,33 @@ const Sidebar = ({
       </button>
 
       <div className="side-head">
-        {!collapsed && (
-          <div className="side-brand-name">
-            umi<em>dash</em>
-          </div>
-        )}
+        {!collapsed ? (
+          isCashOnly ? (
+            <div className="side-brand-naive-wrap">
+              <div className="side-brand-naive">
+                <UmiFish width={26} />
+                <UmiWordmark height={18} />
+                <span className="naive-cash-tag">cash</span>
+              </div>
+              {merchantName ? (
+                <div className="side-merchant-pill">
+                  <span
+                    className="side-merchant-dot"
+                    style={merchantColor ? { background: merchantColor } : undefined}
+                    aria-hidden="true"
+                  />
+                  <span className="side-merchant-name">{merchantName}</span>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="side-brand-name">
+              umi<em>dash</em>
+            </div>
+          )
+        ) : isCashOnly ? (
+          <UmiFish width={24} />
+        ) : null}
       </div>
 
       {/* Only the nav list scrolls: the brand stays pinned at the top and the
@@ -323,26 +354,34 @@ const Sidebar = ({
             {sec.items.map((item) => {
               const Ic = I[item.icon] || I.Settings;
               const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+              const isItemActive =
+                activeFull === item.id || (!item.id.includes('/') && active === item.id);
               // Open when explicitly toggled open; otherwise default to the route (open while
               // you are inside the group). An explicit `false` keeps it closed even inside.
-              const expanded = hasChildren && (openGroups[item.id] ?? active === item.id);
+              const expanded = hasChildren && (openGroups[item.id] ?? isItemActive);
               return (
                 <React.Fragment key={item.id}>
                   <button
                     type="button"
                     className={
-                      'side-item focusable x-active' + (active === item.id ? ' active' : '')
+                      'side-item focusable x-active' +
+                      (isItemActive ? ' active' : '') +
+                      (item.locked ? ' soft-locked' : '')
                     }
                     onClick={() => {
                       if (hasChildren) {
-                        // A parent group is a pure dropdown: toggle its nested items open/shut
-                        // and never navigate. Only the nested items below change the screen.
+                        if (collapsed && item.children[0]?.id) {
+                          onChange(item.children[0].id);
+                          return;
+                        }
+                        // A parent group is a pure dropdown when expanded: toggle its nested
+                        // items open/shut. Only the nested items below change the screen.
                         setOpenGroups((prev) => ({ ...prev, [item.id]: !expanded }));
                         return;
                       }
                       onChange(item.id);
                     }}
-                    aria-current={active === item.id ? 'page' : undefined}
+                    aria-current={isItemActive ? 'page' : undefined}
                     aria-expanded={hasChildren ? expanded : undefined}
                     title={collapsed ? i18n._(item.label) : undefined}
                   >
@@ -350,6 +389,11 @@ const Sidebar = ({
                       <Ic />
                     </span>
                     <span className="label">{i18n._(item.label)}</span>
+                    {item.locked && !collapsed && (
+                      <span className="side-lock-pill" aria-hidden="true">
+                        <I.Lock size={12} />
+                      </span>
+                    )}
                     {hasChildren && !collapsed && (
                       <span
                         className="ic"
@@ -430,6 +474,9 @@ const Topbar = ({
   onMenu,
   screen,
   merchantName,
+  merchantColor,
+  isCashOnly = false,
+  onQuickScan,
   locations = [],
   canSwitchLocations = false,
   selectedLocationId,
@@ -525,7 +572,19 @@ const Topbar = ({
             )}
           </h1>
           <div className="top-actions">
-            <ThemeMenu />
+            {onQuickScan ? (
+              <button
+                type="button"
+                className="btn btn-sm naive-top-scan-btn focusable"
+                onClick={onQuickScan}
+              >
+                <I.QrScan size={15} />
+                <span>
+                  <Trans>Escanear</Trans>
+                </span>
+              </button>
+            ) : null}
+            {!isCashOnly ? <ThemeMenu /> : null}
             <LocaleSelect variant="topbar" />
             {showLocationSelect ? (
               <Select
@@ -557,31 +616,39 @@ const Topbar = ({
         {/* The dateline. */}
         <div className="dateline">
           {/* The state is a button only when there is something to do about it,
-              so the operator never clicks a control that cannot act. */}
-          {isOnline || isChecking ? (
-            <span
-              title={
-                isOnline && connection.latency != null ? `${connection.latency} ms` : undefined
-              }
-            >
-              <span className={'dot ' + netTone} />
-              {netWord}
-            </span>
+              so the operator never clicks a control that cannot act. Hidden for
+              Cash-only cafés that do not run a KDS/POS socket. */}
+          {!isCashOnly ? (
+            isOnline || isChecking ? (
+              <span
+                title={
+                  isOnline && connection.latency != null ? `${connection.latency} ms` : undefined
+                }
+              >
+                <span className={'dot ' + netTone} />
+                {netWord}
+              </span>
+            ) : (
+              <button
+                className="as-text focusable"
+                onClick={connection.retry}
+                title={t`Reintentar la conexión`}
+              >
+                <span className={'dot ' + netTone} />
+                {netWord} · <Trans>reintentar</Trans>
+              </button>
+            )
           ) : (
-            <button
-              className="as-text focusable"
-              onClick={connection.retry}
-              title={t`Reintentar la conexión`}
-            >
-              <span className={'dot ' + netTone} />
-              {netWord} · <Trans>reintentar</Trans>
-            </button>
+            <span className="naive-live-pill">
+              <span
+                className="naive-merchant-dot"
+                style={merchantColor ? { background: merchantColor } : undefined}
+                aria-hidden="true"
+              />
+              <Trans>Umi Cash</Trans>
+            </span>
           )}
-          {/* The café's name, or nothing. This slot used to render whatever it
-              was handed, and the shell handed it the literal "Umi Dash" when
-              there was no café at all — so a missing session or a failed read
-              appeared as a real, differently-named tenant. A separator with
-              nothing after it is a smaller lie than a name nobody chose. */}
+          {/* The café's name, or nothing. */}
           {merchantName || merchant ? (
             <>
               <span className="sep" aria-hidden="true">
@@ -592,7 +659,7 @@ const Topbar = ({
               </span>
             </>
           ) : null}
-          {branchName ? (
+          {!isCashOnly && branchName ? (
             <>
               <span className="sep" aria-hidden="true">
                 ·
@@ -730,6 +797,47 @@ const HubTabs = ({ tabs, active, onChange, ariaLabel }) => {
   );
 };
 
+/**
+ * CashMobileBottomNav — fixed thumb-reach navigation bar on phones (<768px) inside
+ * Cash routes so a barista never has to open a hamburger drawer between customers.
+ */
+const CashMobileBottomNav = ({ tabs = [], activeTab, onSelectTab }) => {
+  const { t, i18n } = useLingui();
+  if (!tabs.length) return null;
+  const mobileOrder = ['home', 'scan', 'members', 'rewards', 'wallet', 'settings'];
+  const picked = mobileOrder
+    .map((id) => tabs.find((tab) => tab.id === id))
+    .filter(Boolean)
+    .slice(0, 5);
+  return (
+    <nav className="cash-mobile-bnav" aria-label={t`Navegación rápida de Cash`}>
+      {picked.map((tab) => {
+        const Ic = I[tab.icon] || I.CreditCard;
+        const isActive = activeTab === tab.id;
+        const label = typeof tab.label === 'string' ? tab.label : i18n._(tab.label);
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            className={
+              'cash-bnav-item focusable' +
+              (isActive ? ' active' : '') +
+              (tab.id === 'scan' ? ' is-scan' : '')
+            }
+            aria-current={isActive ? 'page' : undefined}
+            onClick={() => onSelectTab(tab.id)}
+          >
+            <span className="cash-bnav-ico">
+              <Ic size={17} />
+            </span>
+            <span className="cash-bnav-lbl">{label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+};
+
 export {
   Sidebar,
   Topbar,
@@ -738,6 +846,7 @@ export {
   MiniBars,
   XSep,
   HubTabs,
+  CashMobileBottomNav,
   LocaleSelect,
   ProfileButton,
   ProfileMenu,

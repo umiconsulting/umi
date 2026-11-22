@@ -1,0 +1,92 @@
+{
+  "$description": "Umi Cash Naive surface tokens — locked custom mix (space=0 compacto, ink=0 solo protagonistas, relief=80 sello en bloque, shape=27 amable/limpia, voice=1 imprenta, flair=3 fiesta marina, color=0 papel sereno). Scoped to [data-surface=\"cash-naive\"] and .umi-naive-customer so POS screens in umi-dashboard remain 100% unaffected.",
+  "brand": {
+    "$description": "Umi Naive Core Brand Palette",
+    "naive-navy": { "$type": "color", "$value": "#132642" },
+    "naive-navy-soft": { "$type": "color", "$value": "#263E63" },
+    "naive-coral": { "$type": "color", "$value": "#E66025" },
+    "naive-coral-soft": { "$type": "color", "$value": "#FDEFE7" },
+    "naive-sky": { "$type": "color", "$value": "#5B9BD5" },
+    "naive-sky-soft": { "$type": "color", "$value": "#E6F4FD" },
+    "naive-sage": { "$type": "color", "$value": "#256F4B" }
+  },
+  "surface": {
+    "$description": "Papel sereno surfaces (color=0)",
+    "naive-canvas": { "$type": "color", "$value": "#F8F3E9" },
+    "naive-canvas-2": { "$type": "color", "$value": "#EFE7D8" },
+    "naive-surface": { "$type": "color", "$value": "#FFFDF9" },
+    "naive-surface-alt": { "$type": "color", "$value": "#FAF5EB" },
+    "naive-ink": { "$type": "color", "$value": "#132642" },
+    "naive-muted": { "$type": "color", "$value": "#586A84" },
+    "naive-soft": { "$type": "color", "$value": "#8190A6" }
+  },
+  "chrome": {
+    "$description": "Operational chrome & hero accents",
+    "naive-accent": { "$type": "color", "$value": "#132642" },
+    "naive-accent-soft": { "$type": "color", "$value": "rgba(19, 38, 66, 0.08)" },
+    "naive-accent-ink": { "$type": "color", "$value": "#132642" },
+    "naive-hero-bg": { "$type": "color", "$value": "#132642" },
+    "naive-hero-shadow": { "$type": "color", "$value": "#E66025" },
+    "naive-hero-icon-bg": { "$type": "color", "$value": "#E66025" },
+    "naive-hero-icon-border": { "$type": "color", "$value": "transparent" },
+    "naive-hero-orb": { "$type": "color", "$value": "rgba(255, 253, 248, 0.08)" },
+    "naive-nav-active-bg": { "$type": "color", "$value": "#132642" },
+    "naive-nav-active-ink": { "$type": "color", "$value": "#FFFDF8" },
+    "naive-primary-btn-bg": { "$type": "color", "$value": "#132642" },
+    "naive-primary-btn-ink": { "$type": "color", "$value": "#FFFDF8" }
+  },
+  "space": {
+    "$description": "Compacto spacing (space=0)",
+    "naive-sp-body-x": { "$type": "dimension", "$value": "22px" },
+    "naive-sp-body-y": { "$type": "dimension", "$value": "18px" },
+    "naive-sp-grid-gap": { "$type": "dimension", "$value": "16px" },
+    "naive-sp-stack-gap": { "$type": "dimension", "$value": "11px" },
+    "naive-sp-card-pad": { "$type": "dimension", "$value": "15px" },
+    "naive-sp-row-py": { "$type": "dimension", "$value": "9px" }
+  },
+  "ink-stroke": {
+    "$description": "Solo protagonistas ink strokes (ink=0)",
+    "naive-bw-frame": { "$type": "dimension", "$value": "1px" },
+    "naive-bc-frame": { "$type": "color", "$value": "rgba(19, 38, 66, 0.10)" },
+    "naive-bw-card": { "$type": "dimension", "$value": "1px" },
+    "naive-bc-card": { "$type": "color", "$value": "rgba(19, 38, 66, 0.08)" },
+    "naive-bw-ctl": { "$type": "dimension", "$value": "1px" },
+    "naive-bc-ctl": { "$type": "color", "$value": "rgba(19, 38, 66, 0.12)" },
+    "naive-bw-hero": { "$type": "dimension", "$value": "2.25px" },
+    "naive-bc-hero": { "$type": "color", "$value": "#132642" },
+    "naive-bw-badge": { "$type": "dimension", "$value": "1.5px" },
+    "naive-bc-badge": { "$type": "color", "$value": "#132642" }
+  },
+  "relief": {
+    "$description": "Sello en bloque relief shadows (relief=80)",
+    "naive-sh-frame": { "$type": "shadow", "$value": "0 18px 44px rgba(19, 38, 66, 0.08)" },
+    "naive-sh-card": { "$type": "shadow", "$value": "1.9px 1.9px 0 #132642" },
+    "naive-sh-hero": { "$type": "shadow", "$value": "4.4px 4.4px 0 #E66025" },
+    "naive-sh-btn": { "$type": "shadow", "$value": "3.3px 3.3px 0 #132642" },
+    "naive-sh-ctl": { "$type": "shadow", "$value": "1.2px 1.2px 0 #132642" },
+    "naive-sh-pass": { "$type": "shadow", "$value": "5.2px 5.2px 0 #132642" }
+  },
+  "shape": {
+    "$description": "Amable / Limpia radii (shape=27)",
+    "naive-rad-shell": { "$type": "dimension", "$value": "20px" },
+    "naive-rad-card": { "$type": "dimension", "$value": "16.7px" },
+    "naive-rad-hero": { "$type": "dimension", "$value": "16.7px" },
+    "naive-rad-ctl": { "$type": "dimension", "$value": "11.9px" },
+    "naive-rad-avatar": { "$type": "dimension", "$value": "10px" }
+  },
+  "typography": {
+    "$description": "Imprenta voice (voice=1)",
+    "naive-font-display": {
+      "$type": "fontFamily",
+      "$value": "\"Bricolage Grotesque\", \"Domus\", \"Plus Jakarta Sans\", system-ui, sans-serif"
+    },
+    "naive-font-body": {
+      "$type": "fontFamily",
+      "$value": "\"Plus Jakarta Sans\", \"Domus\", system-ui, sans-serif"
+    },
+    "naive-font-mono": {
+      "$type": "fontFamily",
+      "$value": "\"JetBrains Mono\", ui-monospace, \"SF Mono\", monospace"
+    }
+  }
+}

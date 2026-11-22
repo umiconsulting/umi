@@ -17,13 +17,15 @@ import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RequireProduct } from '../auth/require-product.decorator';
 import { RequirePermission } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
-import { Merchant } from '../auth/current-user.decorator';
+import { CurrentUser, Merchant } from '../auth/current-user.decorator';
 import { hasPermission } from '../auth/roles';
-import type { MerchantAccess } from '../auth/auth.types';
+import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 import { CashReadService } from './cash-read.service';
 import { CashRegisterService } from './cash-register.service';
+import { CashScanService } from './cash-scan.service';
 import { RegisterDto } from './dto/register.dto';
+import { ScanDto, ScanPreviewDto, ScanSealsDto } from './dto/scan.dto';
 import { registerRole } from './cash-roles';
 
 /**
@@ -67,6 +69,7 @@ export class CashMerchantController {
     private readonly cash: CashReadService,
     private readonly register: CashRegisterService,
     private readonly walletPass: WalletPassAdapter,
+    private readonly scanService: CashScanService,
   ) {}
 
   @Get('stats')
@@ -175,5 +178,32 @@ export class CashMerchantController {
   @RequirePermission('merchant.manage')
   patchRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
     return this.cash.updateRewardConfig(t.merchantId, body, 'patch');
+  }
+
+  @Post('scan')
+  @RequirePermission('loyalty.reward.redeem')
+  runScan(@Merchant() t: MerchantAccess, @CurrentUser() user: AuthUser, @Body() dto: ScanDto) {
+    return this.scanService.scan(t.merchantId, user.id, dto);
+  }
+
+  @Post('scan/preview')
+  @HttpCode(200)
+  @RequirePermission('loyalty.reward.redeem')
+  previewScan(
+    @Merchant() t: MerchantAccess,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ScanPreviewDto,
+  ) {
+    return this.scanService.preview(t.merchantId, user.id, dto);
+  }
+
+  @Post('scan/seals')
+  @RequirePermission('loyalty.adjust')
+  creditSeals(
+    @Merchant() t: MerchantAccess,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ScanSealsDto,
+  ) {
+    return this.scanService.seals(t.merchantId, user.id, dto);
   }
 }

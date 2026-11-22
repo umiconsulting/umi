@@ -10,6 +10,7 @@
 // `entitlements` entry, and the reason the laziness must not be removed.
 import { PRODUCT_ACTIVE_STATUSES } from '@umi/contract/entitlements';
 import { msg } from '@lingui/core/macro';
+import { allowedCashTabs } from './cash-tabs.js';
 export { PRODUCT_ACTIVE_STATUSES };
 
 // `label` is a Lingui message descriptor, not a string: this module runs at import
@@ -405,4 +406,103 @@ export function getVisibleModules(capabilities, platformRole = null) {
   return MODULE_ORDER.filter((moduleKey) =>
     canShowModule(moduleKey, capabilities, platformRole),
   ).map((moduleKey) => MODULES[moduleKey]);
+}
+
+/**
+ * True when the selected café subscribes to Umi Cash without the full POS/Dashboard
+ * product. Drives the adaptive Naive shell, top-level Cash sidebar navigation, and
+ * soft-locked product discovery doors.
+ */
+export function isCashOnlyMerchant(capabilities) {
+  if (!capabilities?.products) return false;
+  return isProductActive('cash', capabilities) && !isProductActive('dashboard', capabilities);
+}
+
+/**
+ * Three product-level soft-lock doors shown under "MÁS EN UMI" for Cash-only
+ * decision makers (`owner` / `admin`). Baristas, cashiers, staff and viewers
+ * never see locked product upsells.
+ */
+export const SOFT_LOCK_GROUPS = [
+  {
+    id: 'preview/pos',
+    key: 'pos',
+    label: msg`Punto de venta`,
+    icon: 'Monitor',
+    section: 'MORE_UMI',
+    product: 'dashboard',
+    locked: true,
+  },
+  {
+    id: 'preview/inventory',
+    key: 'inventory',
+    label: msg`Inventario y costos`,
+    icon: 'PackagePlus',
+    section: 'MORE_UMI',
+    product: 'dashboard',
+    locked: true,
+  },
+  {
+    id: 'preview/conversaflow',
+    key: 'conversaflow',
+    label: msg`WhatsApp IA`,
+    icon: 'WhatsApp',
+    section: 'MORE_UMI',
+    product: 'conversaflow',
+    locked: true,
+  },
+];
+
+const DECISION_MAKER_ROLES = new Set(['owner', 'admin']);
+
+export function canSeeSoftLockedProducts(capabilities, platformRole = null) {
+  if (platformRole === 'super_admin') return true;
+  const role = String(capabilities?.membership?.role || '')
+    .trim()
+    .toLowerCase();
+  return DECISION_MAKER_ROLES.has(role);
+}
+
+export function getSoftLockedProductGroups(capabilities, platformRole = null) {
+  if (!capabilities || !canSeeSoftLockedProducts(capabilities, platformRole)) return [];
+  return SOFT_LOCK_GROUPS.filter((group) => !isProductActive(group.product, capabilities));
+}
+
+/**
+ * Adaptive navigation items for the unified sidebar.
+ *
+ * - In a Cash-only café, the allowed Cash tabs (`Inicio`, `Escanear`, `Lealtad`,
+ *   `Recompensas`, `Tarjetas de regalo`, `Monedero`, `Ajustes`) are promoted to
+ *   first-level sidebar items under `CASH` so the operator never deals with a
+ *   1-item sidebar + secondary tab bar.
+ * - In a Full-Suite café (POS + Cash), `Lealtad y valor` stays in `CUSTOMERS`
+ *   and unfolds its allowed Cash tabs as nested `children`, matching `Inventario`
+ *   and `Reportes`.
+ */
+export function getAdaptiveNavItems(capabilities, platformRole = null) {
+  const visible = getVisibleModules(capabilities, platformRole);
+  const cashTabs = allowedCashTabs(capabilities);
+  if (isCashOnlyMerchant(capabilities)) {
+    const promotedCash = cashTabs.map((tab) => ({
+      id: `loyalty-value/${tab.id}`,
+      tabId: tab.id,
+      label: tab.label,
+      icon: tab.icon || 'CreditCard',
+      section: 'CASH',
+      product: 'cash',
+    }));
+    const others = visible.filter((mod) => mod.id !== 'loyalty-value');
+    return [...promotedCash, ...others];
+  }
+
+  return visible.map((mod) => {
+    if (mod.id !== 'loyalty-value' || cashTabs.length === 0) return mod;
+    return {
+      ...mod,
+      children: cashTabs.map((tab) => ({
+        id: `loyalty-value/${tab.id}`,
+        label: tab.label,
+      })),
+    };
+  });
 }

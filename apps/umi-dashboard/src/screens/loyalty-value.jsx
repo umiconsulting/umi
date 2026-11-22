@@ -12,6 +12,8 @@ import {
 import PermissionUnavailable from '@/components/permission-unavailable.jsx';
 import { useMerchantData } from '@/data.jsx';
 import { DomainWorkspace } from './operations-workspace.jsx';
+import CashHomeScreen from './cash-home.jsx';
+import CashScanScreen from './cash-scan.jsx';
 import MembersScreen from './members.jsx';
 import GiftCardsScreen from './gift-cards.jsx';
 import CashSettingsScreen from './cash-settings.jsx';
@@ -28,11 +30,6 @@ import './loyalty-value.css';
  *   3. an unauthorized tab is refused BEFORE its screen mounts, so it cannot
  *      fire the read that would 403. The old state-only tabs mounted every
  *      component behind a conditional and fetched on the first frame.
- *
- * The visual order stays the registry order. The visible tab set is the
- * membership's: a viewer sees the members and wallet tabs; a cashier sees the
- * gift-card list but not the issue command; an owner sees every tab and every
- * command.
  */
 export default function LoyaltyValueScreen() {
   const { t, i18n } = useLingui();
@@ -45,8 +42,6 @@ export default function LoyaltyValueScreen() {
   const fallbackTab = allowed[0] || null;
   const rewardConfig = merchantData?.rewardConfig;
 
-  // The summary uses what the shell already loaded. It never mounts a Cash tab
-  // to count rows: that fetch belongs to the tab that owns the data.
   const summary = [];
   if (hasCashPermission(capabilities, 'loyalty.read')) {
     summary.push({
@@ -71,9 +66,6 @@ export default function LoyaltyValueScreen() {
     });
   }
 
-  // The module gate admitted this screen through at least one of the three
-  // read keys. If no tab is admissible the capability set is incomplete, not
-  // authorized: say so instead of drawing an empty hub.
   if (!fallbackTab) {
     return (
       <div className="cash-screen">
@@ -85,14 +77,12 @@ export default function LoyaltyValueScreen() {
     );
   }
 
-  // No tab in the URL: open the first one this membership may read.
   if (!routeTab) {
     return <Navigate to={`/loyalty-value/${fallbackTab.id}`} replace />;
   }
 
   const resolution = resolveCashTabRoute(routeTab, capabilities);
 
-  // An unknown segment is a wrong link, not a refusal.
   if (resolution.kind === 'redirect') {
     return <Navigate to={`/loyalty-value/${fallbackTab.id}`} replace />;
   }
@@ -113,24 +103,29 @@ export default function LoyaltyValueScreen() {
 
   const activeTab = resolution.tab;
   const tabs = allowed.map((item) => ({ ...item, label: i18n._(item.label) }));
+  const showSummaryBanner = activeTab !== 'home' && activeTab !== 'scan';
 
   return (
-    <div className="fade-up cash-hub">
-      <section className="cash-summary" aria-label={t`Resumen de Lealtad y valor`}>
-        {summary.map((item) => (
-          <div className="cash-summary-item" key={item.id}>
-            <span className="cash-kicker">{item.label}</span>
-            <span className="cash-summary-value">{item.value}</span>
-            <span className="cash-summary-meta">{item.meta}</span>
-          </div>
-        ))}
-      </section>
+    <div className="fade-up cash-hub" data-active-cash-tab={activeTab}>
+      {showSummaryBanner ? (
+        <section className="cash-summary" aria-label={t`Resumen de Lealtad y valor`}>
+          {summary.map((item) => (
+            <div className="cash-summary-item" key={item.id}>
+              <span className="cash-kicker">{item.label}</span>
+              <span className="cash-summary-value">{item.value}</span>
+              <span className="cash-summary-meta">{item.meta}</span>
+            </div>
+          ))}
+        </section>
+      ) : null}
       <HubTabs
         tabs={tabs}
         active={activeTab}
         onChange={(id) => navigate(`/loyalty-value/${id}`)}
         ariaLabel={t`Lealtad y valor`}
       />
+      {activeTab === 'home' && <CashHomeScreen />}
+      {activeTab === 'scan' && <CashScanScreen />}
       {activeTab === 'members' && <MembersScreen />}
       {activeTab === 'gift-cards' && <GiftCardsScreen />}
       {activeTab === 'rewards' && <DomainWorkspace key="rewards" domain="rewards" />}

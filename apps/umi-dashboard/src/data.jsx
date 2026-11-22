@@ -941,7 +941,9 @@ async function topupWallet({ cardId, amountCentavos, note, idempotencyKey }) {
 // API enforces the reward-cycle math and rejects a redeem with nothing to claim.
 async function loyaltyScan({
   cardNumber,
+  qrPayload,
   action,
+  actions,
   redeemQuantity,
   externalReceiptNumber,
   idempotencyKey,
@@ -951,11 +953,39 @@ async function loyaltyScan({
   return _apiFetch(routes.cash.byRef.scan(merchantId), {
     method: 'POST',
     body: JSON.stringify({
-      qrPayload: cardNumber,
+      qrPayload: qrPayload || cardNumber,
       action,
+      actions,
       redeemQuantity,
       externalReceiptNumber,
       idempotencyKey,
+    }),
+  });
+}
+
+async function previewLoyaltyScan(
+  { qrPayload },
+  merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant'),
+) {
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/cash/scan/preview`, {
+    method: 'POST',
+    body: JSON.stringify({ qrPayload }),
+  });
+}
+
+async function purchaseWallet(
+  { cardId, amountCentavos, note, idempotencyKey },
+  merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant'),
+) {
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  return _apiFetch(routes.cash.byRef.purchase(merchantId), {
+    method: 'POST',
+    body: JSON.stringify({
+      cardId,
+      amountCentavos,
+      note: note || undefined,
+      idempotencyKey: idempotencyKey || crypto.randomUUID(),
     }),
   });
 }
@@ -1585,6 +1615,38 @@ function useGiftCardsData(opts) {
   );
 }
 
+const EMPTY_CASH_STATS = {
+  visitsToday: 0,
+  topupsTodayCount: 0,
+  topupsTodayMXN: '$0.00',
+  pendingRewards: 0,
+};
+
+async function _loadCashStats(ctx) {
+  if (!_active(ctx, 'cash') || !hasCashPermission(ctx?.capabilities, 'loyalty.read')) {
+    return EMPTY_CASH_STATS;
+  }
+  const res = await _apiFetch(_merchantPath(ctx, '/cash/stats')).catch(() => null);
+  return {
+    visitsToday: res?.visitsToday ?? 0,
+    topupsTodayCount: res?.topupsTodayCount ?? 0,
+    topupsTodayMXN: res?.topupsTodayMXN ?? '$0.00',
+    pendingRewards: res?.pendingRewards ?? 0,
+  };
+}
+
+function useCashStatsData(opts) {
+  const ctx = useMerchant();
+  const refresh = (opts && opts.refresh) || 0;
+  return _useAsync(
+    function () {
+      return _loadCashStats(ctx);
+    },
+    _deps(ctx, [refresh]),
+    EMPTY_CASH_STATS,
+  );
+}
+
 // Issue a gift card from the dashboard. Same endpoint the register uses
 // (`admin/gift-cards`, staff-guarded); the merchant UUID is a valid `:merchantRef`.
 // The clear code comes back ONCE, in the response — it is never stored in clear and
@@ -2004,6 +2066,7 @@ export {
   useBusinessHours,
   useVoiceConfig,
   useGiftCardsData,
+  useCashStatsData,
   useConversationsData,
   useTriageData,
   // This hook follows the existing data module boundary. Do not increase the warning baseline.
@@ -2035,7 +2098,9 @@ export {
   // Data-module function, not a component. Keeps the react-refresh baseline flat.
   creditLoyaltySeals,
   topupWallet,
+  purchaseWallet,
   loyaltyScan,
+  previewLoyaltyScan,
   issueGiftCard,
   redeemGiftCardByCode,
   registerMember,
