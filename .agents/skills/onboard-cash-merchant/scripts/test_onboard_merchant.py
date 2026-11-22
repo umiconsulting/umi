@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import http.cookiejar
 import json
 import os
 from pathlib import Path
@@ -138,6 +139,30 @@ class OnboardMerchantTests(unittest.TestCase):
             self.assertEqual(draft["provisionPayload"]["name"], "Shimonagi Coffee")
             self.assertEqual(draft["provisionPayload"]["adminEmail"], "admin+shimonagimx@umiconsulting.co")
             self.assertTrue(Path(draft["rawLogoPath"]).exists())
+
+    def test_csrf_header_extracted_from_cookie_jar(self) -> None:
+        jar = http.cookiejar.CookieJar()
+        cookie = http.cookiejar.Cookie(
+            version=0,
+            name="umi_csrf",
+            value="csrf-token-123",
+            port=None,
+            port_specified=False,
+            domain="api-staging.umiconsulting.co",
+            domain_specified=True,
+            domain_initial_dot=False,
+            path="/",
+            path_specified=True,
+            secure=True,
+            expires=None,
+            discard=True,
+            comment=None,
+            comment_url=None,
+            rest={},
+            rfc2109=False,
+        )
+        jar.set_cookie(cookie)
+        self.assertEqual(om._csrf_headers(jar), {"x-umi-csrf": "csrf-token-123"})
 
 
 if __name__ == "__main__":
