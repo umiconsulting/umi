@@ -46,7 +46,9 @@ export function parseArgs(argv, env = process.env) {
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--shots') {
+    if (arg === '--') {
+      continue;
+    } else if (arg === '--shots') {
       opts.shotsDir = argv[++i] || null;
     } else if (arg === '--include-landing') {
       opts.includeLanding = true;
@@ -155,7 +157,12 @@ async function runBrowserCheck(browser, { name, url, timeoutMs, shotsDir, afterL
   let httpStatus = null;
   let extra = {};
   try {
-    const response = await page.goto(url, { waitUntil: 'networkidle', timeout: timeoutMs });
+    const response = await page.goto(url, { waitUntil: 'load', timeout: timeoutMs });
+    await page
+      .waitForFunction(() => (document.body?.innerText || '').trim().length >= 20, null, {
+        timeout: Math.min(timeoutMs, 10_000),
+      })
+      .catch(() => {});
     httpStatus = response ? response.status() : null;
     if (httpStatus === null || httpStatus >= 500) {
       issues.push(`navigation returned HTTP ${String(httpStatus)}`);

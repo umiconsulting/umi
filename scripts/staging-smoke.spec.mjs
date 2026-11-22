@@ -3,7 +3,7 @@ import test from 'node:test';
 import { DEFAULTS, parseArgs, validateApiHealthPayload } from './staging-smoke.mjs';
 
 test('parseArgs applies staging defaults and CLI overrides cleanly', () => {
-  const opts = parseArgs(['--shots', '/tmp/shots', '--include-landing', '--json'], {});
+  const opts = parseArgs(['--', '--shots', '/tmp/shots', '--include-landing', '--json'], {});
   assert.equal(opts.apiUrl, DEFAULTS.apiUrl);
   assert.equal(opts.dashboardUrl, DEFAULTS.dashboardUrl);
   assert.equal(opts.shotsDir, '/tmp/shots');
