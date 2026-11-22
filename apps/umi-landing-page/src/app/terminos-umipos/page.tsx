@@ -25,16 +25,14 @@ export default function UmiPosTermsOfService() {
             <p className="privacy-status">
               Condiciones para usar UmiPOS en la operación de tu restaurante.
             </p>
-            <p>Última actualización y entrada en vigor: 14 de noviembre de 2026.</p>
+            <p>Última actualización y entrada en vigor: 21 de noviembre de 2026.</p>
           </div>
           <div className="privacy-content">
             <section>
               <h2>1. Quién presta el servicio</h2>
               <p>
-                Juan Carlos Lopez Quinonez presta el servicio bajo el nombre comercial Umi. El
-                domicilio de contacto es Blvd. José Limon Lote D, Parque Canacintra I, Humaya, 80020
-                Culiacán Rosales, Sinaloa, México. Para consultas, soporte o reclamaciones, escribe
-                a <a href="mailto:hola@umiconsulting.co">hola@umiconsulting.co</a>.
+                Umi presta el servicio de UmiPOS. Para consultas, soporte o reclamaciones, escribe a{' '}
+                <a href="mailto:hola@umiconsulting.co">hola@umiconsulting.co</a>.
               </p>
             </section>
             <section>

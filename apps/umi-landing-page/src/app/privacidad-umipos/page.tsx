@@ -24,17 +24,12 @@ export default function UmiPosPrivacyPolicy() {
               Consulta qué datos utiliza UmiPOS, para qué los utiliza y cómo ejercer tus derechos de
               privacidad.
             </p>
-            <p>Última actualización: 12 de noviembre de 2026.</p>
+            <p>Última actualización: 21 de noviembre de 2026.</p>
           </div>
           <div className="privacy-content">
             <section>
               <h2>Responsable</h2>
-              <p>
-                Juan Carlos Lopez Quinonez, quien opera bajo el nombre comercial Umi, es responsable
-                del tratamiento de datos para prestar este servicio. Su domicilio de contacto es
-                Blvd. José Limon Lote D, Parque Canacintra I, Humaya, 80020 Culiacán Rosales,
-                Sinaloa, México.
-              </p>
+              <p>Umi es responsable del tratamiento de datos para prestar este servicio.</p>
               <p>
                 El correo para consultas y solicitudes de privacidad es{' '}
                 <a href="mailto:hola@umiconsulting.co">hola@umiconsulting.co</a>.
