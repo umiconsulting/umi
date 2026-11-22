@@ -114,6 +114,33 @@ const ADMIN_PRIMARY = (slug: string) => new Set([
   `/${slug}/admin/analytics`,
 ]);
 
+function resolveDashboardRedirect(slug: string, pathname: string): string {
+  const base = (
+    process.env.NEXT_PUBLIC_DASHBOARD_URL ||
+    process.env.NEXT_PUBLIC_UMI_DASHBOARD_URL ||
+    'https://dash.umiconsulting.co'
+  ).replace(/\/+$/, '');
+  const sub = pathname
+    .replace(new RegExp(`^/${slug}/admin/?`), '')
+    .split('/')[0]
+    .toLowerCase();
+  const tabMap: Record<string, string> = {
+    '': 'home',
+    scan: 'scan',
+    customers: 'members',
+    rewards: 'rewards',
+    'gift-cards': 'gift-cards',
+    giftcards: 'gift-cards',
+    topup: 'wallet',
+    wallet: 'wallet',
+    settings: 'settings',
+    analytics: 'home',
+    messages: 'home',
+  };
+  const tab = tabMap[sub] || 'home';
+  return `${base}/loyalty-value/${tab}?merchant=${encodeURIComponent(slug)}`;
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { slug } = useParams<{ slug: string }>();
   const pathname = usePathname();
@@ -124,6 +151,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const sheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && slug) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('legacy') !== '1') {
+        window.location.replace(resolveDashboardRedirect(slug, pathname || `/${slug}/admin`));
+        return;
+      }
+    }
     async function initAuth() {
       let token = localStorage.getItem('accessToken');
 

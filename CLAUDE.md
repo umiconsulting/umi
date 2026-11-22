@@ -10,12 +10,13 @@ Read first:
 ## Claude adapter rules
 
 - Use `AGENTS.md` as the neutral source of workspace-wide rules.
+- Always target `dev` for pull requests (`dev` -> `staging` -> `main`): branch from `origin/dev`, validate with `PR_BASE_REF=origin/dev pnpm check:pr`, and open PRs with `gh pr create --base dev`.
 - Always follow the [Writing standard](/Users/juanlopez1/Documents/Repositories/Umi/AGENTS.md:61)
   section of `AGENTS.md`. Answer in the language that the user writes:
   - English → ASD-STE100 Simplified Technical English.
   - Spanish, technical content → Español Técnico Simplificado (ETS).
   - Spanish, all other content → Lenguaje claro (Red de Lenguaje Claro).
   - This applies to chat replies, commits, pull requests, comments, and docs.
-- Root `.agents/skills/` is the canonical procedure layer; root `.claude/skills/` is a **symlink** into it (`.claude/skills -> ../.agents/skills`), so there is one source of truth. Read and write skills under `.agents/skills/`; Claude Code loads them through the link — no sync step. `adapter-sync-check` guards the link (symlinks assume macOS/Linux; Windows needs `git config core.symlinks true`).
+- Root `.agents/skills/` is the canonical procedure layer; root `.claude/skills/` is a **symlink** into it (`.claude/skills -> ../.agents/skills`), so there is one source of truth. Read and write skills under `.agents/skills/`; Claude Code loads them through the link — no sync step (`scripts/check-task-router.mjs` checks the symlink; symlinks assume macOS/Linux; Windows needs `git config core.symlinks true`).
 - For project-specific work, descend into the owning repo and follow its local `CLAUDE.md` and `.claude/`.
 - Keep this file aligned with `AGENTS.md`; do not let it drift into a separate architecture.

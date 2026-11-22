@@ -417,3 +417,184 @@ body { font-family: 'Domus', system-ui, -apple-system, sans-serif; }
 .u-fade-up.d2 { animation-delay: .12s; }
 .u-fade-up.d3 { animation-delay: .2s; }
 .u-fade-up.d4 { animation-delay: .28s; }
+
+/* ─────────────────────────────────────────────────────────────
+   Umi Cash Naive Customer Surface
+   Locked mix: Compacto (space=0) · Solo protagonistas (ink=0) · Bloque (relief=80)
+               Amable (shape=27) · Imprenta (voice=1) · Fiesta marina (flair=3)
+               Papel sereno (color=0) + 100% Merchant Brand Consistency
+   ───────────────────────────────────────────────────────────── */
+
+.umi-naive-customer {
+  --font-display: 'Bricolage Grotesque', 'Domus', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-body: 'Plus Jakarta Sans', 'Domus', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  background: #F8F3E9;
+  color: #132642;
+  font-family: var(--font-body);
+}
+
+.umi-naive-customer .u-display {
+  font-family: var(--font-display);
+}
+
+.naive-cust-pill-highlight {
+  display: inline-block;
+  padding: 1px 11px 3px;
+  background: var(--t-tint, #F8EBE7);
+  color: var(--t-brand-dark, #132642);
+  border-radius: 15px 11px 16px 10px / 11px 15px 10px 14px;
+  border: 2.2px solid #132642;
+  box-shadow: 2.5px 2.5px 0 #132642;
+  transform: rotate(-1.2deg);
+}
+
+.naive-wallet-pass {
+  width: 302px;
+  border-radius: 16.7px;
+  background: var(--t-brand, var(--color-brand));
+  color: #FFFDF8;
+  overflow: hidden;
+  position: relative;
+  border: 2.25px solid #132642;
+  box-shadow: 5.2px 5.2px 0 var(--t-hero-shadow, #132642);
+  transform: rotate(-1.2deg);
+}
+
+.naive-rubber-stamp {
+  display: inline-flex;
+  position: absolute;
+  top: -6px;
+  right: 14px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--t-brand, var(--color-brand));
+  color: #FFFDF8;
+  border: 2px solid #132642;
+  box-shadow: 2.5px 2.5px 0 #132642;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  transform: rotate(5deg);
+  z-index: 4;
+}
+
+.naive-step-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 13px;
+  border-radius: 11.9px;
+  background: #FFFDF9;
+  border: 1px solid rgba(19, 38, 66, 0.1);
+  box-shadow: 1.9px 1.9px 0 #132642;
+}
+
+.naive-step-num {
+  width: 27px;
+  height: 27px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--t-brand, var(--color-brand));
+  color: #FFFDF8;
+  border: 2px solid #132642;
+  flex-shrink: 0;
+}
+
+.naive-cust-cta {
+  width: 100%;
+  height: 52px;
+  border-radius: 11.9px;
+  border: 2.25px solid #132642;
+  background: var(--t-brand, var(--color-brand));
+  color: #FFFDF8;
+  font-family: var(--font-display);
+  font-size: 16.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 4.4px 4.4px 0 var(--t-hero-shadow, #132642);
+  text-decoration: none;
+  transition: transform 0.12s ease;
+}
+
+.naive-cust-cta:active {
+  transform: translate(1.5px, 1.5px);
+}
+
+.naive-card-surface {
+  background: #FFFDF9;
+  border: 1px solid rgba(19, 38, 66, 0.1);
+  border-radius: 16.7px;
+  box-shadow: 1.9px 1.9px 0 #132642;
+  padding: 16px;
+}
+
+.naive-reward-banner {
+  padding: 11px 13px;
+  border-radius: 11.9px;
+  background: var(--t-tint, #FFFDF8);
+  color: #132642;
+  border: 2.25px solid #132642;
+  box-shadow: 3px 3px 0 #132642;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.naive-ready-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--t-brand, var(--color-brand));
+  color: #FFFDF8;
+  border: 2px solid #132642;
+  box-shadow: 2px 2px 0 #132642;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  transform: rotate(-2deg);
+  white-space: nowrap;
+}
+
+.naive-qr-frame {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  border-radius: 16px;
+  background: #FFFFFF;
+  border: 2px dashed #132642;
+  box-shadow: 3.5px 3.5px 0 var(--t-brand, var(--color-brand));
+}
+
+.naive-c-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1.75px dashed rgba(255, 255, 255, 0.55);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.naive-c-dot.filled {
+  background: #FFFDF8;
+  border: 2px solid #132642;
+  color: var(--t-brand, var(--color-brand));
+  box-shadow: 1.5px 1.5px 0 #132642;
+  transform: rotate(-5deg);
+}
+
+.naive-c-dot.bonus {
+  border-color: rgba(168, 221, 255, 0.85);
+}

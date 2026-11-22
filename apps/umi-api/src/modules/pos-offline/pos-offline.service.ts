@@ -228,6 +228,7 @@ export class PosOfflineService {
     batch: ReplayBatch,
     scope: ReplayScope,
   ): Promise<ReplayBatchResult> {
+    const startedAt = Date.now();
     const first = batch.commands[0];
     const replayContext = await this.authorize(
       user,
@@ -981,6 +982,22 @@ export class PosOfflineService {
         throw error;
       }
     }
+    let accepted = 0;
+    let duplicate = 0;
+    let conflict = 0;
+    let rejected = 0;
+    for (const r of results) {
+      if (r.status === 'accepted') accepted += 1;
+      else if (r.status === 'duplicate') duplicate += 1;
+      else if (r.status === 'conflict') conflict += 1;
+      else if (r.status === 'rejected') rejected += 1;
+    }
+    this.logger.log(
+      `offline_replay_batch deviceId=${user.deviceId ?? 'none'} merchantId=${merchantId} ` +
+        `locationId=${scope.locationId} batchSize=${batch.commands.length} ` +
+        `accepted=${accepted} duplicate=${duplicate} conflict=${conflict} ` +
+        `rejected=${rejected} stopped=${stopped} durationMs=${Date.now() - startedAt}`,
+    );
     return {
       replaySessionId: batch.replaySessionId,
       results,

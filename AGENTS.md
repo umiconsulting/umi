@@ -51,9 +51,8 @@ Umi is a multi-product monorepo. This file defines product boundaries, ownership
 
 ## Agent layer and skills
 
-- Root `.agents/skills/` is the canonical procedure layer; `.claude/skills` is a symlink (`../.agents/skills`) guarded by `adapter-sync-check`.
+- Root `.agents/skills/` is the canonical procedure layer; `.claude/skills` is a symlink (`../.agents/skills`) checked by `scripts/check-task-router.mjs`.
 - Hermes, Claude Code, and `codex-claude-pipeline` are external components; use them only after approved provisioning.
-- Load `$product-feature-review` before creating, reviewing, researching, or explaining any feature.
 - Umi no longer uses Azure Boards (Trello and Plane are also retired). Track work via the task brief, run record, and GitHub PRs (`docs/agents/issue-tracker.md`).
 
 ## Current stance and commands

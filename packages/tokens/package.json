@@ -10,6 +10,7 @@
   },
   "exports": {
     "./dashboard.css": "./dist/dashboard.css",
+    "./cash-naive.css": "./dist/cash-naive.css",
     "./landing": {
       "require": "./dist/landing.cjs",
       "import": "./dist/landing.mjs"

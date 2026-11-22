@@ -4,7 +4,10 @@ import { apiUrl, withCreds, errMessage } from './config.js';
 import {
   buildModuleAvailability,
   canShowModule,
+  getAdaptiveNavItems,
+  getSoftLockedProductGroups,
   getVisibleModules,
+  isCashOnlyMerchant,
   isProductActive,
 } from './module-registry.js';
 import { routes } from '@umi/contract/routes';
@@ -60,10 +63,24 @@ export function MerchantProvider({ children }) {
         if (!active) return;
         const nextMerchants = payload.merchants || [];
         setMerchants(nextMerchants);
+        const urlMerchantRef = new URLSearchParams(window.location.search)
+          .get('merchant')
+          ?.trim()
+          .toLowerCase();
+        const matchedFromUrl = urlMerchantRef
+          ? nextMerchants.find(
+              (m) =>
+                String(m.id || '').toLowerCase() === urlMerchantRef ||
+                String(m.handle || '').toLowerCase() === urlMerchantRef ||
+                String(m.slug || '').toLowerCase() === urlMerchantRef,
+            )
+          : null;
         const stored = window.localStorage.getItem(SELECTED_MERCHANT_KEY);
-        const nextSelected = nextMerchants.some((merchant) => merchant.id === stored)
-          ? stored
-          : nextMerchants[0]?.id || '';
+        const nextSelected = matchedFromUrl
+          ? matchedFromUrl.id
+          : nextMerchants.some((merchant) => merchant.id === stored)
+            ? stored
+            : nextMerchants[0]?.id || '';
         setSelectedMerchantIdState(nextSelected);
         if (nextSelected) window.localStorage.setItem(SELECTED_MERCHANT_KEY, nextSelected);
       })
@@ -210,8 +227,11 @@ export function MerchantProvider({ children }) {
       setSelectedLocationId,
       updateSelectedMerchant,
       isProductActive: (productKey) => isProductActive(productKey, capabilities),
+      isCashOnly: isCashOnlyMerchant(capabilities),
       canShowModule: (moduleKey) => canShowModule(moduleKey, capabilities, platformRole),
       visibleModules: getVisibleModules(capabilities, platformRole),
+      adaptiveNavItems: getAdaptiveNavItems(capabilities, platformRole),
+      softLockedGroups: getSoftLockedProductGroups(capabilities, platformRole),
       platformRole,
     }),
     [

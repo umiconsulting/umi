@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { msg } from '@lingui/core/macro';
 import { applyMerchantLocale, activateLocale } from '@/lib/i18n.js';
@@ -9,7 +9,12 @@ import { useAuth, signOut } from '@/lib/auth.jsx';
 import { MerchantProvider, useMerchant } from '@/lib/merchant-context.jsx';
 import { MODULES, getModuleAvailability, missingLocationFor } from '@/lib/module-registry.js';
 import { landingRouteFor, moduleForRoute } from '@/lib/role-landing.js';
-import { firstAllowedCashTab } from '@/lib/cash-tabs.js';
+import {
+  allowedCashTabs,
+  canShowCashTab,
+  cashTabForRoute,
+  preferredCashLandingTab,
+} from '@/lib/cash-tabs.js';
 import PermissionUnavailable from '@/components/permission-unavailable.jsx';
 import { I } from '@/icons.jsx';
 import {
@@ -22,7 +27,7 @@ import {
 } from './tweaks-panel.jsx';
 import { useMerchantData, useKdsConnection } from './data.jsx';
 import { CFG } from './lib/config.js';
-import { Sidebar, Topbar } from './shell.jsx';
+import { Sidebar, Topbar, CashMobileBottomNav } from './shell.jsx';
 
 import LoginScreen from '@/screens/login.jsx';
 import ResetPasswordScreen from '@/screens/reset-password.jsx';
@@ -31,6 +36,7 @@ import OrdersScreen from '@/screens/orders.jsx';
 import DevicesScreen from '@/screens/devices.jsx';
 import StaffScreen from '@/screens/staff.jsx';
 import LoyaltyValueScreen from '@/screens/loyalty-value.jsx';
+import SoftLockPreview from '@/screens/soft-lock-preview.jsx';
 import CustomersScreen from '@/screens/customers.jsx';
 import TriageScreen from '@/screens/conversations.jsx';
 import HoursScreen from '@/screens/hours.jsx';
@@ -63,37 +69,6 @@ const PRODUCT_LABELS = {
   cash: 'Umi Cash',
   conversaflow: 'ConversaFlow',
 };
-
-/** Refusal for a screen the café does not own the product for. */
-function ProductUnavailable({ moduleName, product }) {
-  const { t } = useLingui();
-  const name = moduleName || t`Módulo`;
-  const productName = product || t`producto`;
-  return (
-    <div
-      className="card"
-      style={{
-        padding: '38px 34px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 24,
-      }}
-    >
-      <div>
-        <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>
-          <Trans>{name} no está activo en este café</Trans>
-        </h2>
-        <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 620 }}>
-          <Trans>
-            Esta sección necesita {productName}. El super admin lo puede revisar en Productos y
-            facturación; no hay controles hasta activar el producto.
-          </Trans>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /** Refusal for a screen that needs a platform grant — an axis cafés do not carry. */
 function PlatformOnly({ moduleName }) {
@@ -238,10 +213,16 @@ function GuardedScreen({ moduleKey, children }) {
       );
     }
 
+    const softLockKey =
+      moduleKey === 'triage' || moduleKey === 'hours'
+        ? 'conversaflow'
+        : moduleKey === 'inventory' || moduleKey === 'products'
+          ? 'inventory'
+          : 'pos';
     return (
-      <ProductUnavailable
-        moduleName={label}
-        product={PRODUCT_LABELS[mod.product] || mod.product || undefined}
+      <SoftLockPreview
+        productKey={softLockKey}
+        moduleName={label || PRODUCT_LABELS[mod.product] || mod.product}
       />
     );
   }
@@ -252,14 +233,18 @@ function GuardedScreen({ moduleKey, children }) {
   return children;
 }
 
+function CashAliasRedirect() {
+  const { tab } = useParams();
+  const target = cashTabForRoute(tab) || 'home';
+  return <Navigate to={`/loyalty-value/${target}`} replace />;
+}
+
 /**
  * The first route a session opens.
  *
  * `landingRouteFor` answers the module. A Cash hub is not one screen, though:
- * it opens the first tab the membership may read. Doing that here keeps the
- * role map and the tab gate from disagreeing — a Cash-only owner lands on
- * `/loyalty-value/members`, and a viewer without gift-card permission never
- * lands on a gift-card URL the hub would then refuse.
+ * it opens the preferred tab the membership may read (on mobile <768px, a
+ * shop-floor barista/cashier lands directly on `/loyalty-value/scan`).
  */
 function landingTargetFor(capabilities, canShowModule) {
   let route = landingRouteFor({
@@ -268,7 +253,11 @@ function landingTargetFor(capabilities, canShowModule) {
     canShow: canShowModule,
   });
   if (route === '/loyalty-value') {
-    const tab = firstAllowedCashTab(capabilities);
+    const isMobile =
+      typeof window !== 'undefined' && typeof window.innerWidth === 'number'
+        ? window.innerWidth < 768
+        : false;
+    const tab = preferredCashLandingTab(capabilities, { isMobile });
     if (tab) route = `/loyalty-value/${tab}`;
   }
   return route;
@@ -288,19 +277,29 @@ function DashboardLayout() {
   const merchantName = merchantState?.selectedMerchant?.name || merchant?.name;
   const connection = useKdsConnection();
 
-  const rawScreen = location.pathname.split('/').filter(Boolean)[0] || 'overview';
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const rawScreen = pathParts[0] || 'overview';
   const screen =
     rawScreen === 'conversations' || rawScreen === 'insights' ? 'customers' : rawScreen;
-  // The full path (e.g. "reportes/recibos") drives nested-nav sub-item highlighting.
+  // The full path (e.g. "reportes/recibos" or "loyalty-value/scan") drives nested-nav sub-item highlighting.
   const activeFull = location.pathname.replace(/^\/+/, '').split('?')[0] || 'overview';
+  const capabilities = merchantState?.capabilities;
+  const isCashOnly = merchantState?.isCashOnly === true;
+  const isCashSurface = isCashOnly || screen === 'loyalty-value' || screen === 'preview';
+  const brandColor =
+    merchant?.primaryColor ||
+    merchantState?.capabilities?.merchant?.primaryColor ||
+    merchantState?.selectedMerchant?.primaryColor ||
+    '#B5605A';
+  const stripColor = merchant?.secondaryColor || '#EFE3CE';
+  const activeCashTab = screen === 'loyalty-value' ? cashTabForRoute(pathParts[1]) || 'home' : null;
+  const cashTabsForMobile = isCashSurface ? allowedCashTabs(capabilities) : [];
 
   useEffect(() => {
     if (merchant?.primaryColor)
       document.documentElement.style.setProperty('--merchant-brand', merchant.primaryColor);
   }, [merchant?.primaryColor]);
 
-  // The café record carries a locale ("es-MX"). It only speaks when the owner has
-  // not picked a language in this browser; a saved choice always wins.
   const merchantLocale = merchantState?.selectedMerchant?.locale || merchant?.locale;
   useEffect(() => {
     if (merchantLocale) applyMerchantLocale(merchantLocale);
@@ -313,27 +312,7 @@ function DashboardLayout() {
     );
   }, [tweaks.density]);
 
-  // -------------------------------------------------------------------------
-  // ROLE LANDING — plan §8C: "Every role opens the screen that role needs, not
-  // the owner screen with fewer buttons". `role-landing.js` decides which screen.
-  //
-  // WHERE A SESSION BEGINS, both ways in: the login screen navigates to `/`, and
-  // a cold load of an already-signed-in shell starts here. Both land through
-  // this effect, so there is one implementation and no second copy in login.jsx.
-  //
-  // LAND ONCE. The ref flips on the first render that has a resolved merchant,
-  // whether or not it navigated, and it is never cleared. An operator who then
-  // clicks `Resumen` lands on `/` and STAYS there: the shell does not fight the
-  // person it is showing. For the same reason an explicit destination is left
-  // alone — a deep link or a bookmark (`/orders`, `/settings`) is a request, and
-  // only the root path is treated as "no destination chosen yet".
-  //
-  // The resolver asks THIS context (`canShowModule`, the registry gate that
-  // already reads permissions, product entitlement and the platform grant), so a
-  // landing can never name a screen `GuardedScreen` would refuse.
-  // -------------------------------------------------------------------------
   const landedRef = useRef(false);
-  const capabilities = merchantState?.capabilities;
   useEffect(() => {
     if (landedRef.current || !capabilities) return;
     landedRef.current = true;
@@ -349,16 +328,6 @@ function DashboardLayout() {
     navigate(id === 'overview' ? '/?home=1' : '/' + id);
   };
 
-  // The first render after capabilities resolve still holds the index route.
-  // For a Cash-only café that route is Overview, which its entitlement cannot
-  // open: without this gate the person sees "Resumen no está activo" for one
-  // frame before the landing effect moves them. Land in the effect, but show a
-  // neutral sentence until it does.
-  //
-  // A bare `/` is the only address that means "no destination chosen". The
-  // sidebar's own home command adds `?home=1`, so a person who chose Overview is
-  // never moved again. No latch is read during render: the ref belongs to the
-  // effect, and the URL is the rest of the answer.
   const pendingLanding =
     capabilities && location.pathname === '/' && !new URLSearchParams(location.search).has('home')
       ? landingTargetFor(capabilities, (moduleKey) => merchantState.canShowModule(moduleKey))
@@ -399,7 +368,17 @@ function DashboardLayout() {
   }
 
   return (
-    <div className={'app' + (collapsed ? ' collapsed' : '') + (navOpen ? ' nav-open' : '')}>
+    <div
+      className={'app' + (collapsed ? ' collapsed' : '') + (navOpen ? ' nav-open' : '')}
+      data-surface={isCashSurface ? 'cash-naive' : undefined}
+      data-cash-only={isCashOnly ? 'true' : undefined}
+      style={{
+        '--t-brand': brandColor,
+        '--t-brand-dark': `color-mix(in srgb, ${brandColor} 74%, #000)`,
+        '--t-tint': `color-mix(in srgb, ${brandColor} 11%, #FFFDF9)`,
+        '--t-strip': stripColor,
+      }}
+    >
       <a className="skip-link" href="#main-content">
         <Trans>Saltar al contenido</Trans>
       </a>
@@ -420,7 +399,10 @@ function DashboardLayout() {
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed((c) => !c)}
         merchantName={merchantName}
-        navItems={merchantState?.visibleModules}
+        merchantColor={brandColor}
+        isCashOnly={isCashOnly}
+        navItems={merchantState?.adaptiveNavItems || merchantState?.visibleModules}
+        softLockedItems={merchantState?.softLockedGroups}
         merchants={merchantState?.merchants}
         selectedMerchantId={merchantState?.selectedMerchantId}
         onMerchantChange={merchantState?.setSelectedMerchantId}
@@ -429,8 +411,15 @@ function DashboardLayout() {
         <Topbar
           merchant={merchantName}
           onMenu={() => setNavOpen(true)}
-          screen={screen}
+          screen={activeFull in MODULES || activeFull.startsWith('preview/') ? activeFull : screen}
           merchantName={merchantName}
+          merchantColor={brandColor}
+          isCashOnly={isCashOnly}
+          onQuickScan={
+            isCashSurface && activeCashTab !== 'scan' && canShowCashTab('scan', capabilities)
+              ? () => nav('loyalty-value/scan')
+              : null
+          }
           locations={merchantState?.capabilities?.locations || []}
           canSwitchLocations={merchantState?.capabilities?.canSwitchLocations === true}
           selectedLocationId={
@@ -602,6 +591,9 @@ function DashboardLayout() {
                 </GuardedScreen>
               }
             />
+            <Route path="cash" element={<Navigate to="/loyalty-value/home" replace />} />
+            <Route path="cash/:tab" element={<CashAliasRedirect />} />
+            <Route path="preview/:productKey" element={<SoftLockPreview />} />
             {/* Old single-domain routes fold into the Lealtad y valor hub. Keep the
                 paths as redirects so no bookmark 404s; the tab gate then decides
                 whether that tab is readable for this membership. */}
@@ -657,6 +649,13 @@ function DashboardLayout() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
+        {isCashSurface && cashTabsForMobile.length > 0 ? (
+          <CashMobileBottomNav
+            tabs={cashTabsForMobile}
+            activeTab={activeCashTab}
+            onSelectTab={(tabId) => nav(`loyalty-value/${tabId}`)}
+          />
+        ) : null}
       </main>
 
       {/* Developer-only panel: its labels are not owner copy, so they stay in English. */}

@@ -443,6 +443,88 @@ const I = {
       <path d="M10 12h4" />
     </Icon>
   ),
+  QrScan: (p) => (
+    <Icon {...p}>
+      <path d="M4 8V6a2 2 0 0 1 2-2h2" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v2" />
+      <path d="M20 16v2a2 2 0 0 1-2 2h-2" />
+      <path d="M8 20H6a2 2 0 0 1-2-2v-2" />
+      <rect x="8.5" y="8.5" width="7" height="7" rx="1.5" />
+    </Icon>
+  ),
+};
+
+// Hand-drawn Umi Naive fish mark (hollow coral stroke + solid dorsal/ventral fins + navy dot eye)
+const UmiFish = ({
+  width = 28,
+  stroke = '#E66025',
+  eye = '#132642',
+  className = '',
+  style = {},
+}) => {
+  const height = Math.round((width * 68) / 100);
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={width}
+      height={height}
+      viewBox="0 0 116 78"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+      style={{ display: 'block', flexShrink: 0, ...style }}
+    >
+      <path d="M50 18 C47 8, 55 3, 66 7 C74 10, 79 16, 83 21 Z" fill={stroke} />
+      <path d="M53 59 C50 68, 57 74, 67 70 C73 67, 77 62, 80 57 Z" fill={stroke} />
+      <path
+        d="M36 39 C28 27, 17 17, 10 20 C5 23, 8 33, 18 39 C8 46, 5 56, 10 59 C17 62, 28 51, 36 39 C45 24, 63 16, 80 19 C94 21, 105 30, 109 39 C105 49, 94 58, 79 60 C62 62, 45 54, 36 39 Z"
+        stroke={stroke}
+        strokeWidth="8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <circle cx="91.5" cy="37.5" r="5" fill={eye} />
+    </svg>
+  );
+};
+
+// Hand-cut lowercase "umi" naive wordmark
+const UmiWordmark = ({ height = 19, color = '#132642', className = '', style = {} }) => {
+  const width = Math.round((height * 136) / 62);
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={width}
+      height={height}
+      viewBox="0 0 136 62"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+      style={{ display: 'block', flexShrink: 0, ...style }}
+    >
+      <path
+        d="M11 21 C10 34, 10 47, 17 53 C23 58, 34 57, 39 50 C40 53, 42 56, 46 56 C50 56, 52 52, 52 46 C52 38, 52 28, 51 21 C50 16, 42 16, 41 21 C40 28, 41 37, 37 42 C33 46, 26 46, 24 41 C22 36, 23 27, 22 21 C21 16, 12 16, 11 21 Z"
+        fill={color}
+      />
+      <path
+        d="M59 23 C58 32, 58 45, 59 52 C60 57, 68 57, 69 52 C70 46, 69 36, 72 32 C74 29, 78 30, 79 34 C80 39, 79 45, 81 49 C82 53, 89 53, 90 48 C91 42, 91 34, 94 31 C97 28, 101 30, 101 36 C102 42, 101 49, 103 53 C105 57, 113 56, 113 50 C113 41, 114 29, 109 22 C104 16, 95 17, 89 23 C85 18, 76 17, 70 22 C69 17, 60 17, 59 23 Z"
+        fill={color}
+      />
+      <path
+        d="M120 24 C119 33, 119 45, 120 52 C121 57, 130 57, 131 51 C132 43, 131 31, 130 24 C129 19, 121 19, 120 24 Z"
+        fill={color}
+      />
+      <ellipse
+        cx="125.5"
+        cy="10.5"
+        rx="6.8"
+        ry="6.2"
+        transform="rotate(-8 125.5 10.5)"
+        fill={color}
+      />
+    </svg>
+  );
 };
 
 // Umi "X" mark — derived from the brand glyph (two crossing diagonals forming "X")
@@ -468,4 +550,4 @@ const UmiX = ({
   </svg>
 );
 
-export { I, UmiX };
+export { I, UmiX, UmiFish, UmiWordmark };

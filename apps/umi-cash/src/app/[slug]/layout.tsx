@@ -17,15 +17,22 @@ export default async function TenantLayout({
   const primary = safeHex(tenant.primaryColor);
   const secondary = tenant.secondaryColor ? safeHex(tenant.secondaryColor) : primary;
 
+  const heroShadow = primary.toLowerCase() === '#132642' ? '#E66025' : '#132642';
+
   const cssVars = `
     :root {
       --color-brand:        ${primary};
       --color-brand-dark:   ${darken(primary)};
-      --color-ink:          ${veryDark(primary)};
-      --color-ink-light:    ${muted(primary)};
+      --color-ink:          #132642;
+      --color-ink-light:    #586A84;
       --color-accent:       ${secondary};
-      --color-surface:      ${lightSurface(primary)};
+      --color-surface:      #F8F3E9;
       --color-surface-dark: ${darkSurface(primary)};
+      --t-brand:            ${primary};
+      --t-brand-dark:       ${darken(primary)};
+      --t-strip:            ${secondary};
+      --t-tint:             ${darkSurface(primary)};
+      --t-hero-shadow:      ${heroShadow};
     }
   `;
 

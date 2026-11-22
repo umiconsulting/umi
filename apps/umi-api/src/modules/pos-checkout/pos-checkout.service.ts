@@ -1197,31 +1197,50 @@ export class PosCheckoutService {
   /**
    * A trusted sale may differ in PRICE, never in WHAT was sold.
    *
-   * The server cart and the till snapshot are compared line by line on product,
-   * variant, modifiers, quantity, course and note. Local line ids are ignored
-   * because an offline cart receives official ids during replay.
+   * The server cart and the till snapshot are compared as multisets keyed by
+   * product, variant, modifiers, course and note, summing quantities. Local
+   * line ids, row order and identical-line merges (e.g. two offline taps of
+   * qty=1 replayed into one server row of qty=2) are ignored because an
+   * offline cart receives official ids and merges lines during replay.
    */
   private trustedLinesMatch(cart: CheckoutCart, lines: CartItem[]): boolean {
-    if (cart.lines.length !== lines.length) return false;
-    return cart.lines.every((cartLine, index) => {
-      const line = lines[index];
-      const cartModifiers = cartLine.modifiers
+    const serverTotals = new Map<string, number>();
+    for (const cartLine of cart.lines) {
+      const modifiers = cartLine.modifiers
         .map((modifier) => `${modifier.modifierId}:${modifier.quantity}`)
         .sort()
         .join(',');
-      const lineModifiers = line.modifiers
+      const key = JSON.stringify([
+        cartLine.productId,
+        cartLine.variantId ?? null,
+        cartLine.courseNumber,
+        cartLine.note ?? null,
+        modifiers,
+      ]);
+      serverTotals.set(key, (serverTotals.get(key) ?? 0) + cartLine.quantity);
+    }
+
+    const snapshotTotals = new Map<string, number>();
+    for (const line of lines) {
+      const modifiers = line.modifiers
         .map((modifier) => `${modifier.modifierId}:${modifier.quantity}`)
         .sort()
         .join(',');
-      return (
-        cartLine.productId === line.productId &&
-        cartLine.variantId === (line.variant?.variantId ?? null) &&
-        cartLine.quantity === line.quantity &&
-        cartLine.courseNumber === line.courseNumber &&
-        (cartLine.note ?? null) === (line.note ?? null) &&
-        cartModifiers === lineModifiers
-      );
-    });
+      const key = JSON.stringify([
+        line.productId,
+        line.variant?.variantId ?? null,
+        line.courseNumber,
+        line.note ?? null,
+        modifiers,
+      ]);
+      snapshotTotals.set(key, (snapshotTotals.get(key) ?? 0) + line.quantity);
+    }
+
+    if (serverTotals.size !== snapshotTotals.size) return false;
+    for (const [key, qty] of serverTotals) {
+      if (snapshotTotals.get(key) !== qty) return false;
+    }
+    return true;
   }
 
   private async withInventoryErrors<T>(promise: Promise<T>): Promise<T> {

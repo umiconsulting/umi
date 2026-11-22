@@ -258,12 +258,14 @@ final class AppCompositionRoot {
     final offlineJournal = EncryptedOfflineJournal(
       PlatformJournalCipherStore(preferences, secureStorage),
       sqliteStore: kIsWeb ? null : SqliteJournalStore.openDefault(),
+      telemetry: telemetry,
     );
     final policyCache = OfflinePolicyCache(offlineJournal);
     final offlineCheckout = OfflineCheckoutService(
       journal: offlineJournal,
       policyCache: policyCache,
       eligibility: const OfflineCheckoutEligibilityEngine(),
+      telemetry: telemetry,
     );
     final hubGateway = !config.lanNodeEnabled && config.lanHubUri != null
         ? ApiHubCommandGateway(apiClient)
@@ -279,6 +281,7 @@ final class AppCompositionRoot {
       journal: offlineJournal,
       gateway: replayGateway,
       connectivity: connectivity,
+      telemetry: telemetry,
     );
     final hubCommandForwarder = hubGateway == null
         ? null

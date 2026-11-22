@@ -4,6 +4,7 @@
    ============================================================ */
 
 @import '@umi/tokens/dashboard.css';
+@import '@umi/tokens/cash-naive.css';
 
 /* Native UI (scrollbars, form controls, spellcheck) follows the active theme.
    The selectors mirror the token theme blocks in @umi/tokens/dashboard.css so an
