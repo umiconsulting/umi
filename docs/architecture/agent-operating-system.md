@@ -61,7 +61,7 @@ These adapters should stay aligned with `AGENTS.md`, not diverge from it.
 single source of truth for skills, the registry, the routing ledger, and skill seeds. Each tool
 reads its own path, so `.claude/skills/` is a **symlink** into it
 (`.claude/skills -> ../.agents/skills`) — one source of truth, nothing to regenerate. Write to
-`.agents/skills/`; the link reflects it instantly. `adapter-sync-check` guards the link (symlinks
+`.agents/skills/`; the link reflects it instantly. `scripts/check-task-router.mjs` guards the link (symlinks
 assume macOS/Linux; Windows needs `git config core.symlinks true`).
 
 Expected non-linked paths: `.claude/settings.local.json` (machine-local) and `.agents/agents/`
@@ -103,8 +103,11 @@ For meaningful technical decisions:
 ### Root procedures
 
 - [task-router](../../.claude/skills/task-router/SKILL.md)
-- [workspace-boundary-check](../../.claude/skills/workspace-boundary-check/SKILL.md)
-- [scientific-research-check](../../.claude/skills/scientific-research-check/SKILL.md)
+- [research](../../.claude/skills/research/SKILL.md)
+- [pr-gates](../../.claude/skills/pr-gates/SKILL.md)
+- [production-support](../../.claude/skills/production-support/SKILL.md)
+- [ingest-ticket](../../.claude/skills/ingest-ticket/SKILL.md)
+- [onboard-cash-merchant](../../.claude/skills/onboard-cash-merchant/SKILL.md)
 
 ### Workspace maps
 
@@ -138,5 +141,5 @@ When a workspace-wide rule changes:
 3. Update maps, governance docs, or repo contexts if retrieval changed
 4. Update `CLAUDE.md` only as an adapter or shortcut
 5. Update `.agents/skills/` (canonical) only if a procedure changed — `.claude/skills/` is a
-   symlink into it, so the change is reflected instantly; no regeneration step (run
-   `adapter-sync-check` only if the link was replaced by a copy)
+   symlink into it, so the change is reflected instantly; no regeneration step (verify with
+   `node scripts/check-task-router.mjs`)

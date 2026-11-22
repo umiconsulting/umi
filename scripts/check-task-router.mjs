@@ -10,10 +10,13 @@
 import {
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readlinkSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -166,6 +169,31 @@ export function checkRepo(root) {
 
   const linkCount = checkLinks(root, errors);
 
+  // Verify `.claude/skills` stays a symlink to `../.agents/skills` (one source of truth).
+  const claudeSkills = path.join(root, '.claude/skills');
+  if (existsSync(claudeSkills)) {
+    const stat = lstatSync(claudeSkills);
+    if (!stat.isSymbolicLink()) {
+      errors.push('.claude/skills must be a symlink to ../.agents/skills (found non-symlink)');
+    } else if (readlinkSync(claudeSkills) !== '../.agents/skills') {
+      errors.push(
+        `.claude/skills symlink points to "${readlinkSync(claudeSkills)}", expected "../.agents/skills"`,
+      );
+    }
+  }
+
+  // Verify every skill listed under `## Skills` in registry.md exists on disk.
+  const skillsBlock = live.registry.split('## Selection rules')[0] || '';
+  const registeredSkills = [...skillsBlock.matchAll(/^- `([a-z0-9-]+)`$/gm)].map((m) => m[1]);
+  for (const name of registeredSkills) {
+    const skillPath = path.join(root, '.agents/skills', name, 'SKILL.md');
+    if (!existsSync(skillPath)) {
+      errors.push(
+        `${FILES.registry}: registered skill "${name}" missing .agents/skills/${name}/SKILL.md`,
+      );
+    }
+  }
+
   const ruleLines = live.registry
     .split('\n')
     .map((line) => line.toLowerCase())
@@ -194,6 +222,22 @@ function copyRepo(src, dst) {
     const target = path.join(dst, file);
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, readFileSync(path.join(src, file)));
+  }
+  const claudeSrc = path.join(src, '.claude/skills');
+  if (existsSync(claudeSrc) && lstatSync(claudeSrc).isSymbolicLink()) {
+    const claudeDst = path.join(dst, '.claude/skills');
+    mkdirSync(path.dirname(claudeDst), { recursive: true });
+    symlinkSync(readlinkSync(claudeSrc), claudeDst);
+  }
+  const skillsDir = path.join(src, '.agents/skills');
+  const regText = liveRegistry(readFileSync(path.join(src, FILES.registry), 'utf8'));
+  const skillsBlock = regText.split('## Selection rules')[0] || '';
+  for (const [, name] of skillsBlock.matchAll(/^- `([a-z0-9-]+)`$/gm)) {
+    const skillFile = path.join(skillsDir, name, 'SKILL.md');
+    if (!existsSync(skillFile)) continue;
+    const dstSkill = path.join(dst, '.agents/skills', name, 'SKILL.md');
+    mkdirSync(path.dirname(dstSkill), { recursive: true });
+    copyFileSync(skillFile, dstSkill);
   }
   const osFile = path.join(src, FILES.agentOs);
   const osDir = path.dirname(osFile);
@@ -274,8 +318,8 @@ export function selfTest() {
         dir,
         file,
         text.replace(
-          'Umi no longer uses Azure Boards.',
-          'Work items and specs live in **Azure Boards**.',
+          'Umi no longer uses Azure Boards',
+          'Work items and specs live in **Azure Boards**',
         ),
       );
     },

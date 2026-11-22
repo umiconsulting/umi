@@ -1,4 +1,0 @@
-interface:
-  display_name: "Repository Cartographer"
-  short_description: "Build a factual architectural metadata graph of a codebase"
-  default_prompt: "Use $repository-cartographer to map this repository's real architecture — modules, domain/DDD roles, data ownership, dependency cycles, transaction boundaries, and the bounded-context map — deterministically, then report the findings."
