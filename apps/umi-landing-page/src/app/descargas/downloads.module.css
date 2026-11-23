@@ -22,6 +22,17 @@
   margin: 0 auto 24px;
   color: var(--blue);
 }
+.channelBadge {
+  display: inline-block;
+  margin-bottom: 14px;
+  padding: 4px 12px;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 600;
+}
 .card h1 {
   font-size: clamp(24px, 2.8vw, 34px);
   letter-spacing: -0.04em;
