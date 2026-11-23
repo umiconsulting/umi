@@ -1,11 +1,56 @@
 import type initialRelease from '@/data/umipos-release.json';
-export type Release = typeof initialRelease;
+import stagingRelease from '@/data/umipos-staging-release.json';
+
+export type DownloadChannel = 'production' | 'staging';
+export type Release = Omit<typeof initialRelease, 'channel'> & {
+  channel: DownloadChannel;
+};
+
+export function getDownloadChannel(
+  value: string | undefined = process.env.NEXT_PUBLIC_UMIPOS_CHANNEL,
+): DownloadChannel {
+  return value === 'staging' ? 'staging' : 'production';
+}
+
+export function getReleaseManifestUrl(channel: DownloadChannel): string {
+  return channel === 'staging'
+    ? 'https://staging.umi-pos-downloads.pages.dev/latest.json'
+    : 'https://umi-pos-downloads.pages.dev/latest.json';
+}
+
+export function getFallbackRelease(channel: DownloadChannel): {
+  versionCode: number;
+  artifactFile: string;
+  url: string;
+} {
+  if (channel === 'staging') {
+    return {
+      versionCode: stagingRelease.versionCode,
+      artifactFile: stagingRelease.artifactFile,
+      url: `${stagingRelease.downloadOrigin}/${stagingRelease.objectPrefix}/${stagingRelease.artifactFile}`,
+    };
+  }
+  return {
+    versionCode: 337,
+    artifactFile: 'UmiPOS-1.0.0-production-release-build337.apk',
+    url: 'https://dea44d87.umi-pos-downloads.pages.dev/umipos/android/337/UmiPOS-1.0.0-production-release-build337.apk',
+  };
+}
 
 // Treat the remotely hosted pointer as data. Do not accept arbitrary download URLs.
-export function isDownloadRelease(value: unknown): value is Release {
+export function isDownloadRelease(
+  value: unknown,
+  expectedChannel: DownloadChannel = 'production',
+): value is Release {
   if (!value || typeof value !== 'object') return false;
   const r = value as Record<string, unknown>;
-  if (r.schemaVersion !== 1 || r.product !== 'UmiPOS' || r.channel !== 'production') return false;
+  const expectedApiOrigin =
+    expectedChannel === 'staging'
+      ? 'https://api-staging.umiconsulting.co'
+      : 'https://api.umiconsulting.co';
+  if (r.schemaVersion !== 1 || r.product !== 'UmiPOS' || r.channel !== expectedChannel)
+    return false;
+  if (r.apiOrigin !== expectedApiOrigin) return false;
   if (
     r.packageName !== 'co.umiconsulting.umi_pos.estacion' ||
     r.architecture !== 'arm64-v8a' ||
@@ -42,7 +87,8 @@ export function isDownloadRelease(value: unknown): value is Release {
     return false;
   if (
     r.objectPrefix !== `umipos/android/${r.versionCode}` ||
-    r.artifactFile !== `UmiPOS-${r.versionName}-production-release-build${r.versionCode}.apk`
+    r.artifactFile !==
+      `UmiPOS-${r.versionName}-${expectedChannel}-release-build${r.versionCode}.apk`
   )
     return false;
   return (

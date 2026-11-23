@@ -2,8 +2,18 @@
 import { useEffect, useState } from 'react';
 import { ArrowDownToLine, Smartphone, ArrowUpRight } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
-import { isDownloadRelease, type Release } from '@/lib/umipos-release';
+import {
+  getDownloadChannel,
+  getFallbackRelease,
+  getReleaseManifestUrl,
+  isDownloadRelease,
+  type Release,
+} from '@/lib/umipos-release';
 import styles from './downloads.module.css';
+
+const CHANNEL = getDownloadChannel();
+const MANIFEST_URL = getReleaseManifestUrl(CHANNEL);
+const FALLBACK = getFallbackRelease(CHANNEL);
 
 export default function DownloadContent() {
   const [release, setRelease] = useState<Release | null>(null);
@@ -13,14 +23,14 @@ export default function DownloadContent() {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 15000);
     setFailed(false);
-    fetch('https://umi-pos-downloads.pages.dev/latest.json', {
+    fetch(MANIFEST_URL, {
       cache: 'no-store',
       signal: controller.signal,
     })
       .then(async (response) => {
         if (!response.ok) throw new Error('Release unavailable');
         const value: unknown = await response.json();
-        if (!isDownloadRelease(value)) throw new Error('Invalid release');
+        if (!isDownloadRelease(value, CHANNEL)) throw new Error('Invalid release');
         setRelease(value);
       })
       .catch(() => {
@@ -47,6 +57,7 @@ export default function DownloadContent() {
         timeZone: 'UTC',
       }).format(new Date(`${release.releaseDate}T12:00:00Z`))
     : '';
+  const isStaging = CHANNEL === 'staging';
   return (
     <>
       <Navbar />
@@ -54,17 +65,18 @@ export default function DownloadContent() {
         <div className={`site-width ${styles.layout}`}>
           <section className={styles.card} aria-labelledby="download-title">
             <Smartphone className={styles.icon} size={38} aria-hidden="true" />
-            <h1 id="download-title">UmiPOS para Android</h1>
+            {isStaging && (
+              <p className={styles.channelBadge}>Staging · api-staging.umiconsulting.co</p>
+            )}
+            <h1 id="download-title">
+              {isStaging ? 'UmiPOS para Android (Staging)' : 'UmiPOS para Android'}
+            </h1>
             <h2 className={styles.requirements}>Android 7.0+ · ARM64</h2>
             <noscript>
               <style>{'#download-state { display: none; }'}</style>
-              <h3 className={styles.version}>Versión de respaldo · Build 337</h3>
-              <a
-                className={styles.download}
-                href="https://dea44d87.umi-pos-downloads.pages.dev/umipos/android/337/UmiPOS-1.0.0-production-release-build337.apk"
-                download="UmiPOS-1.0.0-production-release-build337.apk"
-              >
-                Descargar APK
+              <h3 className={styles.version}>Versión de respaldo · Build {FALLBACK.versionCode}</h3>
+              <a className={styles.download} href={FALLBACK.url} download={FALLBACK.artifactFile}>
+                {isStaging ? 'Descargar APK (Staging)' : 'Descargar APK'}
               </a>
             </noscript>
             <div id="download-state" aria-live="polite" aria-busy={!release && !failed}>
@@ -72,6 +84,7 @@ export default function DownloadContent() {
                 <>
                   <h3 className={styles.version}>
                     v{release.versionName} · Build {release.versionCode}
+                    {isStaging ? ' · Staging' : ''}
                   </h3>
                   <h3 className={styles.facts}>
                     {size} MB · {date}
@@ -81,7 +94,8 @@ export default function DownloadContent() {
                     href={fileUrl(release.artifactFile)}
                     download={release.artifactFile}
                   >
-                    Descargar APK <ArrowDownToLine size={23} aria-hidden="true" />
+                    {isStaging ? 'Descargar APK (Staging)' : 'Descargar APK'}{' '}
+                    <ArrowDownToLine size={23} aria-hidden="true" />
                   </a>
                 </>
               ) : failed ? (
