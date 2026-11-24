@@ -1021,3 +1021,7 @@ textarea:focus-visible {
 .modal-body h2 {
   overflow-wrap: anywhere;
 }
+
+.product-card:hover {
+  border-color: var(--line);
+}
