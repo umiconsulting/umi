@@ -2,6 +2,8 @@
 
 ## 2026-11-24 — Jerarquía y lectura del menú
 
+- Retirada de los textos auxiliares del reverso; se conserva únicamente la acción +.
+
 - Reverso azul suave con miniatura e icono, nombre y precio destacados, resumen y única acción +.
 - Alto y ancho iguales al frente. El contenido largo se resume y permanece completo en el modal.
 - Lectura del detalle completo también para productos no disponibles; la acción de agregado sigue restringida.

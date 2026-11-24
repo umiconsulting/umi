@@ -844,10 +844,6 @@ textarea:focus-visible {
   font-size: 14px;
   line-height: 1.4;
 }
-.card-detail-intro {
-  color: var(--muted);
-  font-size: 14px;
-}
 .card-option-summary {
   margin: 12px 0 0;
 }
@@ -874,15 +870,10 @@ textarea:focus-visible {
   margin-top: 2px;
 }
 .product-card-back .product-card-footer {
-  justify-content: space-between;
+  justify-content: flex-end;
   border-top: 1px solid var(--line);
   background: var(--blue-soft);
   border-radius: 0 0 8px 8px;
-}
-.card-add-hint {
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.4;
 }
 .product-card-back .product-add {
   color: white;
@@ -993,8 +984,7 @@ textarea:focus-visible {
   flex: 1;
   overflow: hidden;
 }
-.card-description-preview,
-.card-detail-intro {
+.card-description-preview {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -1011,8 +1001,7 @@ textarea:focus-visible {
   .card-detail-label {
     display: none;
   }
-  .card-description-preview,
-  .card-detail-intro {
+  .card-description-preview {
     -webkit-line-clamp: 2;
   }
   .card-detail-section {
