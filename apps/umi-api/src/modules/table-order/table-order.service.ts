@@ -123,9 +123,7 @@ export class TableOrderService {
    * plus each product's modifier groups so the page can build the choices the write
    * path will validate.
    *
-   * A product sold in variants is included but flagged (`hasVariants`), because the
-   * honest answer for "the large latte" is "order it with your waiter" rather than a
-   * base price with the variant silently missing.
+   * Active variants carry availability and price deltas. Order intake requires a choice.
    */
   async menu(credential: ResolvedTableOrderCredential): Promise<TableOrderMenu> {
     const context = await this.repo.context(credential.merchantId, credential.locationId);
@@ -168,9 +166,9 @@ export class TableOrderService {
     // One set-based read for the whole menu, alongside the other two (§8.5): the list is
     // DERIVED from each product's recipe (D8), so it must be read when the menu is read
     // and never stored on a row.
-    const [groups, variantProducts, allergens] = await Promise.all([
+    const [groups, variants, allergens] = await Promise.all([
       this.optionGroups(merchantId, productIds),
-      this.variantProducts(merchantId, productIds),
+      this.catalog.variantsByProduct(merchantId, locationId, productIds, currency),
       this.repo.allergensByProduct(merchantId, productIds),
     ]);
 
@@ -183,7 +181,8 @@ export class TableOrderService {
       price: item.price,
       allergens: allergens.get(item.id) ?? [],
       availability: item.availability,
-      hasVariants: variantProducts.has(item.id),
+      hasVariants: Boolean(variants.get(item.id)?.length),
+      variants: variants.get(item.id) ?? [],
       optionGroups: (groups.get(item.id) ?? []).map((group) => ({
         ...group,
         modifiers: group.modifiers.map((modifier) => ({
@@ -265,6 +264,7 @@ export class TableOrderService {
     const lines: Array<{
       productId: string;
       name: string;
+      variantName: string | null;
       quantity: number;
       unitPriceCents: number;
       note: string | null;
@@ -275,10 +275,30 @@ export class TableOrderService {
         priceDeltaCents: number;
       }>;
     }> = [];
+    const variants = await this.catalog.variantsByProduct(
+      merchantId,
+      locationId,
+      dto.lines.map((line) => line.productId),
+      orderContext.currency,
+      client,
+    );
     for (const line of dto.lines) {
+      const choices = variants.get(line.productId) ?? [];
+      const selected = choices.find((variant) => variant.id === line.variantId);
+      if (
+        (choices.length && !selected) ||
+        (line.variantId && (!selected || selected.availability !== 'enabled'))
+      ) {
+        return {
+          ok: false,
+          code: 'VARIANT_NOT_AVAILABLE',
+          failureClass: 'validation',
+          retryable: true,
+        };
+      }
       const priced = await this.cart.price(client, merchantId, locationId, {
         productId: line.productId,
-        variantId: null,
+        variantId: line.variantId ?? null,
         modifierSelections: line.modifiers,
       });
       if (!priced) return this.lineRefusal(merchantId, locationId, line.productId);
@@ -289,9 +309,8 @@ export class TableOrderService {
       lines.push({
         productId: priced.productId,
         name: priced.productName,
+        variantName: priced.variantName,
         quantity: line.quantity,
-        // Variant delta is always zero here (no variant is accepted), and it is added
-        // rather than assumed away so that this arithmetic stays the till's.
         unitPriceCents: priced.basePrice + priced.variantDelta + modifierTotal,
         note: line.note,
         modifiers: priced.modifiers.map((modifier) => ({
@@ -301,20 +320,6 @@ export class TableOrderService {
           priceDeltaCents: modifier.priceDelta,
         })),
       });
-    }
-
-    // ── 3. A product sold in variants cannot be ordered from here (see the contract).
-    const variantIds = await this.variantProducts(
-      merchantId,
-      lines.map((line) => line.productId),
-    );
-    if (lines.some((line) => variantIds.has(line.productId))) {
-      return {
-        ok: false,
-        code: 'VARIANT_NOT_AVAILABLE',
-        failureClass: 'validation',
-        retryable: true,
-      };
     }
 
     // ── 4. THE order, through THE writer. Idempotent on `externalRef` as well as on
@@ -336,6 +341,7 @@ export class TableOrderService {
       lines: lines.map((line) => ({
         productId: line.productId,
         name: line.name,
+        variantName: line.variantName,
         quantity: line.quantity,
         unitPriceCents: line.unitPriceCents,
         notes: line.note,
@@ -479,18 +485,6 @@ export class TableOrderService {
       }
     }
     return result;
-  }
-
-  /** The products among `productIds` that are sold in active variants. */
-  private async variantProducts(merchantId: string, productIds: string[]): Promise<Set<string>> {
-    if (productIds.length === 0) return new Set();
-    const { rows } = await this.pg.tquery<{ productId: string }>(
-      merchantId,
-      `SELECT DISTINCT product_id::text AS "productId" FROM merchant.product_variant
-        WHERE product_id = ANY($1::uuid[]) AND active`,
-      [productIds],
-    );
-    return new Set(rows.map((row) => row.productId));
   }
 
   // ── The owner's door: issue, revoke, list ───────────────────────────────────

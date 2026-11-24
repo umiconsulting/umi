@@ -191,7 +191,7 @@ function normalized(value) {
     .toLowerCase();
 }
 function availabilityLabel(item) {
-  if (item.hasVariants) return 'Opciones disponibles con el personal';
+  if (item.hasVariants && item.availability === 'enabled') return 'Elige una presentación';
   return (
     {
       enabled: '',
@@ -210,7 +210,7 @@ function clearMenuSearch() {
   $('#search').focus();
 }
 function canAddProduct(item) {
-  return canOrder() && !pending && !sending && item.availability === 'enabled' && !item.hasVariants;
+  return canOrder() && !pending && !sending && item.availability === 'enabled';
 }
 function productAddButton(item) {
   return `<button class="product-add icon-btn" type="button" data-add-product="${item.productId}" aria-label="Agregar ${escapeHTML(item.name)} al carrito" ${canAddProduct(item) ? '' : 'disabled'}>${icon('plus')}</button>`;
@@ -227,7 +227,7 @@ function productCard(item, index) {
   const allergy = item.allergens.length
     ? `Alérgenos registrados: ${item.allergens.map((a) => escapeHTML(a.label ?? a.name ?? a.code)).join(', ')}. Consulta al personal.`
     : 'Consulta al personal si tienes una alergia.';
-  return `<article class="menu-product product-card" data-product="${item.productId}" aria-label="${name}"><div class="product-card-inner"><div class="product-card-front"><button class="product-card-open" type="button" data-flip-product aria-expanded="false" aria-controls="details-${item.productId}" aria-label="Ver detalles de ${name}">${productPhoto(item, false, index < 2)}<span class="menu-product-name">${name}</span>${availability ? `<span class="small muted card-availability">${escapeHTML(availability)}</span>` : ''}</button><div class="product-card-footer"><span class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</span>${productAddButton(item)}</div></div><div class="product-card-back" id="details-${item.productId}" aria-hidden="true" role="group" tabindex="0" aria-label="Detalles de ${name}. Pulsa Enter o Escape para volver." inert><div class="product-card-details" tabindex="0" role="region" aria-label="Detalles de ${name}"><h3>${name}</h3><p class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</p>${item.category ? `<p class="small muted">${escapeHTML(item.category.name)}</p>` : ''}<p>${escapeHTML(item.description || 'Este producto no tiene una descripción registrada.')}</p>${availability ? `<p class="small">${escapeHTML(availability)}</p>` : ''}${groups}<p class="small muted">${allergy}</p></div><div class="product-card-footer">${item.availability === 'enabled' && !item.hasVariants && context?.kind === 'table' ? `<button class="card-customize secondary" type="button" data-customize-product="${item.productId}" ${canAddProduct(item) ? '' : 'disabled'}>${item.optionGroups.length ? 'Elegir opciones' : 'Personalizar'}</button>` : `<span class="small muted">${context?.kind === 'table' ? '' : 'Escanea el QR para pedir.'}</span>`}${productAddButton(item)}</div></div></div></article>`;
+  return `<article class="menu-product product-card" data-product="${item.productId}" aria-label="${name}"><div class="product-card-inner"><div class="product-card-front"><button class="product-card-open" type="button" data-flip-product aria-expanded="false" aria-controls="details-${item.productId}" aria-label="Ver detalles de ${name}">${productPhoto(item, false, index < 2)}<span class="menu-product-name">${name}</span>${availability ? `<span class="small muted card-availability">${escapeHTML(availability)}</span>` : ''}</button><div class="product-card-footer"><span class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</span>${productAddButton(item)}</div></div><div class="product-card-back" id="details-${item.productId}" aria-hidden="true" role="group" tabindex="0" aria-label="Detalles de ${name}. Pulsa Enter o Escape para volver." inert><div class="product-card-details" tabindex="0" role="region" aria-label="Detalles de ${name}"><h3>${name}</h3><p class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</p>${item.category ? `<p class="small muted">${escapeHTML(item.category.name)}</p>` : ''}<p>${escapeHTML(item.description || 'Este producto no tiene una descripción registrada.')}</p>${availability ? `<p class="small">${escapeHTML(availability)}</p>` : ''}${groups}<p class="small muted">${allergy}</p></div><div class="product-card-footer">${item.availability === 'enabled' && context?.kind === 'table' ? `<button class="card-customize secondary" type="button" data-customize-product="${item.productId}" ${canAddProduct(item) ? '' : 'disabled'}>${item.hasVariants || item.optionGroups.length ? 'Elegir opciones' : 'Personalizar'}</button>` : `<span class="small muted">${context?.kind === 'table' ? '' : 'Escanea el QR para pedir.'}</span>`}${productAddButton(item)}</div></div></div></article>`;
 }
 function flipProductCard(card, flipped) {
   card.classList.toggle('is-flipped', flipped);
@@ -251,7 +251,7 @@ function syncProductAddButtons() {
 function addProductFromCard(id) {
   const item = items().find((item) => item.productId === id);
   if (!item || !canAddProduct(item)) return;
-  if (item.optionGroups.length) {
+  if (item.hasVariants || item.optionGroups.length) {
     openProduct(id);
     return;
   }
@@ -315,21 +315,27 @@ function selectedLine() {
   return {
     productId: selectedProduct.productId,
     quantity: selectedQty,
+    ...($('#product-dialog input[data-variant]:checked')
+      ? { variantId: $('#product-dialog input[data-variant]:checked').dataset.variant }
+      : {}),
     modifiers: [...$('#product-dialog').querySelectorAll('input[data-modifier]:checked')].map(
       (input) => ({ modifierId: input.dataset.modifier, quantity: 1 }),
     ),
     note: $('#product-note')?.value.trim() || null,
   };
 }
+function variantChoices(item, editable) {
+  const choices = item.variants ?? [];
+  return `<fieldset class="option-group" ${editable ? '' : 'disabled'}><legend>Presentación <span class="optional">Obligatoria</span></legend>${choices.length ? choices.map((variant) => `<label class="option-row"><input type="radio" name="product-variant" data-variant="${variant.id}" ${variant.availability === 'enabled' ? '' : 'disabled'}><span>${escapeHTML(variant.name)}${variant.availability === 'enabled' ? '' : ' · No disponible'}</span><span>${escapeHTML(money(item.price.minorUnits + variant.priceDelta.minorUnits))}</span></label>`).join('') : '<p class="small" role="status">No pudimos cargar las presentaciones. Actualiza el menú antes de agregar este producto.</p>'}</fieldset>`;
+}
 function openProduct(id) {
   selectedProduct = items().find((item) => item.productId === id);
   if (!selectedProduct) return;
   selectedQty = 1;
   const item = selectedProduct;
-  const editable =
-    canOrder() && !pending && !sending && item.availability === 'enabled' && !item.hasVariants;
+  const editable = canOrder() && !pending && !sending && item.availability === 'enabled';
   $('#product-dialog').innerHTML =
-    `<div class="modal-photo">${productPhoto(item, true)}<button class="icon-btn" data-close aria-label="Cerrar producto">${icon('x')}</button></div><div class="modal-body"><h2 id="product-dialog-title">${escapeHTML(item.name)}</h2><p class="description">${escapeHTML(item.description ?? '')}</p>${item.allergens.length ? `<p class="small">Alérgenos registrados: ${item.allergens.map((a) => escapeHTML(a.label ?? a.name ?? a.code)).join(', ')}. Consulta al personal.</p>` : '<p class="small muted">Consulta al personal si tienes una alergia.</p>'}${availabilityLabel(item) ? `<p>${escapeHTML(availabilityLabel(item))}</p>` : ''}${item.optionGroups.map((group) => `<fieldset class="option-group" ${editable ? '' : 'disabled'}><legend>${escapeHTML(group.name)} <span class="optional">${group.minSelect ? `Mínimo ${group.minSelect}` : 'Opcional'}${group.maxSelect ? ` · Máximo ${group.maxSelect}` : ''}</span></legend>${group.minSelect === 0 && group.maxSelect === 1 ? `<label class="option-row"><input type="radio" name="group-${group.id}" checked><span>Sin extra</span></label>` : ''}${group.modifiers.map((modifier) => `<label class="option-row"><input type="${group.maxSelect === 1 ? 'radio' : 'checkbox'}" name="group-${group.id}" data-modifier="${modifier.id}"><span>${escapeHTML(modifier.name)}</span><span>${modifier.priceDelta.minorUnits ? `+${escapeHTML(money(modifier.priceDelta.minorUnits))}` : 'Incluida'}</span></label>`).join('')}</fieldset>`).join('')}${editable ? '<div class="note-field"><label class="field-label" for="product-note">Indicaciones <span class="optional">Opcional</span></label><textarea class="field" id="product-note" maxlength="500" placeholder="Por ejemplo: sin azúcar."></textarea></div>' : ''}<p class="small" id="product-error" role="status"></p></div><div class="modal-actions">${editable ? `<div class="stepper"><button type="button" id="product-minus" aria-label="Reducir cantidad">${icon('minus')}</button><span id="product-quantity">1</span><button type="button" id="product-plus" aria-label="Aumentar cantidad">${icon('plus')}</button></div><button class="primary" id="add-to-cart"><span>Agregar al pedido</span><span id="product-total"></span></button>` : `<p class="small">${pending ? 'Comprueba primero el envío pendiente.' : context?.kind === 'table' ? 'Consulta al personal para pedir este producto.' : 'Escanea el QR de tu mesa para hacer un pedido.'}</p>`}</div>`;
+    `<div class="modal-photo">${productPhoto(item, true)}<button class="icon-btn" data-close aria-label="Cerrar producto">${icon('x')}</button></div><div class="modal-body"><h2 id="product-dialog-title">${escapeHTML(item.name)}</h2><p class="description">${escapeHTML(item.description ?? '')}</p>${item.allergens.length ? `<p class="small">Alérgenos registrados: ${item.allergens.map((a) => escapeHTML(a.label ?? a.name ?? a.code)).join(', ')}. Consulta al personal.</p>` : '<p class="small muted">Consulta al personal si tienes una alergia.</p>'}${availabilityLabel(item) ? `<p>${escapeHTML(availabilityLabel(item))}</p>` : ''}${item.hasVariants ? variantChoices(item, editable) : ''}${item.optionGroups.map((group) => `<fieldset class="option-group" data-option-group="${group.id}" ${editable ? '' : 'disabled'}><legend>${escapeHTML(group.name)} <span class="optional">${group.minSelect ? `Mínimo ${group.minSelect}` : 'Opcional'}${group.maxSelect ? ` · Máximo ${group.maxSelect}` : ''}</span></legend>${group.minSelect === 0 && group.maxSelect === 1 ? `<label class="option-row"><input type="radio" name="group-${group.id}" checked><span>Sin extra</span></label>` : ''}${group.modifiers.map((modifier) => `<label class="option-row"><input type="${group.maxSelect === 1 ? 'radio' : 'checkbox'}" name="group-${group.id}" data-modifier="${modifier.id}"><span>${escapeHTML(modifier.name)}</span><span>${modifier.priceDelta.minorUnits ? `+${escapeHTML(money(modifier.priceDelta.minorUnits))}` : 'Incluida'}</span></label>`).join('')}</fieldset>`).join('')}${editable ? '<div class="note-field"><label class="field-label" for="product-note">Indicaciones <span class="optional">Opcional</span></label><textarea class="field" id="product-note" maxlength="500" placeholder="Por ejemplo: sin azúcar."></textarea></div>' : ''}<p class="small" id="product-error" role="status"></p></div><div class="modal-actions">${editable ? `<div class="stepper"><button type="button" id="product-minus" aria-label="Reducir cantidad">${icon('minus')}</button><span id="product-quantity">1</span><button type="button" id="product-plus" aria-label="Aumentar cantidad">${icon('plus')}</button></div><button class="primary" id="add-to-cart"><span>Agregar al pedido</span><span id="product-total"></span></button>` : `<p class="small">${pending ? 'Comprueba primero el envío pendiente.' : context?.kind === 'table' ? 'Consulta al personal para pedir este producto.' : 'Escanea el QR de tu mesa para hacer un pedido.'}</p>`}</div>`;
   if (editable) {
     $('#product-minus').onclick = () => {
       selectedQty = Math.max(1, selectedQty - 1);
@@ -364,9 +370,11 @@ function openProduct(id) {
 }
 function updateProductTotal() {
   $('#product-dialog')
-    .querySelectorAll('fieldset.option-group')
-    .forEach((fieldset, index) => {
-      const group = selectedProduct.optionGroups[index];
+    .querySelectorAll('fieldset[data-option-group]')
+    .forEach((fieldset) => {
+      const group = selectedProduct.optionGroups.find(
+        (group) => group.id === fieldset.dataset.optionGroup,
+      );
       if (group.maxSelect === 1 || group.maxSelect === null) return;
       const count = fieldset.querySelectorAll('input:checked').length;
       fieldset.querySelectorAll('input:not(:checked)').forEach((input) => {

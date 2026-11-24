@@ -2,8 +2,18 @@
 (function (root) {
   function validateLine(items, line) {
     const item = items.find((item) => item.productId === line.productId);
-    if (!item || item.availability !== 'enabled' || item.hasVariants)
+    if (!item || item.availability !== 'enabled')
       throw new Error('Un producto cambió o requiere atención del personal. Revisa tu pedido.');
+    const variants = item.variants ?? [];
+    if (item.hasVariants && !line.variantId)
+      throw new Error('Elige una presentación del producto.');
+    if (
+      line.variantId &&
+      !variants.some(
+        (variant) => variant.id === line.variantId && variant.availability === 'enabled',
+      )
+    )
+      throw new Error('La presentación elegida ya no está disponible.');
     if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 50)
       throw new Error('Elige entre 1 y 50 unidades por producto.');
     const modifiers = line.modifiers ?? [];
@@ -38,12 +48,16 @@
       .flatMap((group) => group.modifiers)
       .filter((modifier) => ids.has(modifier.id))
       .reduce((sum, modifier) => sum + modifier.priceDelta.minorUnits, 0);
-    return (item.price.minorUnits + extra) * line.quantity;
+    const variantDelta =
+      (item.variants ?? []).find((variant) => variant.id === line.variantId)?.priceDelta
+        .minorUnits ?? 0;
+    return (item.price.minorUnits + variantDelta + extra) * line.quantity;
   }
   function addLine(lines, next) {
     const key = (line) =>
       JSON.stringify([
         line.productId,
+        line.variantId ?? null,
         line.modifiers.map((m) => m.modifierId).sort(),
         line.note ?? null,
       ]);

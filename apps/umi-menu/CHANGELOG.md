@@ -1,5 +1,14 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Selección de variantes
+
+- Modal obligatorio al agregar productos con variantes u opciones. Agregado directo para productos simples.
+- Precio estimado y separación de líneas por variante, con el nombre elegido en el carrito.
+- Validación y precio del servidor; snapshot de la variante para preparación y recepción en POS.
+- Lectura por lote de variantes con la misma disponibilidad del catálogo; sin consultas por cada producto.
+- Campo opcional sin valor predeterminado para conservar reintentos anteriores.
+- La API desplegada anterior todavía no ofrece estas opciones. La prueba del selector usó respuestas controladas; no creó pedidos.
+
 ## 2026-11-24 — Prueba con el catálogo de staging
 
 - Tarjetas con giro para leer descripción, precio, opciones y alérgenos. Botón + para agregar o elegir opciones; retorno al pulsar el reverso o Escape.

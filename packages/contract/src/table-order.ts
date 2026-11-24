@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { nationalDigitsAreValid, phoneLengthMessage } from './phone';
-import { CatalogMoney } from './pos-catalog';
+import { CatalogMoney, CatalogVariant } from './pos-catalog';
 import { InventoryAllergenRef } from './pos-inventory';
 
 const Uuid = z.string().uuid();
@@ -85,13 +85,9 @@ export const TableOrderMenuItem = z
       'out_of_assortment',
       'future_availability',
     ]),
-    /**
-     * TRUE when the product is sold in variants. Table-order intake deliberately
-     * accepts no variant: `{productId, quantity, modifiers}` cannot express "the large
-     * one", and guessing a variant would put a price on the guest's tab that they did
-     * not choose. The page states it must be ordered with the waiter.
-     */
+    /** Selection is required when active variants exist. Older APIs may omit variants. */
     hasVariants: z.boolean(),
+    variants: z.array(CatalogVariant).max(100).optional(),
     optionGroups: z.array(TableOrderOptionGroup).max(20),
   })
   .strict();
@@ -136,6 +132,7 @@ export const TableOrderModifierSelection = z
 export const TableOrderLine = z
   .object({
     productId: Uuid,
+    variantId: Uuid.nullable().optional(),
     quantity: z.number().int().min(1).max(50),
     modifiers: z.array(TableOrderModifierSelection).max(50).default([]),
     /** The per-line note a guest actually needs: "sin azúcar", "sin cebolla". */

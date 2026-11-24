@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "d97850e648f6f8eda79fc381603d7a49d8439f6a455821a2f4eb350aacc43928",
+  "contentHash": "04fdd46ccdc00db47687057b2213db14b05fb6c088a40f966caee3050eb87afa",
   "contractVersion": "2.58.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -72001,6 +72001,17 @@
                 "maximum": 50,
                 "minimum": 1,
                 "type": "integer"
+              },
+              "variantId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
@@ -78575,6 +78586,67 @@
               "productId": {
                 "format": "uuid",
                 "type": "string"
+              },
+              "variants": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "attributes": {
+                      "additionalProperties": {
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "availability": {
+                      "enum": [
+                        "enabled",
+                        "disabled",
+                        "temporarily_unavailable",
+                        "out_of_assortment",
+                        "future_availability"
+                      ],
+                      "type": "string"
+                    },
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "priceDelta": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "attributes",
+                    "priceDelta",
+                    "availability"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 100,
+                "type": "array"
               }
             },
             "required": [
@@ -105370,6 +105442,17 @@
           "maximum": 50,
           "minimum": 1,
           "type": "integer"
+        },
+        "variantId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -105585,6 +105668,67 @@
               "productId": {
                 "format": "uuid",
                 "type": "string"
+              },
+              "variants": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "attributes": {
+                      "additionalProperties": {
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "availability": {
+                      "enum": [
+                        "enabled",
+                        "disabled",
+                        "temporarily_unavailable",
+                        "out_of_assortment",
+                        "future_availability"
+                      ],
+                      "type": "string"
+                    },
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "priceDelta": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "attributes",
+                    "priceDelta",
+                    "availability"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 100,
+                "type": "array"
               }
             },
             "required": [
@@ -105831,6 +105975,67 @@
         "productId": {
           "format": "uuid",
           "type": "string"
+        },
+        "variants": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "availability": {
+                "enum": [
+                  "enabled",
+                  "disabled",
+                  "temporarily_unavailable",
+                  "out_of_assortment",
+                  "future_availability"
+                ],
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "priceDelta": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "attributes",
+              "priceDelta",
+              "availability"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
         }
       },
       "required": [
@@ -113936,6 +114141,7 @@
         "TABLE_NOT_OCCUPIED",
         "IDEMPOTENCY_CONFLICT",
         "PRODUCT_UNAVAILABLE",
+        "VARIANT_NOT_AVAILABLE",
         "MODIFIER_SELECTION_INVALID"
       ],
       "idempotent": true,

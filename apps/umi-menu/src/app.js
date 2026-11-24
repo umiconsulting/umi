@@ -29,7 +29,9 @@ function cartMarkup() {
             line.modifiers?.some((selection) => selection.modifierId === modifier.id),
           )
           .map((modifier) => modifier.name) ?? [];
-      return `<div class="cart-line">${item ? productPhoto(item) : ''}<div><div class="line-title">${escapeHTML(item?.name ?? 'Producto no disponible')}</div><div class="line-options">${escapeHTML(names.join(' · '))}</div>${line.note ? `<div class="line-options">${escapeHTML(line.note)}</div>` : ''}<div class="line-bottom"><div class="stepper"><button data-qty="${index}" data-delta="-1" aria-label="Quitar una unidad de ${escapeHTML(item?.name ?? 'producto')}" ${pending || sending ? 'disabled' : ''}>${icon('minus')}</button><span>${escapeHTML(line.quantity)}</span><button data-qty="${index}" data-delta="1" aria-label="Añadir una unidad de ${escapeHTML(item?.name ?? 'producto')}" ${pending || sending || line.quantity >= 50 ? 'disabled' : ''}>${icon('plus')}</button></div><span class="line-price">${escapeHTML(linePrice)}</span></div></div></div>`;
+      const variantName = item?.variants?.find((variant) => variant.id === line.variantId)?.name;
+      if (variantName) names.unshift(variantName);
+      return `<div class="cart-line">${item ? productPhoto(item) : ''}<div class="cart-line-content"><div class="line-title">${escapeHTML(item?.name ?? 'Producto no disponible')}</div><div class="line-options">${escapeHTML(names.join(' · '))}</div>${line.note ? `<div class="line-options">${escapeHTML(line.note)}</div>` : ''}<div class="line-bottom"><div class="stepper"><button data-qty="${index}" data-delta="-1" aria-label="Quitar una unidad de ${escapeHTML(item?.name ?? 'producto')}" ${pending || sending ? 'disabled' : ''}>${icon('minus')}</button><span>${escapeHTML(line.quantity)}</span><button data-qty="${index}" data-delta="1" aria-label="Añadir una unidad de ${escapeHTML(item?.name ?? 'producto')}" ${pending || sending || line.quantity >= 50 ? 'disabled' : ''}>${icon('plus')}</button></div><span class="line-price">${escapeHTML(linePrice)}</span></div></div></div>`;
     })
     .join('');
   return (

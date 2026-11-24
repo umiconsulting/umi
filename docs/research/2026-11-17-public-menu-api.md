@@ -21,3 +21,38 @@ Primary-source rung: repository code/schema/contracts, installed vendor source/d
 The required `product-feature-review` skill reference was searched by the parent agent and was absent; its instructions could not be applied. No requirements were invented to replace it.
 
 Local checks covered branch selection, foreign branch refusal, merchant context, safe projection, strict query validation, origin isolation and actual browser preflight. Those temporary checks are not retained, per user instruction. The menu retains one retry regression test. Contract artifacts are regenerated through the existing generator; API and contract typechecks use existing scripts.
+
+## Variant selection: source review, 2026-11-24
+
+**Documented fact — baseline.** The public request is strict and has no `variantId`.
+The menu has `hasVariants`, without variant choices. `TableOrderService` prices with a null variant and refuses products with active variants.
+Sources: `packages/contract/src/table-order.ts` and `apps/umi-api/src/modules/table-order/table-order.service.ts`.
+
+**Documented fact — existing owner.** `PosCartRepository.price` accepts a variant ID and checks its product and active state.
+It returns the server variant name, attributes and price delta. It does not require a variant when the input is null.
+Its product query checks branch availability. The inventory-derived variant availability belongs to `PosCatalogRepository.withDetails`.
+That reader projects active variants with branch-specific availability, alongside variant names, attributes and money.
+Sources: `pos-cart.repository.ts:931`, `pos-catalog.repository.ts:346` and `shared/catalog/availability.ts`.
+
+**Documented fact — persistence.** `NewOrderLine` already accepts `variantName`.
+The shared writer stores that snapshot in `merchant.order_item.variant_name`.
+No new order table or schema migration is needed for that snapshot.
+Source: `shared/orders/order-writer.ts:53`, `:210` and `:218`.
+
+**Umi-specific inference — minimum change.** Add optional variant choices to the public projection and optional nullable `variantId` to request lines.
+Reuse the catalog availability rule and the existing server pricing function.
+Require an explicit active variant for products that have variants. Refuse a foreign, retired or unavailable selection.
+Pass the priced variant name to the shared order writer. Keep prices out of the request.
+Use a batch reader or shared helper for variants; avoid a complete detail query for every menu product.
+
+**Umi-specific inference — compatibility.** Do not insert a default null variant into old DTOs before the command fingerprint.
+That change could make an old idempotency key describe a different payload after deployment.
+Use `line.variantId ?? null` only for the pricing call. A simple browser line should omit `variantId` for older strict servers.
+An old response with `hasVariants` but no choices cannot prove which variant IDs or prices exist.
+The modal must explain missing data; a development proxy must not invent variant choices or translate orders into another product.
+
+**Documented fact — instruments and checks.** This review used local source, `rg`, Node 22.23.4 and pnpm 10.29.3.
+It adds no package, service or adoption cost. Existing tool licenses and dependency versions are recorded above.
+Upstream maintenance status remains **UNVERIFIED**. No remote request or business write was needed for this source review.
+Existing `table-order.integration.ts` checks server/POS price agreement, transactional rows and replay identity.
+It has no variant scenario in this baseline. This review adds no test, per the user's limit.

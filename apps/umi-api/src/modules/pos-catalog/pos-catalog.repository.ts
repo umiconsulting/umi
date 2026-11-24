@@ -356,9 +356,50 @@ export class PosCatalogRepository {
        ORDER BY display_order,id`,
       [merchantId, summary.id],
     );
-    const variants = await this.pg.tquery(
+    const variants = await this.variantsByProduct(
       merchantId,
-      `SELECT v.id::text,v.name,v.attributes,
+      locationId,
+      [summary.id],
+      summary.price.currency,
+    );
+    const groups = await this.pg.tquery(
+      merchantId,
+      `SELECT g.id::text,g.name,(g.min_select>0) required,g.min_select AS "minSelections",
+              g.max_select AS "maxSelections",
+              COALESCE(jsonb_agg(jsonb_build_object('id',m.id::text,'name',m.name,
+                'priceDelta',jsonb_build_object('minorUnits',m.price_delta,'currency',$3::text),
+                'available',true) ORDER BY m.display_order,m.name) FILTER (WHERE m.id IS NOT NULL),'[]') modifiers
+       FROM merchant.product_option_group g
+       JOIN merchant.product p ON p.id=g.product_id AND p.merchant_id=$1::uuid
+       LEFT JOIN merchant.product_modifier m ON m.option_group_id=g.id AND m.active
+       WHERE g.product_id=$2::uuid AND g.active
+       GROUP BY g.id ORDER BY g.display_order,g.name,g.id`,
+      [merchantId, summary.id, summary.price.currency],
+    );
+    const barcode = await this.pg.tquery<{ barcode: string | null }>(
+      merchantId,
+      `SELECT barcode FROM merchant.product WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [merchantId, summary.id],
+    );
+    return {
+      ...summary,
+      barcode: barcode.rows[0]?.barcode ?? null,
+      media: media.rows as CatalogProductDetail['media'],
+      variants: variants.get(summary.id) ?? [],
+      optionGroups: groups.rows as CatalogProductDetail['optionGroups'],
+    };
+  }
+
+  async variantsByProduct(
+    merchantId: string,
+    locationId: string,
+    productIds: string[],
+    currency: string,
+    client?: PoolClient,
+  ): Promise<Map<string, CatalogProductDetail['variants']>> {
+    const result = new Map<string, CatalogProductDetail['variants']>();
+    if (!productIds.length) return result;
+    const query = `SELECT v.product_id::text AS "productId",v.id::text,v.name,v.attributes,
               jsonb_build_object('minorUnits',v.price_delta,'currency',$3::text) AS "priceDelta",
               CASE WHEN NOT v.active THEN 'disabled'
                    WHEN im.mapping_type='direct'
@@ -393,36 +434,19 @@ export class PosCatalogRepository {
        LEFT JOIN merchant.stock_balance b
          ON b.inventory_location_id=ip.inventory_location_id
         AND b.inventory_item_id=im.inventory_item_id
-       WHERE v.merchant_id=$1::uuid AND v.product_id=$2::uuid AND v.active
-       ORDER BY v.display_order,v.name,v.id`,
-      [merchantId, summary.id, summary.price.currency, locationId],
-    );
-    const groups = await this.pg.tquery(
-      merchantId,
-      `SELECT g.id::text,g.name,(g.min_select>0) required,g.min_select AS "minSelections",
-              g.max_select AS "maxSelections",
-              COALESCE(jsonb_agg(jsonb_build_object('id',m.id::text,'name',m.name,
-                'priceDelta',jsonb_build_object('minorUnits',m.price_delta,'currency',$3::text),
-                'available',true) ORDER BY m.display_order,m.name) FILTER (WHERE m.id IS NOT NULL),'[]') modifiers
-       FROM merchant.product_option_group g
-       JOIN merchant.product p ON p.id=g.product_id AND p.merchant_id=$1::uuid
-       LEFT JOIN merchant.product_modifier m ON m.option_group_id=g.id AND m.active
-       WHERE g.product_id=$2::uuid AND g.active
-       GROUP BY g.id ORDER BY g.display_order,g.name,g.id`,
-      [merchantId, summary.id, summary.price.currency],
-    );
-    const barcode = await this.pg.tquery<{ barcode: string | null }>(
-      merchantId,
-      `SELECT barcode FROM merchant.product WHERE merchant_id=$1::uuid AND id=$2::uuid`,
-      [merchantId, summary.id],
-    );
-    return {
-      ...summary,
-      barcode: barcode.rows[0]?.barcode ?? null,
-      media: media.rows as CatalogProductDetail['media'],
-      variants: variants.rows as CatalogProductDetail['variants'],
-      optionGroups: groups.rows as CatalogProductDetail['optionGroups'],
-    };
+       WHERE v.merchant_id=$1::uuid AND v.product_id=ANY($2::uuid[]) AND v.active
+       ORDER BY v.display_order,v.name,v.id`;
+    const values = [merchantId, productIds, currency, locationId];
+    const { rows } = client
+      ? await client.query(query, values)
+      : await this.pg.tquery(merchantId, query, values);
+    for (const row of rows) {
+      const { productId, ...variant } = row as CatalogProductDetail['variants'][number] & {
+        productId: string;
+      };
+      result.set(productId, [...(result.get(productId) ?? []), variant]);
+    }
+    return result;
   }
 
   async version(merchantId: string): Promise<{ version: string; updatedAt: string }> {

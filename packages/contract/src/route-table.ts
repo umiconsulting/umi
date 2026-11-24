@@ -192,6 +192,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
         'TABLE_NOT_OCCUPIED',
         'IDEMPOTENCY_CONFLICT',
         'PRODUCT_UNAVAILABLE',
+        'VARIANT_NOT_AVAILABLE',
         'MODIFIER_SELECTION_INVALID',
       ],
     },

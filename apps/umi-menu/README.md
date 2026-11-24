@@ -87,7 +87,9 @@ La API anterior puede omitir fotos y categorías; la interfaz conserva el respal
 - Las tarjetas giran para mostrar detalles completos. El botón + agrega una unidad o abre las opciones del producto.
 - La cara posterior admite desplazamiento, retorno al pulsar el reverso o Escape y movimiento reducido.
 - La búsqueda admite acentos. El detalle muestra opciones obligatorias y límites de selección.
-- Los productos con variantes requieren al personal: el contrato de pedidos aún no expresa una variante.
+- El botón + abre el modal para variantes u opciones; los productos simples entran directamente al carrito.
+- La API publica variantes activas por sucursal y valida la selección y el precio al recibir el pedido.
+- Una API anterior sin variantes abre el modal y explica que faltan las presentaciones; no se inventan opciones ni precios.
 - Sin QR válido, el menú permite consultar productos y sucursales.
 - Las respuestas inválidas o los errores muestran una recuperación explícita; no hay catálogo de ejemplo como respaldo.
 - No hay recogida, programación, promociones, cocina simulada, solicitud de cuenta ni panel público de personal.
