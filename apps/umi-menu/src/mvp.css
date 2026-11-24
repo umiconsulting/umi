@@ -1183,3 +1183,8 @@ body {
     padding: 8px 12px;
   }
 }
+
+#fulfillment > .row {
+  justify-content: center;
+  align-items: center;
+}

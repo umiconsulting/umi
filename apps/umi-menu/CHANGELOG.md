@@ -1,5 +1,9 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Identificación de mesa
+
+- Icono y nombre de mesa centrados como un conjunto en la tarjeta.
+
 ## 2026-11-24 — Aviso de pago único
 
 - Retirada del aviso de pago en la tarjeta de mesa para evitar su repetición junto al carrito.
