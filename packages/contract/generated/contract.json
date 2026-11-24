@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "2d3ec277b2345be978ea41ba2be501bdb4823718181881f62ddf15d2144e9fce",
+  "contentHash": "04fdd46ccdc00db47687057b2213db14b05fb6c088a40f966caee3050eb87afa",
   "contractVersion": "2.58.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -72001,6 +72001,17 @@
                 "maximum": 50,
                 "minimum": 1,
                 "type": "integer"
+              },
+              "variantId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
@@ -78357,6 +78368,374 @@
         "conflict"
       ],
       "type": "string"
+    },
+    "PublicMenuQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PublicMenuResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "allergens": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "pattern": "^[a-z][a-z0-9_]{1,39}$",
+                      "type": "string"
+                    },
+                    "label": {
+                      "maxLength": 80,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "label"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              "availability": {
+                "enum": [
+                  "enabled",
+                  "disabled",
+                  "temporarily_unavailable",
+                  "out_of_assortment",
+                  "future_availability"
+                ],
+                "type": "string"
+              },
+              "category": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 240,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "maxLength": 2000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "hasVariants": {
+                "type": "boolean"
+              },
+              "imageUrl": {
+                "anyOf": [
+                  {
+                    "format": "uri",
+                    "pattern": "^https\\:\\/\\/",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "maxLength": 240,
+                "minLength": 1,
+                "type": "string"
+              },
+              "optionGroups": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "maxSelect": {
+                      "anyOf": [
+                        {
+                          "maximum": 99,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "minSelect": {
+                      "maximum": 99,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "modifiers": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "name": {
+                            "maxLength": 160,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "priceDelta": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                              },
+                              "minorUnits": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "minorUnits",
+                              "currency"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "priceDelta"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 100,
+                      "type": "array"
+                    },
+                    "name": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "minSelect",
+                    "maxSelect",
+                    "modifiers"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              "price": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "productId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "variants": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "attributes": {
+                      "additionalProperties": {
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "availability": {
+                      "enum": [
+                        "enabled",
+                        "disabled",
+                        "temporarily_unavailable",
+                        "out_of_assortment",
+                        "future_availability"
+                      ],
+                      "type": "string"
+                    },
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "priceDelta": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "attributes",
+                    "priceDelta",
+                    "availability"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 100,
+                "type": "array"
+              }
+            },
+            "required": [
+              "productId",
+              "name",
+              "description",
+              "price",
+              "allergens",
+              "availability",
+              "hasVariants",
+              "optionGroups"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "locationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locationName": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 240,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "merchantHandle": {
+          "maxLength": 63,
+          "minLength": 2,
+          "type": "string"
+        },
+        "merchantName": {
+          "maxLength": 240,
+          "minLength": 1,
+          "type": "string"
+        },
+        "paymentAtCounter": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "merchantHandle",
+        "merchantName",
+        "currency",
+        "paymentAtCounter",
+        "locations",
+        "locationId",
+        "locationName",
+        "items"
+      ],
+      "type": "object"
     },
     "PublishedFloorPlan": {
       "additionalProperties": false,
@@ -105063,6 +105442,17 @@
           "maximum": 50,
           "minimum": 1,
           "type": "integer"
+        },
+        "variantId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -105115,6 +105505,32 @@
                 ],
                 "type": "string"
               },
+              "category": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 240,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "description": {
                 "anyOf": [
                   {
@@ -105128,6 +105544,18 @@
               },
               "hasVariants": {
                 "type": "boolean"
+              },
+              "imageUrl": {
+                "anyOf": [
+                  {
+                    "format": "uri",
+                    "pattern": "^https\\:\\/\\/",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "name": {
                 "maxLength": 240,
@@ -105240,6 +105668,67 @@
               "productId": {
                 "format": "uuid",
                 "type": "string"
+              },
+              "variants": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "attributes": {
+                      "additionalProperties": {
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "availability": {
+                      "enum": [
+                        "enabled",
+                        "disabled",
+                        "temporarily_unavailable",
+                        "out_of_assortment",
+                        "future_availability"
+                      ],
+                      "type": "string"
+                    },
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "priceDelta": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "attributes",
+                    "priceDelta",
+                    "availability"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 100,
+                "type": "array"
               }
             },
             "required": [
@@ -105323,6 +105812,32 @@
           ],
           "type": "string"
         },
+        "category": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "description": {
           "anyOf": [
             {
@@ -105336,6 +105851,18 @@
         },
         "hasVariants": {
           "type": "boolean"
+        },
+        "imageUrl": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "pattern": "^https\\:\\/\\/",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "name": {
           "maxLength": 240,
@@ -105448,6 +105975,67 @@
         "productId": {
           "format": "uuid",
           "type": "string"
+        },
+        "variants": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "availability": {
+                "enum": [
+                  "enabled",
+                  "disabled",
+                  "temporarily_unavailable",
+                  "out_of_assortment",
+                  "future_availability"
+                ],
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "priceDelta": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "attributes",
+              "priceDelta",
+              "availability"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
         }
       },
       "required": [
@@ -112069,6 +112657,37 @@
       "request": "InventoryAuthoringItemQuery",
       "response": "InventoryUnitConversionList"
     },
+    "GET /api/public/menu/:handle": {
+      "approval": false,
+      "auth": "public",
+      "errors": [
+        "VALIDATION_FAILED",
+        "RESOURCE_NOT_FOUND"
+      ],
+      "idempotent": true,
+      "locationContext": false,
+      "merchantContext": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "PublicMenuQuery",
+      "response": "PublicMenuResponse"
+    },
+    "GET /api/public/table-order/:token": {
+      "approval": false,
+      "auth": "public",
+      "errors": [
+        "TABLE_ORDER_CREDENTIAL_INVALID"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": null,
+      "response": "TableOrderMenu"
+    },
     "GET /api/v1/devices/status": {
       "approval": false,
       "auth": "device",
@@ -113513,6 +114132,26 @@
       "pin": false,
       "request": "CreateSupplierRequest",
       "response": "SupplierResult"
+    },
+    "POST /api/public/table-order/:token/orders": {
+      "approval": false,
+      "auth": "public",
+      "errors": [
+        "TABLE_ORDER_CREDENTIAL_INVALID",
+        "TABLE_NOT_OCCUPIED",
+        "IDEMPOTENCY_CONFLICT",
+        "PRODUCT_UNAVAILABLE",
+        "VARIANT_NOT_AVAILABLE",
+        "MODIFIER_SELECTION_INVALID"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "PlaceTableOrderRequest",
+      "response": "TableOrderPlaced"
     },
     "POST /api/v1/auth/pos/global-logout": {
       "approval": false,

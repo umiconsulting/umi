@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { nationalDigitsAreValid, phoneLengthMessage } from './phone';
-import { CatalogMoney } from './pos-catalog';
+import { CatalogMoney, CatalogVariant } from './pos-catalog';
 import { InventoryAllergenRef } from './pos-inventory';
 
 const Uuid = z.string().uuid();
@@ -57,6 +57,13 @@ export const TableOrderMenuItem = z
     productId: Uuid,
     name: z.string().min(1).max(240),
     description: z.string().max(2000).nullable(),
+    /** Optional public display fields. Older API deployments may omit these. */
+    category: z
+      .object({ id: Uuid, name: z.string().min(1).max(240) })
+      .strict()
+      .nullable()
+      .optional(),
+    imageUrl: z.string().url().startsWith('https://').nullable().optional(),
     price: CatalogMoney,
     /**
      * §8.5. The allergen labels this product carries, derived from its recipe when
@@ -78,13 +85,9 @@ export const TableOrderMenuItem = z
       'out_of_assortment',
       'future_availability',
     ]),
-    /**
-     * TRUE when the product is sold in variants. Table-order intake deliberately
-     * accepts no variant: `{productId, quantity, modifiers}` cannot express "the large
-     * one", and guessing a variant would put a price on the guest's tab that they did
-     * not choose. The page states it must be ordered with the waiter.
-     */
+    /** Selection is required when active variants exist. Older APIs may omit variants. */
     hasVariants: z.boolean(),
+    variants: z.array(CatalogVariant).max(100).optional(),
     optionGroups: z.array(TableOrderOptionGroup).max(20),
   })
   .strict();
@@ -103,6 +106,22 @@ export const TableOrderMenu = z
   })
   .strict();
 
+export const PublicMenuQuery = z.object({ locationId: Uuid.optional() }).strict();
+
+export const PublicMenuResponse = z
+  .object({
+    merchantHandle: z.string().min(2).max(63),
+    merchantName: z.string().min(1).max(240),
+    currency: Currency,
+    paymentAtCounter: z.literal(true),
+    locations: z.array(z.object({ id: Uuid, name: z.string().min(1).max(240) }).strict()).max(500),
+    /** Null means the visitor must choose a branch before reading its prices. */
+    locationId: Uuid.nullable(),
+    locationName: z.string().min(1).max(240).nullable(),
+    items: z.array(TableOrderMenuItem).max(500),
+  })
+  .strict();
+
 export const TableOrderModifierSelection = z
   .object({
     modifierId: Uuid,
@@ -113,6 +132,7 @@ export const TableOrderModifierSelection = z
 export const TableOrderLine = z
   .object({
     productId: Uuid,
+    variantId: Uuid.nullable().optional(),
     quantity: z.number().int().min(1).max(50),
     modifiers: z.array(TableOrderModifierSelection).max(50).default([]),
     /** The per-line note a guest actually needs: "sin azúcar", "sin cebolla". */
@@ -234,6 +254,8 @@ export const TableOrderCredentialList = z
   .strict();
 
 export type TableOrderMenu = z.infer<typeof TableOrderMenu>;
+export type PublicMenuQuery = z.infer<typeof PublicMenuQuery>;
+export type PublicMenuResponse = z.infer<typeof PublicMenuResponse>;
 export type TableOrderMenuItem = z.infer<typeof TableOrderMenuItem>;
 export type TableOrderOptionGroup = z.infer<typeof TableOrderOptionGroup>;
 export type TableOrderModifier = z.infer<typeof TableOrderModifier>;
@@ -251,6 +273,8 @@ export const tableOrderModels = {
   TableOrderOptionGroup,
   TableOrderMenuItem,
   TableOrderMenu,
+  PublicMenuQuery,
+  PublicMenuResponse,
   TableOrderModifierSelection,
   TableOrderLine,
   PlaceTableOrderRequest,

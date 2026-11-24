@@ -3,15 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="referrer" content="no-referrer" />
     <meta name="theme-color" content="#223979" />
-    <title>Bruma · Menú con Umi</title>
+    <title>Menú con Umi</title>
     <meta
       name="description"
-      content="Maqueta local del menú digital de Umi. Explora el menú y prueba un pedido de ejemplo."
+      content="Consulta el menú del restaurante y envía tu pedido desde el QR de tu mesa."
     />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23223979'/%3E%3Ctext x='10' y='29' fill='white' font-family='sans-serif' font-weight='bold' font-size='30'%3Eb%3C/text%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23223979'/%3E%3Ctext x='10' y='29' fill='white' font-family='sans-serif' font-weight='bold' font-size='30'%3Eu%3C/text%3E%3C/svg%3E"
     />
     <style>
       :root {
@@ -1768,8 +1769,8 @@
         }
       }
     </style>
-    <link rel="stylesheet" href="./files/menu-redesign.css" />
-    <link rel="stylesheet" href="./mvp.css" />
+    <link rel="stylesheet" href="/files/menu-redesign.css" />
+    <link rel="stylesheet" href="/mvp.css" />
   </head>
   <body>
     <svg xmlns="http://www.w3.org/2000/svg" style="display: none" aria-hidden="true">
@@ -1834,21 +1835,16 @@
         </symbol>
       </defs>
     </svg>
-    <div class="demo-bar">
-      <div class="wrap"><div class="demo-label">Demo · Datos de ejemplo</div></div>
-    </div>
+
     <header class="site-header">
       <div class="wrap">
         <div class="brand">
           <div>
-            <div class="brand-name">bruma</div>
-            <div class="brand-tag">Café de barrio</div>
+            <div class="brand-name">umi</div>
           </div>
         </div>
         <div class="header-right">
-          <span class="location-short row"
-            ><svg class="icon"><use href="#i-pin" /></svg>Centro, Mazatlán</span
-          ><span class="header-rule"></span><span class="umi-word" aria-label="Umi">umi</span>
+          <span class="umi-word" aria-label="Umi">umi</span>
           <div class="header-menu">
             <button
               class="icon-btn hamburger"
@@ -1868,13 +1864,8 @@
               aria-label="Opciones del menú"
               hidden
             >
-              <span class="navigation-label">Tu visita</span
-              ><button type="button" data-mode="pickup" aria-pressed="true">Recoger</button
-              ><button type="button" data-mode="table" aria-pressed="false">Mesa 12</button
-              ><span id="navigation-table" class="navigation-label" hidden></span>
-              <hr />
-              <button type="button" id="info-button">Información</button
-              ><button type="button" id="staff-button">Personal <small>Demo local</small></button>
+              <span id="navigation-table" class="navigation-label">Menú digital</span>
+              <button type="button" id="info-button">Información</button>
             </nav>
           </div>
         </div>
@@ -1882,35 +1873,40 @@
     </header>
     <main class="wrap">
       <section class="welcome">
-        <div><h1>Desayunos y café</h1></div>
-        <div class="hours-pill"><span class="open-dot"></span>Abierto · Hasta las 20:00</div>
+        <div><h1>MENU DIGITAL</h1></div>
+        <button class="text-btn" id="refresh-menu" type="button" aria-label="Actualizar el menú">
+          Actualizar
+        </button>
       </section>
+      <div id="menu-status" class="menu-status" aria-live="polite"></div>
       <div class="layout">
         <section class="menu-main" aria-label="Menú">
           <div class="mobile-context" id="mobile-context"></div>
-          <label class="search"
-            ><svg class="icon"><use href="#i-search" /></svg><span class="sr">Buscar productos</span
-            ><input
-              id="search"
-              type="search"
-              placeholder="Buscar en el menú"
-              autocomplete="off" /><button
-              id="clear-search"
-              type="button"
-              hidden
-              aria-label="Limpiar búsqueda"
-            >
-              <svg class="icon"><use href="#i-x" /></svg></button
-          ></label>
-          <nav class="categories" aria-label="Categorías del menú" role="tablist"></nav>
+          <div class="menu-controls">
+            <label class="search"
+              ><svg class="icon"><use href="#i-search" /></svg
+              ><span class="sr">Buscar productos</span
+              ><input
+                id="search"
+                type="search"
+                placeholder="Buscar en el menú"
+                autocomplete="off" /><button
+                id="clear-search"
+                type="button"
+                hidden
+                aria-label="Limpiar búsqueda"
+              >
+                <svg class="icon"><use href="#i-x" /></svg></button
+            ></label>
+            <nav class="categories" aria-label="Categorías del menú" role="tablist"></nav>
+          </div>
           <div class="section-head">
-            <h2 id="category-title">Destacados</h2>
-            <span id="result-count"></span>
+            <h2 id="category-title">Menú</h2>
+            <span id="result-count" role="status" aria-live="polite" aria-atomic="true"></span>
           </div>
           <div id="products" role="tabpanel" aria-labelledby="category-title"></div>
           <p class="menu-note">
-            <svg class="icon"><use href="#i-info" /></svg>Precios en MXN, con impuestos incluidos.
-            Si tienes una alergia, consulta al personal.
+            <span id="menu-currency">Si tienes una alergia, consulta al personal.</span>
           </p>
         </section>
         <aside class="cart-aside" aria-label="Tu pedido">
@@ -1928,14 +1924,7 @@
     </main>
     <footer class="site-footer">
       <div class="wrap">
-        <div class="row">
-          <span class="row"
-            ><svg class="icon"><use href="#i-pin" /></svg>Bruma · Centro, Mazatlán</span
-          ><span class="row"
-            ><svg class="icon"><use href="#i-clock" /></svg>Lun–dom, 8:00–20:00</span
-          >
-        </div>
-        <span>Menú de ejemplo · Fotografías ilustrativas</span>
+        <span id="restaurant-footer">Menú digital</span><span>Menú con Umi</span>
       </div>
     </footer>
     <div class="mobile-cart">
@@ -1952,45 +1941,19 @@
     <dialog id="status-dialog" class="modal" aria-labelledby="status-dialog-title"></dialog>
     <dialog id="info-dialog" class="modal" aria-labelledby="info-title">
       <div class="dialog-top">
-        <h2 id="info-title">Información de Bruma</h2>
+        <h2 id="info-title">Información del menú</h2>
         <button class="icon-btn" data-close aria-label="Cerrar información">
           <svg class="icon"><use href="#i-x" /></svg>
         </button>
       </div>
-      <div class="modal-body info-content">
-        <div class="info-item">
-          <svg class="icon"><use href="#i-pin" /></svg>
-          <div>
-            <strong>Bruma · Sucursal Centro</strong>
-            <p>Centro, Mazatlán, Sinaloa.</p>
-          </div>
-        </div>
-        <div class="info-item">
-          <svg class="icon"><use href="#i-clock" /></svg>
-          <div>
-            <strong>Horario</strong>
-            <p>Lunes a domingo, de 8:00 a 20:00.</p>
-          </div>
-        </div>
-        <div class="info-item">
-          <svg class="icon"><use href="#i-card" /></svg>
-          <div>
-            <strong>Paga en el negocio</strong>
-            <p>Efectivo o tarjeta al recoger, o al terminar tu visita.</p>
-          </div>
-        </div>
-        <div class="info-demo">
-          Bruma es un negocio ficticio para explorar el diseño. Los precios, horarios y pedidos son
-          de ejemplo.
-        </div>
-      </div>
+      <div class="modal-body info-content"><p>Consulta el menú del restaurante.</p></div>
     </dialog>
-    <dialog id="staff-dialog" class="modal" aria-labelledby="staff-title"></dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./state.js"></script>
-    <script src="./base.js"></script>
-    <script src="./app.js"></script>
-    <script src="./visual.js"></script>
-    <script src="./navigation.js"></script>
+    <script src="/api.js"></script>
+    <script src="/state.js"></script>
+    <script src="/base.js"></script>
+    <script src="/app.js"></script>
+    <script src="/visual.js"></script>
+    <script src="/navigation.js"></script>
   </body>
 </html>

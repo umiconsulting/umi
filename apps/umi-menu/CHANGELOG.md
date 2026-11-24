@@ -1,5 +1,132 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Identificación de mesa
+
+- Icono y nombre de mesa centrados como un conjunto en la tarjeta.
+
+## 2026-11-24 — Aviso de pago único
+
+- Retirada del aviso de pago en la tarjeta de mesa para evitar su repetición junto al carrito.
+
+## 2026-11-24 — Moneda explícita
+
+- Precios con símbolo y código de moneda, por ejemplo $50.00 MXN.
+- Formato compartido para catálogo, opciones, carrito y recibo; conserva la moneda de la API.
+
+## 2026-11-24 — Búsqueda persistente
+
+- Buscador y categorías permanecen juntos al desplazar el catálogo.
+- Controles compactos en móvil; el título principal permanece fuera del bloque fijo.
+
+## 2026-11-24 — Revisión y navegación
+
+- Aviso de pago con el personal en el carrito, confirmación y recibo.
+- Resumen antes del envío con cantidades, variantes, extras, indicaciones y precios estimados.
+- Categorías visibles al desplazar el catálogo y disponibilidad destacada en tarjetas.
+- Aviso previo cuando faltan presentaciones disponibles.
+
+## 2026-11-24 — Botón de agregado
+
+- Texto y precio centrados en el botón, incluso cuando falta el precio por una selección pendiente.
+
+## 2026-11-24 — Título principal
+
+- Título principal actualizado a «MENU DIGITAL».
+
+## 2026-11-24 — Vaciar carrito
+
+- Botón para vaciar el carrito en escritorio y en el diálogo móvil.
+- Encabezado sin separador y botón con espacio superior para evitar la unión visual de los bordes.
+- Opción Deshacer con validación de los productos antes de restaurarlos.
+- Acción bloqueada durante el envío o la comprobación pendiente.
+
+## 2026-11-24 — Imagen del reverso
+
+- Imagen nítida en el reverso, con los recursos existentes por categoría.
+- Etiqueta «Imagen ilustrativa» cuando el producto no tiene fotografía propia.
+- La tarjeta conserva sus dimensiones y el frente conserva el desenfoque.
+
+## 2026-11-24 — Fondo de peces
+
+- Patrón SVG estático con peces de trazo azul tenue sobre el fondo del menú.
+- Ilustración decorativa propia; conserva el logotipo y las superficies sólidas de lectura.
+- Sin dependencias, animaciones ni imágenes grandes.
+
+## 2026-11-24 — Filtros del catálogo
+
+- Categorías publicadas de la API con prioridad; clasificación visual por tipo cuando faltan todas.
+- Filtros con cantidades, búsqueda dentro de la categoría y navegación de teclado.
+- Verificación con 64 productos reales, sin pedidos y sin desbordamiento móvil.
+
+## 2026-11-24 — Jerarquía y lectura del menú
+
+- Retirada de los textos auxiliares del reverso; se conserva únicamente la acción +.
+- El hover conserva el borde suave de la tarjeta; el foco de teclado mantiene su indicador.
+
+- Reverso azul suave con miniatura e icono, nombre y precio destacados, resumen y única acción +.
+- Alto y ancho iguales al frente. El contenido largo se resume y permanece completo en el modal.
+- Lectura del detalle completo también para productos no disponibles; la acción de agregado sigue restringida.
+- Encabezado «Menú», texto secundario con más contraste y nombres más legibles.
+- Carrito con quitar y deshacer, sin modificar un envío pendiente. Avisos accesibles dentro de los diálogos.
+- Investigación en la nota existente, con Material, Carbon, Soft Restaurant y WCAG. Capturas sólo en Desktop.
+- Verificación en Chromium real de escritorio y móvil, descripción extensa, geometría del giro y recuperación del total.
+- Sin nuevas dependencias, pedidos, pruebas ni capturas en el repositorio.
+
+## 2026-11-24 — Selección de variantes
+
+- Carrito con columna de imagen de 54 píxeles, separación de 14 píxeles y contenido flexible para evitar solapes.
+
+- El botón + abre siempre el modal antes de agregar. Se retiran los botones redundantes de personalización y elección de opciones.
+- Precio estimado y separación de líneas por variante, con el nombre elegido en el carrito.
+- Validación y precio del servidor; snapshot de la variante para preparación y recepción en POS.
+- Lectura por lote de variantes con la misma disponibilidad del catálogo; sin consultas por cada producto.
+- Campo opcional sin valor predeterminado para conservar reintentos anteriores.
+- La API desplegada anterior todavía no ofrece estas opciones. La prueba del selector usó respuestas controladas; no creó pedidos.
+
+## 2026-11-24 — Prueba con el catálogo de staging
+
+- Tarjetas con giro para leer descripción, precio, opciones y alérgenos. Botón + para agregar o elegir opciones; retorno al pulsar el reverso o Escape.
+- Movimiento reducido respetado y cara oculta sin controles interactivos. Una sola equis para borrar la búsqueda.
+- Fondos ilustrativos tenues y difuminados para comida, bebida y postre cuando falta la foto real; icono visible por tipo. Se reutilizan recursos existentes.
+- Texto de categorías centrado. Nombre del negocio sólo en el encabezado principal; retirada de etiquetas pequeñas repetidas.
+
+- Puente local opcional hacia las rutas públicas de la API, sin credenciales del dashboard.
+- Conservación de las respuestas reales y de los errores; sin catálogo de respaldo ni pedidos simulados.
+- Validación de ONCA, mesa T3: 64 productos, ocho con opciones, escritorio y móvil sin errores JavaScript.
+- No se envían pedidos, no se modifica la ocupación de mesas y no se despliega el PR.
+- La consulta sin QR continúa pendiente de la nueva ruta en la API desplegada.
+
+## 2026-11-18 — Claridad y controles del menú
+
+- Búsqueda sin resultados con texto específico y botón para borrarla.
+- Fotografías con dimensiones declaradas; primeras tarjetas sin carga diferida y restantes con carga diferida nativa.
+- Respaldo visual si una fotografía falla, sin bloquear la selección del producto.
+- Controles de cantidad, búsqueda, categorías y cierre con objetivo táctil de 44 × 44 píxeles.
+- Foco visible y ajuste de nombres largos. Conteo de resultados anunciado a tecnologías de asistencia.
+- Las opciones múltiples respetan su máximo desde la selección y permiten deshacerla.
+
+Validación: Chromium real en escritorio y móvil, con catálogo sintético y fallos de imagen controlados.
+Se conserva una sola prueba automatizada. No se agregan dependencias ni archivos de evidencia al PR.
+Fuentes: guía de carga diferida de web.dev y criterios de tamaño de objetivo de WCAG, citados en la investigación.
+No se presenta esta comprobación como una medición de Core Web Vitals ni una auditoría completa de accesibilidad.
+
+## 2026-11-17 — Conexión con la API
+
+Rama: `hc_digital_menu_connect`. Base: `b509fcc487bf17fe01cb80787533c98955a664ce` de staging.
+
+- Sustitución del catálogo fijo y los pedidos simulados por contratos y llamadas públicas.
+- Consulta por restaurante y sucursal con el catálogo existente de la API.
+- QR como autoridad de mesa; precios finales calculados por la API.
+- Recuperación de envíos inciertos con cuerpo y clave de idempotencia persistentes.
+- Separación del carrito por contexto y coordinación entre pestañas.
+- Conservación del tema aprobado y fotos del catálogo. Retirada de acciones operativas simuladas.
+- Una sola prueba nueva para el reintento, por instrucción del usuario. Retirada de pruebas de la simulación eliminada.
+- Investigación de UI, rendimiento y alcance en `docs/research/2026-11-17-digital-menu-recommendations.md`.
+
+Validación: recorrido Chromium en escritorio y móvil con respuestas controladas; sin errores JavaScript.
+Se comprobó pérdida de respuesta, recarga, reintento idéntico, total confirmado y consulta sin QR.
+No se creó ningún pedido remoto. El despliegue y un pedido persistido de piloto quedan pendientes.
+
 ## 2026-11-06 — Limpieza del módulo
 
 Rama: `hc_umi_menu_cleanup`. Base local: `e68ed51e`, merge del PR #260 a staging.

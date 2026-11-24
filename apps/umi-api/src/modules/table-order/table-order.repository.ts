@@ -53,6 +53,33 @@ export interface CredentialRow {
 export class TableOrderRepository {
   constructor(private readonly pg: PgService) {}
 
+  /** Resolve a public handle before the request has a merchant context. */
+  async publicMerchant(handle: string) {
+    const { rows } = await this.pg.query<{
+      id: string;
+      name: string;
+      handle: string;
+      currency: string;
+    }>(
+      `SELECT id::text, name, handle, currency FROM merchant.merchant
+       WHERE handle = $1 AND status = 'active' LIMIT 1`,
+      [handle],
+    );
+    return rows[0] ?? null;
+  }
+
+  async publicLocations(merchantId: string) {
+    const { rows } = await this.pg.tquery<{ id: string; name: string }>(
+      merchantId,
+      `SELECT l.id::text, l.name FROM merchant.location l
+       JOIN merchant.merchant m ON m.id=l.merchant_id AND m.status='active'
+       WHERE l.merchant_id=$1::uuid AND l.status='active'
+       ORDER BY lower(l.name), l.id LIMIT 500`,
+      [merchantId],
+    );
+    return rows;
+  }
+
   /**
    * The credential a guest's token names, or null.
    *
