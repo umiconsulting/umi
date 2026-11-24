@@ -5287,8 +5287,14 @@ class _CheckoutLayout extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
       final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
-      final methodBank = box.maxWidth >= 664 * scale && scale < 1.5;
-      final wide = methodBank || box.maxWidth >= 620 * scale;
+      // Fixed-width rails (112 dp methods + 304 dp account + gaps = 448 dp) do
+      // not shrink when a device runs a system font scale below 1.0 (such as
+      // Samsung's 0.85 default on 600 dp portrait tablets). Clamp the layout
+      // breakpoint floor to 1.0 so the middle payment column is never squeezed
+      // to ~130 dp.
+      final layoutScale = scale < 1.0 ? 1.0 : scale;
+      final methodBank = box.maxWidth >= 664 * layoutScale && scale < 1.5;
+      final wide = methodBank || box.maxWidth >= 620 * layoutScale;
       final narrowPanes = box.maxWidth < 900;
       final gap = narrowPanes ? 16.0 : 24.0;
       final work = Column(

@@ -2446,6 +2446,26 @@ void main() {
   }
 
   testWidgets(
+    'portrait 600dp tablet with 0.85 font scale stays single-column instead of squeezing 3 columns',
+    (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 0.85;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final sheet = await _openTenderSheet(
+        tester,
+        _CheckoutRepository(),
+        policy: CheckoutPolicy.fromJson(_policy),
+        viewport: const Size(600, 1005),
+      );
+      final work = tester.getRect(
+        find.byKey(const ValueKey('checkout-keypad')),
+      );
+      expect(work.width, greaterThan(400));
+      expect(tester.takeException(), isNull);
+      await sheet.dispose();
+    },
+  );
+
+  testWidgets(
     'phone checkout keeps method row, full cash keypad and charge reachable with the locked shell',
     (tester) async {
       final sheet = await _openTenderSheet(

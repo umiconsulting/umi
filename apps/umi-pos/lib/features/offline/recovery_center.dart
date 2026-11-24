@@ -354,6 +354,8 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
         return spanish ? 'Enviado a cocina' : 'Sent to kitchen';
       case 'pos.cart.fulfillment.set':
         return spanish ? 'Tipo de servicio' : 'Service type';
+      case 'pos.cart.table.set':
+        return spanish ? 'Mesa asignada' : 'Table assigned';
       default:
         return '#${command.deviceSequence}';
     }

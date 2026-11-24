@@ -218,7 +218,7 @@ final class _PinLoginState extends State<_PinLogin> {
     final tight = largeText ? UmiSpacing.xs : UmiSpacing.sm;
     final error = _tooShort
         ? l.operatorPinLength
-        : _pinError(l, widget.controller.state.errorCode);
+        : _pinError(l, widget.controller.state.errorCode, spanish: es);
     // Touch-first PIN entry: a numeric keypad with large targets, not a text
     // field that would summon the OS keyboard on a counter tablet. The physical
     // keyboard still works through the KeyboardListener (dev, accessibility).
@@ -351,13 +351,21 @@ final class _PinLoginState extends State<_PinLogin> {
   }
 }
 
-String? _pinError(AppLocalizations l, String? code) => switch (code) {
+String? _pinError(
+  AppLocalizations l,
+  String? code, {
+  required bool spanish,
+}) => switch (code) {
+  null => null,
   'PIN_LOCKED' => l.operatorPinLocked,
   'RATE_LIMITED' => l.operatorPinRateLimited,
   'ENTITLEMENT_DISABLED' => l.operatorPinEntitlementDisabled,
   'BRANCH_NOT_FOUND' => l.operatorPinBranchInvalid,
   'PERMISSION_DENIED' => l.operatorPinInvalid,
-  _ => null,
+  _ =>
+    spanish
+        ? 'No se pudo verificar el PIN. Revisa la conexión e intenta de nuevo.'
+        : 'Could not verify the PIN. Check your connection and try again.',
 };
 
 final class _LoginState extends State<_Login> {
