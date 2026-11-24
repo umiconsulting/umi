@@ -78,7 +78,9 @@
     "ci:release": "node --test scripts/deploy-release.spec.mjs",
     "smoke:staging": "node scripts/staging-smoke.mjs",
     "smoke:staging:test": "node --test scripts/staging-smoke.spec.mjs",
-    "pos:release-smoke": "bash scripts/pos-release-smoke.sh"
+    "pos:release-smoke": "bash scripts/pos-release-smoke.sh",
+    "hooks:stats": "node scripts/hooks/report.mjs",
+    "hooks:test": "node --test scripts/hooks/hooks.test.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
