@@ -2,6 +2,8 @@
 
 ## 2026-11-24 — Selección de variantes
 
+- Carrito con columna de imagen de 54 píxeles, separación de 14 píxeles y contenido flexible para evitar solapes.
+
 - Modal obligatorio al agregar productos con variantes u opciones. Agregado directo para productos simples.
 - Precio estimado y separación de líneas por variante, con el nombre elegido en el carrito.
 - Validación y precio del servidor; snapshot de la variante para preparación y recepción en POS.
