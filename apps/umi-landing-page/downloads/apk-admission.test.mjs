@@ -21,7 +21,7 @@ test(
     const dir = mkdtempSync(join(tmpdir(), 'umipos-signer-test-'));
     try {
       assert.equal(sha256(readFileSync(apk)), base.sha256);
-      assert.equal(readApk(apk).versionCode, 337);
+      assert.equal(readApk(apk).versionCode, base.versionCode);
       run('keytool', [
         '-genkeypair',
         '-alias',

@@ -133,7 +133,9 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                 l.recoveryCenterTitle,
                 style: PosTheme.of(context).textTheme.headlineMedium,
               ),
+              const SizedBox(height: UmiSpacing.xs),
               Semantics(liveRegion: true, child: Text(_statusText(l, status))),
+              const SizedBox(height: UmiSpacing.sm),
               PosProgress(
                 value: status.total == 0
                     ? null
@@ -279,9 +281,12 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                         },
                       ),
               ),
+              const SizedBox(height: UmiSpacing.sm),
               Wrap(
                 spacing: UmiSpacing.sm,
                 runSpacing: UmiSpacing.sm,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   for (final action in actions)
                     Semantics(
@@ -306,11 +311,11 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                         ),
                       ),
                     ),
+                  PosTextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(l.closeAction),
+                  ),
                 ],
-              ),
-              PosTextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(l.closeAction),
               ),
             ],
           ),

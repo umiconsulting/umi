@@ -901,6 +901,7 @@ final class SaleCenterSurfaceState extends State<SaleCenterSurface> {
           box.maxWidth < 760 || MediaQuery.textScalerOf(context).scale(16) > 22;
       final sorting = PosSelect<String>(
         value: sort,
+        isExpanded: true,
         items: [
           PosSelectItem(
             value: 'newest',
@@ -920,6 +921,7 @@ final class SaleCenterSurfaceState extends State<SaleCenterSurface> {
       final filtering = compact
           ? PosSelect<String>(
               value: filter ?? 'all',
+              isExpanded: true,
               items: [
                 for (final (value, label) in choices)
                   PosSelectItem(value: value, child: Text(label)),

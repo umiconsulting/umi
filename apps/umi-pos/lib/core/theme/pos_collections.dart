@@ -137,6 +137,7 @@ class PosBadge extends StatelessWidget {
     this.child,
     this.isLabelVisible = true,
     this.backgroundColor,
+    this.foregroundColor,
     super.key,
   });
   PosBadge.count({
@@ -144,24 +145,26 @@ class PosBadge extends StatelessWidget {
     this.child,
     this.isLabelVisible = true,
     this.backgroundColor,
+    this.foregroundColor,
     super.key,
   }) : label = Text('$count');
   final Widget? label, child;
   final bool isLabelVisible;
-  final Color? backgroundColor;
+  final Color? backgroundColor, foregroundColor;
   @override
   Widget build(BuildContext context) {
     final palette = PosTheme.of(context).colorScheme;
     final badge = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
         color: backgroundColor ?? palette.primary,
         borderRadius: BorderRadius.circular(8),
       ),
       child: DefaultTextStyle(
         style: PosTheme.of(context).textTheme.labelSmall!.copyWith(
-          color: palette.onPrimary,
+          color: foregroundColor ?? palette.onPrimary,
           fontSize: 10,
+          fontWeight: FontWeight.w700,
         ),
         child: label ?? const SizedBox(width: 4, height: 4),
       ),
@@ -171,7 +174,7 @@ class PosBadge extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         child!,
-        if (isLabelVisible) Positioned(right: -8, top: -7, child: badge),
+        if (isLabelVisible) Positioned(right: -10, top: -6, child: badge),
       ],
     );
   }
@@ -514,15 +517,21 @@ class PosSelect<T> extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: isExpanded
             ? CrossAxisAlignment.stretch
-            : CrossAxisAlignment.center,
+            : CrossAxisAlignment.start,
         children: [
           Semantics(
             expanded: expanded,
             child: PosOutlineButton(
               focusNode: focus,
               onPressed: open,
+              style: isExpanded
+                  ? PosOutlineButton.styleFrom(alignment: Alignment.centerLeft)
+                  : null,
               child: Row(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize: isExpanded ? MainAxisSize.max : MainAxisSize.min,
+                mainAxisAlignment: isExpanded
+                    ? MainAxisAlignment.spaceBetween
+                    : MainAxisAlignment.start,
                 children: [
                   Flexible(child: match?.child ?? hint ?? const Text('—')),
                   const SizedBox(width: 12),
@@ -550,7 +559,7 @@ class PosSelectFormField<T> extends FormField<T> {
     ValueChanged<T?>? onChanged,
     PosFieldDecoration decoration = const PosFieldDecoration(),
     Widget? hint,
-    bool isExpanded = false,
+    bool isExpanded = true,
     super.validator,
     super.onSaved,
     super.autovalidateMode,

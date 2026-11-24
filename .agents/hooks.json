@@ -1,0 +1,39 @@
+{
+  "prod-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ../scripts/hooks/prod-guard.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "gotcha-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command|read_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ../scripts/hooks/gotcha-guard.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "hygiene-guard": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node ../scripts/hooks/hygiene-guard.mjs",
+        "timeout": 5
+      }
+    ]
+  }
+}

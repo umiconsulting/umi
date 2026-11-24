@@ -291,8 +291,10 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
               ),
             ),
         ],
-        if (state.history?.pointsBalance case final points?)
+        if (state.history?.pointsBalance case final points?) ...[
+          const SizedBox(height: 12),
           PosCard(
+            margin: EdgeInsets.zero,
             child: PosListRow(
               leading: const PosIcon(PosGlyphs.starsOutlined),
               title: Text(_copy('Puntos disponibles', 'Available points')),
@@ -305,6 +307,8 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
               ),
             ),
           ),
+        ],
+        const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,

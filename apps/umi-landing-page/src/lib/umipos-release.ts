@@ -1,4 +1,4 @@
-import type initialRelease from '@/data/umipos-release.json';
+import initialRelease from '@/data/umipos-release.json';
 import stagingRelease from '@/data/umipos-staging-release.json';
 
 export type DownloadChannel = 'production' | 'staging';
@@ -31,9 +31,9 @@ export function getFallbackRelease(channel: DownloadChannel): {
     };
   }
   return {
-    versionCode: 337,
-    artifactFile: 'UmiPOS-1.0.0-production-release-build337.apk',
-    url: 'https://dea44d87.umi-pos-downloads.pages.dev/umipos/android/337/UmiPOS-1.0.0-production-release-build337.apk',
+    versionCode: initialRelease.versionCode,
+    artifactFile: initialRelease.artifactFile,
+    url: `${initialRelease.downloadOrigin}/${initialRelease.objectPrefix}/${initialRelease.artifactFile}`,
   };
 }
 
