@@ -1,5 +1,13 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Prueba con el catálogo de staging
+
+- Puente local opcional hacia las rutas públicas de la API, sin credenciales del dashboard.
+- Conservación de las respuestas reales y de los errores; sin catálogo de respaldo ni pedidos simulados.
+- Validación de ONCA, mesa T3: 64 productos, ocho con opciones, escritorio y móvil sin errores JavaScript.
+- No se envían pedidos, no se modifica la ocupación de mesas y no se despliega el PR.
+- La consulta sin QR continúa pendiente de la nueva ruta en la API desplegada.
+
 ## 2026-11-18 — Claridad y controles del menú
 
 - Búsqueda sin resultados con texto específico y botón para borrarla.

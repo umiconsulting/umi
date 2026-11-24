@@ -54,6 +54,29 @@ Sin sucursal explícita, sólo se selecciona automáticamente cuando hay exactam
 El modelo actual publica negocios activos con handle público y catálogo activo; no añade un interruptor editorial.
 Consulta las decisiones y límites en [la nota de API](../../docs/research/2026-11-17-public-menu-api.md).
 
+## Prueba local con el staging desplegado
+
+Para consultar el endpoint QR existente desde loopback sin cambiar CORS en staging:
+
+```sh
+UMI_MENU_API_ORIGIN=http://127.0.0.1:56456 \
+UMI_MENU_PROXY_API_ORIGIN=https://api-staging.umiconsulting.co \
+pnpm --filter @umi/menu dev
+```
+
+Abre `/qr/:token` con una credencial emitida para una mesa de staging.
+El puente local permite únicamente GET del menú público y POST del pedido por token.
+No reenvía cookies, contraseñas ni encabezados de autenticación del dashboard.
+El POST exige el origen local y conserva la respuesta de staging; no simula confirmaciones.
+Este modo no altera el origen predeterminado del build ni la configuración de producción.
+El servidor escucha sólo en `127.0.0.1`.
+
+El 24 de noviembre se validó ONCA, mesa T3, con 64 productos y ocho productos con opciones.
+El catálogo procede del endpoint QR desplegado. No se envió ningún pedido.
+La credencial de prueba queda fuera del repositorio. No vuelques su token en logs o capturas.
+La consulta sin QR aún requiere que la API desplegada incorpore la nueva ruta pública.
+La API anterior puede omitir fotos y categorías; la interfaz conserva el respaldo visual.
+
 ## Funcionalidad y límites
 
 - Productos, categorías, fotografías HTTPS, precios y opciones provienen de la API.
