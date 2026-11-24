@@ -1,5 +1,10 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Búsqueda persistente
+
+- Buscador y categorías permanecen juntos al desplazar el catálogo.
+- Controles compactos en móvil; el título principal permanece fuera del bloque fijo.
+
 ## 2026-11-24 — Revisión y navegación
 
 - Aviso de pago con el personal en el carrito, confirmación y recibo.

@@ -1882,21 +1882,24 @@
       <div class="layout">
         <section class="menu-main" aria-label="Menú">
           <div class="mobile-context" id="mobile-context"></div>
-          <label class="search"
-            ><svg class="icon"><use href="#i-search" /></svg><span class="sr">Buscar productos</span
-            ><input
-              id="search"
-              type="search"
-              placeholder="Buscar en el menú"
-              autocomplete="off" /><button
-              id="clear-search"
-              type="button"
-              hidden
-              aria-label="Limpiar búsqueda"
-            >
-              <svg class="icon"><use href="#i-x" /></svg></button
-          ></label>
-          <nav class="categories" aria-label="Categorías del menú" role="tablist"></nav>
+          <div class="menu-controls">
+            <label class="search"
+              ><svg class="icon"><use href="#i-search" /></svg
+              ><span class="sr">Buscar productos</span
+              ><input
+                id="search"
+                type="search"
+                placeholder="Buscar en el menú"
+                autocomplete="off" /><button
+                id="clear-search"
+                type="button"
+                hidden
+                aria-label="Limpiar búsqueda"
+              >
+                <svg class="icon"><use href="#i-x" /></svg></button
+            ></label>
+            <nav class="categories" aria-label="Categorías del menú" role="tablist"></nav>
+          </div>
           <div class="section-head">
             <h2 id="category-title">Menú</h2>
             <span id="result-count" role="status" aria-live="polite" aria-atomic="true"></span>

@@ -1121,15 +1121,23 @@ body {
   display: none;
 }
 
-.categories {
+.menu-controls {
   position: sticky;
   top: 0;
   z-index: 5;
   background: var(--bg, #f7f7f4);
-  padding-block: 10px;
+  padding-top: 8px;
+}
+.menu-controls .categories {
+  position: static;
+  margin-block: 8px 0;
+  padding-block: 3px 10px;
+}
+.menu-controls .search {
+  margin: 0;
 }
 #products {
-  scroll-margin-top: 76px;
+  scroll-margin-top: 128px;
 }
 .card-availability {
   align-self: flex-start;
@@ -1165,4 +1173,13 @@ body {
   margin: 6px 0 0;
   color: var(--muted);
   font-size: 14px;
+}
+
+@media (max-width: 480px) {
+  .menu-controls .search {
+    min-height: 44px;
+  }
+  .menu-controls .category {
+    padding: 8px 12px;
+  }
 }
