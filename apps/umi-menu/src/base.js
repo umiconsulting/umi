@@ -181,7 +181,7 @@ function renderContext() {
   const label = context?.kind === 'table' && menu ? menu.tableLabel : 'Consulta del menú';
   const description =
     context?.kind === 'table'
-      ? 'El pago se realiza con el personal del restaurante. El restaurante confirma tu pedido al enviarlo.'
+      ? 'El restaurante confirma tu pedido al enviarlo.'
       : 'Para pedir desde la mesa, escanea su QR. Puedes consultar el menú sin hacer un pedido.';
   $('#fulfillment').innerHTML =
     `<div class="row"><span class="context-icon">${icon('table')}</span><div><div class="context-title">${escapeHTML(label)}</div></div></div><p class="small muted">${escapeHTML(description)}</p>`;

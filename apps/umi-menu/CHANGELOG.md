@@ -1,5 +1,9 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Aviso de pago único
+
+- Retirada del aviso de pago en la tarjeta de mesa para evitar su repetición junto al carrito.
+
 ## 2026-11-24 — Moneda explícita
 
 - Precios con símbolo y código de moneda, por ejemplo $50.00 MXN.
