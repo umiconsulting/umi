@@ -1924,6 +1924,7 @@ final class _ActiveShiftSectionState extends State<_ActiveShiftSection> {
               const SizedBox(height: 16),
               Expanded(
                 child: SingleChildScrollView(
+                  key: ValueKey('cash-tab-$_tab'),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -3078,11 +3079,15 @@ Future<void> _count(BuildContext context, CashController controller) async {
                     Row(
                       children: [
                         Expanded(child: totalLabel),
+                        const SizedBox(width: 8),
                         Flexible(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
+                          child: Align(
                             alignment: Alignment.centerRight,
-                            child: amount,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: amount,
+                            ),
                           ),
                         ),
                       ],
@@ -3186,7 +3191,7 @@ Future<void> _count(BuildContext context, CashController controller) async {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

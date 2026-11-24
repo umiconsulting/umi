@@ -350,7 +350,7 @@ final class _PosSettingsWorkspaceState extends State<PosSettingsWorkspace> {
             children: [
               Padding(
                 key: const ValueKey('settings-sections'),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: LayoutBuilder(
                   builder: (context, bank) {
                     final scale = MediaQuery.textScalerOf(context).scale(1);

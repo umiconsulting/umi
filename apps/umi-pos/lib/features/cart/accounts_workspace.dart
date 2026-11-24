@@ -119,18 +119,21 @@ class AccountsWorkspace extends StatelessWidget {
               ),
             Expanded(
               child: list
-                  ? OpenAccountsList(
-                      additionalRows: freeTables,
-                      watchedAccount: watchedAccount,
-                      readAccount: readAccount,
-                      onAccountReleased: onAccountReleased,
-                      load: load,
-                      showFulfillmentFilter: true,
-                      showDateFilter: true,
-                      onCancelCarriedOver: onCancelCarriedOver,
-                      onDismissNotice: onDismissNotice,
-                      currentBusinessDate: currentBusinessDate,
-                      onSelected: onSelected,
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: OpenAccountsList(
+                        additionalRows: freeTables,
+                        watchedAccount: watchedAccount,
+                        readAccount: readAccount,
+                        onAccountReleased: onAccountReleased,
+                        load: load,
+                        showFulfillmentFilter: true,
+                        showDateFilter: true,
+                        onCancelCarriedOver: onCancelCarriedOver,
+                        onDismissNotice: onDismissNotice,
+                        currentBusinessDate: currentBusinessDate,
+                        onSelected: onSelected,
+                      ),
                     )
                   : tables!,
             ),

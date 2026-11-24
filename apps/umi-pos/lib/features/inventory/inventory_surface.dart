@@ -249,50 +249,69 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                             .toList(),
                       ),
                     ),
-                  if (widget.permissions.allows('inventory.count.create') &&
-                      (state.count == null ||
-                          [
-                            'committed',
-                            'cancelled',
-                          ].contains(state.count!.count['status'])))
+                  if ((widget.permissions.allows('inventory.count.create') &&
+                          (state.count == null ||
+                              [
+                                'committed',
+                                'cancelled',
+                              ].contains(state.count!.count['status']))) ||
+                      widget.permissions.allows('inventory.production.produce'))
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: PosButton.icon(
-                          onPressed: state.busy
-                              ? null
-                              : () =>
-                                    widget.controller.startCount(widget.scope),
-                          icon: const PosIcon(PosGlyphs.factCheckOutlined),
-                          label: Text(
-                            _copy('Iniciar conteo ciego', 'Start blind count'),
-                          ),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (widget.permissions.allows(
+                                  'inventory.count.create',
+                                ) &&
+                                (state.count == null ||
+                                    [
+                                      'committed',
+                                      'cancelled',
+                                    ].contains(state.count!.count['status'])))
+                              PosButton.icon(
+                                compact: true,
+                                onPressed: state.busy
+                                    ? null
+                                    : () => widget.controller.startCount(
+                                        widget.scope,
+                                      ),
+                                icon: const PosIcon(
+                                  PosGlyphs.factCheckOutlined,
+                                ),
+                                label: Text(
+                                  _copy(
+                                    'Iniciar conteo ciego',
+                                    'Start blind count',
+                                  ),
+                                ),
+                              ),
+                            if (widget.permissions.allows(
+                              'inventory.production.produce',
+                            ))
+                              PosButton.icon(
+                                compact: true,
+                                onPressed: state.busy
+                                    ? null
+                                    : () => _productionDialog(),
+                                icon: const PosIcon(
+                                  PosGlyphs.precisionManufacturingOutlined,
+                                ),
+                                label: Text(
+                                  AppLocalizations.of(
+                                    context,
+                                  ).inventoryProductionAction,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
                   if (state.count != null && !blindCountActive)
                     _countPanel(state.count!),
-                  if (widget.permissions.allows('inventory.production.produce'))
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: PosButton.icon(
-                          onPressed: state.busy
-                              ? null
-                              : () => _productionDialog(),
-                          icon: const PosIcon(
-                            PosGlyphs.precisionManufacturingOutlined,
-                          ),
-                          label: Text(
-                            AppLocalizations.of(
-                              context,
-                            ).inventoryProductionAction,
-                          ),
-                        ),
-                      ),
-                    ),
                   Expanded(
                     child: blindCountActive
                         ? SingleChildScrollView(
@@ -1198,68 +1217,90 @@ final class _InventoryItemCard extends StatelessWidget {
       balance?['reserved'] ?? 0,
       scale,
     );
+    final actions = <Widget>[
+      if (permissions.allows('inventory.adjust.increase'))
+        PosOutlineButton.icon(
+          compact: true,
+          onPressed: busy ? null : () => onAction('increase'),
+          icon: const PosIcon(PosGlyphs.add),
+          label: Text(
+            es ? 'Aumentar' : 'Increase',
+            semanticsLabel: es
+                ? 'Aumentar existencias de ${item['displayName']}'
+                : 'Increase stock for ${item['displayName']}',
+          ),
+        ),
+      if (permissions.allows('inventory.adjust.decrease'))
+        PosOutlineButton.icon(
+          compact: true,
+          onPressed: busy ? null : () => onAction('decrease'),
+          icon: const PosIcon(PosGlyphs.remove),
+          label: Text(
+            es ? 'Reducir' : 'Decrease',
+            semanticsLabel: es
+                ? 'Reducir existencias de ${item['displayName']}'
+                : 'Decrease stock for ${item['displayName']}',
+          ),
+        ),
+      if (permissions.allows('inventory.waste.create'))
+        PosIconButton(
+          tooltip: es ? 'Registrar merma' : 'Record waste',
+          onPressed: busy ? null : () => onAction('waste'),
+          icon: const PosIcon(PosGlyphs.deleteSweepOutlined),
+        ),
+      if (permissions.allows('inventory.damage.create'))
+        PosIconButton(
+          tooltip: es ? 'Registrar daño' : 'Record damage',
+          onPressed: busy ? null : () => onAction('damage'),
+          icon: const PosIcon(PosGlyphs.reportProblemOutlined),
+        ),
+      if (permissions.allows('inventory.quarantine.release') &&
+          (balance?['quarantine'] as num? ?? 0) > 0)
+        PosIconButton(
+          tooltip: es ? 'Liberar cuarentena' : 'Release quarantine',
+          onPressed: busy ? null : () => onAction('quarantine_release'),
+          icon: const PosIcon(PosGlyphs.inventoryOutlined),
+        ),
+    ];
     return PosCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 260,
-              child: PosListRow(
-                contentPadding: EdgeInsets.zero,
-                title: Text(item['displayName']! as String),
-                subtitle: Text(
-                  '${item['publicReference']} · ${InventoryQuantityText.unit(item['baseUnit']! as String)}',
-                ),
+            PosListRow(
+              contentPadding: EdgeInsets.zero,
+              title: Text(item['displayName']! as String),
+              subtitle: Text(
+                '${item['publicReference']} · ${InventoryQuantityText.unit(item['baseUnit']! as String)}',
               ),
             ),
-            _Metric(label: es ? 'Existencia física' : 'On hand', value: onHand),
-            _Metric(label: es ? 'Reservado' : 'Reserved', value: reserved),
-            _Metric(label: es ? 'Disponible' : 'Available', value: available),
-            if (permissions.allows('inventory.adjust.increase'))
-              PosOutlineButton.icon(
-                onPressed: busy ? null : () => onAction('increase'),
-                icon: const PosIcon(PosGlyphs.add),
-                label: Text(
-                  es ? 'Aumentar' : 'Increase',
-                  semanticsLabel: es
-                      ? 'Aumentar existencias de ${item['displayName']}'
-                      : 'Increase stock for ${item['displayName']}',
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _Metric(
+                  label: es ? 'Existencia física' : 'On hand',
+                  value: onHand,
                 ),
-              ),
-            if (permissions.allows('inventory.adjust.decrease'))
-              PosOutlineButton.icon(
-                onPressed: busy ? null : () => onAction('decrease'),
-                icon: const PosIcon(PosGlyphs.remove),
-                label: Text(
-                  es ? 'Reducir' : 'Decrease',
-                  semanticsLabel: es
-                      ? 'Reducir existencias de ${item['displayName']}'
-                      : 'Decrease stock for ${item['displayName']}',
+                _Metric(label: es ? 'Reservado' : 'Reserved', value: reserved),
+                _Metric(
+                  label: es ? 'Disponible' : 'Available',
+                  value: available,
                 ),
+              ],
+            ),
+            if (actions.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: actions,
               ),
-            if (permissions.allows('inventory.waste.create'))
-              PosIconButton(
-                tooltip: es ? 'Registrar merma' : 'Record waste',
-                onPressed: busy ? null : () => onAction('waste'),
-                icon: const PosIcon(PosGlyphs.deleteSweepOutlined),
-              ),
-            if (permissions.allows('inventory.damage.create'))
-              PosIconButton(
-                tooltip: es ? 'Registrar daño' : 'Record damage',
-                onPressed: busy ? null : () => onAction('damage'),
-                icon: const PosIcon(PosGlyphs.reportProblemOutlined),
-              ),
-            if (permissions.allows('inventory.quarantine.release') &&
-                (balance?['quarantine'] as num? ?? 0) > 0)
-              PosIconButton(
-                tooltip: es ? 'Liberar cuarentena' : 'Release quarantine',
-                onPressed: busy ? null : () => onAction('quarantine_release'),
-                icon: const PosIcon(PosGlyphs.inventoryOutlined),
-              ),
+            ],
           ],
         ),
       ),

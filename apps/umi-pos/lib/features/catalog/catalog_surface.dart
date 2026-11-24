@@ -3072,6 +3072,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           .toList();
       if (!surfaces.contains(selected)) selected = TillSurface.settings;
     }
+    final palette = PosTheme.of(context).colorScheme;
     return PosNavigation(
       selectedIndex: surfaces.indexOf(selected).clamp(0, surfaces.length - 1),
       onDestinationSelected: (index) {
@@ -3097,6 +3098,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               key: ValueKey(surface),
               icon: PosBadge(
                 isLabelVisible: widget.cash.activeShiftId == null,
+                backgroundColor: palette.signal,
+                foregroundColor: palette.onSignal,
                 child: const PosIcon(PosGlyph('nav_wallet')),
               ),
               label: spanish ? 'Caja' : 'Cash',
@@ -3112,6 +3115,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               icon: PosBadge.count(
                 count: _openAccountCount,
                 isLabelVisible: _openAccountCount > 0,
+                backgroundColor: palette.signal,
+                foregroundColor: palette.onSignal,
                 child: const PosIcon(PosGlyph('nav_layout-grid')),
               ),
               label: spanish ? 'Mesas' : 'Tables',
@@ -3127,6 +3132,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               icon: PosBadge.count(
                 count: _incomingCount ?? 0,
                 isLabelVisible: _incomingCount != null && _incomingCount! > 0,
+                backgroundColor: palette.signal,
+                foregroundColor: palette.onSignal,
                 child: const PosIcon(PosGlyph('nav_inbox')),
               ),
               label: spanish ? 'Pedidos' : 'Orders',
@@ -3267,23 +3274,28 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         ],
       ),
     );
-    final productTools = ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 44),
-      child: Row(
-        children: [
-          if (landscape && newOrder != null) newOrder,
-          const Spacer(),
-          if (_frequentTop.isNotEmpty)
-            PosTextButton(
-              onPressed: () => setState(() => _showFrequent = !_showFrequent),
-              child: Text(
-                spanish ? 'Frecuentes' : 'Frequent',
-                style: PosTheme.of(context).textTheme.bodySmall,
-              ),
+    final hasProductTools =
+        (landscape && newOrder != null) || _frequentTop.isNotEmpty;
+    final productTools = hasProductTools
+        ? ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Row(
+              children: [
+                if (landscape && newOrder != null) newOrder,
+                const Spacer(),
+                if (_frequentTop.isNotEmpty)
+                  PosTextButton(
+                    onPressed: () =>
+                        setState(() => _showFrequent = !_showFrequent),
+                    child: Text(
+                      spanish ? 'Frecuentes' : 'Frequent',
+                      style: PosTheme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
-    );
+          )
+        : const SizedBox(height: 12);
     final serviceChoice = _serviceChoice == null
         ? null
         : CallbackShortcuts(
@@ -4615,7 +4627,9 @@ final class _DetailState extends State<_Detail> {
   }) => LayoutBuilder(
     builder: (context, constraints) {
       const gap = UmiSpacing.sm;
-      const perRow = 1;
+      final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+      final portrait = MediaQuery.sizeOf(context).width < 600;
+      final perRow = portrait && constraints.maxWidth >= 320 * scale ? 2 : 1;
       final tileWidth = (constraints.maxWidth - gap * (perRow - 1)) / perRow;
       final rows = <List<Widget>>[];
       for (var start = 0; start < tiles.length; start += perRow) {
@@ -4672,7 +4686,7 @@ final class _DetailState extends State<_Detail> {
             spacing: 8,
             runSpacing: 4,
             children: [
-              Text(name, style: PosTheme.of(context).textTheme.titleSmall),
+              Text(name, style: PosTheme.of(context).textTheme.titleMedium),
               if (hint != null) ...[
                 const SizedBox(width: UmiSpacing.sm),
                 Text(
@@ -4792,7 +4806,7 @@ final class _DetailState extends State<_Detail> {
       LayoutBuilder(
         builder: (context, constraints) {
           final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
-          final twoColumns = constraints.maxWidth >= 344 * scale;
+          final twoColumns = constraints.maxWidth >= 600 * scale;
           final width = twoColumns
               ? (constraints.maxWidth - 24) / 2
               : constraints.maxWidth;
@@ -4806,7 +4820,7 @@ final class _DetailState extends State<_Detail> {
                       Flexible(
                         child: Text(
                           l.variantsLabel,
-                          style: PosTheme.of(context).textTheme.titleLarge,
+                          style: PosTheme.of(context).textTheme.titleMedium,
                         ),
                       ),
                       // A dead button with no reason is the thing the pilot keeps
@@ -4894,35 +4908,43 @@ final class _DetailState extends State<_Detail> {
             l.cartQuantityLabel,
             style: PosTheme.of(context).textTheme.titleSmall,
           );
-          final quantityStepper = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              PosIconButton(
-                tooltip: l.decreaseQuantity,
-                onPressed: quantity > 1
-                    ? () => setState(() => quantity--)
-                    : null,
-                icon: const PosIcon(PosGlyphs.remove),
+          final quantityStepper = Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(UmiRadius.control),
+              border: Border.all(
+                color: PosTheme.of(context).colorScheme.outlineVariant,
               ),
-              SizedBox(
-                width: 32,
-                child: Text(
-                  '$quantity',
-                  textAlign: TextAlign.center,
-                  style: PosTheme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                PosIconButton(
+                  tooltip: l.decreaseQuantity,
+                  onPressed: quantity > 1
+                      ? () => setState(() => quantity--)
+                      : null,
+                  icon: const PosIcon(PosGlyphs.remove),
+                ),
+                SizedBox(
+                  width: 32,
+                  child: Text(
+                    '$quantity',
+                    textAlign: TextAlign.center,
+                    style: PosTheme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
                 ),
-              ),
-              PosIconButton(
-                tooltip: l.increaseQuantity,
-                onPressed: quantity < 999
-                    ? () => setState(() => quantity++)
-                    : null,
-                icon: const PosIcon(PosGlyphs.add),
-              ),
-            ],
+                PosIconButton(
+                  tooltip: l.increaseQuantity,
+                  onPressed: quantity < 999
+                      ? () => setState(() => quantity++)
+                      : null,
+                  icon: const PosIcon(PosGlyphs.add),
+                ),
+              ],
+            ),
           );
           final quantityControl = sideBySide
               ? Column(
@@ -5101,9 +5123,9 @@ final class _DetailState extends State<_Detail> {
             thumbVisibility: true,
             child: ListView(
               controller: detailScroll,
-              padding: EdgeInsets.all(
-                MediaQuery.sizeOf(context).width < 700 ? 0 : 16,
-              ),
+              padding: MediaQuery.sizeOf(context).width < 700
+                  ? const EdgeInsets.fromLTRB(4, 12, 12, 12)
+                  : const EdgeInsets.all(16),
               children: children,
             ),
           ),
@@ -6374,28 +6396,40 @@ final class _CartPanelState extends State<_CartPanel> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (onClose != null)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: PosIconButton(
-                      tooltip: l.closeOrderAction,
-                      onPressed: onClose,
-                      icon: const PosIcon(PosGlyphs.arrowBack),
-                    ),
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (onClose != null) ...[
+                      PosIconButton(
+                        tooltip: l.closeOrderAction,
+                        onPressed: onClose,
+                        icon: const PosIcon(PosGlyphs.arrowBack),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Expanded(child: _heading(context, l, showClose: false)),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Expanded(
                   child: ListView(
                     children: [
-                      _heading(context, l, showClose: false),
-                      const SizedBox(height: 8),
                       ...accountContext,
                       ...lines,
                       ...footer,
-                      if (box.maxHeight < 440) ...[...dispatch, ...actions],
+                      if (box.maxHeight < 440) ...[
+                        ...dispatch,
+                        if (dispatch.isNotEmpty) const SizedBox(height: 8),
+                        ...actions,
+                      ],
                     ],
                   ),
                 ),
-                if (box.maxHeight >= 440) ...[...dispatch, ...actions],
+                if (box.maxHeight >= 440) ...[
+                  ...dispatch,
+                  if (dispatch.isNotEmpty) const SizedBox(height: 8),
+                  ...actions,
+                ],
               ],
             );
           }

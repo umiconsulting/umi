@@ -123,6 +123,27 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   /// Drives the map's zoom. The zoom buttons and the pinch gesture write the
   /// same controller, so the two cannot disagree about the scale.
   final TransformationController _zoom = TransformationController();
+  final ScrollController _portraitScroll = ScrollController();
+
+  void _scrollToPortraitDetail() {
+    if (!_portraitPanel) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_portraitScroll.hasClients) return;
+      final target = _portraitScroll.position.maxScrollExtent;
+      if (target <= 0) return;
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _portraitScroll.jumpTo(target);
+      } else {
+        unawaited(
+          _portraitScroll.animateTo(
+            target,
+            duration: UmiMotion.fast,
+            curve: Curves.easeOut,
+          ),
+        );
+      }
+    });
+  }
 
   static const double _zoomStep = 1.25;
 
@@ -234,6 +255,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     _timer?.cancel();
     _ticker?.cancel();
     _zoom.dispose();
+    _portraitScroll.dispose();
     WidgetsBinding.instance.removeObserver(this);
     widget.entry.removeListener(_entryChanged);
     widget.controller.removeListener(_changed);
@@ -439,12 +461,29 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
             Expanded(
               child: _portraitPanel
                   ? ListView(
+                      controller: _portraitScroll,
                       children: [
                         SizedBox(
                           height: (MediaQuery.sizeOf(context).width * .62)
-                              .clamp(320.0, 450.0),
-                          child: _roomView(area, visuals, l10n, es),
+                              .clamp(250.0, 320.0),
+                          child: _roomView(
+                            area,
+                            visuals,
+                            l10n,
+                            es,
+                            includeFooter: false,
+                          ),
                         ),
+                        if (!_accessibleList && area != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              UmiSpacing.md,
+                              0,
+                              UmiSpacing.sm,
+                              UmiSpacing.sm,
+                            ),
+                            child: _mapFooter(es),
+                          ),
                         _detailPanel(area, l10n, es, stacked: true),
                       ],
                     )
@@ -628,8 +667,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     FloorPlanArea? area,
     Map<String, FloorPlanTableVisual>? visuals,
     AppLocalizations l10n,
-    bool es,
-  ) {
+    bool es, {
+    bool includeFooter = true,
+  }) {
     final controller = widget.controller;
     if (widget.directAccounts &&
         !controller.loading &&
@@ -732,15 +772,16 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            UmiSpacing.md,
-            0,
-            UmiSpacing.sm,
-            UmiSpacing.sm,
+        if (includeFooter)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              UmiSpacing.md,
+              0,
+              UmiSpacing.sm,
+              UmiSpacing.sm,
+            ),
+            child: _mapFooter(es),
           ),
-          child: _mapFooter(es),
-        ),
       ],
     );
   }
@@ -751,42 +792,69 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   Widget _mapFooter(bool es) {
     final theme = PosTheme.of(context);
     final palette = _FloorPlanPalette.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final state in const [
-                  tableStateOpen,
-                  tableStateSeated,
-                  tableStateOrdered,
-                  tableStateServed,
-                  tableStateAwaitingPayment,
-                  tableVisualPaid,
-                  tableStateDirty,
-                ]) ...[
-                  PosIcon(
-                    tableStateGlyph(state),
-                    size: 13,
-                    color: palette.stateAccent(state),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _stateLabel(state, es),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: palette.stateAccent(state),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                ],
-              ],
+    final legendItems = <Widget>[
+      for (final state in const [
+        tableStateOpen,
+        tableStateSeated,
+        tableStateOrdered,
+        tableStateServed,
+        tableStateAwaitingPayment,
+        tableVisualPaid,
+        tableStateDirty,
+      ])
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PosIcon(
+              tableStateGlyph(state),
+              size: 13,
+              color: palette.stateAccent(state),
             ),
-          ),
+            const SizedBox(width: 4),
+            Text(
+              _stateLabel(state, es),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: palette.stateAccent(state),
+              ),
+            ),
+          ],
         ),
-        ..._zoomControls(es),
-      ],
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 560) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Wrap(spacing: 12, runSpacing: 4, children: legendItems),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: _zoomControls(es),
+              ),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final item in legendItems) ...[
+                      item,
+                      const SizedBox(width: 12),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            ..._zoomControls(es),
+          ],
+        );
+      },
     );
   }
 
@@ -1228,6 +1296,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     if (room == null) {
       setState(() => _selectedId = element.id);
       if (_panelShown) {
+        _scrollToPortraitDetail();
         return;
       }
       await _details(element, es);
@@ -1243,7 +1312,10 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       return;
     }
     setState(() => _selectedId = element.id);
-    if (_panelShown) return;
+    if (_panelShown) {
+      _scrollToPortraitDetail();
+      return;
+    }
     await _details(element, es, l10n);
   }
 
@@ -2251,6 +2323,7 @@ class _FloorPlanElement extends StatelessWidget {
     final label = Padding(
       padding: EdgeInsets.symmetric(
         horizontal: width * (element.shape == 'round' ? .14 : .06),
+        vertical: math.max(2.0, height * .04),
       ),
       child: FittedBox(
         fit: BoxFit.scaleDown,
