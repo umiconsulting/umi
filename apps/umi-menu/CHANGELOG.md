@@ -1,5 +1,9 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Botón de agregado
+
+- Texto y precio centrados en el botón, incluso cuando falta el precio por una selección pendiente.
+
 ## 2026-11-24 — Título principal
 
 - Título principal actualizado a «MENU DIGITAL».

@@ -1101,3 +1101,10 @@ body {
 
 .cart-clear { display: block; margin: 12px 0 12px auto; min-height: 44px; }
 .cart-heading { border-bottom: 0; padding-bottom: 0; }
+
+#add-to-cart {
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+}
+#product-total:empty { display: none; }
