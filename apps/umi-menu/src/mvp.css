@@ -743,3 +743,7 @@ textarea:focus-visible {
   appearance: none;
   display: none;
 }
+
+.placeholder-neutral::before {
+  background-image: url('/files/toast.jpg');
+}
