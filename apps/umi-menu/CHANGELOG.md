@@ -1,5 +1,16 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Jerarquía y lectura del menú
+
+- Reverso azul suave con miniatura e icono, nombre y precio destacados, resumen y única acción +.
+- Alto y ancho iguales al frente. El contenido largo se resume y permanece completo en el modal.
+- Lectura del detalle completo también para productos no disponibles; la acción de agregado sigue restringida.
+- Encabezado «Menú», texto secundario con más contraste y nombres más legibles.
+- Carrito con quitar y deshacer, sin modificar un envío pendiente. Avisos accesibles dentro de los diálogos.
+- Investigación en la nota existente, con Material, Carbon, Soft Restaurant y WCAG. Capturas sólo en Desktop.
+- Verificación en Chromium real de escritorio y móvil, descripción extensa, geometría del giro y recuperación del total.
+- Sin nuevas dependencias, pedidos, pruebas ni capturas en el repositorio.
+
 ## 2026-11-24 — Selección de variantes
 
 - Carrito con columna de imagen de 54 píxeles, separación de 14 píxeles y contenido flexible para evitar solapes.

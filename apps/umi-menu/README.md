@@ -84,10 +84,12 @@ La API anterior puede omitir fotos y categorías; la interfaz conserva el respal
 - Sin foto real se usa un fondo ilustrativo difuminado y un icono según categoría o nombre. Los productos sin tipo reconocido usan una imagen genérica desenfocada.
 - Las fotos reservan espacio y tienen respaldo si fallan; las primeras tarjetas cargan sin demora diferida.
 - Los controles principales tienen objetivos táctiles de 44 píxeles y foco visible.
-- Las tarjetas giran para mostrar detalles completos. El botón + abre siempre el modal antes de agregar al carrito.
-- La cara posterior admite desplazamiento, retorno al pulsar el reverso o Escape y movimiento reducido.
+- Las tarjetas giran para mostrar un resumen con altura fija; el contenido completo queda en el modal del +. El botón + abre siempre el modal antes de agregar al carrito.
+- La cara posterior resume el texto que no cabe. Conserva el retorno al pulsar el reverso o Escape y el movimiento reducido.
 - La búsqueda admite acentos. El detalle muestra opciones obligatorias y límites de selección.
 - El modal permite revisar cantidad, indicaciones y, cuando existen, variantes y opciones.
+- El carrito permite quitar una línea completa y deshacer. Deshacer respeta la disponibilidad y los envíos pendientes.
+- Nombre y precio tienen mayor jerarquía; el texto secundario usa un tono más oscuro para mejorar el contraste.
 - La API publica variantes activas por sucursal y valida la selección y el precio al recibir el pedido.
 - Una API anterior sin variantes abre el modal y explica que faltan las presentaciones; no se inventan opciones ni precios.
 - Sin QR válido, el menú permite consultar productos y sucursales.

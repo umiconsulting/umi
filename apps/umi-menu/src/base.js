@@ -252,19 +252,25 @@ function canAddProduct(item) {
 function productAddButton(item) {
   return `<button class="product-add icon-btn" type="button" data-add-product="${item.productId}" aria-label="Agregar ${escapeHTML(item.name)} al carrito" aria-haspopup="dialog" ${loading || !menu ? 'disabled' : ''}>${icon('plus')}</button>`;
 }
+function productDetailsMarkup(item) {
+  const name = escapeHTML(item.name);
+  const groups = item.optionGroups
+    .slice(0, 2)
+    .map(
+      (group) =>
+        `<div class="card-option-summary"><strong>${escapeHTML(group.name)}</strong><p class="card-option-rule">${group.minSelect ? `Elige al menos ${group.minSelect}` : 'Opcional'}${group.maxSelect ? ` · Máximo ${group.maxSelect}` : ''}</p></div>`,
+    )
+    .join('');
+  const variantCount = item.variants?.length ?? 0;
+  const allergy = item.allergens.length
+    ? 'Alérgenos registrados. Revísalos en +.'
+    : '¿Alergias? Consulta al personal.';
+  return `<header class="card-detail-header"><span class="card-detail-mark" aria-hidden="true">${productPhoto(item)}</span><div class="card-detail-identity"><span class="card-detail-label">${escapeHTML(item.category?.name ?? 'Detalles')}</span><h3>${name}</h3><p class="card-detail-price">${escapeHTML(money(item.price.minorUnits))}${item.hasVariants ? '<span>Precio base</span>' : ''}</p></div></header><div class="product-card-details" role="region" aria-label="Resumen de ${name}"><div class="product-card-summary">${item.description?.trim() ? `<section class="card-detail-section"><p class="card-description-preview">${escapeHTML(item.description)}</p></section>` : '<p class="card-detail-intro">Cantidad e indicaciones desde +.</p>'}${item.hasVariants ? `<p class="card-variant-count">${variantCount ? `${variantCount} ${variantCount === 1 ? 'presentación' : 'presentaciones'}` : 'Elige una presentación'}</p>` : ''}${groups ? `<section class="card-detail-section"><h4>Opciones</h4>${groups}</section>` : ''}</div><div class="card-allergen-note">${icon('info')}<p>${allergy}</p></div></div><div class="product-card-footer"><span class="card-add-hint">Detalles completos</span>${productAddButton(item)}</div>`;
+}
 function productCard(item, index) {
   const name = escapeHTML(item.name);
   const availability = availabilityLabel(item);
-  const groups = item.optionGroups
-    .map(
-      (group) =>
-        `<div class="card-option-summary"><strong>${escapeHTML(group.name)}</strong><p class="small muted">${group.minSelect ? `Mínimo ${group.minSelect}` : 'Opcional'}${group.maxSelect ? ` · Máximo ${group.maxSelect}` : ''}</p><ul>${group.modifiers.map((modifier) => `<li>${escapeHTML(modifier.name)}${modifier.priceDelta.minorUnits ? ` · ${escapeHTML(money(modifier.priceDelta.minorUnits))}` : ''}</li>`).join('')}</ul></div>`,
-    )
-    .join('');
-  const allergy = item.allergens.length
-    ? `Alérgenos registrados: ${item.allergens.map((a) => escapeHTML(a.label ?? a.name ?? a.code)).join(', ')}. Consulta al personal.`
-    : 'Consulta al personal si tienes una alergia.';
-  return `<article class="menu-product product-card" data-product="${item.productId}" aria-label="${name}"><div class="product-card-inner"><div class="product-card-front"><button class="product-card-open" type="button" data-flip-product aria-expanded="false" aria-controls="details-${item.productId}" aria-label="Ver detalles de ${name}">${productPhoto(item, false, index < 2)}<span class="menu-product-name">${name}</span>${availability ? `<span class="small muted card-availability">${escapeHTML(availability)}</span>` : ''}</button><div class="product-card-footer"><span class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</span>${productAddButton(item)}</div></div><div class="product-card-back" id="details-${item.productId}" aria-hidden="true" role="group" tabindex="0" aria-label="Detalles de ${name}. Pulsa Enter o Escape para volver." inert><div class="product-card-details" tabindex="0" role="region" aria-label="Detalles de ${name}"><h3>${name}</h3><p class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</p>${item.category ? `<p class="small muted">${escapeHTML(item.category.name)}</p>` : ''}<p>${escapeHTML(item.description || 'Este producto no tiene una descripción registrada.')}</p>${availability ? `<p class="small">${escapeHTML(availability)}</p>` : ''}${groups}<p class="small muted">${allergy}</p></div><div class="product-card-footer">${productAddButton(item)}</div></div></div></article>`;
+  return `<article class="menu-product product-card" data-product="${item.productId}" aria-label="${name}"><div class="product-card-inner"><div class="product-card-front"><button class="product-card-open" type="button" data-flip-product aria-expanded="false" aria-controls="details-${item.productId}" aria-label="Ver detalles de ${name}">${productPhoto(item, false, index < 2)}<span class="menu-product-name">${name}</span>${availability ? `<span class="small muted card-availability">${escapeHTML(availability)}</span>` : ''}</button><div class="product-card-footer"><span class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</span>${productAddButton(item)}</div></div><div class="product-card-back" id="details-${item.productId}" aria-hidden="true" role="group" tabindex="0" aria-label="Detalles de ${name}. Pulsa Enter o Escape para volver." inert>${productDetailsMarkup(item)}</div></div></article>`;
 }
 function flipProductCard(card, flipped) {
   card.classList.toggle('is-flipped', flipped);
@@ -282,12 +288,17 @@ function syncProductAddButtons() {
   document.querySelectorAll('[data-add-product]').forEach((button) => {
     const id = button.dataset.addProduct;
     const item = items().find((item) => item.productId === id);
-    button.disabled = !item || !canAddProduct(item);
+    button.disabled = !item || loading || !menu;
+    if (item)
+      button.setAttribute(
+        'aria-label',
+        canAddProduct(item) ? `Agregar ${item.name} al carrito` : `Ver detalles de ${item.name}`,
+      );
   });
 }
 function addProductFromCard(id) {
   const item = items().find((item) => item.productId === id);
-  if (!item || !canAddProduct(item)) return;
+  if (!item || loading || !menu) return;
   openProduct(id);
 }
 function renderProducts() {
