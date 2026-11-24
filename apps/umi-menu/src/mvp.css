@@ -1099,4 +1099,5 @@ body {
   .card-detail-photo { flex-basis: 90px; height: 90px; }
 }
 
-.cart-clear { display: block; margin: 0 0 12px auto; min-height: 44px; }
+.cart-clear { display: block; margin: 12px 0 12px auto; min-height: 44px; }
+.cart-heading { border-bottom: 0; padding-bottom: 0; }

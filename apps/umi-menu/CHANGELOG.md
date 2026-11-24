@@ -7,6 +7,7 @@
 ## 2026-11-24 — Vaciar carrito
 
 - Botón para vaciar el carrito en escritorio y en el diálogo móvil.
+- Encabezado sin separador y botón con espacio superior para evitar la unión visual de los bordes.
 - Opción Deshacer con validación de los productos antes de restaurarlos.
 - Acción bloqueada durante el envío o la comprobación pendiente.
 
