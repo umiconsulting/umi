@@ -1285,6 +1285,11 @@ void main() {
     );
     await tester.pump();
 
+    // Defect #1 regression: the Operate tab must read `expectedDrawerCash` from
+    // the expectedCash snapshot instead of rendering MXN 0.00.
+    expect(find.text('MXN 1,150.00'), findsOneWidget);
+    expect(find.text('MXN 0.00'), findsNothing);
+
     // The operator reads the drawer's account and the line that produced it, on
     // the same surface, without asking the owner's dashboard.
     await tester.tap(find.text('Turno'));

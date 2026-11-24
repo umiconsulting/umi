@@ -185,6 +185,100 @@ void main() {
       expect(optimisticRenameAccount(_cart(), '   ').accountName, isNull);
       expect(optimisticRenameAccount(_cart(), null).accountName, isNull);
     });
+
+    test(
+      'ProvisionalLine.fromSelection preserves contract-valid variant and modifiers for offline checkout replay',
+      () {
+        const variantId = '00000000-0000-4000-8000-0000000000a1';
+        const groupId = '00000000-0000-4000-8000-0000000000b1';
+        const modifierId = '00000000-0000-4000-8000-0000000000m1';
+        final detail = CatalogProductDetail.fromJson({
+          'id': '00000000-0000-4000-8000-000000000005',
+          'name': 'Americano',
+          'description': null,
+          'sku': 'AME',
+          'hasBarcode': false,
+          'category': {'id': 'drinks', 'name': 'Bebidas', 'displayOrder': 1},
+          'price': _money(5000),
+          'taxRateBasisPoints': 1600,
+          'saleAction': 'merchandise',
+          'availability': 'available',
+          'availableFrom': null,
+          'primaryMedia': null,
+          'hasVariants': true,
+          'hasModifiers': true,
+          'updatedAt': '2026-10-15T12:00:00.000Z',
+          'barcode': null,
+          'media': const <Object?>[],
+          'variants': [
+            {
+              'id': variantId,
+              'name': 'Frío',
+              'attributes': {'temp': 'cold'},
+              'priceDelta': _money(1000),
+              'availability': 'available',
+            },
+          ],
+          'optionGroups': [
+            {
+              'id': groupId,
+              'name': 'Leche',
+              'required': false,
+              'minSelections': 0,
+              'maxSelections': 1,
+              'modifiers': [
+                {
+                  'id': modifierId,
+                  'name': 'Avena',
+                  'priceDelta': _money(1500),
+                  'available': true,
+                },
+              ],
+            },
+          ],
+        });
+
+        final provisional = ProvisionalLine.fromSelection(
+          product: detail,
+          variantId: variantId,
+          modifierQuantities: const {modifierId: 1},
+        );
+        expect(provisional.unitMinorUnits, 7500);
+        expect(provisional.variant, {
+          'variantId': variantId,
+          'name': 'Frío',
+          'attributes': {'temp': 'cold'},
+        });
+        expect(provisional.modifiers, [
+          {
+            'modifierId': modifierId,
+            'groupId': groupId,
+            'name': 'Avena',
+            'quantity': 1,
+            'priceDelta': _money(1500),
+          },
+        ]);
+
+        final predicted = optimisticAddLine(
+          _cart(items: const []),
+          lineId: '00000000-0000-4000-8000-0000000000c9',
+          line: provisional,
+          quantity: 1,
+          courseNumber: 1,
+          variant: provisional.variant,
+          modifiers: provisional.modifiers,
+          note: 'Sin azucar',
+        );
+        final item = CartItem.fromJson(predicted.items.single);
+        expect(item.variant, {
+          'variantId': variantId,
+          'name': 'Frío',
+          'attributes': {'temp': 'cold'},
+        });
+        expect(item.modifiers.single['groupId'], groupId);
+        expect(item.modifiers.single['name'], 'Avena');
+      },
+    );
   });
 
   group('the controller paints before it confirms', () {

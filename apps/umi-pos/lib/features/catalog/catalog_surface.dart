@@ -5979,8 +5979,13 @@ final class _CartPanelState extends State<_CartPanel> {
             final details = [
               if (item.courseNumber != 1)
                 l.cartCourseCurrent(item.courseNumber),
-              if (item.variant != null) item.variant!['name'] as String,
-              ...item.modifiers.map((m) => m['name'] as String),
+              if (item.variant?['name'] case final String variantName
+                  when variantName.isNotEmpty)
+                variantName,
+              ...item.modifiers
+                  .map((m) => m['name'])
+                  .whereType<String>()
+                  .where((name) => name.isNotEmpty),
               if (item.note != null) item.note!,
             ].join(' · ');
             return Semantics(

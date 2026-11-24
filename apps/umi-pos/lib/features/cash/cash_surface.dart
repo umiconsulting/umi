@@ -1939,7 +1939,11 @@ final class _ActiveShiftSectionState extends State<_ActiveShiftSection> {
                               ? (spanish
                                     ? 'Disponible al enviar el conteo'
                                     : 'Available after submitting the count')
-                              : _money(snapshot.expectedCash!),
+                              : _money(
+                                  snapshot.expectedCash!['expectedDrawerCash']
+                                          as Map<String, Object?>? ??
+                                      snapshot.expectedCash!,
+                                ),
                           style: PosTheme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 16),
