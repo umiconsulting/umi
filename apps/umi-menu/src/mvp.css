@@ -1054,3 +1054,10 @@ textarea:focus-visible {
 .category[aria-selected='true'] .category-count {
   color: var(--blue);
 }
+
+/* Static decoration stays behind the opaque reading surfaces. */
+body {
+  background-image: url('/files/menu-fish-pattern.svg');
+  background-repeat: repeat;
+  background-size: 480px 400px;
+}

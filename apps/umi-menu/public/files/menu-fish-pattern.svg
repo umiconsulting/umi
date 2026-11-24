@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="400" viewBox="0 0 480 400">
+  <defs>
+    <g id="fish" fill="none" stroke="#223979" stroke-opacity=".065" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 32C33 14 61 14 78 32C61 50 33 50 18 32Z M18 32L3 19L6 32L3 45Z M38 19L48 10L57 19 M39 45L48 53L55 45 M58 24Q53 32 58 40"/>
+      <circle cx="67" cy="29" r="1.2"/>
+    </g>
+  </defs>
+  <use href="#fish" transform="translate(38 35) rotate(-20 40 32)"/>
+  <use href="#fish" transform="translate(310 45) rotate(18 40 32) scale(.8)"/>
+  <use href="#fish" transform="translate(180 164) rotate(160 40 32)"/>
+  <use href="#fish" transform="translate(365 278) rotate(-12 40 32) scale(.85)"/>
+  <use href="#fish" transform="translate(55 304) rotate(24 40 32) scale(.7)"/>
+</svg>

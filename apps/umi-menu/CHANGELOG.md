@@ -1,5 +1,11 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Fondo de peces
+
+- Patrón SVG estático con peces de trazo azul tenue sobre el fondo del menú.
+- Ilustración decorativa propia; conserva el logotipo y las superficies sólidas de lectura.
+- Sin dependencias, animaciones ni imágenes grandes.
+
 ## 2026-11-24 — Filtros del catálogo
 
 - Categorías publicadas de la API con prioridad; clasificación visual por tipo cuando faltan todas.
