@@ -39,6 +39,8 @@ final class ProvisionalLine {
     required this.unitMinorUnits,
     required this.currency,
     required this.taxRateBasisPoints,
+    this.variant,
+    this.modifiers = const [],
   });
 
   final String productId;
@@ -50,6 +52,14 @@ final class ProvisionalLine {
   final int unitMinorUnits;
   final String currency;
   final int taxRateBasisPoints;
+
+  /// Full contract-shaped `VariantSelection` (`variantId`, `name`, `attributes`)
+  /// so both local rendering and offline checkout replay pass strict validation.
+  final Map<String, Object?>? variant;
+
+  /// Full contract-shaped `ModifierSelection` entries (`modifierId`, `groupId`,
+  /// `name`, `quantity`, `priceDelta`).
+  final List<Map<String, Object?>> modifiers;
 
   /// Prices a selection from the catalogue detail the operator already has on
   /// screen.
@@ -67,15 +77,25 @@ final class ProvisionalLine {
   }) {
     final base = CatalogMoney.fromJson(product.price);
     var unit = base.minorUnits;
+    Map<String, Object?>? selectedVariant;
     if (variantId != null) {
       for (final raw in product.variants) {
         final variant = CatalogVariant.fromJson(raw);
         if (variant.id == variantId) {
           unit += CatalogMoney.fromJson(variant.priceDelta).minorUnits;
+          selectedVariant = {
+            'variantId': variant.id,
+            'name': variant.name,
+            'attributes': {
+              for (final entry in variant.attributes.entries)
+                entry.key: entry.value?.toString() ?? '',
+            },
+          };
           break;
         }
       }
     }
+    final selectedModifiers = <Map<String, Object?>>[];
     if (modifierQuantities.isNotEmpty) {
       for (final rawGroup in product.optionGroups) {
         final group = CatalogOptionGroup.fromJson(rawGroup);
@@ -86,6 +106,13 @@ final class ProvisionalLine {
             unit +=
                 CatalogMoney.fromJson(modifier.priceDelta).minorUnits *
                 quantity;
+            selectedModifiers.add({
+              'modifierId': modifier.id,
+              'groupId': group.id,
+              'name': modifier.name,
+              'quantity': quantity,
+              'priceDelta': modifier.priceDelta,
+            });
           }
         }
       }
@@ -97,6 +124,8 @@ final class ProvisionalLine {
       unitMinorUnits: unit,
       currency: base.currency,
       taxRateBasisPoints: product.taxRateBasisPoints,
+      variant: selectedVariant,
+      modifiers: selectedModifiers,
     );
   }
 
