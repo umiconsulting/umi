@@ -863,16 +863,20 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: PosTextButton(
-                          compact: _compactPhone,
-                          style: _compactPhone
-                              ? _compactTextButtonStyle()
-                              : null,
-                          onPressed: busy
-                              ? null
-                              : () => Navigator.of(context).pop(),
-                          child: Text(
-                            label('Volver a la cuenta', 'Back to account'),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: PosTextButton.icon(
+                            compact: _compactPhone,
+                            style: _compactPhone
+                                ? _compactTextButtonStyle()
+                                : null,
+                            onPressed: busy
+                                ? null
+                                : () => Navigator.of(context).pop(),
+                            icon: const PosIcon(PosGlyphs.arrowBack, size: 16),
+                            label: Text(
+                              label('Volver a la cuenta', 'Back to account'),
+                            ),
                           ),
                         ),
                       ),
@@ -1022,21 +1026,19 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
         ),
         if (ledger != null) ...[
           const SizedBox(width: 12),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  label('Por cobrar', 'Amount due'),
-                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
-                ),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerRight,
-                  child: Text(money(remaining), style: titleStyle),
-                ),
-              ],
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                label('Por cobrar', 'Amount due'),
+                style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+              ),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(money(remaining), style: titleStyle),
+              ),
+            ],
           ),
         ],
       ],
@@ -1109,7 +1111,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
           if (!canFinalize && !blocked) ...[
             if (_compactPhone) ...[
               _paymentMethods(),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
             ] else
               const SizedBox(height: UmiSpacing.lg),
             Text(

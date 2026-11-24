@@ -40,13 +40,13 @@ jobs:
           set -euo pipefail
           test -x "$ANDROID_HOME/build-tools/36.0.0/apksigner"
           test -x "$ANDROID_HOME/build-tools/36.0.0/aapt2"
-          curl --fail --silent --show-error --max-time 60 'https://dea44d87.umi-pos-downloads.pages.dev/umipos/android/337/UmiPOS-1.0.0-production-release-build337.apk' -o "$RUNNER_TEMP/base337.apk"
-          printf '6afd4082280fec36c5ef37356a5989d70106f0fccd60dc52f9f0fc905c25b757  %s\n' "$RUNNER_TEMP/base337.apk" | sha256sum -c -
+          curl --fail --silent --show-error --max-time 60 'https://e6378d31.umi-pos-downloads.pages.dev/umipos/android/338/UmiPOS-1.0.1-production-release-build338.apk' -o "$RUNNER_TEMP/base338.apk"
+          printf 'e3bb314b31855b9958730460c06c5356b180e5c551e365917b63b34c2561df30  %s\n' "$RUNNER_TEMP/base338.apk" | sha256sum -c -
       - name: Policy, promotion and real APK admission tests
         run: |
           export APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
           export AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt2"
-          export TEST_RELEASE_APK="$RUNNER_TEMP/base337.apk"
+          export TEST_RELEASE_APK="$RUNNER_TEMP/base338.apk"
           node --test apps/umi-landing-page/downloads/*.test.mjs
   publish:
     needs: policy

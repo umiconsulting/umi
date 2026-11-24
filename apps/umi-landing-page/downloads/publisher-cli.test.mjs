@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import base from '../src/data/umipos-release.json' with { type: 'json' };
-import { sha256 } from './release-policy.mjs';
+import { ORIGIN, sha256 } from './release-policy.mjs';
 
 const apk = process.env.TEST_RELEASE_APK;
 const root = dirname(fileURLToPath(import.meta.url));
@@ -22,7 +22,7 @@ test(
     assert.equal(sha256(bytes), base.sha256);
     const state = join(dir, 'live.json'),
       log = join(dir, 'deployments.jsonl');
-    writeFileSync(state, JSON.stringify(base));
+    writeFileSync(state, JSON.stringify({ ...base, downloadOrigin: ORIGIN }));
     const server = createServer((request, response) => {
       if (request.url === '/latest.json') {
         response.setHeader('Content-Type', 'application/json');
@@ -82,7 +82,7 @@ console.log('Deployment complete! https://'+(branch==='main'?'5678abcd':'1234abc
           env: {
             ...process.env,
             PATH: `${join(dir, 'bin')}:${process.env.PATH}`,
-            RELEASE_TAG: 'umipos-android-337',
+            RELEASE_TAG: `umipos-android-${base.versionCode}`,
             RELEASE_COMMIT: base.sourceCommit,
             TEST_LIVE_STATE: state,
             TEST_DEPLOY_LOG: log,
@@ -106,7 +106,7 @@ console.log('Deployment complete! https://'+(branch==='main'?'5678abcd':'1234abc
       const deployments = readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse);
       assert.deepEqual(
         deployments.map((args) => args[args.indexOf('--branch') + 1]),
-        ['release-337', 'main'],
+        [`release-${base.versionCode}`, 'main'],
       );
       assert.equal(
         JSON.parse(readFileSync(state, 'utf8')).downloadOrigin,

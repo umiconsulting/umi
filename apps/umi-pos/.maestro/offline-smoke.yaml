@@ -1,0 +1,8 @@
+appId: co.umiconsulting.umi_pos.estacion
+---
+# Pre-release Maestro UI smoke flow for UmiPOS (run locally on KVM via scripts/pos-release-smoke.sh).
+# Never run on every dev PR — reserved for pre-APK-release verification.
+- launchApp
+- assertVisible:
+    text: '.*'
+- waitForAnimationToEnd

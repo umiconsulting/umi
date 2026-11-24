@@ -417,17 +417,27 @@ def validate_provision_payload(payload: dict[str, Any]) -> list[str]:
     return errors
 
 
+def _csrf_headers(jar: http.cookiejar.CookieJar) -> dict[str, str]:
+    for cookie in jar:
+        if cookie.name == "umi_csrf" and cookie.value:
+            return {"x-umi-csrf": cookie.value}
+    return {}
+
+
 def _api_json(
     opener: urllib.request.OpenerDirector,
     method: str,
     url: str,
     body: dict[str, Any] | None = None,
     extra_headers: dict[str, str] | None = None,
+    jar: http.cookiejar.CookieJar | None = None,
 ) -> tuple[int, Any]:
     data = json.dumps(body).encode("utf-8") if body is not None else None
     headers = {"Accept": "application/json"}
     if data is not None:
         headers["Content-Type"] = "application/json"
+    if jar is not None and method.upper() in ("POST", "PUT", "PATCH", "DELETE"):
+        headers.update(_csrf_headers(jar))
     if extra_headers:
         headers.update(extra_headers)
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
@@ -526,7 +536,14 @@ def cmd_provision(args: argparse.Namespace) -> int:
             if status >= 400:
                 raise RuntimeError(f"MFA verify failed ({status}): {mfa_resp}")
 
-    status, created = _api_json(opener, "POST", f"{api_base}/api/merchants", payload, extra_headers)
+    status, created = _api_json(
+        opener,
+        "POST",
+        f"{api_base}/api/merchants",
+        payload,
+        extra_headers,
+        jar=jar,
+    )
     if status >= 400:
         raise RuntimeError(f"POST /api/merchants failed ({status}): {created}")
 
@@ -557,6 +574,7 @@ def cmd_provision(args: argparse.Namespace) -> int:
                         "contentType": logo_ctype,
                         "dataBase64": base64.b64encode(logo_bytes).decode("ascii"),
                     },
+                    jar=m_jar,
                 )
                 logo_result = {"status": l_status, "response": l_resp}
             else:

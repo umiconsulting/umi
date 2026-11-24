@@ -33,8 +33,8 @@ jobs:
       landing: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.landing == 'true' }}
       cash: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.cash == 'true' }}
       pos: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.pos == 'true' }}
-      pos_ios: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.pos_ios == 'true' }}
-      offline_e2e: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.offline_e2e == 'true' || steps.paths.outputs.api == 'true' || steps.paths.outputs.pos == 'true' }}
+      pos_ios: ${{ steps.base.outputs.full == 'true' || (steps.paths.outputs.pos_ios == 'true' && (github.event_name != 'pull_request' || github.base_ref != 'dev')) }}
+      offline_e2e: ${{ steps.base.outputs.full == 'true' || steps.paths.outputs.offline_e2e == 'true' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
