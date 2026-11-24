@@ -119,21 +119,15 @@ function renderContext() {
     context?.kind === 'table'
       ? 'Pagas en caja. El restaurante confirma tu pedido al enviarlo.'
       : 'Para pedir desde la mesa, escanea su QR. Puedes consultar el menú sin hacer un pedido.';
-  const name = menu
-    ? `${menu.merchantName} · ${menu.locationName ?? 'Elige una sucursal'}`
-    : 'Menú digital';
   $('#fulfillment').innerHTML =
-    `<div class="row"><span class="context-icon">${icon('table')}</span><div><div class="context-title">${escapeHTML(label)}</div><div class="context-sub">${escapeHTML(name)}</div></div></div><p class="small muted">${escapeHTML(description)}</p>`;
-  $('#mobile-context').textContent = `${label} · ${menu?.locationName ?? 'Menú digital'}`;
+    `<div class="row"><span class="context-icon">${icon('table')}</span><div><div class="context-title">${escapeHTML(label)}</div></div></div><p class="small muted">${escapeHTML(description)}</p>`;
+  $('#mobile-context').textContent = label;
   $('.brand-name').textContent = menu?.merchantName ?? 'umi';
-  $('.brand-tag').textContent = menu?.locationName ?? 'Menú digital';
-  $('.location-short').textContent = menu?.locationName ?? '';
   document.title = menu ? `${menu.merchantName} · Menú con Umi` : 'Menú con Umi';
   $('#navigation-table').textContent = label;
   $('#navigation-table').hidden = false;
   $('#menu-currency').textContent =
     `Precios en ${menu?.currency ?? 'la moneda del restaurante'}. Si tienes una alergia, consulta al personal.`;
-  $('#restaurant-footer').textContent = name;
 }
 function categories() {
   const groups = new Map([['all', 'Todo el menú']]);

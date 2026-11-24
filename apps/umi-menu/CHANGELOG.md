@@ -2,6 +2,8 @@
 
 ## 2026-11-24 — Prueba con el catálogo de staging
 
+- Texto de categorías centrado. Nombre del negocio sólo en el encabezado principal; retirada de etiquetas pequeñas repetidas.
+
 - Puente local opcional hacia las rutas públicas de la API, sin credenciales del dashboard.
 - Conservación de las respuestas reales y de los errores; sin catálogo de respaldo ni pedidos simulados.
 - Validación de ONCA, mesa T3: 64 productos, ocho con opciones, escritorio y móvil sin errores JavaScript.
