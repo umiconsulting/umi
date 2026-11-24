@@ -79,6 +79,8 @@
     "smoke:staging": "node scripts/staging-smoke.mjs",
     "smoke:staging:test": "node --test scripts/staging-smoke.spec.mjs",
     "pos:release-smoke": "bash scripts/pos-release-smoke.sh",
+    "adb:tablet": "node scripts/adb-tablet.mjs",
+    "adb:tablet:test": "node --test scripts/adb-tablet.test.mjs",
     "hooks:stats": "node scripts/hooks/report.mjs",
     "hooks:test": "node --test scripts/hooks/hooks.test.mjs"
   },
