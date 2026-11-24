@@ -589,3 +589,32 @@ textarea:focus-visible {
   align-items: center;
   text-align: center;
 }
+
+.menu-photo-placeholder {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.menu-photo-placeholder::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  background-position: center;
+  background-size: cover;
+  filter: blur(6px);
+  opacity: 0.18;
+  pointer-events: none;
+}
+.placeholder-food::before {
+  background-image: url('/files/sandwich.jpg');
+}
+.placeholder-drink::before {
+  background-image: url('/files/coffee.jpg');
+}
+.placeholder-dessert::before {
+  background-image: url('/files/cake.jpg');
+}
+.menu-photo-placeholder .icon {
+  position: relative;
+  z-index: 1;
+}

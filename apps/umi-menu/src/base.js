@@ -33,12 +33,41 @@ const photo = (item) => {
     return null;
   }
 };
-const photoPlaceholder = () =>
-  `<span class="menu-photo-placeholder" aria-hidden="true">${icon('coffee')}</span>`;
+function placeholderKind(item) {
+  const category = normalized(item?.category?.name ?? '');
+  const name = normalized(item?.name ?? '');
+  const classify = (text) => {
+    if (
+      /\b(postres?|pasteles?|cake|brownie|galletas?|cookies?|cheesecake|flan|tartas?|dulces?|panaderia|pan dulce|croissant|concha|coricos?|coyota|chocolatin|berlinesa|danesa|donas?|medialuna|oreja|peinado|rol|roll|trenza)\b/.test(
+        text,
+      )
+    )
+      return 'dessert';
+    if (
+      /\b(bebidas?|cafes?|coffee|espresso|americano|capuccino|cappuccino|latte|flatwhite|moca|mocha|matcha|chai|te|tisana|limonada|kombucha|kombu|cold brew|carajillo|aeropress|v60|origami|prensa|chocorico|jamai k|topochico|margarita|jugos?|smoothies?)\b/.test(
+        text,
+      )
+    )
+      return 'drink';
+    if (
+      /\b(comidas?|alimentos?|desayunos?|sandwich|sandwiches|panini|pizza|pepperoni|ensaladas?|hamburguesas?|burgir|bagel|huevos?|chilaquiles|omelette|tocino|sopas?|pasta|hogaza|brioche)\b/.test(
+        text,
+      )
+    )
+      return 'food';
+    return null;
+  };
+  return classify(category) ?? classify(name) ?? 'neutral';
+}
+const photoPlaceholder = (kind = 'neutral') => {
+  const icons = { food: 'pastry', drink: 'coffee', dessert: 'cake', neutral: 'bag' };
+  const type = Object.hasOwn(icons, kind) ? kind : 'neutral';
+  return `<span class="menu-photo-placeholder placeholder-${type}" aria-hidden="true">${icon(icons[type])}</span>`;
+};
 const productPhoto = (item, large = false, eager = false) =>
   photo(item)
-    ? `<img src="${escapeHTML(photo(item))}" alt="${large ? escapeHTML(item.name) : ''}" width="800" height="600" loading="${large || eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer">`
-    : photoPlaceholder();
+    ? `<img data-fallback-kind="${placeholderKind(item)}" src="${escapeHTML(photo(item))}" alt="${large ? escapeHTML(item.name) : ''}" width="800" height="600" loading="${large || eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer">`
+    : photoPlaceholder(placeholderKind(item));
 document.addEventListener(
   'error',
   (event) => {
@@ -49,7 +78,7 @@ document.addEventListener(
     )
       return;
     const placeholder = document.createElement('span');
-    placeholder.innerHTML = photoPlaceholder();
+    placeholder.innerHTML = photoPlaceholder(image.dataset.fallbackKind);
     const button = image.closest('.photo-enlarge');
     (button ?? image).replaceWith(placeholder.firstElementChild);
   },
