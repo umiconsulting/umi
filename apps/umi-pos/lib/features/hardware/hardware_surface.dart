@@ -176,6 +176,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
       appBar: widget.embedded
           ? null
           : PosHeader(
+              automaticallyImplyLeading: false,
               title: StationHeading(
                 title: widget.embedded
                     ? (widget.section == 'print'
@@ -254,9 +255,11 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
               style: PosTheme.of(context).textTheme.titleLarge,
             ),
           ),
+          const SizedBox(height: 12),
           if (widget.permissions.allows('hardware.manage'))
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: [
                 // One tap: look on the till's own USB host port, then add whatever
                 // printer answers. The cable is the configuration, so the operator
@@ -1138,6 +1141,7 @@ final class _HardwareRegistrationDialogState
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               PosSelectFormField<String>(
                 initialValue: type,
@@ -1169,12 +1173,15 @@ final class _HardwareRegistrationDialogState
                   if (type == 'printer' && link == 'terminal') link = 'network';
                 }),
               ),
+              const SizedBox(height: 8),
               PosSwitchRow(
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
                 value: simulator,
                 onChanged: (value) => setState(() => simulator = value),
                 title: Text(t('Use simulator', 'Usar simulador')),
               ),
-              if (needsLink)
+              if (needsLink) ...[
+                const SizedBox(height: 8),
                 PosSelectFormField<String>(
                   initialValue: link,
                   decoration: PosFieldDecoration(
@@ -1205,6 +1212,8 @@ final class _HardwareRegistrationDialogState
                   ],
                   onChanged: (value) => setState(() => link = value ?? link),
                 ),
+              ],
+              const SizedBox(height: 12),
               PosFormField(
                 controller: _manufacturer,
                 decoration: PosFieldDecoration(
@@ -1212,11 +1221,13 @@ final class _HardwareRegistrationDialogState
                 ),
                 validator: _required,
               ),
+              const SizedBox(height: 12),
               PosFormField(
                 controller: _model,
                 decoration: PosFieldDecoration(labelText: t('Model', 'Modelo')),
                 validator: _required,
               ),
+              const SizedBox(height: 12),
               PosFormField(
                 controller: _reference,
                 decoration: PosFieldDecoration(
@@ -1231,6 +1242,7 @@ final class _HardwareRegistrationDialogState
                       ),
               ),
               if (needsNetwork) ...[
+                const SizedBox(height: 12),
                 PosFormField(
                   controller: _host,
                   decoration: PosFieldDecoration(
@@ -1241,6 +1253,7 @@ final class _HardwareRegistrationDialogState
                       ? null
                       : t('Enter a valid host.', 'Escribe un host válido.'),
                 ),
+                const SizedBox(height: 12),
                 PosFormField(
                   controller: _port,
                   keyboardType: TextInputType.number,

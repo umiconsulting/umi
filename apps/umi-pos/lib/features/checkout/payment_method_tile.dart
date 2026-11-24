@@ -28,8 +28,11 @@ final class PaymentMethodTile extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            constraints: BoxConstraints(minHeight: compact ? 48 : 88),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            constraints: BoxConstraints(minHeight: compact ? 40 : 88),
+            padding: EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: compact ? 6 : 10,
+            ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               border: Border.all(

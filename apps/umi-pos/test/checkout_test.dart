@@ -3707,4 +3707,34 @@ void main() {
       await sheet.dispose();
     },
   );
+  testWidgets(
+    'compact portrait phone (411x731) keeps full 4-row cash keypad visible above change and charge',
+    (tester) async {
+      final sheet = await _openTenderSheet(
+        tester,
+        _CheckoutRepository(),
+        policy: CheckoutPolicy.fromJson(_policy),
+      );
+      const size = Size(411, 731);
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      await tester.pumpAndSettle();
+
+      final chargeRect = tester.getRect(
+        find.byKey(const ValueKey('checkout-charge')),
+      );
+      expect(chargeRect.bottom, lessThanOrEqualTo(size.height));
+      for (final digit in const ['1', '4', '7', '0', '.']) {
+        final keyRect = tester.getRect(find.text(digit).first);
+        expect(
+          keyRect.bottom,
+          lessThan(chargeRect.top),
+          reason:
+              'Numpad key "$digit" should stay completely visible above charge',
+        );
+      }
+      expect(tester.takeException(), isNull);
+      await sheet.dispose();
+    },
+  );
 }
