@@ -254,7 +254,7 @@ function renderReceipt() {
   if (!receipt || !menu) return;
   setDialogContent(
     '#status-dialog',
-    `<div class="dialog-top"><h2 id="status-dialog-title">Pedido recibido</h2><button class="icon-btn" data-close aria-label="Cerrar pedido recibido">${icon('x')}</button></div><div class="modal-body"><p class="order-number">${escapeHTML(receipt.reference)}</p><p>${escapeHTML(menu.merchantName)} · ${escapeHTML(menu.locationName)} · ${escapeHTML(menu.tableLabel)}</p><p>${receipt.unitCount} ${receipt.unitCount === 1 ? 'unidad' : 'unidades'} · ${escapeHTML(new Intl.NumberFormat('es-MX', { style: 'currency', currency: receipt.total.currency }).format(receipt.total.minorUnits / 100))}</p><p>El restaurante confirmó la recepción de este pedido. El pago se realiza con el personal del restaurante.</p><p class="small muted">Para conocer el avance, pedir la cuenta o hacer un cambio, consulta al personal.</p></div>`,
+    `<div class="dialog-top"><h2 id="status-dialog-title">Pedido recibido</h2><button class="icon-btn" data-close aria-label="Cerrar pedido recibido">${icon('x')}</button></div><div class="modal-body"><p class="order-number">${escapeHTML(receipt.reference)}</p><p>${escapeHTML(menu.merchantName)} · ${escapeHTML(menu.locationName)} · ${escapeHTML(menu.tableLabel)}</p><p>${receipt.unitCount} ${receipt.unitCount === 1 ? 'unidad' : 'unidades'} · ${escapeHTML(money(receipt.total.minorUnits, receipt.total.currency))}</p><p>El restaurante confirmó la recepción de este pedido. El pago se realiza con el personal del restaurante.</p><p class="small muted">Para conocer el avance, pedir la cuenta o hacer un cambio, consulta al personal.</p></div>`,
   );
 }
 function renderInfo() {

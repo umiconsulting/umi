@@ -19,10 +19,8 @@ let category = 'all',
   sending = false,
   loading = true;
 let toastTimer;
-const money = (minorUnits) =>
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: menu?.currency ?? 'MXN' }).format(
-    minorUnits / 100,
-  );
+const money = (minorUnits, currency = menu?.currency ?? 'MXN') =>
+  `${new Intl.NumberFormat('es-MX', { style: 'currency', currency, currencyDisplay: 'narrowSymbol' }).format(minorUnits / 100)} ${currency}`;
 const items = () => menu?.items ?? [];
 const quantity = () => cart.reduce((sum, line) => sum + line.quantity, 0);
 const canOrder = () => !loading && Boolean(menu) && context?.kind === 'table';

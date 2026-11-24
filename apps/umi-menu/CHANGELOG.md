@@ -1,5 +1,10 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Moneda explícita
+
+- Precios con símbolo y código de moneda, por ejemplo $50.00 MXN.
+- Formato compartido para catálogo, opciones, carrito y recibo; conserva la moneda de la API.
+
 ## 2026-11-24 — Búsqueda persistente
 
 - Buscador y categorías permanecen juntos al desplazar el catálogo.
