@@ -227,7 +227,7 @@ function productCard(item, index) {
   const allergy = item.allergens.length
     ? `Alérgenos registrados: ${item.allergens.map((a) => escapeHTML(a.label ?? a.name ?? a.code)).join(', ')}. Consulta al personal.`
     : 'Consulta al personal si tienes una alergia.';
-  return `<article class="menu-product product-card" data-product="${item.productId}" aria-label="${name}"><div class="product-card-inner"><div class="product-card-front"><button class="product-card-open" type="button" data-flip-product aria-expanded="false" aria-controls="details-${item.productId}" aria-label="Ver detalles de ${name}">${productPhoto(item, false, index < 2)}<span class="menu-product-name">${name}</span>${availability ? `<span class="small muted card-availability">${escapeHTML(availability)}</span>` : ''}</button><div class="product-card-footer"><span class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</span>${productAddButton(item)}</div></div><div class="product-card-back" id="details-${item.productId}" aria-hidden="true" inert><button class="card-back-button secondary" type="button" data-unflip-product>Volver</button><div class="product-card-details" tabindex="0" role="region" aria-label="Detalles de ${name}"><h3>${name}</h3><p class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</p>${item.category ? `<p class="small muted">${escapeHTML(item.category.name)}</p>` : ''}<p>${escapeHTML(item.description || 'Este producto no tiene una descripción registrada.')}</p>${availability ? `<p class="small">${escapeHTML(availability)}</p>` : ''}${groups}<p class="small muted">${allergy}</p></div><div class="product-card-footer">${item.availability === 'enabled' && !item.hasVariants && context?.kind === 'table' ? `<button class="card-customize secondary" type="button" data-customize-product="${item.productId}" ${canAddProduct(item) ? '' : 'disabled'}>${item.optionGroups.length ? 'Elegir opciones' : 'Personalizar'}</button>` : `<span class="small muted">${context?.kind === 'table' ? 'Consulta al personal.' : 'Escanea el QR para pedir.'}</span>`}${productAddButton(item)}</div></div></div></article>`;
+  return `<article class="menu-product product-card" data-product="${item.productId}" aria-label="${name}"><div class="product-card-inner"><div class="product-card-front"><button class="product-card-open" type="button" data-flip-product aria-expanded="false" aria-controls="details-${item.productId}" aria-label="Ver detalles de ${name}">${productPhoto(item, false, index < 2)}<span class="menu-product-name">${name}</span>${availability ? `<span class="small muted card-availability">${escapeHTML(availability)}</span>` : ''}</button><div class="product-card-footer"><span class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</span>${productAddButton(item)}</div></div><div class="product-card-back" id="details-${item.productId}" aria-hidden="true" role="group" tabindex="0" aria-label="Detalles de ${name}. Pulsa Enter o Escape para volver." inert><div class="product-card-details" tabindex="0" role="region" aria-label="Detalles de ${name}"><h3>${name}</h3><p class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</p>${item.category ? `<p class="small muted">${escapeHTML(item.category.name)}</p>` : ''}<p>${escapeHTML(item.description || 'Este producto no tiene una descripción registrada.')}</p>${availability ? `<p class="small">${escapeHTML(availability)}</p>` : ''}${groups}<p class="small muted">${allergy}</p></div><div class="product-card-footer">${item.availability === 'enabled' && !item.hasVariants && context?.kind === 'table' ? `<button class="card-customize secondary" type="button" data-customize-product="${item.productId}" ${canAddProduct(item) ? '' : 'disabled'}>${item.optionGroups.length ? 'Elegir opciones' : 'Personalizar'}</button>` : `<span class="small muted">${context?.kind === 'table' ? '' : 'Escanea el QR para pedir.'}</span>`}${productAddButton(item)}</div></div></div></article>`;
 }
 function flipProductCard(card, flipped) {
   card.classList.toggle('is-flipped', flipped);
@@ -239,7 +239,7 @@ function flipProductCard(card, flipped) {
   front.setAttribute('aria-hidden', String(flipped));
   back.setAttribute('aria-hidden', String(!flipped));
   opener.setAttribute('aria-expanded', String(flipped));
-  (flipped ? card.querySelector('[data-unflip-product]') : opener).focus({ preventScroll: true });
+  (flipped ? back : opener).focus({ preventScroll: true });
 }
 function syncProductAddButtons() {
   document.querySelectorAll('[data-add-product],[data-customize-product]').forEach((button) => {
@@ -287,7 +287,10 @@ function renderProducts() {
     .querySelectorAll('[data-product]')
     .forEach((card) => {
       card.querySelector('[data-flip-product]').onclick = () => flipProductCard(card, true);
-      card.querySelector('[data-unflip-product]').onclick = () => flipProductCard(card, false);
+      card.querySelector('.product-card-back').onclick = (event) => {
+        if (!event.target.closest('button,input,textarea,select,a,label'))
+          flipProductCard(card, false);
+      };
       card.querySelectorAll('[data-add-product]').forEach((button) => {
         button.onclick = () => addProductFromCard(button.dataset.addProduct);
       });
@@ -297,7 +300,11 @@ function renderProducts() {
           openProduct(event.currentTarget.dataset.customizeProduct),
         );
       card.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && card.classList.contains('is-flipped')) {
+        if (
+          (event.key === 'Escape' ||
+            (event.key === 'Enter' && event.target === card.querySelector('.product-card-back'))) &&
+          card.classList.contains('is-flipped')
+        ) {
           event.preventDefault();
           flipProductCard(card, false);
         }

@@ -619,6 +619,11 @@ textarea:focus-visible {
   z-index: 1;
 }
 
+.search input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
 .product-card {
   perspective: 1000px;
   overflow: visible;
@@ -685,17 +690,13 @@ textarea:focus-visible {
   background: var(--canvas);
 }
 .product-card-back {
+  cursor: pointer;
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
   transform: rotateY(180deg);
   padding-top: 12px;
-}
-.card-back-button {
-  align-self: flex-start;
-  margin: 0 16px 8px;
-  min-height: 44px;
 }
 .product-card-details {
   min-height: 0;
@@ -737,13 +738,6 @@ textarea:focus-visible {
     font-size: 12px;
   }
 }
-
-.search input[type='search']::-webkit-search-cancel-button {
-  -webkit-appearance: none;
-  appearance: none;
-  display: none;
-}
-
 .placeholder-neutral::before {
   background-image: url('/files/toast.jpg');
 }

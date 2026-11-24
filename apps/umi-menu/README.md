@@ -81,8 +81,11 @@ La API anterior puede omitir fotos y categorías; la interfaz conserva el respal
 
 - Productos, categorías, fotografías HTTPS, precios y opciones provienen de la API.
 - La búsqueda ofrece un botón para borrar consultas sin resultados y anuncia el conteo de productos.
+- Sin foto real se usa un fondo ilustrativo difuminado y un icono según categoría o nombre. Los productos sin tipo reconocido usan una imagen genérica desenfocada.
 - Las fotos reservan espacio y tienen respaldo si fallan; las primeras tarjetas cargan sin demora diferida.
 - Los controles principales tienen objetivos táctiles de 44 píxeles y foco visible.
+- Las tarjetas giran para mostrar detalles completos. El botón + agrega una unidad o abre las opciones del producto.
+- La cara posterior admite desplazamiento, retorno al pulsar el reverso o Escape y movimiento reducido.
 - La búsqueda admite acentos. El detalle muestra opciones obligatorias y límites de selección.
 - Los productos con variantes requieren al personal: el contrato de pedidos aún no expresa una variante.
 - Sin QR válido, el menú permite consultar productos y sucursales.

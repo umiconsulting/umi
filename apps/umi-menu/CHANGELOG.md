@@ -2,6 +2,9 @@
 
 ## 2026-11-24 — Prueba con el catálogo de staging
 
+- Tarjetas con giro para leer descripción, precio, opciones y alérgenos. Botón + para agregar o elegir opciones; retorno al pulsar el reverso o Escape.
+- Movimiento reducido respetado y cara oculta sin controles interactivos. Una sola equis para borrar la búsqueda.
+- Fondos ilustrativos tenues y difuminados para comida, bebida y postre cuando falta la foto real; icono visible por tipo. Se reutilizan recursos existentes.
 - Texto de categorías centrado. Nombre del negocio sólo en el encabezado principal; retirada de etiquetas pequeñas repetidas.
 
 - Puente local opcional hacia las rutas públicas de la API, sin credenciales del dashboard.
