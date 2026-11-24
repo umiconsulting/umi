@@ -1,5 +1,11 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Imagen del reverso
+
+- Imagen nítida en el reverso, con los recursos existentes por categoría.
+- Etiqueta «Imagen ilustrativa» cuando el producto no tiene fotografía propia.
+- La tarjeta conserva sus dimensiones y el frente conserva el desenfoque.
+
 ## 2026-11-24 — Fondo de peces
 
 - Patrón SVG estático con peces de trazo azul tenue sobre el fondo del menú.
