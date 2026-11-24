@@ -717,10 +717,6 @@ textarea:focus-visible {
 .card-option-summary ul {
   padding-left: 18px;
 }
-.card-customize {
-  min-height: 44px;
-  white-space: normal;
-}
 @media (prefers-reduced-motion: reduce) {
   .product-card-inner {
     transition: none;
@@ -732,10 +728,6 @@ textarea:focus-visible {
   }
   .product-card-open .menu-product-name {
     padding: 12px 10px 0;
-  }
-  .card-customize {
-    padding: 6px;
-    font-size: 12px;
   }
 }
 .placeholder-neutral::before {
@@ -770,4 +762,8 @@ textarea:focus-visible {
 .cart-line .line-price {
   margin-left: auto;
   white-space: nowrap;
+}
+
+.product-card-back .product-card-footer {
+  justify-content: flex-end;
 }

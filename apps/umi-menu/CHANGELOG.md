@@ -4,7 +4,7 @@
 
 - Carrito con columna de imagen de 54 píxeles, separación de 14 píxeles y contenido flexible para evitar solapes.
 
-- Modal obligatorio al agregar productos con variantes u opciones. Agregado directo para productos simples.
+- El botón + abre siempre el modal antes de agregar. Se retiran los botones redundantes de personalización y elección de opciones.
 - Precio estimado y separación de líneas por variante, con el nombre elegido en el carrito.
 - Validación y precio del servidor; snapshot de la variante para preparación y recepción en POS.
 - Lectura por lote de variantes con la misma disponibilidad del catálogo; sin consultas por cada producto.
