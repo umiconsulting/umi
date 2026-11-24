@@ -472,7 +472,6 @@ final class SqliteLocalDatabase implements LocalDatabase, LocalWorkingCopy {
       whereArgs: [partition.key, filterKey],
       limit: 1,
     );
-    if (pages.isEmpty) return null;
     final meta = await database.query(
       'catalog_partitions',
       where: 'partition_key = ?',
@@ -480,8 +479,67 @@ final class SqliteLocalDatabase implements LocalDatabase, LocalWorkingCopy {
       limit: 1,
     );
     if (meta.isEmpty) return null;
-    final pageVersion = pages.first['catalog_version'] as String?;
     final currentVersion = meta.first['catalog_version'] as String;
+    if (pages.isEmpty) {
+      if ((categoryId == null && (search == null || search.trim().isEmpty)) ||
+          barcode != null) {
+        return null;
+      }
+      final rootPages = await database.query(
+        'catalog_pages',
+        where: 'partition_key = ? AND filter_key = ?',
+        whereArgs: [partition.key, _filterKey()],
+        limit: 1,
+      );
+      if (rootPages.isEmpty ||
+          (rootPages.first['catalog_version'] as String?) != currentVersion) {
+        return null;
+      }
+      final categories = await database.query(
+        'catalog_categories',
+        where: 'partition_key = ? AND deleted_at IS NULL',
+        whereArgs: [partition.key],
+        orderBy: 'display_order, category_id',
+      );
+      final whereParts = <String>['partition_key = ?', 'deleted_at IS NULL'];
+      final whereArgs = <Object?>[partition.key];
+      if (categoryId != null) {
+        whereParts.add('category_id = ?');
+        whereArgs.add(categoryId);
+      }
+      final normalizedSearch = search?.trim().toLowerCase();
+      if (normalizedSearch != null && normalizedSearch.isNotEmpty) {
+        whereParts.add('search_text LIKE ?');
+        whereArgs.add('%$normalizedSearch%');
+      }
+      final derivedProducts = await database.query(
+        'catalog_products',
+        columns: ['payload_json'],
+        where: whereParts.join(' AND '),
+        whereArgs: whereArgs,
+        orderBy: 'product_name COLLATE NOCASE, product_id',
+      );
+      return LocalCatalogSnapshot(
+        categories: categories
+            .map(
+              (row) => CatalogCategory.fromJson(
+                _decodeObject(row['payload_json'] as String),
+              ),
+            )
+            .toList(growable: false),
+        products: derivedProducts
+            .map(
+              (row) => CatalogProductSummary.fromJson(
+                _decodeObject(row['payload_json'] as String),
+              ),
+            )
+            .toList(growable: false),
+        catalogVersion: currentVersion,
+        updatedAt: meta.first['updated_at'] as String,
+        nextCursor: null,
+      );
+    }
+    final pageVersion = pages.first['catalog_version'] as String?;
     if (pageVersion != currentVersion) return null;
     final categories = await database.query(
       'catalog_categories',

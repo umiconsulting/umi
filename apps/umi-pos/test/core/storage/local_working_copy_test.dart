@@ -252,34 +252,39 @@ void main() {
     },
   );
 
-  test('derived search pages are bounded while the canonical catalog stays', () async {
-    await database.writeCategories(_scope, _categories());
-    await database.writeCatalogPage(
-      _scope,
-      _page([_product('root', name: 'Root')]),
-    );
-    for (var index = 0; index < 30; index++) {
+  test(
+    'derived search pages are bounded while the canonical catalog stays',
+    () async {
+      await database.writeCategories(_scope, _categories());
       await database.writeCatalogPage(
         _scope,
-        _page([_product('search-$index', name: 'Search $index')]),
-        search: 'term$index',
+        _page([_product('root', name: 'Root')]),
       );
-    }
+      for (var index = 0; index < 30; index++) {
+        await database.writeCatalogPage(
+          _scope,
+          _page([_product('search-$index', name: 'Search $index')]),
+          search: 'term$index',
+        );
+      }
 
-    await database.close();
-    final raw = await databaseFactoryFfi.openDatabase(databasePath);
-    final countRow = await raw.rawQuery('SELECT COUNT(*) AS n FROM catalog_pages');
-    final count = countRow.first['n'] as int;
-    await raw.close();
-    database = SqliteLocalDatabase(
-      factory: databaseFactoryFfi,
-      path: databasePath,
-    );
-    await database.initialize();
+      await database.close();
+      final raw = await databaseFactoryFfi.openDatabase(databasePath);
+      final countRow = await raw.rawQuery(
+        'SELECT COUNT(*) AS n FROM catalog_pages',
+      );
+      final count = countRow.first['n'] as int;
+      await raw.close();
+      database = SqliteLocalDatabase(
+        factory: databaseFactoryFfi,
+        path: databasePath,
+      );
+      await database.initialize();
 
-    expect(count, lessThanOrEqualTo(21));
-    expect((await database.readCatalog(_scope))!.products, isNotEmpty);
-  });
+      expect(count, lessThanOrEqualTo(21));
+      expect((await database.readCatalog(_scope))!.products, isNotEmpty);
+    },
+  );
 
   test(
     'a replacement page updates rows without blanking the last answer',
@@ -356,4 +361,37 @@ void main() {
       {'role': 'main'},
     );
   });
+
+  test(
+    'offline category and search filter derive from cached root catalog when page was not fetched',
+    () async {
+      await database.writeCategories(_scope, _categories());
+      await database.writeCatalogPage(
+        _scope,
+        _page([
+          _product('americano', name: 'Americano', categoryId: 'drinks'),
+          _product('latte', name: 'Latte', categoryId: 'drinks'),
+          _product('pan', name: 'Pan de caja', categoryId: 'food'),
+        ]),
+      );
+
+      final drinks = await database.readCatalogPage(
+        _scope,
+        categoryId: 'drinks',
+      );
+      expect(drinks, isNotNull);
+      expect(drinks!.products.map((product) => product.id), [
+        'americano',
+        'latte',
+      ]);
+
+      final search = await database.readCatalogPage(
+        _scope,
+        categoryId: 'food',
+        search: 'pan',
+      );
+      expect(search, isNotNull);
+      expect(search!.products.map((product) => product.id), ['pan']);
+    },
+  );
 }

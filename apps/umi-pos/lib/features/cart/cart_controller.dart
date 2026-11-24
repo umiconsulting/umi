@@ -1085,8 +1085,8 @@ final class CartController extends ChangeNotifier {
             line: provisional,
             quantity: quantity,
             courseNumber: courseNumber,
-            variant: variantId == null ? null : {'variantId': variantId},
-            modifiers: modifiers,
+            variant: provisional.variant,
+            modifiers: provisional.modifiers,
             note: cleanNote,
           ),
         )) {
@@ -1102,6 +1102,8 @@ final class CartController extends ChangeNotifier {
               line: provisional,
               quantity: quantity,
               courseNumber: courseNumber,
+              variant: provisional.variant,
+              modifiers: provisional.modifiers,
               note: cleanNote,
             )
           : null,
@@ -1178,6 +1180,8 @@ final class CartController extends ChangeNotifier {
         unitMinorUnits: (price.unitPrice['minorUnits'] as num?)?.toInt() ?? 0,
         currency: price.unitPrice['currency'] as String? ?? 'MXN',
         taxRateBasisPoints: price.taxRateBasisPoints,
+        variant: item.variant,
+        modifiers: item.modifiers,
       ),
     );
   }
