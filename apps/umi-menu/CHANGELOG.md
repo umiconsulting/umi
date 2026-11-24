@@ -1,5 +1,11 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Filtros del catálogo
+
+- Categorías publicadas de la API con prioridad; clasificación visual por tipo cuando faltan todas.
+- Filtros con cantidades, búsqueda dentro de la categoría y navegación de teclado.
+- Verificación con 64 productos reales, sin pedidos y sin desbordamiento móvil.
+
 ## 2026-11-24 — Jerarquía y lectura del menú
 
 - Retirada de los textos auxiliares del reverso; se conserva únicamente la acción +.

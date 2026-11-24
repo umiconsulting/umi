@@ -225,6 +225,8 @@ async function loadCurrentMenu() {
   closeDialogs();
   menu = null;
   $('#products').innerHTML = '';
+  $('#products').removeAttribute('aria-labelledby');
+  $('#products').setAttribute('aria-label', 'Productos del menú');
   $('.categories').innerHTML = '';
   $('#menu-status').innerHTML = '<p role="status">Cargando el menú del restaurante…</p>';
   renderCart();

@@ -195,11 +195,35 @@ function renderContext() {
   $('#menu-currency').textContent =
     `Precios en ${menu?.currency ?? 'la moneda del restaurante'}. Si tienes una alergia, consulta al personal.`;
 }
+const menuTypeGroups = [
+  { id: 'type-drink', name: 'Bebidas', kind: 'drink' },
+  { id: 'type-food', name: 'Comida', kind: 'food' },
+  { id: 'type-dessert', name: 'Postres y panadería', kind: 'dessert' },
+  { id: 'type-other', name: 'Otros', kind: 'neutral' },
+];
+function productCategory(item, hasPublishedCategories) {
+  if (hasPublishedCategories)
+    return item.category ?? { id: 'uncategorized', name: 'Sin categoría' };
+  return menuTypeGroups.find((group) => group.kind === placeholderKind(item));
+}
 function categories() {
-  const groups = new Map([['all', 'Todo el menú']]);
-  for (const item of items())
-    if (item.category?.id) groups.set(item.category.id, item.category.name);
-  return [...groups].map(([id, name]) => ({ id, name }));
+  const published = items().some((item) => item.category?.id);
+  const groups = new Map();
+  for (const item of items()) {
+    const group = productCategory(item, published);
+    const existing = groups.get(group.id);
+    groups.set(group.id, { id: group.id, name: group.name, count: (existing?.count ?? 0) + 1 });
+  }
+  const ordered = published
+    ? [...groups.values()].sort((a, b) =>
+        a.id === 'uncategorized'
+          ? 1
+          : b.id === 'uncategorized'
+            ? -1
+            : a.name.localeCompare(b.name, 'es'),
+      )
+    : menuTypeGroups.filter((group) => groups.has(group.id)).map((group) => groups.get(group.id));
+  return [{ id: 'all', name: 'Todo el menú', count: items().length }, ...ordered];
 }
 function renderCategories() {
   const groups = categories();
@@ -207,19 +231,39 @@ function renderCategories() {
   $('.categories').innerHTML = groups
     .map(
       (group) =>
-        `<button class="category" role="tab" aria-selected="${group.id === category}" type="button" data-category="${escapeHTML(group.id)}">${escapeHTML(group.name)}</button>`,
+        `<button class="category" id="filter-${group.id}" role="tab" aria-selected="${group.id === category}" aria-controls="products" tabindex="${group.id === category ? '0' : '-1'}" type="button" data-category="${group.id}"><span>${escapeHTML(group.name)}</span><span class="category-count">${group.count}</span></button>`,
     )
     .join('');
+  const activate = (id) => {
+    category = id;
+    renderCategories();
+    renderProducts();
+    const active = $(`[data-category="${category}"]`);
+    active.focus({ preventScroll: true });
+    active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  };
   $('.categories')
     .querySelectorAll('button')
-    .forEach((button) => {
-      button.onclick = () => {
-        category = button.dataset.category;
-        renderCategories();
-        renderProducts();
-        $(`[data-category="${category}"]`).focus();
+    .forEach((button, index) => {
+      button.onclick = () => activate(button.dataset.category);
+      button.onkeydown = (event) => {
+        const next =
+          event.key === 'ArrowRight'
+            ? (index + 1) % groups.length
+            : event.key === 'ArrowLeft'
+              ? (index + groups.length - 1) % groups.length
+              : event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                  ? groups.length - 1
+                  : null;
+        if (next === null) return;
+        event.preventDefault();
+        activate(groups[next].id);
       };
     });
+  $('#products').setAttribute('role', 'tabpanel');
+  $('#products').setAttribute('aria-labelledby', `filter-${category}`);
 }
 function normalized(value) {
   return value
@@ -303,9 +347,10 @@ function addProductFromCard(id) {
 }
 function renderProducts() {
   if (context?.kind === 'browse' && !menu?.locationId) return;
+  const published = items().some((item) => item.category?.id);
   const list = items().filter(
     (item) =>
-      (category === 'all' || item.category?.id === category) &&
+      (category === 'all' || productCategory(item, published).id === category) &&
       normalized(`${item.name} ${item.description ?? ''}`).includes(normalized(search)),
   );
   $('#category-title').textContent = search

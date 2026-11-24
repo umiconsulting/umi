@@ -1025,3 +1025,32 @@ textarea:focus-visible {
 .product-card:hover {
   border-color: var(--line);
 }
+
+.categories {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 3px 3px 8px;
+  scrollbar-width: thin;
+}
+.category {
+  flex: 0 0 auto;
+  flex-direction: row;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+.category-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.category[aria-selected='true'] {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.category[aria-selected='true'] .category-count {
+  color: var(--blue);
+}
