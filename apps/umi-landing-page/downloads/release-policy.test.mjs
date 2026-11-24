@@ -10,11 +10,12 @@ import {
   verifySignerOutput,
   verifyApiBytes,
 } from './release-policy.mjs';
+const nextVersionCode = base.versionCode + 1;
 const next = {
   ...base,
-  versionCode: 338,
-  objectPrefix: 'umipos/android/338',
-  artifactFile: 'UmiPOS-1.0.0-production-release-build338.apk',
+  versionCode: nextVersionCode,
+  objectPrefix: `umipos/android/${nextVersionCode}`,
+  artifactFile: `UmiPOS-${base.versionName}-production-release-build${nextVersionCode}.apk`,
 };
 const accepted = {
   schemaVersion: 1,

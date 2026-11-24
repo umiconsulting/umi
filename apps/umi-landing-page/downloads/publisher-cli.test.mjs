@@ -82,7 +82,7 @@ console.log('Deployment complete! https://'+(branch==='main'?'5678abcd':'1234abc
           env: {
             ...process.env,
             PATH: `${join(dir, 'bin')}:${process.env.PATH}`,
-            RELEASE_TAG: 'umipos-android-337',
+            RELEASE_TAG: `umipos-android-${base.versionCode}`,
             RELEASE_COMMIT: base.sourceCommit,
             TEST_LIVE_STATE: state,
             TEST_DEPLOY_LOG: log,
@@ -106,7 +106,7 @@ console.log('Deployment complete! https://'+(branch==='main'?'5678abcd':'1234abc
       const deployments = readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse);
       assert.deepEqual(
         deployments.map((args) => args[args.indexOf('--branch') + 1]),
-        ['release-337', 'main'],
+        [`release-${base.versionCode}`, 'main'],
       );
       assert.equal(
         JSON.parse(readFileSync(state, 'utf8')).downloadOrigin,

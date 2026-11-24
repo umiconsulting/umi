@@ -2,8 +2,11 @@
 import { useEffect, useState } from 'react';
 import { ArrowDownToLine, Smartphone, ArrowUpRight } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
+import fallbackRelease from '@/data/umipos-release.json';
 import { isDownloadRelease, type Release } from '@/lib/umipos-release';
 import styles from './downloads.module.css';
+
+const FALLBACK_URL = `${fallbackRelease.downloadOrigin}/${fallbackRelease.objectPrefix}/${fallbackRelease.artifactFile}`;
 
 export default function DownloadContent() {
   const [release, setRelease] = useState<Release | null>(null);
@@ -58,11 +61,13 @@ export default function DownloadContent() {
             <h2 className={styles.requirements}>Android 7.0+ · ARM64</h2>
             <noscript>
               <style>{'#download-state { display: none; }'}</style>
-              <h3 className={styles.version}>Versión de respaldo · Build 337</h3>
+              <h3 className={styles.version}>
+                Versión de respaldo · Build {fallbackRelease.versionCode}
+              </h3>
               <a
                 className={styles.download}
-                href="https://dea44d87.umi-pos-downloads.pages.dev/umipos/android/337/UmiPOS-1.0.0-production-release-build337.apk"
-                download="UmiPOS-1.0.0-production-release-build337.apk"
+                href={FALLBACK_URL}
+                download={fallbackRelease.artifactFile}
               >
                 Descargar APK
               </a>

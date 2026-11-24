@@ -2,11 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import base from '../src/data/umipos-release.json' with { type: 'json' };
 import { publishAccepted } from './publisher-core.mjs';
+const nextVersionCode = base.versionCode + 1;
+const newerVersionCode = base.versionCode + 2;
 const next = {
   ...base,
-  versionCode: 338,
-  objectPrefix: 'umipos/android/338',
-  artifactFile: 'UmiPOS-1.0.0-production-release-build338.apk',
+  versionCode: nextVersionCode,
+  objectPrefix: `umipos/android/${nextVersionCode}`,
+  artifactFile: `UmiPOS-${base.versionName}-production-release-build${nextVersionCode}.apk`,
 };
 const acceptance = {
   schemaVersion: 1,
@@ -32,7 +34,7 @@ function fixture(changes = {}) {
   const options = {
     release: next,
     acceptance,
-    tag: 'umipos-android-338',
+    tag: `umipos-android-${nextVersionCode}`,
     commit: next.sourceCommit,
     current: async () => {
       calls.push('current');
@@ -67,7 +69,7 @@ test('verifies immutable APK before promotion and confirms the new public pointe
   assert.deepEqual(calls, [
     'current',
     'authenticate-binary',
-    'deploy:release-338',
+    `deploy:release-${nextVersionCode}`,
     `verify:${immutable}`,
     'set-pointer',
     'current',
@@ -97,9 +99,9 @@ test('downgrade and conflicting identities cannot deploy', async () => {
   for (const current of [
     {
       ...next,
-      versionCode: 339,
-      objectPrefix: 'umipos/android/339',
-      artifactFile: 'UmiPOS-1.0.0-production-release-build339.apk',
+      versionCode: newerVersionCode,
+      objectPrefix: `umipos/android/${newerVersionCode}`,
+      artifactFile: `UmiPOS-${base.versionName}-production-release-build${newerVersionCode}.apk`,
     },
     { ...next, sha256: '0'.repeat(64) },
   ]) {
@@ -110,7 +112,7 @@ test('downgrade and conflicting identities cannot deploy', async () => {
 });
 test('tag, source or acceptance mismatch stops before network and preparation', async () => {
   for (const change of [
-    { tag: 'umipos-android-339' },
+    { tag: `umipos-android-${newerVersionCode}` },
     { commit: '0'.repeat(40) },
     { acceptance: { ...acceptance, apkSha256: '0'.repeat(64) } },
   ]) {
@@ -142,9 +144,9 @@ test('a newer release appearing before promotion prevents downgrade', async () =
   let reads = 0;
   const newer = {
     ...next,
-    versionCode: 339,
-    objectPrefix: 'umipos/android/339',
-    artifactFile: 'UmiPOS-1.0.0-production-release-build339.apk',
+    versionCode: newerVersionCode,
+    objectPrefix: `umipos/android/${newerVersionCode}`,
+    artifactFile: `UmiPOS-${base.versionName}-production-release-build${newerVersionCode}.apk`,
   };
   const { calls, options } = fixture({ current: async () => (++reads === 1 ? base : newer) });
   await assert.rejects(publishAccepted(options), /downgrade/);
