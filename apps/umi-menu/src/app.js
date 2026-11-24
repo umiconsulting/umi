@@ -86,6 +86,7 @@ function renderCart() {
   }
   $('#mobile-total').textContent = canOrder() && sum !== null ? money(sum) : '';
   if ($('#cart-dialog').open) renderCartDialog();
+  syncProductAddButtons();
 }
 function renderCartDialog() {
   $('#cart-dialog').innerHTML =

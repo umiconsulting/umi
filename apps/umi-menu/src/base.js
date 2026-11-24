@@ -209,6 +209,63 @@ function clearMenuSearch() {
   renderProducts();
   $('#search').focus();
 }
+function canAddProduct(item) {
+  return canOrder() && !pending && !sending && item.availability === 'enabled' && !item.hasVariants;
+}
+function productAddButton(item) {
+  return `<button class="product-add icon-btn" type="button" data-add-product="${item.productId}" aria-label="Agregar ${escapeHTML(item.name)} al carrito" ${canAddProduct(item) ? '' : 'disabled'}>${icon('plus')}</button>`;
+}
+function productCard(item, index) {
+  const name = escapeHTML(item.name);
+  const availability = availabilityLabel(item);
+  const groups = item.optionGroups
+    .map(
+      (group) =>
+        `<div class="card-option-summary"><strong>${escapeHTML(group.name)}</strong><p class="small muted">${group.minSelect ? `Mínimo ${group.minSelect}` : 'Opcional'}${group.maxSelect ? ` · Máximo ${group.maxSelect}` : ''}</p><ul>${group.modifiers.map((modifier) => `<li>${escapeHTML(modifier.name)}${modifier.priceDelta.minorUnits ? ` · ${escapeHTML(money(modifier.priceDelta.minorUnits))}` : ''}</li>`).join('')}</ul></div>`,
+    )
+    .join('');
+  const allergy = item.allergens.length
+    ? `Alérgenos registrados: ${item.allergens.map((a) => escapeHTML(a.label ?? a.name ?? a.code)).join(', ')}. Consulta al personal.`
+    : 'Consulta al personal si tienes una alergia.';
+  return `<article class="menu-product product-card" data-product="${item.productId}" aria-label="${name}"><div class="product-card-inner"><div class="product-card-front"><button class="product-card-open" type="button" data-flip-product aria-expanded="false" aria-controls="details-${item.productId}" aria-label="Ver detalles de ${name}">${productPhoto(item, false, index < 2)}<span class="menu-product-name">${name}</span>${availability ? `<span class="small muted card-availability">${escapeHTML(availability)}</span>` : ''}</button><div class="product-card-footer"><span class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</span>${productAddButton(item)}</div></div><div class="product-card-back" id="details-${item.productId}" aria-hidden="true" inert><button class="card-back-button secondary" type="button" data-unflip-product>Volver</button><div class="product-card-details" tabindex="0" role="region" aria-label="Detalles de ${name}"><h3>${name}</h3><p class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</p>${item.category ? `<p class="small muted">${escapeHTML(item.category.name)}</p>` : ''}<p>${escapeHTML(item.description || 'Este producto no tiene una descripción registrada.')}</p>${availability ? `<p class="small">${escapeHTML(availability)}</p>` : ''}${groups}<p class="small muted">${allergy}</p></div><div class="product-card-footer">${item.availability === 'enabled' && !item.hasVariants && context?.kind === 'table' ? `<button class="card-customize secondary" type="button" data-customize-product="${item.productId}" ${canAddProduct(item) ? '' : 'disabled'}>${item.optionGroups.length ? 'Elegir opciones' : 'Personalizar'}</button>` : `<span class="small muted">${context?.kind === 'table' ? 'Consulta al personal.' : 'Escanea el QR para pedir.'}</span>`}${productAddButton(item)}</div></div></div></article>`;
+}
+function flipProductCard(card, flipped) {
+  card.classList.toggle('is-flipped', flipped);
+  const front = card.querySelector('.product-card-front');
+  const back = card.querySelector('.product-card-back');
+  const opener = card.querySelector('[data-flip-product]');
+  front.inert = flipped;
+  back.inert = !flipped;
+  front.setAttribute('aria-hidden', String(flipped));
+  back.setAttribute('aria-hidden', String(!flipped));
+  opener.setAttribute('aria-expanded', String(flipped));
+  (flipped ? card.querySelector('[data-unflip-product]') : opener).focus({ preventScroll: true });
+}
+function syncProductAddButtons() {
+  document.querySelectorAll('[data-add-product],[data-customize-product]').forEach((button) => {
+    const id = button.dataset.addProduct ?? button.dataset.customizeProduct;
+    const item = items().find((item) => item.productId === id);
+    button.disabled = !item || !canAddProduct(item);
+  });
+}
+function addProductFromCard(id) {
+  const item = items().find((item) => item.productId === id);
+  if (!item || !canAddProduct(item)) return;
+  if (item.optionGroups.length) {
+    openProduct(id);
+    return;
+  }
+  try {
+    const line = { productId: id, quantity: 1, modifiers: [], note: null };
+    MenuState.validateLine(items(), line);
+    cart = MenuState.addLine(cart, line);
+    saveState();
+    renderCart();
+    notify('Agregado a tu pedido.');
+  } catch (error) {
+    notify(error.message);
+  }
+}
 function renderProducts() {
   if (context?.kind === 'browse' && !menu?.locationId) return;
   const list = items().filter(
@@ -221,15 +278,30 @@ function renderProducts() {
     : (categories().find((group) => group.id === category)?.name ?? 'Menú');
   $('#result-count').textContent = `${list.length} ${list.length === 1 ? 'producto' : 'productos'}`;
   $('#products').innerHTML = list.length
-    ? `<div class="product-grid">${list.map((item, index) => `<button type="button" class="menu-product" data-product="${escapeHTML(item.productId)}" aria-label="Ver ${escapeHTML(item.name)}, ${escapeHTML(money(item.price.minorUnits))}">${productPhoto(item, false, index < 2)}<span class="menu-product-name">${escapeHTML(item.name)}</span><span class="menu-product-price">${escapeHTML(money(item.price.minorUnits))}</span>${availabilityLabel(item) ? `<span class="small muted">${escapeHTML(availabilityLabel(item))}</span>` : ''}</button>`).join('')}</div>`
+    ? `<div class="product-grid">${list.map(productCard).join('')}</div>`
     : search.trim()
       ? `<div class="empty-results"><h3>No encontramos «${escapeHTML(search.trim())}»</h3><p>Prueba otro nombre o borra la búsqueda para ver los productos de esta categoría.</p><button class="secondary" id="reset-search">Borrar búsqueda</button></div>`
       : '<div class="empty-results"><h3>Sin productos disponibles</h3><p>Revisa otra categoría o consulta al personal.</p></div>';
   $('#reset-search')?.addEventListener('click', clearMenuSearch);
   $('#products')
     .querySelectorAll('[data-product]')
-    .forEach((button) => {
-      button.onclick = () => openProduct(button.dataset.product);
+    .forEach((card) => {
+      card.querySelector('[data-flip-product]').onclick = () => flipProductCard(card, true);
+      card.querySelector('[data-unflip-product]').onclick = () => flipProductCard(card, false);
+      card.querySelectorAll('[data-add-product]').forEach((button) => {
+        button.onclick = () => addProductFromCard(button.dataset.addProduct);
+      });
+      card
+        .querySelector('[data-customize-product]')
+        ?.addEventListener('click', (event) =>
+          openProduct(event.currentTarget.dataset.customizeProduct),
+        );
+      card.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && card.classList.contains('is-flipped')) {
+          event.preventDefault();
+          flipProductCard(card, false);
+        }
+      });
     });
 }
 function selectedLine() {

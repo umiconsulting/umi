@@ -618,3 +618,122 @@ textarea:focus-visible {
   position: relative;
   z-index: 1;
 }
+
+.product-card {
+  perspective: 1000px;
+  overflow: visible;
+}
+.product-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 360ms ease;
+}
+.product-card.is-flipped .product-card-inner {
+  transform: rotateY(180deg);
+}
+.product-card-front,
+.product-card-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 8px;
+  background: var(--white);
+}
+.product-card-front {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  overflow: hidden;
+}
+.product-card-open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+.product-card-open .menu-product-name {
+  padding: 16px 16px 0;
+  margin: 0;
+}
+.card-availability {
+  padding: 8px 16px 0;
+}
+.product-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+}
+.product-card-footer .menu-product-price {
+  margin: 0;
+  padding: 0;
+}
+.product-add {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  background: var(--canvas);
+}
+.product-card-back {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  transform: rotateY(180deg);
+  padding-top: 12px;
+}
+.card-back-button {
+  align-self: flex-start;
+  margin: 0 16px 8px;
+  min-height: 44px;
+}
+.product-card-details {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px;
+  overflow-wrap: anywhere;
+}
+.product-card-details h3 {
+  font-size: 18px;
+  margin: 8px 0;
+}
+.product-card-details p,
+.card-option-summary {
+  margin: 10px 0;
+}
+.card-option-summary ul {
+  padding-left: 18px;
+}
+.card-customize {
+  min-height: 44px;
+  white-space: normal;
+}
+@media (prefers-reduced-motion: reduce) {
+  .product-card-inner {
+    transition: none;
+  }
+}
+@media (max-width: 480px) {
+  .product-card-footer {
+    padding: 10px;
+  }
+  .product-card-open .menu-product-name {
+    padding: 12px 10px 0;
+  }
+  .card-customize {
+    padding: 6px;
+    font-size: 12px;
+  }
+}
