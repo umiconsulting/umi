@@ -1,5 +1,12 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Revisión y navegación
+
+- Aviso de pago con el personal en el carrito, confirmación y recibo.
+- Resumen antes del envío con cantidades, variantes, extras, indicaciones y precios estimados.
+- Categorías visibles al desplazar el catálogo y disponibilidad destacada en tarjetas.
+- Aviso previo cuando faltan presentaciones disponibles.
+
 ## 2026-11-24 — Botón de agregado
 
 - Texto y precio centrados en el botón, incluso cuando falta el precio por una selección pendiente.

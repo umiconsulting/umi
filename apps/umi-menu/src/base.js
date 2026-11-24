@@ -183,7 +183,7 @@ function renderContext() {
   const label = context?.kind === 'table' && menu ? menu.tableLabel : 'Consulta del menú';
   const description =
     context?.kind === 'table'
-      ? 'Pagas en caja. El restaurante confirma tu pedido al enviarlo.'
+      ? 'El pago se realiza con el personal del restaurante. El restaurante confirma tu pedido al enviarlo.'
       : 'Para pedir desde la mesa, escanea su QR. Puedes consultar el menú sin hacer un pedido.';
   $('#fulfillment').innerHTML =
     `<div class="row"><span class="context-icon">${icon('table')}</span><div><div class="context-title">${escapeHTML(label)}</div></div></div><p class="small muted">${escapeHTML(description)}</p>`;
@@ -272,7 +272,10 @@ function normalized(value) {
     .toLowerCase();
 }
 function availabilityLabel(item) {
-  if (item.hasVariants && item.availability === 'enabled') return 'Elige una presentación';
+  if (item.hasVariants && item.availability === 'enabled')
+    return item.variants?.some((variant) => variant.availability === 'enabled')
+      ? 'Elige una presentación'
+      : 'Presentaciones no disponibles';
   return (
     {
       enabled: '',

@@ -36,7 +36,8 @@ function cartMarkup() {
     .join('');
   return (
     (cart.length
-      ? `<button class="cart-clear secondary" type="button" data-clear-cart ${pending || sending ? 'disabled' : ''}>Vaciar carrito</button>` + lines +
+      ? `<button class="cart-clear secondary" type="button" data-clear-cart ${pending || sending ? 'disabled' : ''}>Vaciar carrito</button>` +
+        lines +
         `<div class="subtotal"><span>Total estimado</span><strong>${valid ? money(sum) : 'Por revisar'}</strong></div>`
       : '<div class="cart-empty"><div class="bag-drawing">' +
         icon('bag') +
@@ -44,7 +45,7 @@ function cartMarkup() {
     (pending
       ? '<p class="pending-notice" role="status">Hay un envío pendiente de comprobar. Reintenta el mismo pedido antes de cambiar productos.</p>'
       : '') +
-    `<button class="primary" data-checkout ${sending || (!pending && (!cart.length || !valid)) ? 'disabled' : ''}>${sending ? 'Comprobando envío…' : pending ? 'Comprobar envío pendiente' : 'Revisar mi pedido'} ${icon('arrow')}</button><p class="cart-footnote">${icon('card')}Pagas en caja. El restaurante calcula el importe final.</p>`
+    `<button class="primary" data-checkout ${sending || (!pending && (!cart.length || !valid)) ? 'disabled' : ''}>${sending ? 'Comprobando envío…' : pending ? 'Comprobar envío pendiente' : 'Revisar mi pedido'} ${icon('arrow')}</button><p class="cart-footnote">${icon('card')}El pago se realiza con el personal del restaurante. El restaurante calcula el importe final.</p>`
   );
 }
 function bindCart(root) {
@@ -162,6 +163,25 @@ function renderCartDialog() {
   bindCart($('#cart-dialog'));
 }
 
+function checkoutSummary() {
+  return `<ul class="checkout-summary">${cart
+    .map((line) => {
+      const item = items().find((product) => product.productId === line.productId);
+      const variant = item?.variants?.find((choice) => choice.id === line.variantId)?.name;
+      const modifiers =
+        item?.optionGroups
+          .flatMap((group) => group.modifiers)
+          .filter((modifier) => line.modifiers.some((choice) => choice.modifierId === modifier.id))
+          .map((modifier) => modifier.name) ?? [];
+      const details = [variant, ...modifiers].filter(Boolean).join(' · ');
+      let price = 'Por revisar';
+      try {
+        price = money(MenuState.priceLine(items(), line));
+      } catch {}
+      return `<li><div><strong>${line.quantity} × ${escapeHTML(item?.name ?? 'Producto no disponible')}</strong>${details ? `<p>${escapeHTML(details)}</p>` : ''}${line.note ? `<p>Indicaciones: ${escapeHTML(line.note)}</p>` : ''}</div><span>${escapeHTML(price)}</span></li>`;
+    })
+    .join('')}</ul>`;
+}
 function openCheckout() {
   if (!canOrder() || sending || !cart.length) return;
   try {
@@ -172,7 +192,7 @@ function openCheckout() {
   }
   setDialogContent(
     '#checkout-dialog',
-    `<div class="dialog-top"><h2 id="checkout-dialog-title">${pending ? 'Comprobar envío pendiente' : 'Confirmar pedido'}</h2><button class="icon-btn" data-close aria-label="Cerrar confirmación">${icon('x')}</button></div><div class="modal-body"><p>${escapeHTML(menu.merchantName)} · ${escapeHTML(menu.locationName)} · ${escapeHTML(menu.tableLabel)}</p><p>${pending ? 'Se enviará exactamente la misma solicitud, con la misma clave de envío. El restaurante devuelve la confirmación si ya recibió el pedido.' : 'El importe del carrito es una estimación. El restaurante verifica disponibilidad, opciones y precios al recibir el pedido. Pagas en caja.'}</p><p id="checkout-error" role="alert"></p><button class="primary" id="place-order">${pending ? 'Comprobar el mismo envío' : 'Enviar pedido a mi mesa'}</button></div>`,
+    `<div class="dialog-top"><h2 id="checkout-dialog-title">${pending ? 'Comprobar envío pendiente' : 'Confirmar pedido'}</h2><button class="icon-btn" data-close aria-label="Cerrar confirmación">${icon('x')}</button></div><div class="modal-body"><p>${escapeHTML(menu.merchantName)} · ${escapeHTML(menu.locationName)} · ${escapeHTML(menu.tableLabel)}</p><p>${pending ? 'Se enviará exactamente la misma solicitud, con la misma clave de envío. El restaurante devuelve la confirmación si ya recibió el pedido.' : 'El importe del carrito es una estimación. El restaurante verifica disponibilidad, opciones y precios al recibir el pedido. El pago se realiza con el personal del restaurante.'}</p>${checkoutSummary()}<p class="small muted">Revisa los productos y cierra esta ventana si necesitas cambiar tu pedido.</p><p id="checkout-error" role="alert"></p><button class="primary" id="place-order">${pending ? 'Comprobar el mismo envío' : 'Enviar pedido a mi mesa'}</button></div>`,
   );
   $('#place-order').onclick = submitOrder;
   showDialog('#checkout-dialog');
@@ -234,7 +254,7 @@ function renderReceipt() {
   if (!receipt || !menu) return;
   setDialogContent(
     '#status-dialog',
-    `<div class="dialog-top"><h2 id="status-dialog-title">Pedido recibido</h2><button class="icon-btn" data-close aria-label="Cerrar pedido recibido">${icon('x')}</button></div><div class="modal-body"><p class="order-number">${escapeHTML(receipt.reference)}</p><p>${escapeHTML(menu.merchantName)} · ${escapeHTML(menu.locationName)} · ${escapeHTML(menu.tableLabel)}</p><p>${receipt.unitCount} ${receipt.unitCount === 1 ? 'unidad' : 'unidades'} · ${escapeHTML(new Intl.NumberFormat('es-MX', { style: 'currency', currency: receipt.total.currency }).format(receipt.total.minorUnits / 100))}</p><p>El restaurante confirmó la recepción de este pedido. Pagas en caja.</p><p class="small muted">Para conocer el avance, pedir la cuenta o hacer un cambio, consulta al personal.</p></div>`,
+    `<div class="dialog-top"><h2 id="status-dialog-title">Pedido recibido</h2><button class="icon-btn" data-close aria-label="Cerrar pedido recibido">${icon('x')}</button></div><div class="modal-body"><p class="order-number">${escapeHTML(receipt.reference)}</p><p>${escapeHTML(menu.merchantName)} · ${escapeHTML(menu.locationName)} · ${escapeHTML(menu.tableLabel)}</p><p>${receipt.unitCount} ${receipt.unitCount === 1 ? 'unidad' : 'unidades'} · ${escapeHTML(new Intl.NumberFormat('es-MX', { style: 'currency', currency: receipt.total.currency }).format(receipt.total.minorUnits / 100))}</p><p>El restaurante confirmó la recepción de este pedido. El pago se realiza con el personal del restaurante.</p><p class="small muted">Para conocer el avance, pedir la cuenta o hacer un cambio, consulta al personal.</p></div>`,
   );
 }
 function renderInfo() {
