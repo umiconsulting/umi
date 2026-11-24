@@ -1,5 +1,9 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Título principal
+
+- Título principal actualizado a «MENU DIGITAL».
+
 ## 2026-11-24 — Vaciar carrito
 
 - Botón para vaciar el carrito en escritorio y en el diálogo móvil.
