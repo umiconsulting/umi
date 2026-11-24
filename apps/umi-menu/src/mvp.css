@@ -1098,3 +1098,5 @@ body {
 @media (max-width: 480px) {
   .card-detail-photo { flex-basis: 90px; height: 90px; }
 }
+
+.cart-clear { display: block; margin: 0 0 12px auto; min-height: 44px; }

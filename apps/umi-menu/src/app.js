@@ -36,7 +36,7 @@ function cartMarkup() {
     .join('');
   return (
     (cart.length
-      ? lines +
+      ? `<button class="cart-clear secondary" type="button" data-clear-cart ${pending || sending ? 'disabled' : ''}>Vaciar carrito</button>` + lines +
         `<div class="subtotal"><span>Total estimado</span><strong>${valid ? money(sum) : 'Por revisar'}</strong></div>`
       : '<div class="cart-empty"><div class="bag-drawing">' +
         icon('bag') +
@@ -48,6 +48,37 @@ function cartMarkup() {
   );
 }
 function bindCart(root) {
+  root.querySelectorAll('[data-clear-cart]').forEach((button) => {
+    button.onclick = () => {
+      if (pending || sending || !cart.length) return;
+      const removed = structuredClone(cart);
+      cart = [];
+      saveState();
+      renderCart();
+      notify('Carrito vacío.', {
+        label: 'Deshacer',
+        run: () => {
+          if (pending || sending || !canOrder()) {
+            notify('Termina la comprobación del envío antes de cambiar el pedido.');
+            return;
+          }
+          try {
+            let restored = cart;
+            removed.forEach((line) => {
+              MenuState.validateLine(items(), line);
+              restored = MenuState.addLine(restored, line);
+            });
+            cart = restored;
+            saveState();
+            renderCart();
+            notify('Carrito recuperado.');
+          } catch (error) {
+            notify(error.message);
+          }
+        },
+      });
+    };
+  });
   root.querySelectorAll('[data-qty]').forEach((button) => {
     button.onclick = () => {
       if (pending || sending) return;

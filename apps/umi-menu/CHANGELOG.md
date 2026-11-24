@@ -1,5 +1,11 @@
 # Bitácora de Umi Menu
 
+## 2026-11-24 — Vaciar carrito
+
+- Botón para vaciar el carrito en escritorio y en el diálogo móvil.
+- Opción Deshacer con validación de los productos antes de restaurarlos.
+- Acción bloqueada durante el envío o la comprobación pendiente.
+
 ## 2026-11-24 — Imagen del reverso
 
 - Imagen nítida en el reverso, con los recursos existentes por categoría.
