@@ -14,7 +14,10 @@ function enableProductPhoto(item) {
   image.replaceWith(button);
   button.append(image);
   button.onclick = () => {
-    photoDialog.innerHTML = `<div class="photo-viewer-top"><h2 id="photo-title">${escapeHTML(item.name)}</h2><button class="icon-btn" data-close aria-label="Cerrar foto ampliada">${icon('x')}</button></div>${productPhoto(item, true)}`;
+    setDialogContent(
+      photoDialog,
+      `<div class="photo-viewer-top"><h2 id="photo-title">${escapeHTML(item.name)}</h2><button class="icon-btn" data-close aria-label="Cerrar foto ampliada">${icon('x')}</button></div>${productPhoto(item, true)}`,
+    );
     photoDialog.showModal();
   };
 }

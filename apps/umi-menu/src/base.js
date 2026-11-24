@@ -84,11 +84,48 @@ document.addEventListener(
   },
   true,
 );
-function notify(message) {
-  $('#toast').textContent = message;
-  $('#toast').classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => $('#toast').classList.remove('show'), 5000);
+function notify(message, action) {
+  const toast = $('#toast');
+  const activeDialog = [...document.querySelectorAll('dialog[open]')].at(-1);
+  (activeDialog ?? document.body).append(toast);
+  toast.replaceChildren(document.createTextNode(message));
+  toast.inert = false;
+  toast.classList.add('show');
+  toast.style.pointerEvents = action ? 'auto' : 'none';
+  const hide = () => {
+    toast.classList.remove('show');
+    toast.inert = true;
+    toast.style.pointerEvents = 'none';
+  };
+  const schedule = () => {
+    clearTimeout(toastTimer);
+    if (!toast.contains(document.activeElement))
+      toastTimer = setTimeout(hide, action ? 10000 : 5000);
+  };
+  toast.onpointerenter = () => clearTimeout(toastTimer);
+  toast.onpointerleave = schedule;
+  toast.onfocusin = () => clearTimeout(toastTimer);
+  toast.onfocusout = schedule;
+  if (action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = action.label;
+    button.onclick = () => {
+      clearTimeout(toastTimer);
+      hide();
+      action.run();
+    };
+    toast.append(button);
+  }
+  schedule();
+}
+function setDialogContent(target, markup) {
+  const dialog = typeof target === 'string' ? $(target) : target;
+  const toast = $('#toast');
+  const containsToast = toast && dialog.contains(toast);
+  if (containsToast) document.body.append(toast);
+  dialog.innerHTML = markup;
+  if (containsToast && dialog.open && toast.classList.contains('show')) dialog.append(toast);
 }
 function showDialog(id) {
   if (!$(id).open) $(id).showModal();
@@ -213,7 +250,7 @@ function canAddProduct(item) {
   return canOrder() && !pending && !sending && item.availability === 'enabled';
 }
 function productAddButton(item) {
-  return `<button class="product-add icon-btn" type="button" data-add-product="${item.productId}" aria-label="Agregar ${escapeHTML(item.name)} al carrito" ${canAddProduct(item) ? '' : 'disabled'}>${icon('plus')}</button>`;
+  return `<button class="product-add icon-btn" type="button" data-add-product="${item.productId}" aria-label="Agregar ${escapeHTML(item.name)} al carrito" aria-haspopup="dialog" ${loading || !menu ? 'disabled' : ''}>${icon('plus')}</button>`;
 }
 function productCard(item, index) {
   const name = escapeHTML(item.name);
@@ -316,8 +353,10 @@ function openProduct(id) {
   selectedQty = 1;
   const item = selectedProduct;
   const editable = canOrder() && !pending && !sending && item.availability === 'enabled';
-  $('#product-dialog').innerHTML =
-    `<div class="modal-photo">${productPhoto(item, true)}<button class="icon-btn" data-close aria-label="Cerrar producto">${icon('x')}</button></div><div class="modal-body"><h2 id="product-dialog-title">${escapeHTML(item.name)}</h2><p class="description">${escapeHTML(item.description ?? '')}</p>${item.allergens.length ? `<p class="small">Alérgenos registrados: ${item.allergens.map((a) => escapeHTML(a.label ?? a.name ?? a.code)).join(', ')}. Consulta al personal.</p>` : '<p class="small muted">Consulta al personal si tienes una alergia.</p>'}${availabilityLabel(item) ? `<p>${escapeHTML(availabilityLabel(item))}</p>` : ''}${item.hasVariants ? variantChoices(item, editable) : ''}${item.optionGroups.map((group) => `<fieldset class="option-group" data-option-group="${group.id}" ${editable ? '' : 'disabled'}><legend>${escapeHTML(group.name)} <span class="optional">${group.minSelect ? `Mínimo ${group.minSelect}` : 'Opcional'}${group.maxSelect ? ` · Máximo ${group.maxSelect}` : ''}</span></legend>${group.minSelect === 0 && group.maxSelect === 1 ? `<label class="option-row"><input type="radio" name="group-${group.id}" checked><span>Sin extra</span></label>` : ''}${group.modifiers.map((modifier) => `<label class="option-row"><input type="${group.maxSelect === 1 ? 'radio' : 'checkbox'}" name="group-${group.id}" data-modifier="${modifier.id}"><span>${escapeHTML(modifier.name)}</span><span>${modifier.priceDelta.minorUnits ? `+${escapeHTML(money(modifier.priceDelta.minorUnits))}` : 'Incluida'}</span></label>`).join('')}</fieldset>`).join('')}${editable ? '<div class="note-field"><label class="field-label" for="product-note">Indicaciones <span class="optional">Opcional</span></label><textarea class="field" id="product-note" maxlength="500" placeholder="Por ejemplo: sin azúcar."></textarea></div>' : ''}<p class="small" id="product-error" role="status"></p></div><div class="modal-actions">${editable ? `<div class="stepper"><button type="button" id="product-minus" aria-label="Reducir cantidad">${icon('minus')}</button><span id="product-quantity">1</span><button type="button" id="product-plus" aria-label="Aumentar cantidad">${icon('plus')}</button></div><button class="primary" id="add-to-cart"><span>Agregar al pedido</span><span id="product-total"></span></button>` : `<p class="small">${pending ? 'Comprueba primero el envío pendiente.' : context?.kind === 'table' ? 'Consulta al personal para pedir este producto.' : 'Escanea el QR de tu mesa para hacer un pedido.'}</p>`}</div>`;
+  setDialogContent(
+    '#product-dialog',
+    `<div class="modal-photo">${productPhoto(item, true)}<button class="icon-btn" data-close aria-label="Cerrar producto">${icon('x')}</button></div><div class="modal-body"><h2 id="product-dialog-title">${escapeHTML(item.name)}</h2><p class="description">${escapeHTML(item.description ?? '')}</p>${item.allergens.length ? `<p class="small">Alérgenos registrados: ${item.allergens.map((a) => escapeHTML(a.label ?? a.name ?? a.code)).join(', ')}. Consulta al personal.</p>` : '<p class="small muted">Consulta al personal si tienes una alergia.</p>'}${availabilityLabel(item) ? `<p>${escapeHTML(availabilityLabel(item))}</p>` : ''}${item.hasVariants ? variantChoices(item, editable) : ''}${item.optionGroups.map((group) => `<fieldset class="option-group" data-option-group="${group.id}" ${editable ? '' : 'disabled'}><legend>${escapeHTML(group.name)} <span class="optional">${group.minSelect ? `Mínimo ${group.minSelect}` : 'Opcional'}${group.maxSelect ? ` · Máximo ${group.maxSelect}` : ''}</span></legend>${group.minSelect === 0 && group.maxSelect === 1 ? `<label class="option-row"><input type="radio" name="group-${group.id}" checked><span>Sin extra</span></label>` : ''}${group.modifiers.map((modifier) => `<label class="option-row"><input type="${group.maxSelect === 1 ? 'radio' : 'checkbox'}" name="group-${group.id}" data-modifier="${modifier.id}"><span>${escapeHTML(modifier.name)}</span><span>${modifier.priceDelta.minorUnits ? `+${escapeHTML(money(modifier.priceDelta.minorUnits))}` : 'Incluida'}</span></label>`).join('')}</fieldset>`).join('')}${editable ? '<div class="note-field"><label class="field-label" for="product-note">Indicaciones <span class="optional">Opcional</span></label><textarea class="field" id="product-note" maxlength="500" placeholder="Por ejemplo: sin azúcar."></textarea></div>' : ''}<p class="small" id="product-error" role="status"></p></div><div class="modal-actions">${editable ? `<div class="stepper"><button type="button" id="product-minus" aria-label="Reducir cantidad">${icon('minus')}</button><span id="product-quantity">1</span><button type="button" id="product-plus" aria-label="Aumentar cantidad">${icon('plus')}</button></div><button class="primary" id="add-to-cart"><span>Agregar al pedido</span><span id="product-total"></span></button>` : `<p class="small">${pending ? 'Comprueba primero el envío pendiente.' : context?.kind === 'table' ? 'Consulta al personal para pedir este producto.' : 'Escanea el QR de tu mesa para hacer un pedido.'}</p>`}</div>`,
+  );
   if (editable) {
     $('#product-minus').onclick = () => {
       selectedQty = Math.max(1, selectedQty - 1);

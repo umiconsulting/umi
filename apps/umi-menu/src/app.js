@@ -31,7 +31,7 @@ function cartMarkup() {
           .map((modifier) => modifier.name) ?? [];
       const variantName = item?.variants?.find((variant) => variant.id === line.variantId)?.name;
       if (variantName) names.unshift(variantName);
-      return `<div class="cart-line">${item ? productPhoto(item) : ''}<div class="cart-line-content"><div class="line-title">${escapeHTML(item?.name ?? 'Producto no disponible')}</div><div class="line-options">${escapeHTML(names.join(' · '))}</div>${line.note ? `<div class="line-options">${escapeHTML(line.note)}</div>` : ''}<div class="line-bottom"><div class="stepper"><button data-qty="${index}" data-delta="-1" aria-label="Quitar una unidad de ${escapeHTML(item?.name ?? 'producto')}" ${pending || sending ? 'disabled' : ''}>${icon('minus')}</button><span>${escapeHTML(line.quantity)}</span><button data-qty="${index}" data-delta="1" aria-label="Añadir una unidad de ${escapeHTML(item?.name ?? 'producto')}" ${pending || sending || line.quantity >= 50 ? 'disabled' : ''}>${icon('plus')}</button></div><span class="line-price">${escapeHTML(linePrice)}</span></div></div></div>`;
+      return `<div class="cart-line">${item ? productPhoto(item) : ''}<div class="cart-line-content"><div class="cart-line-heading"><div class="line-title">${escapeHTML(item?.name ?? 'Producto no disponible')}</div><button class="cart-remove" type="button" data-remove-line="${index}" aria-label="Quitar ${escapeHTML(item?.name ?? 'producto')} del pedido" title="Quitar producto" ${pending || sending ? 'disabled' : ''}>${icon('x')}</button></div><div class="line-options">${escapeHTML(names.join(' · '))}</div>${line.note ? `<div class="line-options">${escapeHTML(line.note)}</div>` : ''}<div class="line-bottom"><div class="stepper"><button data-qty="${index}" data-delta="-1" aria-label="Quitar una unidad de ${escapeHTML(item?.name ?? 'producto')}" ${pending || sending ? 'disabled' : ''}>${icon('minus')}</button><span>${escapeHTML(line.quantity)}</span><button data-qty="${index}" data-delta="1" aria-label="Añadir una unidad de ${escapeHTML(item?.name ?? 'producto')}" ${pending || sending || line.quantity >= 50 ? 'disabled' : ''}>${icon('plus')}</button></div><span class="line-price">${escapeHTML(linePrice)}</span></div></div></div>`;
     })
     .join('');
   return (
@@ -59,6 +59,35 @@ function bindCart(root) {
       renderCart();
     };
   });
+  root.querySelectorAll('[data-remove-line]').forEach((button) => {
+    button.onclick = () => {
+      if (pending || sending) return;
+      const index = Number(button.dataset.removeLine);
+      const removed = cart[index];
+      if (!removed) return;
+      cart = cart.filter((_, i) => i !== index);
+      saveState();
+      renderCart();
+      notify('Producto quitado.', {
+        label: 'Deshacer',
+        run: () => {
+          if (pending || sending || !canOrder()) {
+            notify('Termina la comprobación del envío antes de cambiar el pedido.');
+            return;
+          }
+          try {
+            MenuState.validateLine(items(), removed);
+            cart = MenuState.addLine(cart, removed);
+            saveState();
+            renderCart();
+            notify('Producto recuperado.');
+          } catch (error) {
+            notify(error.message);
+          }
+        },
+      });
+    };
+  });
   root.querySelectorAll('[data-checkout]').forEach((button) => {
     button.onclick = openCheckout;
   });
@@ -76,6 +105,10 @@ function renderCart() {
       : '';
   $('#cart-content').innerHTML = cartMarkup() + last;
   $('#cart-count').textContent = quantity();
+  $('#cart-count').setAttribute(
+    'aria-label',
+    `${quantity()} ${quantity() === 1 ? 'unidad' : 'unidades'}`,
+  );
   bindCart($('#cart-content'));
   $('#mobile-count').textContent = quantity();
   $('#mobile-label').textContent =
@@ -91,10 +124,13 @@ function renderCart() {
   syncProductAddButtons();
 }
 function renderCartDialog() {
-  $('#cart-dialog').innerHTML =
-    `<div class="dialog-top"><h2 id="cart-dialog-title">Tu pedido</h2><button class="icon-btn" data-close aria-label="Cerrar pedido">${icon('x')}</button></div><div class="modal-body">${cartMarkup()}${receipt ? '<button class="secondary order-link" data-view-order>Ver último pedido recibido</button>' : ''}</div>`;
+  setDialogContent(
+    '#cart-dialog',
+    `<div class="dialog-top"><h2 id="cart-dialog-title">Tu pedido</h2><button class="icon-btn" data-close aria-label="Cerrar pedido">${icon('x')}</button></div><div class="modal-body">${cartMarkup()}${receipt ? '<button class="secondary order-link" data-view-order>Ver último pedido recibido</button>' : ''}</div>`,
+  );
   bindCart($('#cart-dialog'));
 }
+
 function openCheckout() {
   if (!canOrder() || sending || !cart.length) return;
   try {
@@ -103,8 +139,10 @@ function openCheckout() {
     notify(error.message);
     return;
   }
-  $('#checkout-dialog').innerHTML =
-    `<div class="dialog-top"><h2 id="checkout-dialog-title">${pending ? 'Comprobar envío pendiente' : 'Confirmar pedido'}</h2><button class="icon-btn" data-close aria-label="Cerrar confirmación">${icon('x')}</button></div><div class="modal-body"><p>${escapeHTML(menu.merchantName)} · ${escapeHTML(menu.locationName)} · ${escapeHTML(menu.tableLabel)}</p><p>${pending ? 'Se enviará exactamente la misma solicitud, con la misma clave de envío. El restaurante devuelve la confirmación si ya recibió el pedido.' : 'El importe del carrito es una estimación. El restaurante verifica disponibilidad, opciones y precios al recibir el pedido. Pagas en caja.'}</p><p id="checkout-error" role="alert"></p><button class="primary" id="place-order">${pending ? 'Comprobar el mismo envío' : 'Enviar pedido a mi mesa'}</button></div>`;
+  setDialogContent(
+    '#checkout-dialog',
+    `<div class="dialog-top"><h2 id="checkout-dialog-title">${pending ? 'Comprobar envío pendiente' : 'Confirmar pedido'}</h2><button class="icon-btn" data-close aria-label="Cerrar confirmación">${icon('x')}</button></div><div class="modal-body"><p>${escapeHTML(menu.merchantName)} · ${escapeHTML(menu.locationName)} · ${escapeHTML(menu.tableLabel)}</p><p>${pending ? 'Se enviará exactamente la misma solicitud, con la misma clave de envío. El restaurante devuelve la confirmación si ya recibió el pedido.' : 'El importe del carrito es una estimación. El restaurante verifica disponibilidad, opciones y precios al recibir el pedido. Pagas en caja.'}</p><p id="checkout-error" role="alert"></p><button class="primary" id="place-order">${pending ? 'Comprobar el mismo envío' : 'Enviar pedido a mi mesa'}</button></div>`,
+  );
   $('#place-order').onclick = submitOrder;
   showDialog('#checkout-dialog');
 }
@@ -163,8 +201,10 @@ async function sendPendingOrder() {
 }
 function renderReceipt() {
   if (!receipt || !menu) return;
-  $('#status-dialog').innerHTML =
-    `<div class="dialog-top"><h2 id="status-dialog-title">Pedido recibido</h2><button class="icon-btn" data-close aria-label="Cerrar pedido recibido">${icon('x')}</button></div><div class="modal-body"><p class="order-number">${escapeHTML(receipt.reference)}</p><p>${escapeHTML(menu.merchantName)} · ${escapeHTML(menu.locationName)} · ${escapeHTML(menu.tableLabel)}</p><p>${receipt.unitCount} ${receipt.unitCount === 1 ? 'unidad' : 'unidades'} · ${escapeHTML(new Intl.NumberFormat('es-MX', { style: 'currency', currency: receipt.total.currency }).format(receipt.total.minorUnits / 100))}</p><p>El restaurante confirmó la recepción de este pedido. Pagas en caja.</p><p class="small muted">Para conocer el avance, pedir la cuenta o hacer un cambio, consulta al personal.</p></div>`;
+  setDialogContent(
+    '#status-dialog',
+    `<div class="dialog-top"><h2 id="status-dialog-title">Pedido recibido</h2><button class="icon-btn" data-close aria-label="Cerrar pedido recibido">${icon('x')}</button></div><div class="modal-body"><p class="order-number">${escapeHTML(receipt.reference)}</p><p>${escapeHTML(menu.merchantName)} · ${escapeHTML(menu.locationName)} · ${escapeHTML(menu.tableLabel)}</p><p>${receipt.unitCount} ${receipt.unitCount === 1 ? 'unidad' : 'unidades'} · ${escapeHTML(new Intl.NumberFormat('es-MX', { style: 'currency', currency: receipt.total.currency }).format(receipt.total.minorUnits / 100))}</p><p>El restaurante confirmó la recepción de este pedido. Pagas en caja.</p><p class="small muted">Para conocer el avance, pedir la cuenta o hacer un cambio, consulta al personal.</p></div>`,
+  );
 }
 function renderInfo() {
   $('#info-dialog .modal-body').innerHTML =

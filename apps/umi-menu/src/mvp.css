@@ -767,3 +767,83 @@ textarea:focus-visible {
 .product-card-back .product-card-footer {
   justify-content: flex-end;
 }
+
+:root {
+  --muted: #536078;
+}
+
+.menu-product-name {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.cart-line-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+}
+.cart-line .line-title {
+  flex: 1;
+  padding-top: 8px;
+  font-size: 15px;
+}
+.cart-remove {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  margin: -4px -8px -8px 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.cart-remove .icon {
+  width: 16px;
+  height: 16px;
+}
+.cart-line .line-options,
+.cart-footnote {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.toast {
+  white-space: normal;
+}
+.toast button {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.toast button:focus-visible {
+  outline-color: white;
+}
+
+@media (max-width: 480px) {
+  .menu-product-name {
+    font-size: 16px;
+  }
+}
+
+.product-card-open .menu-product-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.modal-body h2 {
+  overflow-wrap: anywhere;
+}
